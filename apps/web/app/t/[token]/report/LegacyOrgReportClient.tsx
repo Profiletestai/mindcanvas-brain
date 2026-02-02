@@ -8,7 +8,6 @@ import jsPDF from "jspdf";
 
 import PersonalityMapSection from "./PersonalityMapSection";
 
-import { getBaseUrl } from "@/lib/server-url";
 import { getOrgFramework, type OrgFramework } from "@/lib/report/getOrgFramework";
 import AppBackground from "@/components/ui/AppBackground";
 
@@ -53,11 +52,6 @@ type ResultData = {
 type ResultAPI = { ok: boolean; data?: ResultData; error?: string };
 
 // ---------- helpers --------------------------------------------------------
-
-function formatPercent(v: number | undefined): string {
-  if (!v || Number.isNaN(v)) return "0%";
-  return `${Math.round(v * 100)}%`;
-}
 
 function getFullName(taker: ResultData["taker"]): string {
   const rawFirst =
@@ -203,7 +197,6 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
   const [loading, setLoading] = useState(true);
   const [resultData, setResultData] = useState<ResultData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [base, setBase] = useState<string | null>(null);
 
   const [redirecting, setRedirecting] = useState(false);
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -213,7 +206,6 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
 
     const element = reportRef.current;
 
-    // capture from top like LEAD (prevents weird partial captures)
     const prevScroll = window.scrollY;
     window.scrollTo(0, 0);
 
@@ -258,26 +250,26 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
 
     async function load() {
       try {
-        const b = await getBaseUrl();
-        if (cancelled) return;
-        setBase(b);
-
         if (!tid) {
           setLoadError("Missing tid");
           setLoading(false);
           return;
         }
 
-        const resultUrl = `${b}/api/public/test/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
-          tid
-        )}`;
+        // ✅ Always fetch relative to current origin (fixes prod base-url issues)
+        // ✅ Use unified report endpoint
+        const resultUrl = `/api/public/test/${encodeURIComponent(
+          token
+        )}/report?tid=${encodeURIComponent(tid)}`;
 
         const res = await fetch(resultUrl, { cache: "no-store" });
         const ct = res.headers.get("content-type") ?? "";
+
         if (!ct.includes("application/json")) {
           const text = await res.text();
           throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 200)}`);
         }
+
         const json = (await res.json()) as ResultAPI;
 
         if (!res.ok || json.ok === false || !json.data) {
@@ -315,15 +307,15 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     window.location.assign(redirectUrl);
   }, [resultData]);
 
-  // QSC redirect if needed – client-side using the error
+  // QSC redirect if needed – client-side using the error (relative URLs)
   useEffect(() => {
     async function maybeRedirectQSC() {
-      if (!loadError || !base) return;
+      if (!loadError) return;
       if (!loadError.toLowerCase().includes("labels_missing_for_test_frequency")) return;
 
       let variant = "entrepreneur";
       try {
-        const metaRes = await fetch(`${base}/api/public/test/${encodeURIComponent(token)}`, {
+        const metaRes = await fetch(`/api/public/test/${encodeURIComponent(token)}`, {
           cache: "no-store",
         });
         const metaJson = (await metaRes.json().catch(() => null as any)) as any;
@@ -347,7 +339,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     }
 
     maybeRedirectQSC();
-  }, [loadError, base, token, tid, router]);
+  }, [loadError, token, tid, router]);
 
   if (!tid) {
     return (
@@ -371,10 +363,15 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
           <AppBackground />
           <main className="relative z-10 mx-auto max-w-4xl p-6 space-y-4">
             <h1 className="text-2xl font-semibold">Personalised report</h1>
-            <p className="text-sm text-red-400">Could not load your report. Please refresh or contact support.</p>
+            <p className="text-sm text-red-400">
+              Could not load your report. Please refresh or contact support.
+            </p>
+
             <details className="mt-4 rounded-lg border border-slate-700 bg-slate-950 p-4 text-xs text-slate-50">
               <summary className="cursor-pointer font-medium">Debug information (for developer)</summary>
               <div className="mt-2 space-y-2">
+                <div>Token: {token}</div>
+                <div>Taker ID (tid): {tid}</div>
                 <div>Error: {loadError ?? "Unknown"}</div>
               </div>
             </details>
@@ -436,11 +433,9 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
   const orgAssets = getOrgAssets(orgSlug, orgName);
   const isTeamPuzzle = isTeamPuzzleOrg(orgSlug, orgName);
 
-  // link next steps button
   const nextStepsUrl = (data.link?.next_steps_url || "").trim();
   const hasNextSteps = !!nextStepsUrl;
 
-  // --- framework + copy ----------------------------------------------------
   const orgFw: OrgFramework = getOrgFramework(orgSlug);
   const fw = orgFw.framework;
   const reportCopy: OrgReportCopy | null = (fw as any)?.report ?? null;
@@ -488,8 +483,6 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     "For example, you’re likely to be the person who brings energy to the room, helps others stay engaged, and keeps people moving toward a shared goal.";
 
   const topProfileImage = isTeamPuzzle && primary?.name ? getTeamPuzzleProfileImage(primary.name) : null;
-
-  // ---------- RENDER -------------------------------------------------------
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
@@ -563,7 +556,6 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
               <h2 className="text-lg font-semibold text-slate-900">{welcomeTitle}</h2>
               <p className="mt-1 text-sm font-medium text-slate-500">A note from the creator of this framework.</p>
 
-              {/* UPDATED: founder image now stacks below the letter (not beside it) */}
               <div className="mt-4 flex flex-col gap-6">
                 <div className="space-y-3 text-sm leading-relaxed text-slate-700">
                   {welcomeBody.map((p, idx) => (

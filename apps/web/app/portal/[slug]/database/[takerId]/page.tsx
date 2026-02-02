@@ -366,16 +366,26 @@ export default async function TakerDetail({
   }
 
   // --- Main report URL (what "Open test-taker report" should open) ----------
-  let reportUrl: string | null = null;
+let reportUrl: string | null = null;
+
+if (isQsc) {
+  reportUrl = qscStrategicUrl;
+} else if (taker.link_token) {
+  reportUrl = `/t/${encodeURIComponent(
+    taker.link_token
+  )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+} else if (taker.last_result_url) {
+  reportUrl = String(taker.last_result_url);
+}
 
   if (isQsc) {
     // ✅ QSC: always open the public Strategic report
     reportUrl = qscStrategicUrl;
   } else if (taker.link_token) {
-    // Non-QSC: open normal /t/... report
+    // ✅ Non-QSC: open the RESULT viewer (portal should NOT be subject to redirect_url/show_results)
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
-    )}/report?tid=${encodeURIComponent(taker.id)}`;
+    )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
   } else if (taker.last_result_url) {
     reportUrl = String(taker.last_result_url);
   }
