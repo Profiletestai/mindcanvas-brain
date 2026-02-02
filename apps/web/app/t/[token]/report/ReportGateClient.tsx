@@ -2,11 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import AppBackground from "@/components/ui/AppBackground";
 
-import LegacyReportClient from "./LegacyReportClient"; // ✅ LEAD storage renderer
-import LegacyOrgReportClient from "./LegacyOrgReportClient"; // ✅ Team Puzzle / Competency Coach + base legacy renderer
+import LegacyReportClient from "./LegacyReportClient";
+import LegacyOrgReportClient from "./LegacyOrgReportClient";
 
 type GateMode = "loading" | "storage" | "legacy" | "error";
 
@@ -17,25 +16,16 @@ type GateAPI = {
     debug?: { useStorageFramework?: boolean };
     version?: string;
   };
-  // some report routes also return these:
-  redirect?: string | null;
-  show_results?: boolean;
-  next_steps_url?: string | null;
-  hidden_results_message?: string | null;
-
   error?: string;
 };
 
-export default function ReportGateClient(props: { token: string; tid: string }) {
+export default function ReportGateClient(props: { token: string; tid: string; src?: string }) {
   const { token, tid } = props;
-
-  const searchParams = useSearchParams();
-  const src = (searchParams?.get("src") || "").trim(); // e.g. "portal"
+  const src = typeof props.src === "string" ? props.src : "";
 
   const [mode, setMode] = useState<GateMode>("loading");
   const [err, setErr] = useState<string | null>(null);
 
-  // Optional: show what decision was made (helps debug quickly without guessing)
   const [decisionDebug, setDecisionDebug] = useState<{
     url?: string;
     version?: string;
@@ -59,21 +49,18 @@ export default function ReportGateClient(props: { token: string; tid: string }) 
           return;
         }
 
-        const baseUrl = `/api/public/test/${encodeURIComponent(
-          token
-        )}/report?tid=${encodeURIComponent(tid)}`;
+        const qs = new URLSearchParams();
+        qs.set("tid", tid);
+        if (src) qs.set("src", src); // ✅ forward src
 
-        // ✅ Forward portal signal (so backend can bypass redirect/show_results rules)
-        const url = src ? `${baseUrl}&src=${encodeURIComponent(src)}` : baseUrl;
+        const url = `/api/public/test/${encodeURIComponent(token)}/report?${qs.toString()}`;
 
         const res = await fetch(url, { cache: "no-store" });
         const ct = res.headers.get("content-type") ?? "";
 
         if (!ct.includes("application/json")) {
           const text = await res.text();
-          throw new Error(
-            `Non-JSON response (${res.status}): ${text.slice(0, 200)}`
-          );
+          throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 200)}`);
         }
 
         const json = (await res.json()) as GateAPI;
@@ -82,33 +69,10 @@ export default function ReportGateClient(props: { token: string; tid: string }) 
           throw new Error(json.error || `HTTP ${res.status}`);
         }
 
-        // ✅ Optional safety:
-        // If API is telling public users to redirect (show_results=false),
-        // respect it for public viewers, but NEVER for portal viewers.
-        if (src !== "portal") {
-          const redirectUrl =
-            (typeof json.redirect === "string" ? json.redirect : "") ||
-            (typeof json.next_steps_url === "string" ? json.next_steps_url : "");
-
-          if (json.show_results === false && redirectUrl) {
-            if (!cancelled && typeof window !== "undefined") {
-              window.location.href = redirectUrl;
-              return;
-            }
-          }
-        }
-
-        // ✅ FIX:
-        // Do NOT treat "sections" as proof of storage.
-        // Legacy responses can also contain sections.
-        // Only use explicit opt-in signals.
-        const explicitStorageFlag = Boolean(
-          json.data?.debug?.useStorageFramework
-        );
+        const explicitStorageFlag = Boolean(json.data?.debug?.useStorageFramework);
         const version = String(json.data?.version || "");
         const versionSuggestsStorage =
-          version.toLowerCase().includes("storage") ||
-          version.toLowerCase().includes("portal-v2");
+          version.toLowerCase().includes("storage") || version.toLowerCase().includes("portal-v2");
 
         const useStorage = explicitStorageFlag || versionSuggestsStorage;
 
@@ -156,13 +120,11 @@ export default function ReportGateClient(props: { token: string; tid: string }) 
           <h1 className="text-2xl font-semibold">Personalised report</h1>
           <p className="text-sm text-red-400">Could not load your report.</p>
           <details className="rounded-lg border border-slate-700 bg-slate-950 p-4 text-xs text-slate-50">
-            <summary className="cursor-pointer font-medium">
-              Debug information
-            </summary>
+            <summary className="cursor-pointer font-medium">Debug information</summary>
             <div className="mt-2 space-y-2">
               <div>Error: {err ?? "Unknown"}</div>
               {decisionDebug?.url ? <div>URL: {decisionDebug.url}</div> : null}
-              {decisionDebug?.src ? <div>src: {decisionDebug.src}</div> : null}
+              {decisionDebug?.src ? <div>src: {decisionDebug.src}</div> : <div>src: —</div>}
             </div>
           </details>
         </main>
@@ -170,12 +132,10 @@ export default function ReportGateClient(props: { token: string; tid: string }) 
     );
   }
 
-  // ✅ LEAD (storage) renderer
   if (mode === "storage") {
     return <LegacyReportClient token={token} tid={tid} />;
   }
 
-  // ✅ Team Puzzle / Competency Coach / base legacy renderer
   return <LegacyOrgReportClient token={token} tid={tid} />;
 }
 
