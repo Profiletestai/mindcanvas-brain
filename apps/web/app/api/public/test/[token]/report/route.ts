@@ -52,16 +52,7 @@ type LinkMeta = {
   test_id: string;
   org_slug: string | null;
   test_name: string | null;
-
-  // ✅ IMPORTANT: link behaviour flags come from test_links COLUMNS
-  link_meta?: {
-    show_results?: boolean | null;
-    redirect_url?: string | null;
-    hidden_results_message?: string | null;
-    next_steps_url?: string | null;
-    // keep original json meta too (optional)
-    meta?: any | null;
-  } | null;
+  link_meta?: any | null;
 };
 
 type ReportFrameworkMeta = {
@@ -77,6 +68,7 @@ type TestMeta = {
   // Preferred (meta-driven storage framework)
   report_framework_key?: string;
   report_framework_bucket?: string;
+  report_framework_version?: string;
 
   // legacy
   frameworkKey?: string;
@@ -114,9 +106,7 @@ function safeText(x: any): string {
   return String(x);
 }
 
-function toPercentages<T extends string>(
-  totals: Partial<Record<T, number>>
-): Record<T, number> {
+function toPercentages<T extends string>(totals: Partial<Record<T, number>>): Record<T, number> {
   const vals = Object.values(totals || {}) as number[];
   const sum = vals.reduce((a, b) => a + (Number(b) || 0), 0);
   const out: Record<string, number> = {};
@@ -175,10 +165,7 @@ function coerceMapEntries(x: any): MapEntry[] {
   return [];
 }
 
-function computeFromAnswers(
-  answers: AnswerShape[] | null | undefined,
-  qmap: Map<string, QuestionMapRow>
-) {
+function computeFromAnswers(answers: AnswerShape[] | null | undefined, qmap: Map<string, QuestionMapRow>) {
   const freqTotals: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
   const profileTotals: Record<string, number> = {};
 
@@ -214,11 +201,7 @@ function computeFromAnswers(
     if (ab) freqTotals[ab] = (freqTotals[ab] || 0) + pts;
   }
 
-  return {
-    freqTotals,
-    profileTotals,
-    used: usedAny ? ("qmap" as const) : ("none" as const),
-  };
+  return { freqTotals, profileTotals, used: usedAny ? ("qmap" as const) : ("none" as const) };
 }
 
 /**
@@ -229,10 +212,8 @@ function computeFromAnswers(
 function readSavedTotals(totals: any) {
   const raw = totals && typeof totals === "object" ? totals : {};
 
-  const nestedFreq =
-    raw?.frequencies && typeof raw.frequencies === "object" ? raw.frequencies : null;
-  const nestedProfiles =
-    raw?.profiles && typeof raw.profiles === "object" ? raw.profiles : null;
+  const nestedFreq = raw?.frequencies && typeof raw.frequencies === "object" ? raw.frequencies : null;
+  const nestedProfiles = raw?.profiles && typeof raw.profiles === "object" ? raw.profiles : null;
 
   const freqSrc = nestedFreq || raw;
   const freqTotals: Record<AB, number> = {
@@ -249,16 +230,11 @@ function readSavedTotals(totals: any) {
     const key = String(k || "").toUpperCase().trim();
     if (key.startsWith("PROFILE_")) profileTotals[key] = safeNumber(v, 0);
   }
-  const profileSum = Object.values(profileTotals).reduce(
-    (a, b) => a + (Number(b) || 0),
-    0
-  );
+  const profileSum = Object.values(profileTotals).reduce((a, b) => a + (Number(b) || 0), 0);
 
   const meta = raw?.meta && typeof raw.meta === "object" ? raw.meta : null;
-  const wrapper_test_id =
-    typeof meta?.wrapper_test_id === "string" ? meta.wrapper_test_id : null;
-  const effective_test_id =
-    typeof meta?.effective_test_id === "string" ? meta.effective_test_id : null;
+  const wrapper_test_id = typeof meta?.wrapper_test_id === "string" ? meta.wrapper_test_id : null;
+  const effective_test_id = typeof meta?.effective_test_id === "string" ? meta.effective_test_id : null;
 
   return {
     freqTotals,
@@ -271,7 +247,7 @@ function readSavedTotals(totals: any) {
   };
 }
 
-// ✅ Portal bypass helper (unchanged)
+// ✅ Portal bypass helper
 function sanitizeLinkMetaForPortal(linkMeta: any) {
   const link = linkMeta && typeof linkMeta === "object" ? { ...linkMeta } : {};
 
@@ -304,10 +280,8 @@ function sbAdmin() {
     process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url)
-    throw new Error("SUPABASE_URL is required (or NEXT_PUBLIC_SUPABASE_URL).");
-  if (!key)
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required (or an anon key fallback).");
+  if (!url) throw new Error("SUPABASE_URL is required (or NEXT_PUBLIC_SUPABASE_URL).");
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required (or an anon key fallback).");
 
   return createClient(url, key, {
     auth: { persistSession: false },
@@ -315,7 +289,7 @@ function sbAdmin() {
   });
 }
 
-// ✅ FIXED: Resolve org/test + link behaviour flags for a token
+// ✅ Resolve org/test for a token (use COLUMN flags as truth)
 async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   const sb = sbAdmin();
 
@@ -325,18 +299,18 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
       `
       test_id,
       token,
-      meta,
       show_results,
       redirect_url,
       hidden_results_message,
       next_steps_url,
+      email_report,
       tests:tests (
         id,
         name,
         org_id,
         orgs:orgs ( slug )
       )
-    `
+    `,
     )
     .eq("token", token)
     .limit(1)
@@ -347,14 +321,12 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   const testName = (q.data as any)?.tests?.name ?? null;
   const orgSlug = (q.data as any)?.tests?.orgs?.slug ?? null;
 
-  // ✅ IMPORTANT: build link_meta from real columns (and keep meta if you want)
   const link_meta = {
     show_results: (q.data as any)?.show_results ?? true,
     redirect_url: ((q.data as any)?.redirect_url as string | null) ?? null,
-    hidden_results_message:
-      ((q.data as any)?.hidden_results_message as string | null) ?? null,
+    hidden_results_message: ((q.data as any)?.hidden_results_message as string | null) ?? null,
     next_steps_url: ((q.data as any)?.next_steps_url as string | null) ?? null,
-    meta: (q.data as any)?.meta ?? null,
+    email_report: (q.data as any)?.email_report ?? false,
   };
 
   return {
@@ -369,7 +341,7 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
 // ✅ Accept legacy rows where link_token is NULL
 async function fetchLatestSubmission(
   taker_id: string,
-  token: string
+  token: string,
 ): Promise<{ row: SubmissionRow | null; matched: "token" | "null" | "none" }> {
   const sb = sbAdmin();
 
@@ -382,8 +354,7 @@ async function fetchLatestSubmission(
     .limit(1)
     .maybeSingle();
 
-  if (!strict.error && strict.data)
-    return { row: strict.data as SubmissionRow, matched: "token" };
+  if (!strict.error && strict.data) return { row: strict.data as SubmissionRow, matched: "token" };
 
   const legacy = await sb
     .from("test_submissions")
@@ -394,8 +365,7 @@ async function fetchLatestSubmission(
     .limit(1)
     .maybeSingle();
 
-  if (!legacy.error && legacy.data)
-    return { row: legacy.data as SubmissionRow, matched: "null" };
+  if (!legacy.error && legacy.data) return { row: legacy.data as SubmissionRow, matched: "null" };
 
   return { row: null, matched: "none" };
 }
@@ -458,9 +428,7 @@ async function fetchDbLabels(test_id: string): Promise<{
       ? (profRes.data as any[]).map((r) => ({
           code: String(r.profile_code || "").toUpperCase(),
           name: String(r.profile_name || ""),
-          frequency_code: (r.frequency_code
-            ? (String(r.frequency_code).toUpperCase() as AB)
-            : null),
+          frequency_code: (r.frequency_code ? (String(r.frequency_code).toUpperCase() as AB) : null),
         }))
       : [];
 
@@ -504,8 +472,7 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
   const meta = (testMeta || {}) as any;
 
   const key = typeof meta.report_framework_key === "string" ? meta.report_framework_key.trim() : "";
-  const bucketOverride =
-    typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
+  const bucketOverride = typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
 
   if (key) {
     const bucket = bucketOverride || "framework";
@@ -518,6 +485,7 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
     };
   }
 
+  // Legacy: reportFramework: { bucket, path, version }
   const rf: ReportFrameworkMeta | null = meta?.reportFramework || null;
   const bucket = typeof rf?.bucket === "string" ? rf.bucket.trim() : "";
   const path = typeof rf?.path === "string" ? rf.path.trim() : "";
@@ -611,10 +579,7 @@ function enforceOptionA(commonIn: any[], profileIn: any[]) {
   };
 }
 
-function buildSegmentationSection(
-  qualQs: QualQuestionRow[],
-  answers: AnswerShape[] | null | undefined
-) {
+function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShape[] | null | undefined) {
   const ansList = Array.isArray(answers) ? answers : [];
   const ansByQid = new Map<string, any>();
   for (const a of ansList) {
@@ -626,8 +591,7 @@ function buildSegmentationSection(
 
   for (const q of qualQs) {
     const w = q.weights && typeof q.weights === "object" ? q.weights : {};
-    const captureKey =
-      safeText((w as any).capture_key || "").trim() || `S${q.idx ?? ""}`.trim();
+    const captureKey = safeText((w as any).capture_key || "").trim() || `S${q.idx ?? ""}`.trim();
     const questionText = safeText(q.text).trim();
     const a = ansByQid.get(q.id);
 
@@ -635,10 +599,7 @@ function buildSegmentationSection(
 
     if (String(q.type || "").toLowerCase() === "text") {
       answerText =
-        safeText((a as any)?.text) ||
-        safeText((a as any)?.value) ||
-        safeText((a as any)?.answer) ||
-        "";
+        safeText((a as any)?.text) || safeText((a as any)?.value) || safeText((a as any)?.answer) || "";
     } else {
       const opts = Array.isArray(q.options) ? q.options : [];
       const sel = selectedIndex(a);
@@ -658,10 +619,7 @@ function buildSegmentationSection(
   return {
     id: "segmentation-responses",
     title: "Your responses",
-    blocks: [
-      { type: "p", text: "These are the answers you provided to the initial questions." },
-      { type: "ul", items: rows },
-    ],
+    blocks: [{ type: "p", text: "These are the answers you provided to the initial questions." }, { type: "ul", items: rows }],
   };
 }
 
@@ -673,6 +631,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const token = params.token;
     const takerId = searchParams.get("tid");
 
+    // ✅ portal bypass flag
     const src = (searchParams.get("src") || "").trim().toLowerCase();
     const isPortalViewer = src === "portal";
 
@@ -692,9 +651,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const useStorageFramework = storageChoice.use;
 
     const orgSlug = String(
-      meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach"
+      meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach",
     ).trim();
 
+    // Default: filesystem framework (by org)
     let fw: any = await loadFrameworkBySlug(orgSlug);
     let frameworkSource: "filesystem" | "storage" = "filesystem";
 
@@ -712,6 +672,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     }
 
     const look = buildLookups(fw);
+
+    // Prefer DB labels
     const dbLabels = await fetchDbLabels(meta.test_id);
 
     const metaFreqs = Array.isArray(testMeta?.frequencies) ? testMeta.frequencies : null;
@@ -743,7 +705,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           error: "Submission not found for this taker/token.",
           debug: { takerId, token, test_id: meta.test_id },
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -753,20 +715,17 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const qmap = await fetchQuestionMaps(meta.test_id);
     const comp = computeFromAnswers(sub.answers_json, qmap);
 
-    const freqTotals: Record<AB, number> =
-      savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
-    const profileTotals: Record<string, number> =
-      savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
+    const freqTotals: Record<AB, number> = savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
+    const profileTotals: Record<string, number> = savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq =
-      (Object.entries(freqTotals) as [AB, number][])
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq = (Object.entries(freqTotals) as [AB, number][])
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry =
-      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry = Object.entries(profileTotals)
+      .sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
 
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
@@ -774,6 +733,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       look.profileByCode.get(top_profile_code)?.name ||
       top_profile_code;
 
+    // Storage sections payload (LEAD) — enforce Option A here
     let sections: any = null;
     let removed_overlap_count = 0;
 
@@ -789,7 +749,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
       const qualQs = await fetchQualQuestions(meta.test_id);
       const segSection = buildSegmentationSection(qualQs, sub.answers_json);
-
       const commonWithSeg = segSection ? [...fixed.common, segSection] : fixed.common;
 
       sections = {
@@ -803,14 +762,12 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       };
     }
 
+    // ✅ Link behavior comes from resolveLinkMeta() columns
     const rawLinkMeta = meta.link_meta || null;
     const linkMeta = isPortalViewer ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
 
     const answersCount = Array.isArray(sub.answers_json) ? sub.answers_json.length : 0;
-    const computedSum = Object.values(profileTotals || {}).reduce(
-      (a, b) => a + (Number(b) || 0),
-      0
-    );
+    const computedSum = Object.values(profileTotals || {}).reduce((a, b) => a + (Number(b) || 0), 0);
 
     const scoringWarning =
       savedRead.freqSum <= 0 &&
@@ -834,7 +791,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           last_name: taker?.last_name ?? null,
         },
 
-        // ✅ this is what Legacy clients use to decide redirects:
+        // ✅ clients use this for show/hide/redirect
         link: linkMeta || undefined,
 
         frequency_labels,
@@ -893,6 +850,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
+
 
 
 
