@@ -8,12 +8,8 @@ import { createClient } from "@supabase/supabase-js";
 
 type TimelinePoint = { date: string; submissions: number };
 
-type TopItem = {
-  code: string;
-  name: string;
-  avgPoints: number;
-  submissions: number;
-};
+type TopByCount = { code: string; name: string; count: number; pct: number };
+type TopByAvg = { code: string; name: string; avgPoints: number; n: number };
 
 type LinkRow = {
   linkId: string;
@@ -27,8 +23,12 @@ type LinkRow = {
   maxUses: number | null;
 
   testsTaken: number;
-  topProfiles: TopItem[];
-  topFrequency: TopItem | null;
+
+  topProfilesByCount: TopByCount[];
+  topProfilesByAvg: TopByAvg[];
+
+  topFrequencyByCount: TopByCount | null;
+  topFrequencyByAvg: TopByAvg | null;
 };
 
 function supaAdmin() {
@@ -89,6 +89,7 @@ type OrgRow = { id: string; slug: string };
 
 type UsageRow = {
   submission_id: string;
+  taker_id?: string | null; // only present if you updated v_usage_submissions
   test_id: string;
   test_slug: string | null;
   test_name: string | null;
@@ -126,6 +127,19 @@ type ExpandedRow = {
   total_points: number;
 };
 
+type ProfileLabelRow = {
+  test_id: string;
+  profile_code: string;
+  profile_name: string;
+  frequency_code: string | null;
+};
+
+type FreqLabelRow = {
+  test_id: string;
+  frequency_code: string;
+  frequency_name: string;
+};
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -140,12 +154,7 @@ export async function GET(req: Request) {
     let orgId = orgIdParam;
 
     if (!orgId && orgSlugParam) {
-      const orgRes = await supa
-        .from("orgs")
-        .select("id, slug")
-        .eq("slug", orgSlugParam)
-        .limit(1);
-
+      const orgRes = await supa.from("orgs").select("id, slug").eq("slug", orgSlugParam).limit(1);
       if (orgRes.error) throw orgRes.error;
       const row = (orgRes.data?.[0] || null) as OrgRow | null;
       if (!row) {
@@ -168,7 +177,7 @@ export async function GET(req: Request) {
     const toQ = parseDateParam(url.searchParams.get("to"));
     const { from, to } = clampRange(fromQ, toQ);
 
-    // 1) Links (meta/status)
+    // 1) Links
     let linksQ = supa
       .from("v_test_links_full")
       .select("id, org_id, test_id, token, name, label, is_active, use_count, max_uses, created_at, expires_at")
@@ -178,14 +187,13 @@ export async function GET(req: Request) {
 
     const linksRes = await linksQ;
     if (linksRes.error) throw linksRes.error;
-
     const links = (linksRes.data || []) as LinkFullRow[];
 
-    // 2) Usage in range
+    // 2) Usage in range (include taker_id if your view has it)
     let usageQ = supa
       .from("v_usage_submissions")
       .select(
-        "submission_id, test_id, test_slug, test_name, link_id, link_token, link_name, org_id, org_slug, created_at"
+        "submission_id, taker_id, test_id, test_slug, test_name, link_id, link_token, link_name, org_id, org_slug, created_at"
       )
       .eq("org_id", orgId)
       .gte("created_at", toIso(from))
@@ -195,13 +203,18 @@ export async function GET(req: Request) {
 
     const usageRes = await usageQ;
     if (usageRes.error) throw usageRes.error;
-
     const usage = (usageRes.data || []) as UsageRow[];
 
     const submissions = usage.length;
 
-    // Optional KPI: unique takers (not available in v_usage_submissions yet)
-    const uniqueTakers = null as number | null;
+    // Unique takers (only if taker_id is present)
+    let uniqueTakers: number | null = null;
+    const anyTakerId = usage.some((u) => !!u.taker_id);
+    if (anyTakerId) {
+      const set = new Set<string>();
+      for (const u of usage) if (u.taker_id) set.add(u.taker_id);
+      uniqueTakers = set.size;
+    }
 
     const activeLinks = links.filter((l) =>
       isLinkActive({
@@ -222,14 +235,14 @@ export async function GET(req: Request) {
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([date, submissions]) => ({ date, submissions }));
 
-    // Per-link submission counts
+    // Per-link counts
     const linkCounts = new Map<string, number>();
     for (const u of usage) {
       if (!u.link_token) continue;
       linkCounts.set(u.link_token, (linkCounts.get(u.link_token) || 0) + 1);
     }
 
-    // 3) Expanded scores in range (profiles + frequencies)
+    // 3) Expanded scores in range
     let expQ = supa
       .from("v_submission_scores_expanded_submissions")
       .select(
@@ -243,48 +256,118 @@ export async function GET(req: Request) {
 
     const expRes = await expQ;
     if (expRes.error) throw expRes.error;
-
     const expanded = (expRes.data || []) as ExpandedRow[];
 
-    // Aggregate avg points per link + type + code
-    type Agg = { sum: number; n: number; name: string; submissions: Set<string> };
+    // Build label maps per test_id used in this payload
+    const testIdsInPlay = new Set<string>();
+    for (const l of links) testIdsInPlay.add(l.test_id);
+
+    // Fetch labels for those tests
+    const testIdsArr = Array.from(testIdsInPlay);
+
+    const [profilesLblRes, freqsLblRes] = await Promise.all([
+      supa
+        .from("test_profile_labels")
+        .select("test_id, profile_code, profile_name, frequency_code")
+        .in("test_id", testIdsArr),
+      supa
+        .from("test_frequency_labels")
+        .select("test_id, frequency_code, frequency_name")
+        .in("test_id", testIdsArr),
+    ]);
+
+    if (profilesLblRes.error) throw profilesLblRes.error;
+    if (freqsLblRes.error) throw freqsLblRes.error;
+
+    const profileLblRows = (profilesLblRes.data || []) as ProfileLabelRow[];
+    const freqLblRows = (freqsLblRes.data || []) as FreqLabelRow[];
+
+    const profileNameByTest = new Map<string, Map<string, string>>();
+    const freqNameByTest = new Map<string, Map<string, string>>();
+
+    for (const r of profileLblRows) {
+      const m = profileNameByTest.get(r.test_id) || new Map<string, string>();
+      m.set(r.profile_code, r.profile_name);
+      profileNameByTest.set(r.test_id, m);
+    }
+
+    for (const r of freqLblRows) {
+      const m = freqNameByTest.get(r.test_id) || new Map<string, string>();
+      m.set(r.frequency_code, r.frequency_name);
+      freqNameByTest.set(r.test_id, m);
+    }
+
+    // Aggregate per link + type + code
+    type Agg = { sum: number; n: number; subs: Set<string> };
     const agg = new Map<string, Agg>();
 
     for (const r of expanded) {
       if (!r.link_token) continue;
-      const key = `${r.link_token}||${r.dimension_type}||${r.dimension_code}`;
-      const existing = agg.get(key) || { sum: 0, n: 0, name: r.dimension_name, submissions: new Set<string>() };
-      existing.sum += Number(r.total_points || 0);
-      existing.n += 1;
-      existing.name = r.dimension_name || existing.name;
-      existing.submissions.add(r.submission_id);
-      agg.set(key, existing);
+      const key = `${r.link_token}||${r.test_id}||${r.dimension_type}||${r.dimension_code}`;
+      const a = agg.get(key) || { sum: 0, n: 0, subs: new Set<string>() };
+      a.sum += Number(r.total_points || 0);
+      a.n += 1;
+      a.subs.add(r.submission_id);
+      agg.set(key, a);
     }
 
-    function topNForLink(linkToken: string, type: "profile" | "frequency", n: number): TopItem[] {
-      const items: TopItem[] = [];
+    function labelName(test_id: string, type: "profile" | "frequency", code: string) {
+      if (type === "profile") return profileNameByTest.get(test_id)?.get(code) || code;
+      return freqNameByTest.get(test_id)?.get(code) || code;
+    }
+
+    function topByAvg(linkToken: string, test_id: string, type: "profile" | "frequency", n: number): TopByAvg[] {
+      const items: TopByAvg[] = [];
       for (const [k, a] of agg.entries()) {
-        const [lt, dt, code] = k.split("||");
+        const [lt, tid, dt, code] = k.split("||");
         if (lt !== linkToken) continue;
+        if (tid !== test_id) continue;
         if (dt !== type) continue;
-        const avgPoints = a.n ? a.sum / a.n : 0;
+
+        const avg = a.n ? a.sum / a.n : 0;
         items.push({
           code,
-          name: a.name,
-          avgPoints: Number.isFinite(avgPoints) ? avgPoints : 0,
-          submissions: a.submissions.size,
+          name: labelName(test_id, type, code),
+          avgPoints: Number.isFinite(avg) ? avg : 0,
+          n: a.subs.size,
         });
       }
       items.sort((a, b) => b.avgPoints - a.avgPoints);
       return items.slice(0, n);
     }
 
+    function topByCount(linkToken: string, test_id: string, type: "profile" | "frequency", n: number, totalSubs: number): TopByCount[] {
+      const items: TopByCount[] = [];
+      for (const [k, a] of agg.entries()) {
+        const [lt, tid, dt, code] = k.split("||");
+        if (lt !== linkToken) continue;
+        if (tid !== test_id) continue;
+        if (dt !== type) continue;
+
+        const count = a.subs.size;
+        items.push({
+          code,
+          name: labelName(test_id, type, code),
+          count,
+          pct: totalSubs > 0 ? count / totalSubs : 0,
+        });
+      }
+      items.sort((a, b) => b.count - a.count);
+      return items.slice(0, n);
+    }
+
     const linkRows: LinkRow[] = links
       .map((l) => {
         const testsTaken = linkCounts.get(l.token) || 0;
-        const topProfiles = testsTaken > 0 ? topNForLink(l.token, "profile", 3) : [];
-        const topFreqArr = testsTaken > 0 ? topNForLink(l.token, "frequency", 1) : [];
-        const topFrequency = topFreqArr[0] || null;
+
+        const topProfilesByCount = testsTaken ? topByCount(l.token, l.test_id, "profile", 3, testsTaken) : [];
+        const topProfilesByAvg = testsTaken ? topByAvg(l.token, l.test_id, "profile", 3) : [];
+
+        const topFreqByCountArr = testsTaken ? topByCount(l.token, l.test_id, "frequency", 1, testsTaken) : [];
+        const topFrequencyByCount = topFreqByCountArr[0] || null;
+
+        const topFreqByAvgArr = testsTaken ? topByAvg(l.token, l.test_id, "frequency", 1) : [];
+        const topFrequencyByAvg = topFreqByAvgArr[0] || null;
 
         return {
           linkId: l.id,
@@ -296,9 +379,14 @@ export async function GET(req: Request) {
           expiresAt: l.expires_at ?? null,
           useCount: l.use_count ?? 0,
           maxUses: l.max_uses ?? null,
+
           testsTaken,
-          topProfiles,
-          topFrequency,
+
+          topProfilesByCount,
+          topProfilesByAvg,
+
+          topFrequencyByCount,
+          topFrequencyByAvg,
         };
       })
       .sort((a, b) => b.testsTaken - a.testsTaken);
@@ -321,10 +409,8 @@ export async function GET(req: Request) {
       links: linkRows,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
   }
 }
+
 

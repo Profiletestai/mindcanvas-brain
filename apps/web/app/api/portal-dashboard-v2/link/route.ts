@@ -11,9 +11,9 @@ type TimelinePoint = { date: string; submissions: number };
 type DistItem = {
   code: string;
   name: string;
-  avgPoints: number;
-  submissions: number;
+  count: number;
   pct: number;
+  avgPoints: number;
 };
 
 function supaAdmin() {
@@ -69,6 +69,7 @@ type LinkFullRow = {
 
 type UsageRow = {
   submission_id: string;
+  taker_id?: string | null;
   created_at: string;
   link_token: string | null;
 };
@@ -81,6 +82,19 @@ type ExpandedRow = {
   dimension_code: string;
   dimension_name: string;
   total_points: number;
+};
+
+type ProfileLabelRow = {
+  test_id: string;
+  profile_code: string;
+  profile_name: string;
+  frequency_code: string | null;
+};
+
+type FreqLabelRow = {
+  test_id: string;
+  frequency_code: string;
+  frequency_name: string;
 };
 
 export async function GET(req: Request) {
@@ -97,25 +111,51 @@ export async function GET(req: Request) {
 
     const supa = supaAdmin();
 
-    // 1) Link meta
+    // Link meta
     const linkRes = await supa
       .from("v_test_links_full")
       .select(
         "id, org_id, test_id, token, name, label, is_active, use_count, max_uses, created_at, expires_at, redirect_url, next_steps_url, show_results, meta"
       )
       .eq("token", token)
-      .maybeSingle();
+      .limit(1);
 
     if (linkRes.error) throw linkRes.error;
-    const link = linkRes.data as LinkFullRow | null;
-    if (!link) {
-      return NextResponse.json({ ok: false, error: "Link not found" }, { status: 404 });
+    const link = (linkRes.data?.[0] || null) as LinkFullRow | null;
+    if (!link) return NextResponse.json({ ok: false, error: "Link not found" }, { status: 404 });
+
+    // Load labels for this test
+    const [profilesLblRes, freqsLblRes] = await Promise.all([
+      supa
+        .from("test_profile_labels")
+        .select("test_id, profile_code, profile_name, frequency_code")
+        .eq("test_id", link.test_id),
+      supa
+        .from("test_frequency_labels")
+        .select("test_id, frequency_code, frequency_name")
+        .eq("test_id", link.test_id),
+    ]);
+
+    if (profilesLblRes.error) throw profilesLblRes.error;
+    if (freqsLblRes.error) throw freqsLblRes.error;
+
+    const profileName = new Map<string, string>();
+    for (const r of (profilesLblRes.data || []) as ProfileLabelRow[]) {
+      profileName.set(r.profile_code, r.profile_name);
+    }
+    const freqName = new Map<string, string>();
+    for (const r of (freqsLblRes.data || []) as FreqLabelRow[]) {
+      freqName.set(r.frequency_code, r.frequency_name);
     }
 
-    // 2) Usage in range
+    const labelName = (type: "profile" | "frequency", code: string) => {
+      return type === "profile" ? profileName.get(code) || code : freqName.get(code) || code;
+    };
+
+    // Usage in range
     const usageRes = await supa
       .from("v_usage_submissions")
-      .select("submission_id, created_at, link_token")
+      .select("submission_id, taker_id, created_at, link_token")
       .eq("link_token", token)
       .gte("created_at", toIso(from))
       .lte("created_at", toIso(to));
@@ -124,6 +164,15 @@ export async function GET(req: Request) {
     const usage = (usageRes.data || []) as UsageRow[];
 
     const testsTaken = usage.length;
+
+    // Unique takers (if taker_id exists)
+    let uniqueTakers: number | null = null;
+    if (usage.some((u) => !!u.taker_id)) {
+      const set = new Set<string>();
+      for (const u of usage) if (u.taker_id) set.add(u.taker_id);
+      uniqueTakers = set.size;
+    }
+
     const lastUsedAt =
       usage.length > 0
         ? usage.reduce((max, r) => (r.created_at > max ? r.created_at : max), usage[0].created_at)
@@ -139,7 +188,7 @@ export async function GET(req: Request) {
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([date, submissions]) => ({ date, submissions }));
 
-    // 3) Expanded scores for this link in range
+    // Expanded scores for this link
     const expRes = await supa
       .from("v_submission_scores_expanded_submissions")
       .select("submission_id, created_at, company, dimension_type, dimension_code, dimension_name, total_points")
@@ -150,44 +199,42 @@ export async function GET(req: Request) {
     if (expRes.error) throw expRes.error;
     const expanded = (expRes.data || []) as ExpandedRow[];
 
-    // Aggregate avg points and distinct submissions per dimension
-    type Agg = { sum: number; n: number; name: string; submissions: Set<string> };
+    // Aggregate: distinct submissions (count), avg points
+    type Agg = { subs: Set<string>; sum: number; n: number };
     const agg = new Map<string, Agg>();
 
     for (const r of expanded) {
       const key = `${r.dimension_type}||${r.dimension_code}`;
-      const a = agg.get(key) || { sum: 0, n: 0, name: r.dimension_name, submissions: new Set<string>() };
+      const a = agg.get(key) || { subs: new Set<string>(), sum: 0, n: 0 };
+      a.subs.add(r.submission_id);
       a.sum += Number(r.total_points || 0);
       a.n += 1;
-      a.name = r.dimension_name || a.name;
-      a.submissions.add(r.submission_id);
       agg.set(key, a);
     }
 
-    function dist(type: "profile" | "frequency"): DistItem[] {
+    const buildDist = (type: "profile" | "frequency"): DistItem[] => {
       const items: DistItem[] = [];
       for (const [k, a] of agg.entries()) {
         const [dt, code] = k.split("||");
         if (dt !== type) continue;
-        const avgPoints = a.n ? a.sum / a.n : 0;
-        const subs = a.submissions.size;
+
+        const count = a.subs.size;
+        const avg = a.n ? a.sum / a.n : 0;
+
         items.push({
           code,
-          name: a.name,
-          avgPoints: Number.isFinite(avgPoints) ? avgPoints : 0,
-          submissions: subs,
-          pct: testsTaken > 0 ? subs / testsTaken : 0,
+          name: labelName(type, code),
+          count,
+          pct: testsTaken > 0 ? count / testsTaken : 0,
+          avgPoints: Number.isFinite(avg) ? avg : 0,
         });
       }
-      // default sort: avg points desc
-      items.sort((a, b) => b.avgPoints - a.avgPoints);
+      // Sort by count (most common first) — best for UX
+      items.sort((a, b) => b.count - a.count);
       return items;
-    }
+    };
 
-    const profiles = dist("profile");
-    const frequencies = dist("frequency");
-
-    // Company segmentation (based on submissions counts)
+    // Company segmentation
     const companyMap = new Map<string, Set<string>>();
     for (const r of expanded) {
       const c = (r.company || "").trim() || "Unknown";
@@ -207,11 +254,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      filters: {
-        token,
-        from: toIso(from),
-        to: toIso(to),
-      },
+      filters: { token, from: toIso(from), to: toIso(to) },
       link: {
         linkId: link.id,
         orgId: link.org_id,
@@ -227,24 +270,16 @@ export async function GET(req: Request) {
         showResults: link.show_results ?? null,
         meta: link.meta ?? {},
       },
-      kpis: {
-        testsTaken,
-        uniqueTakers: null, // can be added once taker_id is exposed in v_usage_submissions
-        lastUsedAt,
-      },
+      kpis: { testsTaken, uniqueTakers, lastUsedAt },
       timeline,
       distributions: {
-        profiles,
-        frequencies,
+        profiles: buildDist("profile"),
+        frequencies: buildDist("frequency"),
       },
-      segments: {
-        companies,
-      },
+      segments: { companies },
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
   }
 }
+
