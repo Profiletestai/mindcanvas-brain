@@ -36,6 +36,12 @@ type DashboardV2Payload = {
   links: LinkRow[];
 };
 
+type PortalTestsPayload = {
+  ok: true;
+  org: string;
+  tests: { id: string; name: string; slug: string; is_default_dashboard?: boolean | null; status?: string | null }[];
+};
+
 type InsightsPayload = {
   ok: true;
   summary: {
@@ -57,14 +63,12 @@ function isoToDateInput(iso: string) {
 }
 
 function dateInputToIsoStart(dateStr: string) {
-  // Start of day UTC
   const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
   if (!y || !m || !d) return null;
   return new Date(Date.UTC(y, m - 1, d, 0, 0, 0)).toISOString();
 }
 
 function dateInputToIsoEnd(dateStr: string) {
-  // End of day UTC
   const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
   if (!y || !m || !d) return null;
   return new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).toISOString();
@@ -73,12 +77,6 @@ function dateInputToIsoEnd(dateStr: string) {
 function clampPct(p: number) {
   if (!Number.isFinite(p)) return 0;
   return Math.max(0, Math.min(1, p));
-}
-
-function badgeClass(active: boolean | null) {
-  if (active === false) return "bg-red-50 text-red-700 border-red-200";
-  if (active === true) return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  return "bg-gray-50 text-gray-700 border-gray-200";
 }
 
 function fmtPct(p: number) {
@@ -96,6 +94,12 @@ function fmtDateTime(iso: string | null) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "—";
   return d.toLocaleString();
+}
+
+function badgeClass(active: boolean | null) {
+  if (active === false) return "bg-red-500/10 text-red-200 border-red-500/20";
+  if (active === true) return "bg-emerald-500/10 text-emerald-200 border-emerald-500/20";
+  return "bg-white/5 text-white/70 border-white/10";
 }
 
 function SimpleBars({ data }: { data: TimelinePoint[] }) {
@@ -126,8 +130,6 @@ function SimpleBars({ data }: { data: TimelinePoint[] }) {
 
 export default function DashboardV2Client() {
   const sp = useSearchParams();
-
-  // Keep parity with your existing pattern:
   const org = sp?.get("org") ?? "team-puzzle";
 
   // Default: last 30 days
@@ -137,6 +139,11 @@ export default function DashboardV2Client() {
 
   const [fromDate, setFromDate] = useState<string>(defaultFrom);
   const [toDate, setToDate] = useState<string>(defaultTo);
+
+  const [testsLoading, setTestsLoading] = useState(false);
+  const [testsErr, setTestsErr] = useState("");
+  const [tests, setTests] = useState<PortalTestsPayload["tests"]>([]);
+  const [selectedTestId, setSelectedTestId] = useState<string>(""); // empty = all tests
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
@@ -154,6 +161,29 @@ export default function DashboardV2Client() {
   const appliedFromIso = useMemo(() => dateInputToIsoStart(fromDate), [fromDate]);
   const appliedToIso = useMemo(() => dateInputToIsoEnd(toDate), [toDate]);
 
+  async function loadTests() {
+    try {
+      setTestsLoading(true);
+      setTestsErr("");
+      const res = await fetch(`/api/portal-tests?org=${encodeURIComponent(org)}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+      const payload = j as PortalTestsPayload;
+      setTests(payload.tests || []);
+
+      // Auto-select default dashboard test if provided and user hasn't chosen anything yet
+      if (!selectedTestId) {
+        const def = (payload.tests || []).find((t) => t.is_default_dashboard) || null;
+        if (def?.id) setSelectedTestId(def.id);
+      }
+    } catch (e: any) {
+      setTestsErr(String(e?.message || e));
+      setTests([]);
+    } finally {
+      setTestsLoading(false);
+    }
+  }
+
   async function loadMain() {
     try {
       setLoading(true);
@@ -162,6 +192,7 @@ export default function DashboardV2Client() {
 
       const q = new URLSearchParams();
       q.set("org", org);
+      if (selectedTestId) q.set("testId", selectedTestId);
       if (appliedFromIso) q.set("from", appliedFromIso);
       if (appliedToIso) q.set("to", appliedToIso);
 
@@ -181,11 +212,10 @@ export default function DashboardV2Client() {
     try {
       setInsightsLoading(true);
 
-      // Use the top link as “headline” inputs for the insights block.
       const topLink = (d.links || []).slice().sort((a, b) => b.testsTaken - a.testsTaken)[0] || null;
 
       const payload = {
-        scope: "org",
+        scope: selectedTestId ? "test" : "org",
         orgId: d.filters.orgId,
         testId: d.filters.testId,
         linkToken: null,
@@ -196,7 +226,7 @@ export default function DashboardV2Client() {
           timeline: d.timeline,
           topProfiles: topLink?.topProfilesByCount || [],
           topFrequency: topLink?.topFrequencyByCount || null,
-          topCompanies: [], // we’ll populate companies on the link deep-dive
+          topCompanies: [],
         },
       };
 
@@ -210,7 +240,6 @@ export default function DashboardV2Client() {
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
       setInsights((j as InsightsPayload).summary);
     } catch {
-      // Non-blocking: don’t fail the dashboard if insights fail
       setInsights(null);
     } finally {
       setInsightsLoading(false);
@@ -235,7 +264,6 @@ export default function DashboardV2Client() {
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
       setDrawerData(j);
 
-      // Optional: link-scoped insights (re-use same endpoint, scope=link)
       const linkTopProfiles = j?.distributions?.profiles?.slice?.(0, 3) || [];
       const linkTopFrequency = j?.distributions?.frequencies?.[0] || null;
       const topCompanies = j?.segments?.companies?.slice?.(0, 5) || [];
@@ -256,7 +284,6 @@ export default function DashboardV2Client() {
         },
       };
 
-      // Fire and forget; don’t block drawer render
       fetch(`/api/portal-dashboard-v2/insights`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -274,16 +301,23 @@ export default function DashboardV2Client() {
     }
   }
 
+  // Load tests + initial dashboard
   useEffect(() => {
-    // initial load
-    loadMain();
+    loadTests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org]);
 
+  // Reload dashboard whenever filters change
+  useEffect(() => {
+    loadMain();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org, selectedTestId]);
+
+  // Auto-refresh insights whenever main payload changes
   useEffect(() => {
     if (data?.ok) loadInsights(data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.filters?.from, data?.filters?.to, data?.kpis?.submissions]);
+  }, [data?.filters?.from, data?.filters?.to, data?.kpis?.submissions, data?.filters?.testId]);
 
   const links = useMemo(() => data?.links ?? [], [data]);
   const nonZeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) > 0), [links]);
@@ -296,19 +330,39 @@ export default function DashboardV2Client() {
   }, [data]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen p-6 space-y-6 text-white">
       {/* Beta banner */}
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <div className="text-sm uppercase tracking-wide text-white/70">Beta</div>
+            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
             <h1 className="text-2xl font-semibold">Dashboard v2</h1>
             <p className="text-sm text-white/70">
               Drill-down analytics for links, profiles, and frequencies (safe parallel build).
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            {/* Test selector */}
+            <div className="min-w-[240px]">
+              <label className="block text-xs text-white/60 mb-1">Test</label>
+              <select
+                value={selectedTestId}
+                onChange={(e) => setSelectedTestId(e.target.value)}
+                className="h-10 w-full rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+              >
+                <option value="">All tests</option>
+                {tests.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {testsLoading ? <div className="mt-1 text-xs text-white/50">Loading tests…</div> : null}
+              {testsErr ? <div className="mt-1 text-xs text-red-300">Tests error: {testsErr}</div> : null}
+            </div>
+
+            {/* Date range */}
             <div>
               <label className="block text-xs text-white/60 mb-1">From</label>
               <input
@@ -344,6 +398,12 @@ export default function DashboardV2Client() {
               · orgId=<span className="font-mono">{data.filters.orgId}</span>
             </>
           ) : null}
+          {selectedTestId ? (
+            <>
+              {" "}
+              · testId=<span className="font-mono">{selectedTestId}</span>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -354,11 +414,11 @@ export default function DashboardV2Client() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs text-white/60">Submissions</div>
               <div className="text-3xl font-semibold">{fmtNum(data.kpis.submissions)}</div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs text-white/60">Unique takers</div>
               <div className="text-3xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
               <div className="text-xs text-white/50 mt-1">
@@ -367,7 +427,7 @@ export default function DashboardV2Client() {
                   : ""}
               </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-xs text-white/60">Active links</div>
               <div className="text-3xl font-semibold">{fmtNum(data.kpis.activeLinks)}</div>
             </div>
@@ -375,7 +435,7 @@ export default function DashboardV2Client() {
 
           {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-xl border border-white/10 bg-white/5 p-4 text-white">
+            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Submissions over time</h2>
                 <div className="text-xs text-white/50">
@@ -392,7 +452,7 @@ export default function DashboardV2Client() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Insights (Beta)</h2>
                 {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
@@ -407,8 +467,8 @@ export default function DashboardV2Client() {
               {insights ? (
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="text-xs text-white/50">
-                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span>{" "}
-                    · n={insights.confidence.sampleSize}
+                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n=
+                    {insights.confidence.sampleSize}
                   </div>
 
                   <div>
@@ -434,7 +494,7 @@ export default function DashboardV2Client() {
           </div>
 
           {/* Links table */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold">Link performance</h2>
@@ -443,12 +503,12 @@ export default function DashboardV2Client() {
                 </p>
               </div>
               <div className="text-xs text-white/50">
-                {nonZeroLinks.length} active links with usage · {zeroLinks.length} with zero usage
+                {nonZeroLinks.length} links with usage · {zeroLinks.length} with zero usage
               </div>
             </div>
 
             <div className="mt-4 overflow-x-auto">
-              <table className="min-w-[900px] w-full text-sm">
+              <table className="min-w-[980px] w-full text-sm">
                 <thead className="text-white/70">
                   <tr className="border-b border-white/10">
                     <th className="py-2 text-left font-medium">Link</th>
@@ -468,11 +528,7 @@ export default function DashboardV2Client() {
                     return (
                       <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-3 pr-3">
-                          <button
-                            className="text-left hover:underline"
-                            onClick={() => openLink(l.token)}
-                            title={l.token}
-                          >
+                          <button className="text-left hover:underline" onClick={() => openLink(l.token)} title={l.token}>
                             <div className="font-medium">{l.name || l.label || "Untitled link"}</div>
                             <div className="text-xs text-white/50 font-mono">{l.token}</div>
                           </button>
@@ -484,9 +540,7 @@ export default function DashboardV2Client() {
                           </span>
                         </td>
 
-                        <td className="py-3 pr-3 text-right font-semibold">
-                          {l.testsTaken}
-                        </td>
+                        <td className="py-3 pr-3 text-right font-semibold">{l.testsTaken}</td>
 
                         <td className="py-3 pr-3">
                           {topP.length ? (
@@ -566,24 +620,22 @@ export default function DashboardV2Client() {
 
                 {!drawerLoading && !drawerErr && drawerData?.ok && (
                   <div className="mt-4 space-y-4">
-                    {/* Link KPIs */}
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                         <div className="text-xs text-white/60">Tests taken</div>
                         <div className="text-xl font-semibold">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                         <div className="text-xs text-white/60">Unique takers</div>
                         <div className="text-xl font-semibold">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
                         <div className="text-xs text-white/60">Last used</div>
                         <div className="text-xs text-white/80 mt-1">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
                       </div>
                     </div>
 
-                    {/* Link insights (if available) */}
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold">Insights (Beta)</h3>
                         {drawerData?._insights?.confidence ? (
@@ -593,7 +645,7 @@ export default function DashboardV2Client() {
                         ) : null}
                       </div>
                       {drawerData?._insights ? (
-                        <div className="mt-3 text-sm space-y-3">
+                        <div className="mt-3 text-sm">
                           <ul className="list-disc pl-5 space-y-1 text-white/85">
                             {(drawerData._insights.whatYoureSeeing || []).slice(0, 4).map((s: string, i: number) => (
                               <li key={i}>{s}</li>
@@ -605,11 +657,10 @@ export default function DashboardV2Client() {
                       )}
                     </div>
 
-                    {/* Distributions */}
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <h3 className="font-semibold">Top profiles</h3>
                       <div className="mt-3 space-y-2">
-                        {(drawerData?.distributions?.profiles || []).slice(0, 8).map((p: any) => (
+                        {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
                           <div key={p.code} className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                               <div className="font-medium truncate">{p.name}</div>
@@ -617,15 +668,13 @@ export default function DashboardV2Client() {
                                 {p.code} · {p.count} · {fmtPct(p.pct)}
                               </div>
                             </div>
-                            <div className="text-xs text-white/70">
-                              avg {Number(p.avgPoints || 0).toFixed(1)}
-                            </div>
+                            <div className="text-xs text-white/70">avg {Number(p.avgPoints || 0).toFixed(1)}</div>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <h3 className="font-semibold">Top frequencies</h3>
                       <div className="mt-3 space-y-2">
                         {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
@@ -636,16 +685,13 @@ export default function DashboardV2Client() {
                                 {f.code} · {f.count} · {fmtPct(f.pct)}
                               </div>
                             </div>
-                            <div className="text-xs text-white/70">
-                              avg {Number(f.avgPoints || 0).toFixed(1)}
-                            </div>
+                            <div className="text-xs text-white/70">avg {Number(f.avgPoints || 0).toFixed(1)}</div>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    {/* Segments */}
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <h3 className="font-semibold">Company segmentation</h3>
                       <div className="mt-3 space-y-2">
                         {(drawerData?.segments?.companies || []).length ? (
