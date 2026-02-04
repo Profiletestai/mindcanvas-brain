@@ -55,13 +55,11 @@ function ymd(d: Date): string {
 }
 
 function clampRange(from: Date | null, to: Date | null) {
-  // Default last 30 days if missing.
   const now = new Date();
   const toD = to ?? now;
   const fromD =
     from ??
     new Date(Date.UTC(toD.getUTCFullYear(), toD.getUTCMonth(), toD.getUTCDate() - 30));
-  // Ensure order
   if (fromD > toD) return { from: toD, to: fromD };
   return { from: fromD, to: toD };
 }
@@ -86,6 +84,8 @@ function isLinkActive(row: {
 
   return true;
 }
+
+type OrgRow = { id: string; slug: string };
 
 type UsageRow = {
   submission_id: string;
@@ -129,18 +129,44 @@ type ExpandedRow = {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const orgId = url.searchParams.get("orgId")?.trim() || "";
+
+    const orgIdParam = url.searchParams.get("orgId")?.trim() || "";
+    const orgSlugParam = url.searchParams.get("org")?.trim() || "";
     const testId = url.searchParams.get("testId")?.trim() || null;
 
+    const supa = supaAdmin();
+
+    // Resolve org_id
+    let orgId = orgIdParam;
+
+    if (!orgId && orgSlugParam) {
+      const orgRes = await supa
+        .from("orgs")
+        .select("id, slug")
+        .eq("slug", orgSlugParam)
+        .limit(1);
+
+      if (orgRes.error) throw orgRes.error;
+      const row = (orgRes.data?.[0] || null) as OrgRow | null;
+      if (!row) {
+        return NextResponse.json(
+          { ok: false, error: `Unknown org slug: ${orgSlugParam}` },
+          { status: 404 }
+        );
+      }
+      orgId = row.id;
+    }
+
     if (!orgId) {
-      return NextResponse.json({ ok: false, error: "Missing orgId" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Missing orgId (or org slug via ?org=...)" },
+        { status: 400 }
+      );
     }
 
     const fromQ = parseDateParam(url.searchParams.get("from"));
     const toQ = parseDateParam(url.searchParams.get("to"));
     const { from, to } = clampRange(fromQ, toQ);
-
-    const supa = supaAdmin();
 
     // 1) Links (meta/status)
     let linksQ = supa
@@ -172,14 +198,11 @@ export async function GET(req: Request) {
 
     const usage = (usageRes.data || []) as UsageRow[];
 
-    // KPI: total submissions
     const submissions = usage.length;
 
-    // KPI: unique takers (generic: we don’t have taker_id in v_usage_submissions yet)
-    // We’ll treat unique submissions as unique; if you want unique takers, we can add taker_id to v_usage_submissions.
+    // Optional KPI: unique takers (not available in v_usage_submissions yet)
     const uniqueTakers = null as number | null;
 
-    // KPI: active links
     const activeLinks = links.filter((l) =>
       isLinkActive({
         is_active: l.is_active,
@@ -199,15 +222,14 @@ export async function GET(req: Request) {
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([date, submissions]) => ({ date, submissions }));
 
-    // 3) Per-link counts
+    // Per-link submission counts
     const linkCounts = new Map<string, number>();
     for (const u of usage) {
       if (!u.link_token) continue;
       linkCounts.set(u.link_token, (linkCounts.get(u.link_token) || 0) + 1);
     }
 
-    // 4) Expanded scores in range (for profiles + frequencies)
-    // NOTE: This uses the new view you created in Step 1.
+    // 3) Expanded scores in range (profiles + frequencies)
     let expQ = supa
       .from("v_submission_scores_expanded_submissions")
       .select(
@@ -224,19 +246,14 @@ export async function GET(req: Request) {
 
     const expanded = (expRes.data || []) as ExpandedRow[];
 
-    // Aggregate avg points per link_token + dimension_type + dimension_code
+    // Aggregate avg points per link + type + code
     type Agg = { sum: number; n: number; name: string; submissions: Set<string> };
     const agg = new Map<string, Agg>();
 
     for (const r of expanded) {
       if (!r.link_token) continue;
       const key = `${r.link_token}||${r.dimension_type}||${r.dimension_code}`;
-      const existing = agg.get(key) || {
-        sum: 0,
-        n: 0,
-        name: r.dimension_name,
-        submissions: new Set<string>(),
-      };
+      const existing = agg.get(key) || { sum: 0, n: 0, name: r.dimension_name, submissions: new Set<string>() };
       existing.sum += Number(r.total_points || 0);
       existing.n += 1;
       existing.name = r.dimension_name || existing.name;
@@ -262,44 +279,42 @@ export async function GET(req: Request) {
       return items.slice(0, n);
     }
 
-    // Build link rows
-    const linkRows: LinkRow[] = links.map((l) => {
-      const testsTaken = linkCounts.get(l.token) || 0;
-      const topProfiles = testsTaken > 0 ? topNForLink(l.token, "profile", 3) : [];
-      const topFreqArr = testsTaken > 0 ? topNForLink(l.token, "frequency", 1) : [];
-      const topFrequency = topFreqArr[0] || null;
+    const linkRows: LinkRow[] = links
+      .map((l) => {
+        const testsTaken = linkCounts.get(l.token) || 0;
+        const topProfiles = testsTaken > 0 ? topNForLink(l.token, "profile", 3) : [];
+        const topFreqArr = testsTaken > 0 ? topNForLink(l.token, "frequency", 1) : [];
+        const topFrequency = topFreqArr[0] || null;
 
-      return {
-        linkId: l.id,
-        token: l.token,
-        name: l.name ?? null,
-        label: l.label ?? null,
-        isActive: l.is_active ?? null,
-        createdAt: l.created_at,
-        expiresAt: l.expires_at ?? null,
-        useCount: l.use_count ?? 0,
-        maxUses: l.max_uses ?? null,
-
-        testsTaken,
-        topProfiles,
-        topFrequency,
-      };
-    });
-
-    // Sort links by testsTaken desc
-    linkRows.sort((a, b) => b.testsTaken - a.testsTaken);
+        return {
+          linkId: l.id,
+          token: l.token,
+          name: l.name ?? null,
+          label: l.label ?? null,
+          isActive: l.is_active ?? null,
+          createdAt: l.created_at,
+          expiresAt: l.expires_at ?? null,
+          useCount: l.use_count ?? 0,
+          maxUses: l.max_uses ?? null,
+          testsTaken,
+          topProfiles,
+          topFrequency,
+        };
+      })
+      .sort((a, b) => b.testsTaken - a.testsTaken);
 
     return NextResponse.json({
       ok: true,
       filters: {
         orgId,
+        org: orgSlugParam || null,
         testId,
         from: toIso(from),
         to: toIso(to),
       },
       kpis: {
         submissions,
-        uniqueTakers, // null until we add taker_id to v_usage_submissions (recommended)
+        uniqueTakers,
         activeLinks,
       },
       timeline,
@@ -312,3 +327,4 @@ export async function GET(req: Request) {
     );
   }
 }
+
