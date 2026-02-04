@@ -10,9 +10,15 @@ import DashboardV2Client from "./DashboardV2Client";
 
 export default function Page() {
   return (
-    <main className="relative min-h-screen">
+    <main className="relative min-h-screen overflow-hidden">
       {/* Background layer */}
       <AppBackground />
+
+      {/* Dark scrim for contrast */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[#050914]/70"
+      />
 
       {/* Foreground content */}
       <div className="relative z-10">
