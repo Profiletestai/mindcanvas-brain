@@ -50,7 +50,7 @@ type SectionsPayload = {
   profile_missing?: boolean;
   framework_version?: string | null;
   framework_bucket?: string | null;
-  framework_path?: string | null; // IMPORTANT: we’ll use this to infer image base path
+  framework_path?: string | null;
 };
 
 type ResultData = {
@@ -136,101 +136,6 @@ function isNextStepsSection(s: ReportSection) {
   return id === "next-steps" || title === "next steps" || title.includes("next steps");
 }
 
-/** ---------- profile image helpers (generic + fail-soft) ------------------ */
-
-function normaliseWhitespace(s: string) {
-  return s.replace(/\s+/g, " ").trim();
-}
-
-function slugifyDashed(s: string) {
-  return normaliseWhitespace(s)
-    .toLowerCase()
-    .replace(/[™®©]/g, "")
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s\-]+/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/\-+/g, "-")
-    .trim();
-}
-
-function slugifyUnderscore(s: string) {
-  return normaliseWhitespace(s)
-    .toLowerCase()
-    .replace(/[™®©]/g, "")
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s\-_]+/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/_+/g, "_")
-    .trim();
-}
-
-function filenameWithSpaces(s: string) {
-  // supports your current "vision engineer.png"
-  return normaliseWhitespace(s).toLowerCase();
-}
-
-function inferImageBaseFromFrameworkPath(frameworkPath?: string | null) {
-  const p = String(frameworkPath || "").toLowerCase();
-
-  // OperatingFrame
-  if (p.includes("operatingframe")) return "/images/operatingframe-full-test";
-
-  // LEAD
-  if (p.includes("lead")) return "/images/mindCanvas-LEAD-system";
-
-  // Unknown: no auto images
-  return "";
-}
-
-function buildProfileCardCandidates(basePath: string, profileName: string) {
-  if (!basePath) return [];
-  const name = String(profileName || "").trim();
-  if (!name) return [];
-
-  const spaced = filenameWithSpaces(name);
-  const dashed = slugifyDashed(name);
-  const underscored = slugifyUnderscore(name);
-
-  const files = [spaced, dashed, underscored]
-    .filter(Boolean)
-    .map((f) => `${basePath}/profile-cards/${encodeURIComponent(f)}.png`);
-
-  return Array.from(new Set(files));
-}
-
-function sectionLooksLikeTopProfileDetail(
-  section: ReportSection,
-  topProfileName: string
-) {
-  const title = safeText(section.title).toLowerCase();
-  const id = safeText(section.id).toLowerCase();
-  const prof = safeText(topProfileName).toLowerCase();
-
-  // Heuristic for “your in-depth profile section”
-  const inDepth =
-    title.includes("in depth") ||
-    title.includes("in-depth") ||
-    title.includes("operating style") ||
-    title.includes("operating pattern") ||
-    id.includes("in-depth") ||
-    id.includes("operating") ||
-    id.includes("profile");
-
-  const mentionsProfile = prof && (title.includes(prof) || id.includes(prof));
-  return Boolean(inDepth && (mentionsProfile || title.includes(":")));
-}
-
-function hasImageBlockNearTop(section: ReportSection) {
-  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-  for (let i = 0; i < Math.min(3, blocks.length); i++) {
-    const t = String((blocks[i] as any)?.type || "").toLowerCase();
-    if (t === "image") return true;
-  }
-  return false;
-}
-
-/** ---------- UI components ------------------------------------------------ */
-
 function Donut(props: { value: number; label: string }) {
   // value is 0..1
   const v = Math.max(0, Math.min(1, props.value || 0));
@@ -288,9 +193,7 @@ function Donut(props: { value: number; label: string }) {
       </svg>
 
       <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          {props.label}
-        </div>
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{props.label}</div>
         <div className="mt-1 text-sm text-slate-700">Your dominant frequency</div>
       </div>
     </div>
@@ -324,9 +227,7 @@ function ImageRenderer({ block }: { block: ImageBlock }) {
       </div>
 
       {block.caption ? (
-        <figcaption className="mt-2 text-center text-xs text-slate-500">
-          {safeText(block.caption)}
-        </figcaption>
+        <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText(block.caption)}</figcaption>
       ) : null}
     </figure>
   );
@@ -344,19 +245,11 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   }
 
   if (type === "h1") {
-    return (
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-        {safeText((block as any).text)}
-      </h1>
-    );
+    return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
   }
 
   if (type === "h2") {
-    return (
-      <h2 className="text-xl font-semibold tracking-tight text-slate-900">
-        {safeText((block as any).text)}
-      </h2>
-    );
+    return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
   }
 
   if (type === "h3") {
@@ -477,18 +370,21 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     const common = (data?.sections?.common || []) as ReportSection[];
     const profile = (data?.sections?.profile || []) as ReportSection[];
 
+    // Option A expects common + profile with NO overlap.
+    // Safety rail: dedupe by id/title in case a framework is uploaded incorrectly.
     const combined = [...common, ...profile].filter(Boolean);
 
     const seen = new Set<string>();
     const deduped: ReportSection[] = [];
     for (let i = 0; i < combined.length; i++) {
       const s = combined[i];
-      const key = getSectionDomId(s, i);
+      const key = getSectionDomId(s, i); // prefers s.id; falls back to title
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(s);
     }
 
+    // Force Welcome to first if present
     const idx = findWelcomeIndex(deduped);
     if (idx > 0) {
       const welcome = deduped[idx];
@@ -507,15 +403,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
         return { id, title: String(s.title), raw: s };
       });
   }, [mergedSections]);
-
-  // Infer image base from storage framework path so OperatingFrame + LEAD work automatically.
-  const imageBase = useMemo(() => {
-    return inferImageBaseFromFrameworkPath(data?.sections?.framework_path || "");
-  }, [data?.sections?.framework_path]);
-
-  const profileCardCandidates = useMemo(() => {
-    return buildProfileCardCandidates(imageBase, data?.top_profile_name || "");
-  }, [imageBase, data?.top_profile_name]);
 
   async function handleDownloadPdf() {
     if (!reportRef.current) return;
@@ -575,11 +462,13 @@ export default function LegacyReportClient(props: { token: string; tid: string }
   function openNextSteps() {
     const url = (data?.link?.next_steps_url || "").trim();
 
+    // Preferred: go to your external next-steps flow if present
     if (url) {
       window.open(url, "_blank", "noopener,noreferrer");
       return;
     }
 
+    // Fallback: jump to the Next Steps section in the report
     const next = mergedSections.find((s) => isNextStepsSection(s));
     if (next) {
       const id = getSectionDomId(next, 0) || "next-steps";
@@ -587,6 +476,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
       return;
     }
 
+    // Last resort: try standard id
     scrollToSection("next-steps");
   }
 
@@ -638,6 +528,9 @@ export default function LegacyReportClient(props: { token: string; tid: string }
   const orgName = data.org_name || data.test_name || "Organisation";
   const reportTitle = data.sections?.report_title || data.test_name || "Personalised report";
 
+  const nextStepsUrl = (data.link?.next_steps_url || "").trim();
+  const hasNextSteps = Boolean(nextStepsUrl);
+
   // Dominant frequency
   const topFreqCode = data.top_freq;
   const topFreqPct = data.frequency_percentages?.[topFreqCode] ?? 0;
@@ -652,33 +545,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
   const secondary = sortedProfiles[1];
   const tertiary = sortedProfiles[2];
 
-  // AUTO-INJECT: if the “in depth” profile section doesn’t have an image yet, add one.
-  const mergedSectionsWithAutoProfileImage = useMemo(() => {
-    const topName = String(data?.top_profile_name || "").trim();
-    if (!topName) return mergedSections;
-
-    const candidates = buildProfileCardCandidates(imageBase, topName);
-    if (!candidates.length) return mergedSections;
-
-    const firstCandidate = candidates[0];
-
-    return mergedSections.map((s) => {
-      if (!sectionLooksLikeTopProfileDetail(s, topName)) return s;
-      if (hasImageBlockNearTop(s)) return s;
-
-      const blocks = Array.isArray(s.blocks) ? s.blocks : [];
-      const injected: ImageBlock = {
-        type: "image",
-        src: firstCandidate.startsWith("/") ? firstCandidate : `/${firstCandidate}`,
-        alt: topName,
-        align: "center",
-        max_h: 220,
-      };
-
-      return { ...s, blocks: [injected, ...blocks] };
-    });
-  }, [mergedSections, data?.top_profile_name, imageBase]);
-
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
@@ -686,50 +552,31 @@ export default function LegacyReportClient(props: { token: string; tid: string }
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-6">
         {/* Header */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="flex items-start gap-4">
-              {/* NEW: top profile image in header (fail-soft) */}
-              {profileCardCandidates.length ? (
-                <img
-                  src={profileCardCandidates[0]}
-                  alt={data.top_profile_name}
-                  crossOrigin="anonymous"
-                  className="hidden sm:block h-16 w-auto rounded-xl border border-white/10 bg-white/5 p-1"
-                  onError={(e) => {
-                    // If header image fails, hide it. (Section auto-inject still tries too.)
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : null}
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Personalised report</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">{reportTitle}</h1>
+          <p className="mt-2 text-sm text-slate-200">
+            For {participant} · Organisation: {orgName}
+          </p>
+          <p className="mt-1 text-sm text-slate-200">
+            Top profile: <span className="font-semibold">{data.top_profile_name}</span>
+          </p>
 
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Personalised report</p>
-                <h1 className="mt-2 text-3xl font-bold tracking-tight">{reportTitle}</h1>
-                <p className="mt-2 text-sm text-slate-200">
-                  For {participant} · Organisation: {orgName}
-                </p>
-                <p className="mt-1 text-sm text-slate-200">
-                  Top profile: <span className="font-semibold">{data.top_profile_name}</span>
-                </p>
-              </div>
-            </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              onClick={handleDownloadPdf}
+              className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+            >
+              Download PDF
+            </button>
 
-            <div className="mt-2 flex flex-wrap gap-3 md:mt-0">
-              <button
-                onClick={handleDownloadPdf}
-                className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-              >
-                Download PDF
-              </button>
+            {/* Next Step CTA (always available; opens URL if configured, otherwise scrolls to Next Steps section) */}
+            <button
+              onClick={openNextSteps}
+              className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+            >
+              Next Step
+            </button>
 
-              {/* FIX: only ONE Next Step button */}
-              <button
-                onClick={openNextSteps}
-                className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
-              >
-                Next Step
-              </button>
-            </div>
           </div>
         </div>
 
@@ -739,6 +586,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <h2 className="text-lg font-semibold">Frequencies</h2>
 
+            {/* White content container */}
             <div className="mt-4 rounded-xl bg-white p-4 text-slate-900">
               <Donut value={topFreqPct} label={topFreqName} />
 
@@ -764,6 +612,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               <span className="font-semibold">{tertiary?.name}</span>
             </p>
 
+            {/* White content container */}
             <div className="mt-4 rounded-xl bg-white p-4 text-slate-900">
               <div className="space-y-3">
                 {sortedProfiles.map((p) => {
@@ -775,10 +624,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
                         <span className="text-slate-700">{pctLabel(p.pct)}</span>
                       </div>
                       <div className="mt-1 h-2 w-full rounded-full bg-slate-200">
-                        <div
-                          className="h-2 rounded-full bg-slate-900"
-                          style={{ width: `${Math.round(pct * 100)}%` }}
-                        />
+                        <div className="h-2 rounded-full bg-slate-900" style={{ width: `${Math.round(pct * 100)}%` }} />
                       </div>
                     </div>
                   );
@@ -788,7 +634,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
           </div>
         </div>
 
-        {/* Body layout */}
+        {/* Body layout: left quick index + right content */}
         <div className="mt-6 grid gap-4 md:grid-cols-[280px_1fr]">
           {/* Quick index */}
           <aside className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -822,13 +668,16 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               <h2 className="text-lg font-semibold">Core sections</h2>
             </div>
 
-            {mergedSectionsWithAutoProfileImage.length === 0 ? (
+            {mergedSections.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                <p className="text-sm text-slate-200">No sections were returned for this report.</p>
+                <p className="text-sm text-slate-200">
+                  No sections were returned for this report. (This usually means the storage framework file is missing
+                  content or the report route didn’t attach sections.profile.)
+                </p>
               </div>
             ) : null}
 
-            {mergedSectionsWithAutoProfileImage.map((section, idx) => {
+            {mergedSections.map((section, idx) => {
               const id = getSectionDomId(section, idx);
               const title = safeText(section.title);
 
@@ -864,4 +713,3 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     </div>
   );
 }
-
