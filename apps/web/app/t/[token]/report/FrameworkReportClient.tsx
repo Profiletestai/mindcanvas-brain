@@ -1,3 +1,4 @@
+// apps/web/app/t/[token]/report/FrameworkReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -31,6 +32,109 @@ function fullName(taker: any) {
   return name || "Participant";
 }
 
+function normaliseWhitespace(s: string) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function slugifyDashed(s: string) {
+  // "Vision Engineer" -> "vision-engineer"
+  return normaliseWhitespace(s)
+    .toLowerCase()
+    .replace(/[™®©]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9\s\-]+/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/\-+/g, "-")
+    .trim();
+}
+
+function slugifyUnderscore(s: string) {
+  // "Vision Engineer" -> "vision_engineer"
+  return normaliseWhitespace(s)
+    .toLowerCase()
+    .replace(/[™®©]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9\s\-_]+/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .trim();
+}
+
+function filenameWithSpaces(s: string) {
+  // "Vision Engineer" -> "vision engineer" (your current file)
+  return normaliseWhitespace(s).toLowerCase();
+}
+
+function inferImageBase(reportFrameworkPath: string) {
+  const p = String(reportFrameworkPath || "").toLowerCase();
+
+  // OperatingFrame
+  if (p.includes("operatingframe")) return "/images/operatingframe-full-test";
+
+  // LEAD
+  if (p.includes("lead")) return "/images/mindCanvas-LEAD-system";
+
+  // Unknown framework: no auto images
+  return "";
+}
+
+function ProfileCardImage({
+  profileName,
+  basePath,
+  className,
+}: {
+  profileName?: string;
+  basePath: string;
+  className?: string;
+}) {
+  const name = String(profileName || "").trim();
+  if (!name || !basePath) return null;
+
+  const candidates = useMemo(() => {
+    const dashed = slugifyDashed(name);
+    const underscored = slugifyUnderscore(name);
+    const spaced = filenameWithSpaces(name);
+
+    // Try in a sensible order:
+    // 1) exact “spaced” (matches your current "vision engineer.png")
+    // 2) dashed (recommended)
+    // 3) underscored (fallback)
+    const files = [spaced, dashed, underscored]
+      .filter(Boolean)
+      .map((f) => `${basePath}/profile-cards/${encodeURIComponent(f)}.png`);
+
+    // De-dupe (if name has no spaces, all three may match)
+    return Array.from(new Set(files));
+  }, [name, basePath]);
+
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    // Reset if profile/base changes
+    setIdx(0);
+  }, [candidates.join("|")]);
+
+  const src = candidates[idx];
+  if (!src) return null;
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      crossOrigin="anonymous"
+      className={className}
+      onError={(e) => {
+        // Try next candidate. If none left, hide.
+        if (idx < candidates.length - 1) {
+          setIdx(idx + 1);
+          return;
+        }
+        e.currentTarget.style.display = "none";
+      }}
+    />
+  );
+}
+
 export default function FrameworkReportClient({
   token,
   tid,
@@ -48,6 +152,8 @@ export default function FrameworkReportClient({
 
   const title = payload?.test_name || "Personalised report";
   const participant = useMemo(() => fullName(payload?.taker), [payload?.taker]);
+
+  const imageBase = useMemo(() => inferImageBase(reportFramework?.path || ""), [reportFramework?.path]);
 
   async function downloadPdf() {
     const el = reportRef.current;
@@ -143,9 +249,7 @@ export default function FrameworkReportClient({
         <AppBackground />
         <main className="relative z-10 mx-auto max-w-5xl p-6 space-y-3">
           <h1 className="text-2xl font-semibold">Personalised report</h1>
-          <p className="text-sm text-red-400">
-            Could not load your report. Please refresh.
-          </p>
+          <p className="text-sm text-red-400">Could not load your report. Please refresh.</p>
           <pre className="text-xs text-slate-300 whitespace-pre-wrap">{err}</pre>
         </main>
       </div>
@@ -157,21 +261,32 @@ export default function FrameworkReportClient({
       <AppBackground />
 
       <div className="relative z-10 mx-auto max-w-5xl px-4 pb-12 pt-8 md:px-6 space-y-6">
-        <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-6">
-          <div>
-            <p className="text-xs font-medium tracking-[0.2em] text-slate-300">
-              PERSONALISED REPORT
-            </p>
-            <h1 className="mt-2 text-3xl font-bold">{title}</h1>
-            <p className="mt-2 text-sm text-slate-200">
-              For {participant}
-              {payload?.top_profile_name ? (
-                <>
-                  {" · "}
-                  Top profile: <span className="font-semibold">{payload.top_profile_name}</span>
-                </>
-              ) : null}
-            </p>
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-6">
+          <div className="flex items-start gap-4">
+            {/* NEW: top profile image (fail-soft, only if base path is known) */}
+            {payload?.top_profile_name && imageBase ? (
+              <div className="hidden sm:block">
+                <ProfileCardImage
+                  profileName={payload.top_profile_name}
+                  basePath={imageBase}
+                  className="h-16 w-auto rounded-xl border border-white/10 bg-white/5 p-1"
+                />
+              </div>
+            ) : null}
+
+            <div>
+              <p className="text-xs font-medium tracking-[0.2em] text-slate-300">PERSONALISED REPORT</p>
+              <h1 className="mt-2 text-3xl font-bold">{title}</h1>
+              <p className="mt-2 text-sm text-slate-200">
+                For {participant}
+                {payload?.top_profile_name ? (
+                  <>
+                    {" · "}
+                    Top profile: <span className="font-semibold">{payload.top_profile_name}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
           </div>
 
           <button
@@ -187,3 +302,4 @@ export default function FrameworkReportClient({
     </div>
   );
 }
+
