@@ -16,6 +16,17 @@ type LinkMeta = {
   hidden_results_message?: string | null;
 };
 
+type ImageBlock = {
+  type: "image";
+  src?: string;
+  alt?: string;
+  caption?: string;
+  align?: "left" | "center" | "right";
+  max_h?: number; // px
+  // optional: allow future extension
+  [k: string]: any;
+};
+
 type SectionBlock =
   | { type: "p"; text?: string }
   | { type: "ul"; items?: string[] }
@@ -23,6 +34,7 @@ type SectionBlock =
   | { type: "quote"; text?: string; cite?: string }
   | { type: "divider" }
   | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
+  | ImageBlock
   | { type: string; [k: string]: any };
 
 type ReportSection = {
@@ -188,6 +200,39 @@ function Donut(props: { value: number; label: string }) {
   );
 }
 
+function ImageRenderer({ block }: { block: ImageBlock }) {
+  const src = String(block?.src || "").trim();
+  if (!src) return null;
+
+  const align = (block.align || "center").toLowerCase();
+  const justify =
+    align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
+
+  const maxH = typeof block.max_h === "number" && block.max_h > 0 ? block.max_h : 360;
+
+  return (
+    <figure className="my-5">
+      <div className={`flex ${justify}`}>
+        <img
+          src={src}
+          alt={safeText(block.alt)}
+          crossOrigin="anonymous"
+          className="h-auto max-w-full rounded-xl border border-slate-200 bg-white"
+          style={{ maxHeight: maxH }}
+          onError={(e) => {
+            // Fail-soft: hide missing/404 images without breaking the report (or PDF export).
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      </div>
+
+      {block.caption ? (
+        <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText(block.caption)}</figcaption>
+      ) : null}
+    </figure>
+  );
+}
+
 function BlockRenderer({ block }: { block: SectionBlock }) {
   const type = String((block as any)?.type || "").toLowerCase();
 
@@ -195,16 +240,16 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     return <hr className="my-5 border-slate-200" />;
   }
 
+  if (type === "image") {
+    return <ImageRenderer block={block as ImageBlock} />;
+  }
+
   if (type === "h1") {
-    return (
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>
-    );
+    return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
   }
 
   if (type === "h2") {
-    return (
-      <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>
-    );
+    return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
   }
 
   if (type === "h3") {
@@ -221,7 +266,7 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
 
   if (type === "p") {
     const t = safeText((block as any).text);
-    return <p className="text-sm leading-relaxed text-slate-700">{t}</p>;
+    return <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{t}</p>;
   }
 
   if (type === "ul") {
