@@ -101,6 +101,7 @@ export default async function TakerDetail({
     .maybeSingle();
   if (!org) return notFound();
 
+  // NOTE: do not org-filter taker here; we validate access below (supports wrapper org setups)
   const { data: taker } = await sb
     .from("test_takers")
     .select(
@@ -108,7 +109,37 @@ export default async function TakerDetail({
     )
     .eq("id", takerId)
     .maybeSingle();
-  if (!taker || taker.org_id !== org.id) return notFound();
+
+  if (!taker) return notFound();
+
+  // ✅ Access check:
+  // 1) allow if taker belongs to this org
+  // 2) otherwise allow if taker has ANY submission for a test whose tests.org_id == this org
+  let allowed = taker.org_id === org.id;
+
+  if (!allowed) {
+    const { data: subs } = await sb
+      .from("test_submissions")
+      .select("test_id")
+      .eq("taker_id", taker.id)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    const testIds = Array.from(
+      new Set((subs || []).map((s: any) => s?.test_id).filter(Boolean))
+    ) as string[];
+
+    if (testIds.length) {
+      const { data: testsForSubs } = await sb
+        .from("tests")
+        .select("id, org_id")
+        .in("id", testIds);
+
+      allowed = (testsForSubs || []).some((t: any) => t?.org_id === org.id);
+    }
+  }
+
+  if (!allowed) return notFound();
 
   const { data: test } = await sb
     .from("tests")
@@ -322,11 +353,10 @@ export default async function TakerDetail({
   let qscExtendedUrl: string | null = null;
   let qscStrategicUrl: string | null = null;
 
-  // ✅ Determine QSC audience server-side so we build correct URLs (leader vs entrepreneur)
+  // Determine QSC audience server-side so we build correct URLs (leader vs entrepreneur)
   let qscAudience: QscAudience | null = null;
 
   if (isQsc && taker.link_token) {
-    // Prefer the actual qsc_results.audience for THIS token+taker
     const { data: qscRow } = await sb
       .from("qsc_results")
       .select("audience, created_at")
@@ -338,9 +368,6 @@ export default async function TakerDetail({
 
     const aud = (qscRow?.audience as QscAudience | null) ?? null;
 
-    // Fallbacks:
-    // - if this is the leaders test, treat null audience as leader (legacy rows)
-    // - otherwise default to entrepreneur
     if (aud === "leader" || aud === "entrepreneur") {
       qscAudience = aud;
     } else if (test?.slug === "qsc-leaders") {
@@ -352,37 +379,21 @@ export default async function TakerDetail({
     const base = `/qsc/${encodeURIComponent(taker.link_token)}`;
     const query = `?tid=${encodeURIComponent(taker.id)}`;
 
-    // 1) Snapshot (same viewer, audience decides what buttons should do)
     qscSnapshotUrl = `${base}${query}`;
 
-    // 2) ✅ Extended Source Code Snapshot (portal-only) — audience-aware
     const extendedPath = qscAudience === "leader" ? "/extended-leader" : "/extended";
     qscExtendedUrl = `${base}${extendedPath}${query}`;
 
-    // 3) ✅ Strategic report (public, taker-facing) — audience-aware
-    // This avoids relying on redirects and prevents landing on the wrong report.
     const strategicPath = qscAudience === "leader" ? "/leader" : "/entrepreneur";
     qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
   // --- Main report URL (what "Open test-taker report" should open) ----------
-let reportUrl: string | null = null;
-
-if (isQsc) {
-  reportUrl = qscStrategicUrl;
-} else if (taker.link_token) {
-  reportUrl = `/t/${encodeURIComponent(
-    taker.link_token
-  )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-} else if (taker.last_result_url) {
-  reportUrl = String(taker.last_result_url);
-}
+  let reportUrl: string | null = null;
 
   if (isQsc) {
-    // ✅ QSC: always open the public Strategic report
     reportUrl = qscStrategicUrl;
   } else if (taker.link_token) {
-    // ✅ Non-QSC: open the RESULT viewer (portal should NOT be subject to redirect_url/show_results)
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
     )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
@@ -459,7 +470,7 @@ if (isQsc) {
                 <Link
                   href={reportUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
                 >
                   Open test-taker report
@@ -469,11 +480,14 @@ if (isQsc) {
           </div>
         </div>
 
+        {/* ✅ QSC buttons now open in a new tab */}
         {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
           <div className="flex flex-wrap gap-2 pt-2">
             {qscSnapshotUrl && (
               <Link
                 href={qscSnapshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
               >
                 Buyer Persona Snapshot
@@ -483,6 +497,8 @@ if (isQsc) {
             {qscExtendedUrl && (
               <Link
                 href={qscExtendedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
               >
                 Extended Source Code Snapshot
@@ -492,6 +508,8 @@ if (isQsc) {
             {qscStrategicUrl && (
               <Link
                 href={qscStrategicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md border border-amber-600 bg-amber-500 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-400"
               >
                 QSC — Strategic Growth Report
@@ -586,4 +604,3 @@ if (isQsc) {
     </div>
   );
 }
-
