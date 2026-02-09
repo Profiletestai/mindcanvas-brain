@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AppBackground from "@/components/ui/AppBackground";
 
 import LegacyReportClient from "./LegacyReportClient";
@@ -19,7 +20,50 @@ type GateAPI = {
   error?: string;
 };
 
+type MetaAPI = {
+  ok?: boolean;
+  data?: any;
+  error?: string;
+  // sometimes endpoints return raw meta without {ok,data}
+  [k: string]: any;
+};
+
+function norm(x: any) {
+  return String(x ?? "").trim().toLowerCase();
+}
+
+function detectQsc(meta: any): { isQsc: boolean; variant: "entrepreneur" | "leader" } {
+  const frameworkType = norm(meta?.framework_type || meta?.test?.framework_type);
+  const resultType = norm(meta?.result_type || meta?.test?.result_type);
+
+  const qscVariantRaw =
+    meta?.qsc_variant ||
+    meta?.test?.qsc_variant ||
+    meta?.meta?.qsc_variant ||
+    meta?.link?.meta?.qsc_variant ||
+    meta?.meta?.variant ||
+    meta?.variant;
+
+  const qscVariant = norm(qscVariantRaw);
+
+  const isQsc =
+    frameworkType === "qsc" ||
+    resultType === "qsc" ||
+    qscVariant === "entrepreneur" ||
+    qscVariant === "leader" ||
+    // extra safety: name/slug sometimes includes it
+    norm(meta?.test_name).includes("qsc") ||
+    norm(meta?.test?.name).includes("qsc") ||
+    norm(meta?.test_slug).includes("qsc") ||
+    norm(meta?.test?.slug).includes("qsc");
+
+  const variant: "entrepreneur" | "leader" = qscVariant === "leader" ? "leader" : "entrepreneur";
+  return { isQsc, variant };
+}
+
 export default function ReportGateClient(props: { token: string; tid: string; src?: string }) {
+  const router = useRouter();
+
   const { token, tid } = props;
   const src = typeof props.src === "string" ? props.src : "";
 
@@ -32,6 +76,8 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     useStorageFramework?: boolean;
     decided?: "storage" | "legacy";
     src?: string;
+    qscDetected?: boolean;
+    qscVariant?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -49,9 +95,10 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
           return;
         }
 
+        // --- existing report endpoint (keep exactly as your current approach) ---
         const qs = new URLSearchParams();
         qs.set("tid", tid);
-        if (src) qs.set("src", src); // ✅ forward src
+        if (src) qs.set("src", src); // forward src
 
         const url = `/api/public/test/${encodeURIComponent(token)}/report?${qs.toString()}`;
 
@@ -76,6 +123,31 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
         const useStorage = explicitStorageFlag || versionSuggestsStorage;
 
+        // --- NEW: QSC detection (narrow + fail-soft) ---
+        // Only redirect when we can positively identify QSC.
+        let qscDetected = false;
+        let qscVariant: "entrepreneur" | "leader" = "entrepreneur";
+
+        try {
+          const metaRes = await fetch(`/api/public/test/${encodeURIComponent(token)}`, {
+            cache: "no-store",
+          });
+
+          const metaCt = metaRes.headers.get("content-type") ?? "";
+          if (metaCt.includes("application/json")) {
+            const metaJson = (await metaRes.json()) as MetaAPI;
+            const meta = (metaJson?.data ?? metaJson) as any;
+
+            const q = detectQsc(meta);
+            qscDetected = q.isQsc;
+            qscVariant = q.variant;
+          }
+        } catch {
+          // Fail-soft: if meta check fails, do nothing and continue with existing logic.
+          qscDetected = false;
+          qscVariant = "entrepreneur";
+        }
+
         if (cancelled) return;
 
         setDecisionDebug({
@@ -84,8 +156,23 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
           useStorageFramework: json.data?.debug?.useStorageFramework,
           decided: useStorage ? "storage" : "legacy",
           src,
+          qscDetected,
+          qscVariant,
         });
 
+        // If QSC → redirect to the QSC report route and stop.
+        if (qscDetected) {
+          const qsp = new URLSearchParams();
+          qsp.set("tid", tid);
+          if (src) qsp.set("src", src);
+
+          router.replace(
+            `/qsc/${encodeURIComponent(token)}/${encodeURIComponent(qscVariant)}?${qsp.toString()}`
+          );
+          return;
+        }
+
+        // Otherwise: preserve existing behavior.
         setMode(useStorage ? "storage" : "legacy");
       } catch (e: any) {
         if (cancelled) return;
@@ -98,7 +185,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     return () => {
       cancelled = true;
     };
-  }, [token, tid, src]);
+  }, [token, tid, src, router]);
 
   if (mode === "loading") {
     return (
@@ -125,6 +212,11 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
               <div>Error: {err ?? "Unknown"}</div>
               {decisionDebug?.url ? <div>URL: {decisionDebug.url}</div> : null}
               {decisionDebug?.src ? <div>src: {decisionDebug.src}</div> : <div>src: —</div>}
+              {decisionDebug?.qscDetected ? (
+                <div>QSC detected: yes ({decisionDebug.qscVariant})</div>
+              ) : (
+                <div>QSC detected: no</div>
+              )}
             </div>
           </details>
         </main>
@@ -132,6 +224,9 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     );
   }
 
+  // NOTE: keep your original mapping exactly:
+  // "storage" → LegacyReportClient
+  // "legacy"  → LegacyOrgReportClient
   if (mode === "storage") {
     return <LegacyReportClient token={token} tid={tid} />;
   }
