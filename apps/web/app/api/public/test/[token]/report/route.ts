@@ -68,6 +68,7 @@ type TestMeta = {
   // Preferred (meta-driven storage framework)
   report_framework_key?: string;
   report_framework_bucket?: string;
+  report_framework_version?: string;
 
   // legacy
   frameworkKey?: string;
@@ -129,12 +130,7 @@ function profileCodeToAB(pcode: string): AB | null {
 
 function selectedIndex(a: any): number {
   // We allow various shapes; numeric answers should resolve to 0..N-1
-  const raw =
-    a?.value ??
-    a?.index ??
-    a?.selected ??
-    a?.selected_index ??
-    undefined;
+  const raw = a?.value ?? a?.index ?? a?.selected ?? a?.selected_index ?? undefined;
 
   const n = Number(raw);
   // If answer stored as 1..N (radio), convert to 0-based:
@@ -251,6 +247,30 @@ function readSavedTotals(totals: any) {
   };
 }
 
+// ✅ Portal bypass helper
+function sanitizeLinkMetaForPortal(linkMeta: any) {
+  const link = linkMeta && typeof linkMeta === "object" ? { ...linkMeta } : {};
+
+  if ("redirect_url" in link) link.redirect_url = null;
+  if ("redirectUrl" in link) link.redirectUrl = null;
+
+  if ("next_steps_url" in link) link.next_steps_url = null;
+  if ("nextStepsUrl" in link) link.nextStepsUrl = null;
+
+  if ("show_results" in link) link.show_results = true;
+  if ("showResults" in link) link.showResults = true;
+
+  if (link?.meta && typeof link.meta === "object") {
+    const m = { ...link.meta };
+    if ("redirect_url" in m) m.redirect_url = null;
+    if ("next_steps_url" in m) m.next_steps_url = null;
+    if ("show_results" in m) m.show_results = true;
+    link.meta = m;
+  }
+
+  return link;
+}
+
 // --- Supabase client (admin) ---
 function sbAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -269,23 +289,29 @@ function sbAdmin() {
   });
 }
 
-// Resolve org/test for a token (canonical, no view fallback)
+// ✅ Resolve org/test for a token (use COLUMN flags as truth)
 async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   const sb = sbAdmin();
 
   const q = await sb
     .from("test_links")
-    .select(`
+    .select(
+      `
       test_id,
       token,
-      meta,
+      show_results,
+      redirect_url,
+      hidden_results_message,
+      next_steps_url,
+      email_report,
       tests:tests (
         id,
         name,
         org_id,
         orgs:orgs ( slug )
       )
-    `)
+    `,
+    )
     .eq("token", token)
     .limit(1)
     .maybeSingle();
@@ -295,11 +321,19 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   const testName = (q.data as any)?.tests?.name ?? null;
   const orgSlug = (q.data as any)?.tests?.orgs?.slug ?? null;
 
+  const link_meta = {
+    show_results: (q.data as any)?.show_results ?? true,
+    redirect_url: ((q.data as any)?.redirect_url as string | null) ?? null,
+    hidden_results_message: ((q.data as any)?.hidden_results_message as string | null) ?? null,
+    next_steps_url: ((q.data as any)?.next_steps_url as string | null) ?? null,
+    email_report: (q.data as any)?.email_report ?? false,
+  };
+
   return {
     test_id: q.data.test_id,
     org_slug: orgSlug,
     test_name: testName,
-    link_meta: (q.data as any)?.meta ?? null,
+    link_meta,
   };
 }
 
@@ -438,8 +472,7 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
   const meta = (testMeta || {}) as any;
 
   const key = typeof meta.report_framework_key === "string" ? meta.report_framework_key.trim() : "";
-  const bucketOverride =
-    typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
+  const bucketOverride = typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
 
   if (key) {
     const bucket = bucketOverride || "framework";
@@ -511,9 +544,7 @@ function findProfileReport(frameworkJson: any, profileCode: string) {
 }
 
 function normaliseSectionId(x: any): string {
-  return String(x || "")
-    .trim()
-    .toLowerCase();
+  return String(x || "").trim().toLowerCase();
 }
 
 function dedupeSectionsById(arr: any[]): any[] {
@@ -548,10 +579,7 @@ function enforceOptionA(commonIn: any[], profileIn: any[]) {
   };
 }
 
-function buildSegmentationSection(
-  qualQs: QualQuestionRow[],
-  answers: AnswerShape[] | null | undefined,
-) {
+function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShape[] | null | undefined) {
   const ansList = Array.isArray(answers) ? answers : [];
   const ansByQid = new Map<string, any>();
   for (const a of ansList) {
@@ -562,22 +590,17 @@ function buildSegmentationSection(
   const rows: string[] = [];
 
   for (const q of qualQs) {
-    const w = (q.weights && typeof q.weights === "object") ? q.weights : {};
+    const w = q.weights && typeof q.weights === "object" ? q.weights : {};
     const captureKey = safeText((w as any).capture_key || "").trim() || `S${q.idx ?? ""}`.trim();
     const questionText = safeText(q.text).trim();
     const a = ansByQid.get(q.id);
 
     let answerText = "";
 
-    // text input
     if (String(q.type || "").toLowerCase() === "text") {
       answerText =
-        safeText((a as any)?.text) ||
-        safeText((a as any)?.value) ||
-        safeText((a as any)?.answer) ||
-        "";
+        safeText((a as any)?.text) || safeText((a as any)?.value) || safeText((a as any)?.answer) || "";
     } else {
-      // radio/select -> map to option label
       const opts = Array.isArray(q.options) ? q.options : [];
       const sel = selectedIndex(a);
       const picked = opts[sel];
@@ -588,7 +611,6 @@ function buildSegmentationSection(
     }
 
     const line = `${captureKey}: ${answerText || "—"}`;
-    // only include if we have any meaningful answer or it’s a text question
     if (answerText || questionText) rows.push(line);
   }
 
@@ -597,10 +619,7 @@ function buildSegmentationSection(
   return {
     id: "segmentation-responses",
     title: "Your responses",
-    blocks: [
-      { type: "p", text: "These are the answers you provided to the initial questions." },
-      { type: "ul", items: rows },
-    ],
+    blocks: [{ type: "p", text: "These are the answers you provided to the initial questions." }, { type: "ul", items: rows }],
   };
 }
 
@@ -611,6 +630,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const { searchParams } = new URL(req.url);
     const token = params.token;
     const takerId = searchParams.get("tid");
+
+    // ✅ portal bypass flag
+    const src = (searchParams.get("src") || "").trim().toLowerCase();
+    const isPortalViewer = src === "portal";
 
     if (!takerId) {
       return NextResponse.json({ ok: false, error: "Missing tid" }, { status: 400 });
@@ -627,7 +650,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const storageChoice = resolveStorageFramework(testMeta);
     const useStorageFramework = storageChoice.use;
 
-    const orgSlug = String(meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach").trim();
+    const orgSlug = String(
+      meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach",
+    ).trim();
 
     // Default: filesystem framework (by org)
     let fw: any = await loadFrameworkBySlug(orgSlug);
@@ -648,7 +673,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     const look = buildLookups(fw);
 
-    // ✅ NEW: prefer DB labels (these are the source of truth for legacy tests)
+    // Prefer DB labels
     const dbLabels = await fetchDbLabels(meta.test_id);
 
     const metaFreqs = Array.isArray(testMeta?.frequencies) ? testMeta.frequencies : null;
@@ -678,11 +703,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         {
           ok: false,
           error: "Submission not found for this taker/token.",
-          debug: {
-            takerId,
-            token,
-            test_id: meta.test_id,
-          },
+          debug: { takerId, token, test_id: meta.test_id },
         },
         { status: 404 },
       );
@@ -700,10 +721,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq =
-      (Object.entries(freqTotals) as [AB, number][]).sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq = (Object.entries(freqTotals) as [AB, number][])
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry = Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry = Object.entries(profileTotals)
+      .sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
 
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
@@ -725,10 +747,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       const fixed = enforceOptionA(commonRaw, profileRaw);
       removed_overlap_count = fixed.removed_overlap_count;
 
-      // ✅ NEW: build S1–S5 response section and append to common
       const qualQs = await fetchQualQuestions(meta.test_id);
       const segSection = buildSegmentationSection(qualQs, sub.answers_json);
-
       const commonWithSeg = segSection ? [...fixed.common, segSection] : fixed.common;
 
       sections = {
@@ -742,7 +762,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       };
     }
 
-    const linkMeta = meta.link_meta || null;
+    // ✅ Link behavior comes from resolveLinkMeta() columns
+    const rawLinkMeta = meta.link_meta || null;
+    const linkMeta = isPortalViewer ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
 
     const answersCount = Array.isArray(sub.answers_json) ? sub.answers_json.length : 0;
     const computedSum = Object.values(profileTotals || {}).reduce((a, b) => a + (Number(b) || 0), 0);
@@ -769,6 +791,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           last_name: taker?.last_name ?? null,
         },
 
+        // ✅ clients use this for show/hide/redirect
         link: linkMeta || undefined,
 
         frequency_labels,
@@ -814,6 +837,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             freq_count: dbLabels.freqs.length,
             profile_count: dbLabels.profiles.length,
           },
+
+          src,
+          isPortalViewer,
         },
 
         version: useStorageFramework ? "portal-v2-storage-meta+labels+qual" : "portal-v1",
@@ -824,5 +850,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
+
+
+
 
 

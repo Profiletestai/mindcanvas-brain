@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { calculateQscScores } from "@/lib/qsc-scoring";
 import { sendTemplatedEmail } from "@/lib/server/emailTemplates";
+import { getBaseUrl } from "@/lib/baseUrl";
 
 type AB = "A" | "B" | "C" | "D";
 type PMEntry = { points?: number; profile?: string };
@@ -92,7 +93,7 @@ type LinkBehavior = {
   redirect_url: string | null;
   hidden_results_message: string | null;
   next_steps_url: string | null;
-  email_report: boolean; // ✅ your real DB column
+  email_report: boolean; // ✅ real DB column
 };
 
 /**
@@ -125,7 +126,7 @@ async function loadLinkBehavior(
     };
   }
 
-  // ⚠️ fallback: older schema might have email_results (not your case now, but safe)
+  // ⚠️ fallback: older schema might have email_results
   const a2 = await sb
     .from("test_links")
     .select(
@@ -145,7 +146,6 @@ async function loadLinkBehavior(
     };
   }
 
-  // Final fallback: don't fail submission because of flags
   console.warn("[submit] test_links behavior load failed", a2.error || a1.error);
   return {
     show_results: true,
@@ -303,9 +303,9 @@ export async function POST(
 
       if (name && code) nameToCode.set(name, code);
       if (code) {
-        if (f === "A" || f === "B" || f === "C" || f === "D")
+        if (f === "A" || f === "B" || f === "C" || f === "D") {
           codeToFreq.set(code, f as AB);
-        else {
+        } else {
           const implied = profileCodeToFreq(code);
           if (implied) codeToFreq.set(code, implied);
         }
@@ -476,29 +476,32 @@ export async function POST(
       .eq("id", taker.id)
       .eq("link_token", token);
 
-    // Prefer APP_ORIGIN (public domain) for links in emails
-    const appOrigin = String(process.env.APP_ORIGIN || "").replace(/\/+$/, "");
-    const origin = appOrigin || new URL(req.url).origin;
+    // ✅ Canonical base for ALL absolute links
+    const origin = getBaseUrl();
 
-    // Base “results page”
-    const baseResultUrl = `${origin}/t/${encodeURIComponent(
-      token
-    )}/result?tid=${encodeURIComponent(taker.id)}`;
+    // These are useful for both redirect + email/debugging
+    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
+    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(taker.id)}`;
 
-    // QSC report (internal)
-    const qscReportPath = `/qsc/${encodeURIComponent(
-      token
-    )}/report?tid=${encodeURIComponent(taker.id)}`;
+    const baseReportUrl = `${origin}${reportPath}`;
+    const baseResultUrl = `${origin}${resultPath}`;
+
+    // QSC report (public-facing)
+    const qscReportPath = `/qsc/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
     const qscReportUrl = `${origin}${qscReportPath}`;
 
-    const reportUrlForEmail = isQscEntrepreneur ? qscReportUrl : baseResultUrl;
+    // Email the report page (not /result)
+    const reportUrlForEmail = isQscEntrepreneur ? qscReportUrl : baseReportUrl;
 
-    // ✅ Decide redirect
-    const redirectUrl: string | null = isQscEntrepreneur
-      ? qscReportPath
-      : linkBehavior.redirect_url
-      ? linkBehavior.redirect_url
-      : null;
+    // ✅ NEW: Decide redirect deterministically using show_results
+    // - show_results=true  -> go to report (or QSC report)
+    // - show_results=false -> go to redirect_url if present, else fall back to /result (hidden message screen)
+    const redirectUrl: string =
+      linkBehavior.show_results === true
+        ? (isQscEntrepreneur ? qscReportPath : reportPath)
+        : (linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
+            ? linkBehavior.redirect_url.trim()
+            : resultPath);
 
     // Load org (needed for email template placeholders)
     const { data: orgRow } = await sb
@@ -520,7 +523,7 @@ export async function POST(
       if (linkBehavior.email_report && normalizeEmail(taker.email)) {
         takerEmailResult = await sendTemplatedEmail({
           orgId: taker.org_id,
-          type: "test_taker_report", // if you prefer, set this to "report"
+          type: "test_taker_report",
           to: String(taker.email),
           context: {
             first_name: taker.first_name || "there",
@@ -539,7 +542,7 @@ export async function POST(
       console.error("[submit] test_taker_report unexpected error", e);
     }
 
-    // ✅ Send internal notification (existing behavior)
+    // ✅ Send internal notification
     let ownerNotification: any = null;
     try {
       const sentTo =
@@ -597,8 +600,12 @@ export async function POST(
         email_report: linkBehavior.email_report,
       },
 
+      // ✅ redirect is now ALWAYS a string (path or external URL)
       redirect: redirectUrl,
+
+      // keep these as-is for existing client logic + debugging
       result_url: baseResultUrl,
+      report_url: baseReportUrl,
 
       owner_notification: ownerNotification,
       taker_email: takerEmailResult,
@@ -610,3 +617,4 @@ export async function POST(
     );
   }
 }
+
