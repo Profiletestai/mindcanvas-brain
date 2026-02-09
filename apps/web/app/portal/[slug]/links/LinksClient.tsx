@@ -18,9 +18,26 @@ type LinkRow = {
   show_results: boolean | null;
   is_active: boolean | null;
   expires_at: string | null;
+
+  // "Test name / Test purpose" (your human-friendly label)
   test_name: string | null;
+
   contact_owner: string | null;
   email_report: boolean;
+
+  // ✅ NEW (optional — depends on API returning them)
+  // "Test" (actual test, eg MindCanvas LEAD / Team Puzzle / QSC)
+  test?: string | null;
+  test_title?: string | null;
+  test_actual_name?: string | null;
+
+  // Redirect URL stored on the link (portal.test_links.redirect_url)
+  redirect_url?: string | null;
+  redirectUrl?: string | null;
+
+  // Uses stored on the link (portal.test_links.use_count)
+  use_count?: number | null;
+  uses?: number | null;
 };
 
 export default function LinksClient(props: {
@@ -56,7 +73,7 @@ export default function LinksClient(props: {
   const [loadingLinks, setLoadingLinks] = useState(false);
 
   const baseUrl = getBaseUrl();
-  
+
   // fetch helpers (uncached)
   const fetchJSON = async (url: string) => {
     const r = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`);
@@ -80,7 +97,7 @@ export default function LinksClient(props: {
   const refreshLinks = () => {
     setLoadingLinks(true);
     fetchJSON(`/api/admin/links?orgId=${orgId}`)
-      .then((d) => setLinks(Array.isArray(d) ? d : []))
+      .then((d) => setLinks(Array.isArray(d) ? (d as LinkRow[]) : []))
       .catch((e: any) => {
         setLinks([]);
         setStatus(`Links load error: ${e.message}`);
@@ -202,13 +219,12 @@ export default function LinksClient(props: {
           testDisplayName || selectedTest?.name || "Profile Test";
 
         try {
-          // ✅ This endpoint will now use sendTemplatedEmail("send_test_link")
           const emailRes = await fetch("/api/portal/links/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              orgId,                 // ✅ NEW (so templates + org profile can be loaded)
-              orgSlug,               // optional, but useful for debugging
+              orgId,
+              orgSlug,
               email: recipientEmail,
               linkUrl: url,
               orgName,
@@ -308,7 +324,9 @@ export default function LinksClient(props: {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block font-medium">Test name / Test purpose</span>
+            <span className="mb-1 block font-medium">
+              Test name / Test purpose
+            </span>
             <input
               type="text"
               className="w-full rounded border border-gray-300 p-2 text-sm"
@@ -330,7 +348,9 @@ export default function LinksClient(props: {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block font-medium">Recipient email (optional)</span>
+            <span className="mb-1 block font-medium">
+              Recipient email (optional)
+            </span>
             <input
               type="email"
               className="w-full rounded border border-gray-300 p-2 text-sm"
@@ -361,7 +381,8 @@ export default function LinksClient(props: {
               onChange={(e) => setShowResults(e.target.checked)}
             />
             <span>
-              Show results to taker <span className="text-gray-500">after completion</span>
+              Show results to taker{" "}
+              <span className="text-gray-500">after completion</span>
             </span>
           </label>
 
@@ -388,7 +409,8 @@ export default function LinksClient(props: {
                 onChange={(e) => setRedirectUrl(e.target.value)}
               />
               <span className="mt-1 block text-xs text-gray-500">
-                If results are hidden, the test taker will be redirected here after completing the test.
+                If results are hidden, the test taker will be redirected here
+                after completing the test.
               </span>
             </label>
           )}
@@ -406,7 +428,8 @@ export default function LinksClient(props: {
                 onChange={(e) => setNextStepsUrl(e.target.value)}
               />
               <span className="mt-1 block text-xs text-gray-500">
-                This will be used as the “Next steps” call-to-action link on the report.
+                This will be used as the “Next steps” call-to-action link on the
+                report.
               </span>
             </label>
           )}
@@ -423,7 +446,8 @@ export default function LinksClient(props: {
                 onChange={(e) => setHiddenResultsMessage(e.target.value)}
               />
               <span className="mt-1 block text-xs text-gray-500">
-                This message may be shown to the test taker when results are hidden.
+                This message may be shown to the test taker when results are
+                hidden.
               </span>
             </label>
           )}
@@ -473,19 +497,33 @@ export default function LinksClient(props: {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Test name / Test purpose</th>
+                <th className="px-3 py-2 text-left font-medium">
+                  Test name / Test purpose
+                </th>
+
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Test</th>
+
                 <th className="px-3 py-2 text-left font-medium">Created</th>
                 <th className="px-3 py-2 text-left font-medium">Results</th>
                 <th className="px-3 py-2 text-left font-medium">Expiry</th>
+
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Redirect link</th>
+
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Uses</th>
+
                 <th className="px-3 py-2 text-left font-medium">Link</th>
                 <th className="px-3 py-2 text-left font-medium">Copy</th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {links.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-gray-500">
+                  <td colSpan={10} className="py-6 text-center text-gray-500">
                     No links yet.
                   </td>
                 </tr>
@@ -493,16 +531,43 @@ export default function LinksClient(props: {
 
               {links.map((r, idx) => {
                 const url = fullLink(r.token);
-                const expired = r.expires_at ? new Date(r.expires_at) < new Date() : false;
+                const expired = r.expires_at
+                  ? new Date(r.expires_at) < new Date()
+                  : false;
                 const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
+
+                const redirect =
+                  (typeof r.redirect_url === "string" && r.redirect_url.trim()) ||
+                  (typeof r.redirectUrl === "string" && r.redirectUrl.trim()) ||
+                  "";
+
+                const uses =
+                  typeof r.use_count === "number"
+                    ? r.use_count
+                    : typeof r.uses === "number"
+                    ? r.uses
+                    : null;
+
+                const testActual =
+                  r.test_actual_name ||
+                  r.test_title ||
+                  r.test ||
+                  null;
 
                 return (
                   <tr key={r.id} className={`${rowBg} border-t`}>
                     <td className="px-3 py-2 align-top">
                       <div className="font-medium">{r.test_name || "Untitled link"}</div>
                       {r.contact_owner && (
-                        <div className="text-xs text-gray-500">Owner: {r.contact_owner}</div>
+                        <div className="text-xs text-gray-500">
+                          Owner: {r.contact_owner}
+                        </div>
                       )}
+                    </td>
+
+                    {/* ✅ NEW: Test */}
+                    <td className="px-3 py-2 align-top">
+                      <div className="text-sm">{testActual || "—"}</div>
                     </td>
 
                     <td className="px-3 py-2 align-top">
@@ -518,8 +583,40 @@ export default function LinksClient(props: {
 
                     <td className="px-3 py-2 align-top">
                       {r.expires_at
-                        ? `${new Date(r.expires_at).toLocaleString()}${expired ? " (expired)" : ""}`
+                        ? `${new Date(r.expires_at).toLocaleString()}${
+                            expired ? " (expired)" : ""
+                          }`
                         : "—"}
+                    </td>
+
+                    {/* ✅ NEW: Redirect Link */}
+                    <td className="px-3 py-2 align-top">
+                      {redirect ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="text-blue-600 underline"
+                            type="button"
+                            onClick={() => window.open(redirect, "_blank")}
+                            title={redirect}
+                          >
+                            Open
+                          </button>
+                          <button
+                            className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                            type="button"
+                            onClick={() => doCopy(redirect, "Redirect copied")}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+
+                    {/* ✅ NEW: Uses */}
+                    <td className="px-3 py-2 align-top">
+                      {uses === null ? "—" : String(uses)}
                     </td>
 
                     <td className="px-3 py-2 align-top">
@@ -543,7 +640,9 @@ export default function LinksClient(props: {
 
                         <button
                           className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
-                          onClick={() => downloadTxt(embedCode(url), `mindcanvas-embed-${r.token}.txt`)}
+                          onClick={() =>
+                            downloadTxt(embedCode(url), `mindcanvas-embed-${r.token}.txt`)
+                          }
                           title="Download the embed code as a .txt file"
                         >
                           Download embed
@@ -579,3 +678,4 @@ export default function LinksClient(props: {
     </div>
   );
 }
+
