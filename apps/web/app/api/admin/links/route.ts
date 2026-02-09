@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
     const sb = createClient().schema("portal");
 
-    // 1) Recent links for this org (include fields we need for the table)
+    // 1) Recent links for this org
     const { data: links, error: linkErr } = await sb
       .from("test_links")
       .select(
@@ -43,9 +43,11 @@ export async function GET(req: Request) {
     if (linkErr)
       return NextResponse.json({ error: linkErr.message }, { status: 500 });
 
-    // 2) Fetch actual test names for those test_ids
+    const safeLinks = links ?? [];
+
+    // 2) Fetch actual test names
     const testIds = Array.from(
-      new Set((links ?? []).map((r: any) => r.test_id).filter(Boolean))
+      new Set(safeLinks.map((r: any) => r.test_id).filter(Boolean))
     );
 
     let nameById: Record<string, string> = {};
@@ -63,8 +65,29 @@ export async function GET(req: Request) {
       }
     }
 
-    // 3) Shape response
-    const rows = (links ?? []).map((r: any) => ({
+    // 3) ✅ Compute Uses from actual submissions (authoritative)
+    // token is unique, so counting by link_token is safe
+    const tokens = safeLinks.map((r: any) => r.token).filter(Boolean);
+    const usesByToken: Record<string, number> = {};
+
+    if (tokens.length) {
+      const { data: subs, error: subsErr } = await sb
+        .from("test_submissions")
+        .select("id, link_token")
+        .in("link_token", tokens);
+
+      if (subsErr)
+        return NextResponse.json({ error: subsErr.message }, { status: 500 });
+
+      for (const s of subs ?? []) {
+        const t = (s as any).link_token;
+        if (!t) continue;
+        usesByToken[t] = (usesByToken[t] || 0) + 1;
+      }
+    }
+
+    // 4) Shape response (use computed uses first, fallback to stored use_count)
+    const rows = safeLinks.map((r: any) => ({
       id: r.id,
       token: r.token,
       created_at: r.created_at,
@@ -72,10 +95,8 @@ export async function GET(req: Request) {
       is_active: r.is_active,
       expires_at: r.expires_at,
 
-      // Your "purpose/name" saved on the link
       link_name: r.name || null,
 
-      // Actual test name from portal.tests.name
       test_name: nameById[r.test_id] || "Untitled test",
       test_id: r.test_id,
 
@@ -85,7 +106,14 @@ export async function GET(req: Request) {
       redirect_url: r.redirect_url || null,
       next_steps_url: r.next_steps_url || null,
 
-      use_count: typeof r.use_count === "number" ? r.use_count : 0,
+      // ✅ this is what your UI column shows
+      use_count:
+        typeof usesByToken[r.token] === "number"
+          ? usesByToken[r.token]
+          : typeof r.use_count === "number"
+          ? r.use_count
+          : 0,
+
       max_uses: r.max_uses ?? null,
     }));
 
