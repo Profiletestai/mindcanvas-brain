@@ -19,25 +19,21 @@ type LinkRow = {
   is_active: boolean | null;
   expires_at: string | null;
 
-  // "Test name / Test purpose" (your human-friendly label)
-  test_name: string | null;
+  // NEW (from API)
+  test_id: string | null;
+  test_name: string; // actual test name (portal.tests.name)
+  link_name: string | null; // saved purpose/name on link (portal.test_links.name)
 
   contact_owner: string | null;
   email_report: boolean;
 
-  // ✅ NEW (optional — depends on API returning them)
-  // "Test" (actual test, eg MindCanvas LEAD / Team Puzzle / QSC)
-  test?: string | null;
-  test_title?: string | null;
-  test_actual_name?: string | null;
+  // NEW
+  redirect_url: string | null;
+  next_steps_url: string | null;
 
-  // Redirect URL stored on the link (portal.test_links.redirect_url)
-  redirect_url?: string | null;
-  redirectUrl?: string | null;
-
-  // Uses stored on the link (portal.test_links.use_count)
-  use_count?: number | null;
-  uses?: number | null;
+  // NEW
+  use_count: number;
+  max_uses: number | null;
 };
 
 export default function LinksClient(props: {
@@ -97,7 +93,7 @@ export default function LinksClient(props: {
   const refreshLinks = () => {
     setLoadingLinks(true);
     fetchJSON(`/api/admin/links?orgId=${orgId}`)
-      .then((d) => setLinks(Array.isArray(d) ? (d as LinkRow[]) : []))
+      .then((d) => setLinks(Array.isArray(d) ? d : []))
       .catch((e: any) => {
         setLinks([]);
         setStatus(`Links load error: ${e.message}`);
@@ -194,7 +190,6 @@ export default function LinksClient(props: {
           emailReport,
           hiddenResultsMessage: messageToSave,
 
-          // NEW
           redirectUrl: !showResults ? redirectUrl.trim() : null,
           nextStepsUrl: showResults ? nextStepsUrl.trim() : null,
 
@@ -324,9 +319,7 @@ export default function LinksClient(props: {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block font-medium">
-              Test name / Test purpose
-            </span>
+            <span className="mb-1 block font-medium">Test name / Test purpose</span>
             <input
               type="text"
               className="w-full rounded border border-gray-300 p-2 text-sm"
@@ -348,9 +341,7 @@ export default function LinksClient(props: {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block font-medium">
-              Recipient email (optional)
-            </span>
+            <span className="mb-1 block font-medium">Recipient email (optional)</span>
             <input
               type="email"
               className="w-full rounded border border-gray-300 p-2 text-sm"
@@ -381,8 +372,7 @@ export default function LinksClient(props: {
               onChange={(e) => setShowResults(e.target.checked)}
             />
             <span>
-              Show results to taker{" "}
-              <span className="text-gray-500">after completion</span>
+              Show results to taker <span className="text-gray-500">after completion</span>
             </span>
           </label>
 
@@ -409,8 +399,7 @@ export default function LinksClient(props: {
                 onChange={(e) => setRedirectUrl(e.target.value)}
               />
               <span className="mt-1 block text-xs text-gray-500">
-                If results are hidden, the test taker will be redirected here
-                after completing the test.
+                If results are hidden, the test taker will be redirected here after completing the test.
               </span>
             </label>
           )}
@@ -428,8 +417,7 @@ export default function LinksClient(props: {
                 onChange={(e) => setNextStepsUrl(e.target.value)}
               />
               <span className="mt-1 block text-xs text-gray-500">
-                This will be used as the “Next steps” call-to-action link on the
-                report.
+                This will be used as the “Next steps” call-to-action link on the report.
               </span>
             </label>
           )}
@@ -446,8 +434,7 @@ export default function LinksClient(props: {
                 onChange={(e) => setHiddenResultsMessage(e.target.value)}
               />
               <span className="mt-1 block text-xs text-gray-500">
-                This message may be shown to the test taker when results are
-                hidden.
+                This message may be shown to the test taker when results are hidden.
               </span>
             </label>
           )}
@@ -504,16 +491,16 @@ export default function LinksClient(props: {
                 {/* ✅ NEW */}
                 <th className="px-3 py-2 text-left font-medium">Test</th>
 
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Uses</th>
+
                 <th className="px-3 py-2 text-left font-medium">Created</th>
                 <th className="px-3 py-2 text-left font-medium">Results</th>
-                <th className="px-3 py-2 text-left font-medium">Expiry</th>
 
                 {/* ✅ NEW */}
                 <th className="px-3 py-2 text-left font-medium">Redirect link</th>
 
-                {/* ✅ NEW */}
-                <th className="px-3 py-2 text-left font-medium">Uses</th>
-
+                <th className="px-3 py-2 text-left font-medium">Expiry</th>
                 <th className="px-3 py-2 text-left font-medium">Link</th>
                 <th className="px-3 py-2 text-left font-medium">Copy</th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
@@ -536,28 +523,18 @@ export default function LinksClient(props: {
                   : false;
                 const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
 
-                const redirect =
-                  (typeof r.redirect_url === "string" && r.redirect_url.trim()) ||
-                  (typeof r.redirectUrl === "string" && r.redirectUrl.trim()) ||
-                  "";
-
-                const uses =
-                  typeof r.use_count === "number"
-                    ? r.use_count
-                    : typeof r.uses === "number"
-                    ? r.uses
-                    : null;
-
-                const testActual =
-                  r.test_actual_name ||
-                  r.test_title ||
-                  r.test ||
-                  null;
+                // Redirect link: if results are hidden use redirect_url,
+                // otherwise show next_steps_url (still useful to see in table)
+                const redirectOrNext =
+                  (r.show_results ? r.next_steps_url : r.redirect_url) || "";
 
                 return (
                   <tr key={r.id} className={`${rowBg} border-t`}>
+                    {/* Purpose / label */}
                     <td className="px-3 py-2 align-top">
-                      <div className="font-medium">{r.test_name || "Untitled link"}</div>
+                      <div className="font-medium">
+                        {r.link_name || "Untitled link"}
+                      </div>
                       {r.contact_owner && (
                         <div className="text-xs text-gray-500">
                           Owner: {r.contact_owner}
@@ -565,22 +542,58 @@ export default function LinksClient(props: {
                       )}
                     </td>
 
-                    {/* ✅ NEW: Test */}
+                    {/* ✅ Test */}
                     <td className="px-3 py-2 align-top">
-                      <div className="text-sm">{testActual || "—"}</div>
+                      <div className="text-sm text-gray-900">{r.test_name || "—"}</div>
                     </td>
 
+                    {/* ✅ Uses */}
                     <td className="px-3 py-2 align-top">
-                      {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                      <div className="text-sm text-gray-900 tabular-nums">
+                        {typeof r.use_count === "number" ? r.use_count : 0}
+                        {r.max_uses ? ` / ${r.max_uses}` : ""}
+                      </div>
                     </td>
 
+                    {/* Created */}
+                    <td className="px-3 py-2 align-top">
+                      {r.created_at
+                        ? new Date(r.created_at).toLocaleString()
+                        : "—"}
+                    </td>
+
+                    {/* Results */}
                     <td className="px-3 py-2 align-top">
                       {r.show_results ? "Shown" : "Hidden"}
                       {!r.email_report && (
-                        <div className="text-xs text-gray-500">Report not emailed</div>
+                        <div className="text-xs text-gray-500">
+                          Report not emailed
+                        </div>
                       )}
                     </td>
 
+                    {/* ✅ Redirect link */}
+                    <td className="px-3 py-2 align-top">
+                      {redirectOrNext ? (
+                        <button
+                          type="button"
+                          className="text-blue-600 underline"
+                          onClick={() => window.open(redirectOrNext, "_blank")}
+                          title={redirectOrNext}
+                        >
+                          Open
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                      {redirectOrNext ? (
+                        <div className="mt-1 text-xs text-gray-500 truncate max-w-[220px]">
+                          {redirectOrNext}
+                        </div>
+                      ) : null}
+                    </td>
+
+                    {/* Expiry */}
                     <td className="px-3 py-2 align-top">
                       {r.expires_at
                         ? `${new Date(r.expires_at).toLocaleString()}${
@@ -589,36 +602,7 @@ export default function LinksClient(props: {
                         : "—"}
                     </td>
 
-                    {/* ✅ NEW: Redirect Link */}
-                    <td className="px-3 py-2 align-top">
-                      {redirect ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            className="text-blue-600 underline"
-                            type="button"
-                            onClick={() => window.open(redirect, "_blank")}
-                            title={redirect}
-                          >
-                            Open
-                          </button>
-                          <button
-                            className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
-                            type="button"
-                            onClick={() => doCopy(redirect, "Redirect copied")}
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-
-                    {/* ✅ NEW: Uses */}
-                    <td className="px-3 py-2 align-top">
-                      {uses === null ? "—" : String(uses)}
-                    </td>
-
+                    {/* Link */}
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
@@ -629,6 +613,7 @@ export default function LinksClient(props: {
                       </button>
                     </td>
 
+                    {/* Copy */}
                     <td className="px-3 py-2 align-top">
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -641,7 +626,10 @@ export default function LinksClient(props: {
                         <button
                           className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
                           onClick={() =>
-                            downloadTxt(embedCode(url), `mindcanvas-embed-${r.token}.txt`)
+                            downloadTxt(
+                              embedCode(url),
+                              `mindcanvas-embed-${r.token}.txt`
+                            )
                           }
                           title="Download the embed code as a .txt file"
                         >
@@ -657,6 +645,7 @@ export default function LinksClient(props: {
                       </div>
                     </td>
 
+                    {/* Actions */}
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
