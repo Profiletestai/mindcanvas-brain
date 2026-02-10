@@ -54,23 +54,6 @@ type InsightsPayload = {
   };
 };
 
-type SegCompany = { company: string; testsTaken: number; pct: number };
-type SegPurpose = { purpose: string; testsTaken: number; pct: number };
-
-type SegmentsPayload = {
-  ok: true;
-  filters: { orgId: string; org: string | null; testId: string | null; from: string; to: string };
-  segments: {
-    companies: SegCompany[];
-    purposes: SegPurpose[];
-    profilesByCount: TopByCount[];
-    profilesByAvg: TopByAvg[];
-    frequenciesByCount: TopByCount[];
-    frequenciesByAvg: TopByAvg[];
-    totals?: { submissions?: number };
-  };
-};
-
 function isoToDateInput(iso: string) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
@@ -97,13 +80,12 @@ function clampPct(p: number) {
   return Math.max(0, Math.min(1, p));
 }
 
-// ✅ Always round percentages to whole numbers (e.g. 23%)
+// Always round percentages to whole numbers (e.g. 23%)
 function fmtPct(p: number) {
-  const v = Math.round(clampPct(p) * 100);
-  return `${v}%`;
+  return `${Math.round(clampPct(p) * 100)}%`;
 }
 
-// ✅ Always round numbers to whole numbers (counts/averages)
+// Always round numbers to whole numbers (counts/averages)
 function fmtNum(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return "—";
   return String(Math.round(n));
@@ -195,10 +177,6 @@ export default function DashboardV2Client({
   const [err, setErr] = useState<string>("");
   const [data, setData] = useState<DashboardV2Payload | null>(null);
 
-  const [segmentsLoading, setSegmentsLoading] = useState(false);
-  const [segmentsErr, setSegmentsErr] = useState("");
-  const [segments, setSegments] = useState<SegmentsPayload["segments"] | null>(null);
-
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insights, setInsights] = useState<InsightsPayload["summary"] | null>(null);
 
@@ -221,7 +199,6 @@ export default function DashboardV2Client({
       const payload = j as PortalTestsPayload;
       setTests(payload.tests || []);
 
-      // Auto-select default dashboard test if provided and user hasn't chosen anything yet
       if (!selectedTestId) {
         const def = (payload.tests || []).find((t) => t.is_default_dashboard) || null;
         if (def?.id) setSelectedTestId(def.id);
@@ -234,40 +211,11 @@ export default function DashboardV2Client({
     }
   }
 
-  async function loadSegments(filters: DashboardV2Payload["filters"]) {
-    try {
-      setSegmentsLoading(true);
-      setSegmentsErr("");
-      setSegments(null);
-
-      const q = new URLSearchParams();
-      // Prefer orgId (most reliable), but keep org slug for clarity/debugging
-      if (filters?.orgId) q.set("orgId", filters.orgId);
-      q.set("org", org);
-      if (selectedTestId) q.set("testId", selectedTestId);
-      if (filters?.from) q.set("from", filters.from);
-      if (filters?.to) q.set("to", filters.to);
-
-      const res = await fetch(`/api/portal-dashboard-v2/segments?${q.toString()}`, { cache: "no-store" });
-      const j = await res.json();
-      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
-
-      setSegments((j as SegmentsPayload).segments || null);
-    } catch (e: any) {
-      setSegmentsErr(String(e?.message || e));
-      setSegments(null);
-    } finally {
-      setSegmentsLoading(false);
-    }
-  }
-
   async function loadMain() {
     try {
       setLoading(true);
       setErr("");
       setInsights(null);
-      setSegments(null);
-      setSegmentsErr("");
 
       const q = new URLSearchParams();
       q.set("org", org);
@@ -278,18 +226,10 @@ export default function DashboardV2Client({
       const res = await fetch(`/api/portal-dashboard-v2?${q.toString()}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
-
-      const payload = j as DashboardV2Payload;
-      setData(payload);
-
-      // Fire & forget (non-blocking widgets)
-      if (payload?.ok && payload?.filters?.orgId) {
-        loadSegments(payload.filters);
-      }
+      setData(j as DashboardV2Payload);
     } catch (e: any) {
       setErr(String(e?.message || e));
       setData(null);
-      setSegments(null);
     } finally {
       setLoading(false);
     }
@@ -343,11 +283,10 @@ export default function DashboardV2Client({
     try {
       const q = new URLSearchParams();
       q.set("token", token);
-      q.set("org", org);
-      if (selectedTestId) q.set("testId", selectedTestId);
       if (appliedFromIso) q.set("from", appliedFromIso);
       if (appliedToIso) q.set("to", appliedToIso);
 
+      // API is token-only (org/testId not needed here)
       const res = await fetch(`/api/portal-dashboard-v2/link?${q.toString()}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
@@ -397,7 +336,6 @@ export default function DashboardV2Client({
     const header = [
       "link_name",
       "label",
-      "token",
       "status",
       "tests_taken",
       "top_profile_1",
@@ -422,7 +360,6 @@ export default function DashboardV2Client({
       return [
         l.name || "",
         l.label || "",
-        l.token,
         l.isActive === false ? "inactive" : "active",
         Math.round(l.testsTaken || 0),
         p1?.name || "",
@@ -439,40 +376,6 @@ export default function DashboardV2Client({
     });
 
     const filename = `dashboard_links_${org}_${fromDate}_to_${toDate}${selectedTestId ? `_test_${selectedTestId}` : ""}.csv`;
-    downloadCsv(filename, header, rows);
-  }
-
-  function downloadSegmentsCsv() {
-    if (!segments || !data?.ok) return;
-
-    const header = ["segment_type", "name", "code", "count", "pct", "avg_points", "n"];
-    const rows: any[][] = [];
-
-    for (const c of segments.companies || []) {
-      rows.push(["company", c.company, "", Math.round(c.testsTaken || 0), Math.round(clampPct(c.pct) * 100), "", ""]);
-    }
-
-    for (const p of segments.purposes || []) {
-      rows.push(["purpose", p.purpose, "", Math.round(p.testsTaken || 0), Math.round(clampPct(p.pct) * 100), "", ""]);
-    }
-
-    for (const p of segments.profilesByCount || []) {
-      rows.push(["profile_by_count", p.name, p.code, Math.round(p.count || 0), Math.round(clampPct(p.pct) * 100), "", ""]);
-    }
-
-    for (const p of segments.profilesByAvg || []) {
-      rows.push(["profile_by_avg", p.name, p.code, "", "", Math.round(p.avgPoints || 0), Math.round(p.n || 0)]);
-    }
-
-    for (const f of segments.frequenciesByCount || []) {
-      rows.push(["frequency_by_count", f.name, f.code, Math.round(f.count || 0), Math.round(clampPct(f.pct) * 100), "", ""]);
-    }
-
-    for (const f of segments.frequenciesByAvg || []) {
-      rows.push(["frequency_by_avg", f.name, f.code, "", "", Math.round(f.avgPoints || 0), Math.round(f.n || 0)]);
-    }
-
-    const filename = `dashboard_segments_${org}_${fromDate}_to_${toDate}${selectedTestId ? `_test_${selectedTestId}` : ""}.csv`;
     downloadCsv(filename, header, rows);
   }
 
@@ -528,19 +431,16 @@ export default function DashboardV2Client({
     URL.revokeObjectURL(url);
   }
 
-  // Load tests + initial dashboard
   useEffect(() => {
     loadTests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org]);
 
-  // Reload dashboard whenever org/test changes (date is applied via Apply button)
   useEffect(() => {
     loadMain();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org, selectedTestId]);
 
-  // Auto-refresh insights whenever main payload changes
   useEffect(() => {
     if (data?.ok) loadInsights(data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -556,15 +456,18 @@ export default function DashboardV2Client({
     return t;
   }, [data]);
 
-  // Used for the “Open full analytics” link (preserve filters)
-  const linkFullAnalyticsQuery = useMemo(() => {
+  // ✅ Correct FULL analytics route (existing beta link page)
+  const fullAnalyticsHref = useMemo(() => {
+    if (!selectedToken) return null;
+
     const q = new URLSearchParams();
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
     if (selectedTestId) q.set("testId", selectedTestId);
-    const s = q.toString();
-    return s ? `?${s}` : "";
-  }, [appliedFromIso, appliedToIso, selectedTestId]);
+
+    const qs = q.toString();
+    return `/portal/${org}/dashboard/beta/link/${selectedToken}${qs ? `?${qs}` : ""}`;
+  }, [selectedToken, org, appliedFromIso, appliedToIso, selectedTestId]);
 
   const FiltersRow = (
     <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -616,35 +519,15 @@ export default function DashboardV2Client({
 
   return (
     <div className="min-h-screen p-6 space-y-6 text-white">
-      {/* Standalone banner (hide when embedded in PortalChrome to avoid duplicate headers) */}
       {!embedded ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
               <h1 className="text-2xl font-semibold">Dashboard v2</h1>
-              <p className="text-sm text-white/70">
-                Drill-down analytics for links, profiles, frequencies, and segmentation (safe parallel build).
-              </p>
+              <p className="text-sm text-white/70">Drill-down analytics for links, profiles, and frequencies.</p>
             </div>
-
             {FiltersRow}
-          </div>
-
-          <div className="mt-3 text-xs text-white/50">
-            org=<span className="font-mono">{org}</span>
-            {data?.filters?.orgId ? (
-              <>
-                {" "}
-                · orgId=<span className="font-mono">{data.filters.orgId}</span>
-              </>
-            ) : null}
-            {selectedTestId ? (
-              <>
-                {" "}
-                · testId=<span className="font-mono">{selectedTestId}</span>
-              </>
-            ) : null}
           </div>
         </div>
       ) : (
@@ -685,124 +568,6 @@ export default function DashboardV2Client({
             </div>
           </div>
 
-          {/* Segmentation (Org/Test level) */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Segmentation</h2>
-                <p className="text-sm text-white/60">
-                  Company, purpose (link label/name), and overall distributions for this org/test + date range.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {segmentsLoading ? <div className="text-xs text-white/50">Loading…</div> : null}
-                {segmentsErr ? <div className="text-xs text-red-300">Error: {segmentsErr}</div> : null}
-                <button
-                  onClick={downloadSegmentsCsv}
-                  disabled={!segments}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-                  title="Download segmentation as CSV"
-                >
-                  Download CSV
-                </button>
-              </div>
-            </div>
-
-            {!segmentsLoading && !segments && !segmentsErr ? (
-              <div className="mt-3 text-sm text-white/60">No segmentation available.</div>
-            ) : null}
-
-            {segments ? (
-              <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Companies */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <h3 className="font-semibold">Top companies</h3>
-                  <div className="mt-3 space-y-2">
-                    {(segments.companies || []).length ? (
-                      (segments.companies || []).slice(0, 12).map((c) => (
-                        <div key={c.company} className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{c.company}</div>
-                            <div className="text-xs text-white/50">
-                              {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-white/60">No company data captured.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Purpose */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <h3 className="font-semibold">Purpose (link label/name)</h3>
-                  <div className="mt-3 space-y-2">
-                    {(segments.purposes || []).length ? (
-                      (segments.purposes || []).slice(0, 12).map((p) => (
-                        <div key={p.purpose} className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{p.purpose}</div>
-                            <div className="text-xs text-white/50">
-                              {fmtNum(p.testsTaken)} · {fmtPct(p.pct)}
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-white/60">No purpose data captured.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Overall distributions */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <h3 className="font-semibold">Overall distributions</h3>
-
-                  <div className="mt-3">
-                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Top profiles (by count)</div>
-                    {(segments.profilesByCount || []).length ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(segments.profilesByCount || []).slice(0, 8).map((p) => (
-                          <span
-                            key={p.code}
-                            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                            title={`${p.code} · ${fmtNum(p.count)} (${fmtPct(p.pct)})`}
-                          >
-                            {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-white/60">—</div>
-                    )}
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Top frequencies (by count)</div>
-                    {(segments.frequenciesByCount || []).length ? (
-                      <div className="flex flex-wrap gap-2">
-                        {(segments.frequenciesByCount || []).slice(0, 6).map((f) => (
-                          <span
-                            key={f.code}
-                            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                            title={`${f.code} · ${fmtNum(f.count)} (${fmtPct(f.pct)})`}
-                          >
-                            {f.name} <span className="ml-2 text-white/50">{fmtPct(f.pct)}</span>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-white/60">—</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
           {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -814,11 +579,7 @@ export default function DashboardV2Client({
                 </div>
               </div>
               <div className="mt-3">
-                {sortedTimeline.length ? (
-                  <SimpleBars data={sortedTimeline} />
-                ) : (
-                  <div className="text-sm text-white/60">No activity in this range.</div>
-                )}
+                {sortedTimeline.length ? <SimpleBars data={sortedTimeline} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
               </div>
             </div>
 
@@ -829,16 +590,13 @@ export default function DashboardV2Client({
               </div>
 
               {!insights && !insightsLoading ? (
-                <div className="mt-3 text-sm text-white/60">
-                  Insights unavailable (non-blocking). Dashboard data is still valid.
-                </div>
+                <div className="mt-3 text-sm text-white/60">Insights unavailable (non-blocking).</div>
               ) : null}
 
               {insights ? (
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="text-xs text-white/50">
-                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n=
-                    {fmtNum(insights.confidence.sampleSize)}
+                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n={fmtNum(insights.confidence.sampleSize)}
                   </div>
 
                   <div>
@@ -868,9 +626,7 @@ export default function DashboardV2Client({
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Link performance</h2>
-                <p className="text-sm text-white/60">
-                  Click a link to drill down into distributions, segments, and link-level insights.
-                </p>
+                <p className="text-sm text-white/60">Click a link to drill down into link-level insights.</p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -880,7 +636,7 @@ export default function DashboardV2Client({
                 <button
                   onClick={downloadMainCsv}
                   className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                  title="Download the link table as CSV"
+                  title="Download link table as CSV"
                 >
                   Download CSV
                 </button>
@@ -894,7 +650,7 @@ export default function DashboardV2Client({
                     <th className="py-2 text-left font-medium">Link</th>
                     <th className="py-2 text-left font-medium">Status</th>
                     <th className="py-2 text-right font-medium">Tests taken</th>
-                    <th className="py-2 text-left font-medium">Top profiles (most common)</th>
+                    <th className="py-2 text-left font-medium">Top profiles</th>
                     <th className="py-2 text-left font-medium">Top frequency</th>
                     <th className="py-2 text-left font-medium">Created</th>
                     <th className="py-2 text-left font-medium">Expires</th>
@@ -908,22 +664,14 @@ export default function DashboardV2Client({
                     return (
                       <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-3 pr-3">
-                          <button
-                            className="text-left hover:underline"
-                            onClick={() => openLink(l.token)}
-                            title={l.token}
-                          >
+                          <button className="text-left hover:underline" onClick={() => openLink(l.token)}>
                             <div className="font-medium">{l.name || l.label || "Untitled link"}</div>
-                            <div className="text-xs text-white/50 font-mono">{l.token}</div>
+                            {l.label && l.name ? <div className="text-xs text-white/50">Label: {l.label}</div> : null}
                           </button>
                         </td>
 
                         <td className="py-3 pr-3">
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(
-                              l.isActive
-                            )}`}
-                          >
+                          <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(l.isActive)}`}>
                             {l.isActive === false ? "Inactive" : "Active"}
                           </span>
                         </td>
@@ -937,7 +685,7 @@ export default function DashboardV2Client({
                                 <span
                                   key={p.code}
                                   className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                                  title={`${p.code} · ${fmtNum(p.count)} (${fmtPct(p.pct)})`}
+                                  title={`${fmtNum(p.count)} (${fmtPct(p.pct)})`}
                                 >
                                   {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
                                 </span>
@@ -952,7 +700,7 @@ export default function DashboardV2Client({
                           {topF ? (
                             <span
                               className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                              title={`${topF.code} · ${fmtNum(topF.count)} (${fmtPct(topF.pct)})`}
+                              title={`${fmtNum(topF.count)} (${fmtPct(topF.pct)})`}
                             >
                               {topF.name} <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
                             </span>
@@ -989,15 +737,14 @@ export default function DashboardV2Client({
                     <div className="text-lg font-semibold truncate">
                       {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
                     </div>
-                    <div className="text-xs text-white/50 font-mono break-all">{selectedToken}</div>
                   </div>
 
                   <div className="flex gap-2">
-                    {selectedToken ? (
+                    {fullAnalyticsHref ? (
                       <Link
-                        href={`/portal/${org}/dashboard/beta/link/${selectedToken}${linkFullAnalyticsQuery}`}
+                        href={fullAnalyticsHref}
                         className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                        title="Open full analytics page for this link"
+                        title="Open full analytics page"
                       >
                         Open full analytics
                       </Link>
@@ -1009,7 +756,7 @@ export default function DashboardV2Client({
                       className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
                       title="Download link analytics as CSV"
                     >
-                      CSV
+                      Download CSV
                     </button>
 
                     <button
@@ -1050,8 +797,7 @@ export default function DashboardV2Client({
                         <h3 className="font-semibold">Insights (Beta)</h3>
                         {drawerData?._insights?.confidence ? (
                           <div className="text-xs text-white/50">
-                            {drawerData._insights.confidence.level} · n=
-                            {fmtNum(drawerData._insights.confidence.sampleSize)}
+                            {drawerData._insights.confidence.level} · n={fmtNum(drawerData._insights.confidence.sampleSize)}
                           </div>
                         ) : null}
                       </div>
@@ -1076,7 +822,7 @@ export default function DashboardV2Client({
                             <div className="min-w-0">
                               <div className="font-medium truncate">{p.name}</div>
                               <div className="text-xs text-white/50">
-                                {p.code} · {fmtNum(p.count)} · {fmtPct(p.pct)}
+                                {fmtNum(p.count)} · {fmtPct(p.pct)}
                               </div>
                             </div>
                             <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
@@ -1093,7 +839,7 @@ export default function DashboardV2Client({
                             <div className="min-w-0">
                               <div className="font-medium truncate">{f.name}</div>
                               <div className="text-xs text-white/50">
-                                {f.code} · {fmtNum(f.count)} · {fmtPct(f.pct)}
+                                {fmtNum(f.count)} · {fmtPct(f.pct)}
                               </div>
                             </div>
                             <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
@@ -1131,4 +877,3 @@ export default function DashboardV2Client({
     </div>
   );
 }
-
