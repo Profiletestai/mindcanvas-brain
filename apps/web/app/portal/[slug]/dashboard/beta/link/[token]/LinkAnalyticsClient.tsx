@@ -84,6 +84,144 @@ function MindCanvasBackdrop() {
   );
 }
 
+/** Neon sparkline with area glow */
+function Sparkline({
+  data,
+  height = 150,
+}: {
+  data: TimelinePoint[];
+  height?: number;
+}) {
+  const width = 920;
+  const padX = 10;
+  const padY = 12;
+
+  const values = data.map((d) => Math.max(0, d.submissions || 0));
+  const max = Math.max(1, ...values);
+  const min = 0;
+
+  const n = Math.max(2, data.length);
+  const dx = (width - padX * 2) / (n - 1);
+
+  const pts = data.map((d, i) => {
+    const v = Math.max(0, d.submissions || 0);
+    const t = (v - min) / (max - min || 1);
+    const x = padX + i * dx;
+    const y = padY + (1 - t) * (height - padY * 2);
+    return { x, y, v, date: d.date };
+  });
+
+  function pathSmooth(points: { x: number; y: number }[]) {
+    if (points.length < 2) return "";
+    const p = points;
+    let d = `M ${p[0].x} ${p[0].y}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] || p[i];
+      const p1 = p[i];
+      const p2 = p[i + 1];
+      const p3 = p[i + 2] || p2;
+
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+    }
+    return d;
+  }
+
+  const linePath = pathSmooth(pts);
+  const baselineY = height - padY;
+  const areaPath =
+    pts.length >= 2
+      ? `${linePath} L ${pts[pts.length - 1].x} ${baselineY} L ${pts[0].x} ${baselineY} Z`
+      : "";
+
+  const leftLabel = data[0]?.date ?? "";
+  const rightLabel = data[data.length - 1]?.date ?? "";
+
+  return (
+    <div className="w-full">
+      <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+        <div className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(800px_220px_at_50%_0%,rgba(100,186,226,0.18),transparent_60%)]" />
+
+        <svg viewBox={`0 0 ${width} ${height}`} className="block w-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="mcLine2" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="rgba(100,186,226,0.95)" />
+              <stop offset="50%" stopColor="rgba(45,143,196,0.95)" />
+              <stop offset="100%" stopColor="rgba(1,90,139,0.95)" />
+            </linearGradient>
+
+            <linearGradient id="mcArea2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(100,186,226,0.30)" />
+              <stop offset="60%" stopColor="rgba(45,143,196,0.14)" />
+              <stop offset="100%" stopColor="rgba(1,90,139,0.0)" />
+            </linearGradient>
+
+            <filter id="glow2">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feColorMatrix
+                in="blur"
+                type="matrix"
+                values="
+                  1 0 0 0 0
+                  0 1 0 0 0
+                  0 0 1 0 0
+                  0 0 0 0.9 0"
+                result="coloredBlur"
+              />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {[0.2, 0.4, 0.6, 0.8].map((t, i) => {
+            const y = padY + t * (height - padY * 2);
+            return (
+              <line
+                key={i}
+                x1={padX}
+                x2={width - padX}
+                y1={y}
+                y2={y}
+                stroke="rgba(255,255,255,0.06)"
+                strokeWidth="1"
+              />
+            );
+          })}
+
+          {areaPath ? <path d={areaPath} fill="url(#mcArea2)" /> : null}
+
+          {linePath ? (
+            <path d={linePath} fill="none" stroke="url(#mcLine2)" strokeWidth="6" opacity="0.22" filter="url(#glow2)" />
+          ) : null}
+          {linePath ? <path d={linePath} fill="none" stroke="url(#mcLine2)" strokeWidth="2.8" /> : null}
+
+          {pts.map((p, idx) => (
+            <g key={idx}>
+              <circle cx={p.x} cy={p.y} r="3.4" fill="rgba(255,255,255,0.85)" opacity="0.35" />
+              <circle cx={p.x} cy={p.y} r="2.0" fill="rgba(100,186,226,0.95)">
+                <title>
+                  {p.date}: {Math.round(p.v)}
+                </title>
+              </circle>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      <div className="mt-2 flex justify-between text-[11px] text-white/60">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 /** CSV helpers */
 function csvEscape(v: any) {
   const s = v == null ? "" : String(v);
@@ -101,49 +239,6 @@ function downloadCsvLines(filename: string, lines: string[]) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-}
-
-function SimpleBars({ data }: { data: TimelinePoint[] }) {
-  const max = Math.max(1, ...data.map((d) => d.submissions || 0));
-
-  return (
-    <div className="w-full">
-      <div className="flex items-end gap-1 h-28">
-        {data.map((p, idx) => {
-          const v = Math.max(0, p.submissions || 0);
-          const h = Math.round((v / max) * 108);
-
-          const glow =
-            idx % 3 === 0 ? "rgba(100,186,226,0.45)" : idx % 3 === 1 ? "rgba(45,143,196,0.42)" : "rgba(1,90,139,0.38)";
-
-          return (
-            <div key={p.date} className="flex-1 min-w-[6px] group">
-              <div className="relative w-full">
-                <div
-                  className="absolute bottom-0 left-0 right-0 rounded-sm blur-md opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ height: `${Math.max(6, h)}px`, background: `linear-gradient(180deg, ${glow}, transparent 75%)` }}
-                />
-                <div
-                  className="w-full rounded-sm border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
-                  style={{
-                    height: `${Math.max(2, h)}px`,
-                    background:
-                      "linear-gradient(180deg, rgba(100,186,226,0.90) 0%, rgba(45,143,196,0.75) 45%, rgba(1,90,139,0.60) 100%)",
-                  }}
-                  title={`${p.date}: ${Math.round(v)}`}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{data[0]?.date ?? ""}</span>
-        <span>{data[data.length - 1]?.date ?? ""}</span>
-      </div>
-    </div>
-  );
 }
 
 function TabButton({
@@ -187,6 +282,7 @@ export default function LinkAnalyticsClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [data, setData] = useState<LinkApiPayload | null>(null);
+
   const [tab, setTab] = useState<"companies" | "profiles" | "frequencies">("companies");
 
   useEffect(() => {
@@ -230,19 +326,6 @@ export default function LinkAnalyticsClient({
     return String(base).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
   }, [title]);
 
-  const timelineSorted = useMemo(() => {
-    const t = (data?.timeline || []).slice();
-    t.sort((a, b) => (a.date < b.date ? -1 : 1));
-    return t;
-  }, [data]);
-
-  const backHref = useMemo(() => {
-    const q = new URLSearchParams();
-    if (testId) q.set("testId", testId);
-    const qs = q.toString();
-    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
-  }, [orgSlug, testId]);
-
   function downloadCsv() {
     if (!data?.ok) return;
 
@@ -281,8 +364,22 @@ export default function LinkAnalyticsClient({
     pushSection("Profiles", ["profile_name", "profile_code", "count", "pct", "avg_points"], profiles);
     pushSection("Frequencies", ["frequency_name", "frequency_code", "count", "pct", "avg_points"], freqs);
 
-    downloadCsvLines(`link_analytics_${orgSlug}_${safeName}.csv`, lines);
+    const filename = `link_analytics_${orgSlug}_${safeName}.csv`;
+    downloadCsvLines(filename, lines);
   }
+
+  const backHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (testId) q.set("testId", testId);
+    const qs = q.toString();
+    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
+  }, [orgSlug, testId]);
+
+  const timelineSorted = useMemo(() => {
+    const t = (data?.timeline || []).slice();
+    t.sort((a, b) => (a.date < b.date ? -1 : 1));
+    return t;
+  }, [data]);
 
   const Card = ({ children }: { children: any }) => (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
@@ -316,11 +413,15 @@ export default function LinkAnalyticsClient({
               onClick={downloadCsv}
               disabled={!data?.ok}
               className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+              title="Download as CSV"
               type="button"
             >
               Download CSV
             </button>
-            <Link href={backHref} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
+            <Link
+              href={backHref}
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+            >
               Back to dashboard
             </Link>
           </div>
@@ -365,16 +466,16 @@ export default function LinkAnalyticsClient({
               <div className="text-xs text-white/50">Daily submissions</div>
             </div>
             <div className="mt-3">
-              {timelineSorted.length ? <SimpleBars data={timelineSorted} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
+              {timelineSorted.length ? <Sparkline data={timelineSorted} height={150} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
             </div>
           </Card>
 
-          {/* Segmentation */}
+          {/* Segmentation (Tabbed) */}
           <Card>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Segmentation</h2>
-                <p className="text-sm text-white/60">Switch tabs to explore companies, profiles, and frequencies.</p>
+                <p className="text-sm text-white/60">Cleaner view: switch tabs to explore companies, profiles, and frequencies.</p>
               </div>
 
               <div className="flex gap-2">
@@ -397,7 +498,7 @@ export default function LinkAnalyticsClient({
                     (data.segments.companies || []).slice(0, 25).map((c) => (
                       <div
                         key={c.company}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/7 transition"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
                       >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{c.company || "Unknown"}</div>
@@ -420,7 +521,7 @@ export default function LinkAnalyticsClient({
                     (data.distributions.profiles || []).slice(0, 30).map((p) => (
                       <div
                         key={p.code}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/7 transition"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
                       >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{p.name}</div>
@@ -443,7 +544,7 @@ export default function LinkAnalyticsClient({
                     (data.distributions.frequencies || []).slice(0, 20).map((f) => (
                       <div
                         key={f.code}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/7 transition"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
                       >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{f.name}</div>

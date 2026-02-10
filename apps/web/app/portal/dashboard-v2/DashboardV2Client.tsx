@@ -107,11 +107,8 @@ function badgeClass(active: boolean | null) {
 function MindCanvasBackdrop() {
   return (
     <div aria-hidden className="fixed inset-0 -z-10">
-      {/* depth gradient */}
       <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_50%_-10%,rgba(17,49,73,0.95)_0%,rgba(8,18,27,0.92)_55%,rgba(6,14,22,0.96)_100%)]" />
-      {/* subtle accent glow */}
       <div className="absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.45),transparent_60%)]" />
-      {/* grid */}
       <div
         className="absolute inset-0 opacity-30"
         style={{
@@ -120,52 +117,175 @@ function MindCanvasBackdrop() {
           backgroundSize: "60px 60px",
         }}
       />
-      {/* vignette */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/50" />
     </div>
   );
 }
 
-function SimpleBars({ data }: { data: TimelinePoint[] }) {
-  const max = Math.max(1, ...data.map((d) => d.submissions || 0));
+/** Neon sparkline with area glow */
+function Sparkline({
+  data,
+  height = 140,
+}: {
+  data: TimelinePoint[];
+  height?: number;
+}) {
+  const width = 920; // virtual width for consistent geometry
+  const padX = 10;
+  const padY = 12;
+
+  const values = data.map((d) => Math.max(0, d.submissions || 0));
+  const max = Math.max(1, ...values);
+  const min = 0;
+
+  const n = Math.max(2, data.length);
+  const dx = (width - padX * 2) / (n - 1);
+
+  // Build points
+  const pts = data.map((d, i) => {
+    const v = Math.max(0, d.submissions || 0);
+    const t = (v - min) / (max - min || 1); // 0..1
+    const x = padX + i * dx;
+    const y = padY + (1 - t) * (height - padY * 2);
+    return { x, y, v, date: d.date };
+  });
+
+  // Smoothing: Catmull-Rom to Bezier
+  function pathSmooth(points: { x: number; y: number }[]) {
+    if (points.length < 2) return "";
+    const p = points;
+    let d = `M ${p[0].x} ${p[0].y}`;
+
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] || p[i];
+      const p1 = p[i];
+      const p2 = p[i + 1];
+      const p3 = p[i + 2] || p2;
+
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+
+      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+    }
+    return d;
+  }
+
+  const linePath = pathSmooth(pts);
+  const baselineY = height - padY;
+
+  const areaPath =
+    pts.length >= 2
+      ? `${linePath} L ${pts[pts.length - 1].x} ${baselineY} L ${pts[0].x} ${baselineY} Z`
+      : "";
+
+  const leftLabel = data[0]?.date ?? "";
+  const rightLabel = data[data.length - 1]?.date ?? "";
 
   return (
     <div className="w-full">
-      <div className="flex items-end gap-1 h-28">
-        {data.map((p, idx) => {
-          const v = Math.max(0, p.submissions || 0);
-          const h = Math.round((v / max) * 108);
+      <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+        {/* subtle inner glow */}
+        <div className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(800px_220px_at_50%_0%,rgba(100,186,226,0.18),transparent_60%)]" />
 
-          // add slight variance so it feels alive (still brand-consistent)
-          const glow = idx % 3 === 0 ? "rgba(100,186,226,0.45)" : idx % 3 === 1 ? "rgba(45,143,196,0.42)" : "rgba(1,90,139,0.38)";
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="block w-full"
+          role="img"
+          aria-label="Submissions timeline"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="mcLine" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="rgba(100,186,226,0.95)" />
+              <stop offset="50%" stopColor="rgba(45,143,196,0.95)" />
+              <stop offset="100%" stopColor="rgba(1,90,139,0.95)" />
+            </linearGradient>
 
-          return (
-            <div key={p.date} className="flex-1 min-w-[6px] group">
-              <div className="relative w-full">
-                {/* glow behind */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 rounded-sm blur-md opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ height: `${Math.max(6, h)}px`, background: `linear-gradient(180deg, ${glow}, transparent 75%)` }}
-                />
-                {/* actual bar */}
-                <div
-                  className="w-full rounded-sm border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
-                  style={{
-                    height: `${Math.max(2, h)}px`,
-                    background:
-                      "linear-gradient(180deg, rgba(100,186,226,0.90) 0%, rgba(45,143,196,0.75) 45%, rgba(1,90,139,0.60) 100%)",
-                  }}
-                  title={`${p.date}: ${Math.round(v)}`}
-                />
-              </div>
-            </div>
-          );
-        })}
+            <linearGradient id="mcArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(100,186,226,0.30)" />
+              <stop offset="60%" stopColor="rgba(45,143,196,0.14)" />
+              <stop offset="100%" stopColor="rgba(1,90,139,0.0)" />
+            </linearGradient>
+
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="6" result="blur" />
+              <feColorMatrix
+                in="blur"
+                type="matrix"
+                values="
+                  1 0 0 0 0
+                  0 1 0 0 0
+                  0 0 1 0 0
+                  0 0 0 0.9 0"
+                result="coloredBlur"
+              />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* grid-ish horizontal guides */}
+          {[0.2, 0.4, 0.6, 0.8].map((t, i) => {
+            const y = padY + t * (height - padY * 2);
+            return (
+              <line
+                key={i}
+                x1={padX}
+                x2={width - padX}
+                y1={y}
+                y2={y}
+                stroke="rgba(255,255,255,0.06)"
+                strokeWidth="1"
+              />
+            );
+          })}
+
+          {/* area */}
+          {areaPath ? <path d={areaPath} fill="url(#mcArea)" /> : null}
+
+          {/* glow line (under) */}
+          {linePath ? (
+            <path
+              d={linePath}
+              fill="none"
+              stroke="url(#mcLine)"
+              strokeWidth="6"
+              opacity="0.22"
+              filter="url(#glow)"
+            />
+          ) : null}
+
+          {/* main line */}
+          {linePath ? (
+            <path d={linePath} fill="none" stroke="url(#mcLine)" strokeWidth="2.8" />
+          ) : null}
+
+          {/* dots */}
+          {pts.map((p, idx) => (
+            <g key={idx}>
+              <circle cx={p.x} cy={p.y} r="3.4" fill="rgba(255,255,255,0.85)" opacity="0.35" />
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="2.0"
+                fill="rgba(100,186,226,0.95)"
+              >
+                <title>
+                  {p.date}: {Math.round(p.v)}
+                </title>
+              </circle>
+            </g>
+          ))}
+        </svg>
       </div>
 
       <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{data[0]?.date ?? ""}</span>
-        <span>{data[data.length - 1]?.date ?? ""}</span>
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
       </div>
     </div>
   );
@@ -201,6 +321,7 @@ export default function DashboardV2Client({
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
 
+  // Default: last 30 days
   const now = new Date();
   const defaultTo = isoToDateInput(now.toISOString());
   const defaultFrom = isoToDateInput(new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString());
@@ -211,7 +332,7 @@ export default function DashboardV2Client({
   const [testsLoading, setTestsLoading] = useState(false);
   const [testsErr, setTestsErr] = useState("");
   const [tests, setTests] = useState<PortalTestsPayload["tests"]>([]);
-  const [selectedTestId, setSelectedTestId] = useState<string>("");
+  const [selectedTestId, setSelectedTestId] = useState<string>(""); // empty = all tests
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
@@ -497,15 +618,15 @@ export default function DashboardV2Client({
     return t;
   }, [data]);
 
+  // ✅ FIX: point to the existing full analytics page route you already have
   const fullAnalyticsHref = useMemo(() => {
     if (!selectedToken) return null;
     const q = new URLSearchParams();
-    q.set("org", org);
-    q.set("token", selectedToken);
     if (selectedTestId) q.set("testId", selectedTestId);
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
-    return `/portal/dashboard-v2/link?${q.toString()}`;
+    const qs = q.toString();
+    return `/portal/${encodeURIComponent(org)}/dashboard/beta/link/${encodeURIComponent(selectedToken)}${qs ? `?${qs}` : ""}`;
   }, [selectedToken, org, selectedTestId, appliedFromIso, appliedToIso]);
 
   const FiltersRow = (
@@ -564,15 +685,11 @@ export default function DashboardV2Client({
 
   return (
     <div className="min-h-screen p-6 space-y-6 text-white">
-      {/* ensures MindCanvas continuity even when outer page forgets background */}
       <MindCanvasBackdrop />
 
-      {/* Header */}
       {!embedded ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl relative overflow-hidden">
-          {/* subtle header sheen */}
           <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.35),transparent_60%)]" />
-
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
@@ -599,7 +716,6 @@ export default function DashboardV2Client({
 
       {!loading && !err && data?.ok && (
         <>
-          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <div className="text-xs text-white/60">Submissions</div>
@@ -625,7 +741,6 @@ export default function DashboardV2Client({
             </Card>
           </div>
 
-          {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
               <div className="flex items-center justify-between">
@@ -637,7 +752,7 @@ export default function DashboardV2Client({
               </div>
               <div className="mt-3">
                 {sortedTimeline.length ? (
-                  <SimpleBars data={sortedTimeline} />
+                  <Sparkline data={sortedTimeline} height={150} />
                 ) : (
                   <div className="text-sm text-white/60">No activity in this range.</div>
                 )}
@@ -685,7 +800,6 @@ export default function DashboardV2Client({
             </div>
           </div>
 
-          {/* Links */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
@@ -865,7 +979,8 @@ export default function DashboardV2Client({
                         <h3 className="font-semibold">Insights (Beta)</h3>
                         {drawerData?._insights?.confidence ? (
                           <div className="text-xs text-white/50">
-                            {drawerData._insights.confidence.level} · n={fmtNum(drawerData._insights.confidence.sampleSize)}
+                            {drawerData._insights.confidence.level} · n=
+                            {fmtNum(drawerData._insights.confidence.sampleSize)}
                           </div>
                         ) : null}
                       </div>
@@ -945,5 +1060,4 @@ export default function DashboardV2Client({
     </div>
   );
 }
-
 
