@@ -103,6 +103,74 @@ function badgeClass(active: boolean | null) {
   return "bg-white/5 text-white/70 border-white/10";
 }
 
+/** MindCanvas background layer (grid + glow) */
+function MindCanvasBackdrop() {
+  return (
+    <div aria-hidden className="fixed inset-0 -z-10">
+      {/* depth gradient */}
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_50%_-10%,rgba(17,49,73,0.95)_0%,rgba(8,18,27,0.92)_55%,rgba(6,14,22,0.96)_100%)]" />
+      {/* subtle accent glow */}
+      <div className="absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.45),transparent_60%)]" />
+      {/* grid */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      {/* vignette */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/50" />
+    </div>
+  );
+}
+
+function SimpleBars({ data }: { data: TimelinePoint[] }) {
+  const max = Math.max(1, ...data.map((d) => d.submissions || 0));
+
+  return (
+    <div className="w-full">
+      <div className="flex items-end gap-1 h-28">
+        {data.map((p, idx) => {
+          const v = Math.max(0, p.submissions || 0);
+          const h = Math.round((v / max) * 108);
+
+          // add slight variance so it feels alive (still brand-consistent)
+          const glow = idx % 3 === 0 ? "rgba(100,186,226,0.45)" : idx % 3 === 1 ? "rgba(45,143,196,0.42)" : "rgba(1,90,139,0.38)";
+
+          return (
+            <div key={p.date} className="flex-1 min-w-[6px] group">
+              <div className="relative w-full">
+                {/* glow behind */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 rounded-sm blur-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ height: `${Math.max(6, h)}px`, background: `linear-gradient(180deg, ${glow}, transparent 75%)` }}
+                />
+                {/* actual bar */}
+                <div
+                  className="w-full rounded-sm border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
+                  style={{
+                    height: `${Math.max(2, h)}px`,
+                    background:
+                      "linear-gradient(180deg, rgba(100,186,226,0.90) 0%, rgba(45,143,196,0.75) 45%, rgba(1,90,139,0.60) 100%)",
+                  }}
+                  title={`${p.date}: ${Math.round(v)}`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex justify-between text-[11px] text-white/60">
+        <span>{data[0]?.date ?? ""}</span>
+        <span>{data[data.length - 1]?.date ?? ""}</span>
+      </div>
+    </div>
+  );
+}
+
 /** CSV helpers */
 function csvEscape(v: any) {
   const s = v == null ? "" : String(v);
@@ -123,134 +191,15 @@ function downloadCsv(filename: string, header: string[], rows: any[][]) {
   URL.revokeObjectURL(url);
 }
 
-/** Premium UI building blocks */
-function GradientCard({
-  children,
-  className = "",
-  glow = true,
+export default function DashboardV2Client({
+  orgSlug,
+  embedded = false,
 }: {
-  children: any;
-  className?: string;
-  glow?: boolean;
+  orgSlug?: string;
+  embedded?: boolean;
 }) {
-  return (
-    <div
-      className={[
-        "relative rounded-2xl p-[1px]",
-        "bg-gradient-to-br from-white/14 via-white/6 to-white/10",
-        glow ? "shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_50px_rgba(0,0,0,0.45)]" : "",
-        className,
-      ].join(" ")}
-    >
-      <div className="relative rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl">
-        {/* subtle radial highlight */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-2xl opacity-60"
-          style={{
-            background:
-              "radial-gradient(900px 400px at 15% 0%, rgba(100,186,226,0.16), transparent 55%), radial-gradient(700px 360px at 100% 0%, rgba(45,143,196,0.10), transparent 60%)",
-          }}
-        />
-        <div className="relative">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  accent = "cyan",
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: "cyan" | "blue" | "emerald";
-}) {
-  const accentClass =
-    accent === "emerald"
-      ? "from-emerald-400/25"
-      : accent === "blue"
-      ? "from-blue-400/25"
-      : "from-cyan-400/25";
-
-  return (
-    <GradientCard className="overflow-hidden">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs tracking-wide uppercase text-white/55">{label}</div>
-            <div className="mt-2 text-4xl font-semibold leading-none text-white">{value}</div>
-            {sub ? <div className="mt-2 text-xs text-white/55">{sub}</div> : null}
-          </div>
-
-          <div
-            className={[
-              "h-10 w-10 rounded-xl border border-white/10",
-              "bg-gradient-to-br",
-              accentClass,
-              "to-transparent",
-            ].join(" ")}
-          />
-        </div>
-      </div>
-
-      {/* bottom sheen */}
-      <div
-        aria-hidden
-        className="h-[1px] w-full"
-        style={{
-          background:
-            "linear-gradient(90deg, rgba(100,186,226,0.0), rgba(100,186,226,0.35), rgba(45,143,196,0.0))",
-        }}
-      />
-    </GradientCard>
-  );
-}
-
-function Pill({ children, title }: { children: any; title?: string }) {
-  return (
-    <span
-      title={title}
-      className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/85"
-    >
-      {children}
-    </span>
-  );
-}
-
-function MiniBars({ data }: { data: TimelinePoint[] }) {
-  const max = Math.max(1, ...data.map((d) => d.submissions || 0));
-  return (
-    <div className="w-full">
-      <div className="flex items-end gap-1 h-24">
-        {data.map((p) => {
-          const h = Math.max(2, Math.round((p.submissions / max) * 96));
-          return (
-            <div key={p.date} className="flex-1 min-w-[6px]">
-              <div
-                className="w-full rounded-sm bg-white/75"
-                style={{ height: `${h}px` }}
-                title={`${p.date}: ${Math.round(p.submissions)}`}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 flex justify-between text-[11px] text-white/55">
-        <span>{data[0]?.date ?? ""}</span>
-        <span>{data[data.length - 1]?.date ?? ""}</span>
-      </div>
-    </div>
-  );
-}
-
-export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSlug?: string; embedded?: boolean }) {
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
-  const debug = sp?.get("debug") === "1";
 
   const now = new Date();
   const defaultTo = isoToDateInput(now.toISOString());
@@ -276,9 +225,6 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerErr, setDrawerErr] = useState<string>("");
   const [drawerData, setDrawerData] = useState<any>(null);
-
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"tests_desc" | "created_desc" | "name_asc">("tests_desc");
 
   const appliedFromIso = useMemo(() => dateInputToIsoStart(fromDate), [fromDate]);
   const appliedToIso = useMemo(() => dateInputToIsoEnd(toDate), [toDate]);
@@ -481,6 +427,7 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
     const safeName = String(linkName).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
 
     const lines: string[] = [];
+
     const pushSection = (title: string, header: string[], rows: any[][]) => {
       lines.push(csvEscape(title));
       lines.push(header.map(csvEscape).join(","));
@@ -540,52 +487,35 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.filters?.from, data?.filters?.to, data?.kpis?.submissions, data?.filters?.testId]);
 
+  const links = useMemo(() => data?.links ?? [], [data]);
+  const nonZeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) > 0), [links]);
+  const zeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) === 0), [links]);
+
   const sortedTimeline = useMemo(() => {
     const t = (data?.timeline ?? []).slice();
     t.sort((a, b) => (a.date < b.date ? -1 : 1));
     return t;
   }, [data]);
 
-  const linksFiltered = useMemo(() => {
-    const list = (data?.links ?? []).slice();
-
-    const q = query.trim().toLowerCase();
-    const filtered = q
-      ? list.filter((l) => ((l.name || "") + " " + (l.label || "")).toLowerCase().includes(q))
-      : list;
-
-    filtered.sort((a, b) => {
-      if (sort === "tests_desc") return (b.testsTaken || 0) - (a.testsTaken || 0);
-      if (sort === "created_desc") return (b.createdAt || "").localeCompare(a.createdAt || "");
-      const an = (a.name || a.label || "").toLowerCase();
-      const bn = (b.name || b.label || "").toLowerCase();
-      return an.localeCompare(bn);
-    });
-
-    return filtered;
-  }, [data, query, sort]);
-
-  const nonZeroCount = useMemo(() => linksFiltered.filter((l) => (l.testsTaken || 0) > 0).length, [linksFiltered]);
-  const zeroCount = useMemo(() => linksFiltered.filter((l) => (l.testsTaken || 0) === 0).length, [linksFiltered]);
-
   const fullAnalyticsHref = useMemo(() => {
     if (!selectedToken) return null;
     const q = new URLSearchParams();
+    q.set("org", org);
+    q.set("token", selectedToken);
     if (selectedTestId) q.set("testId", selectedTestId);
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
-    const qs = q.toString();
-    return `/portal/${org}/dashboard/beta/link/${selectedToken}${qs ? `?${qs}` : ""}`;
+    return `/portal/dashboard-v2/link?${q.toString()}`;
   }, [selectedToken, org, selectedTestId, appliedFromIso, appliedToIso]);
 
   const FiltersRow = (
     <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
       <div className="min-w-[260px]">
-        <label className="block text-[11px] uppercase tracking-widest text-white/55 mb-2">Test</label>
+        <label className="block text-xs text-white/60 mb-1">Test</label>
         <select
           value={selectedTestId}
           onChange={(e) => setSelectedTestId(e.target.value)}
-          className="h-11 w-full rounded-xl bg-white/8 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
+          className="h-10 w-full rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20 focus:bg-white/12"
         >
           <option value="">All tests</option>
           {tests.map((t) => (
@@ -594,471 +524,419 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
             </option>
           ))}
         </select>
-        {testsLoading ? <div className="mt-2 text-xs text-white/45">Loading tests…</div> : null}
-        {testsErr ? <div className="mt-2 text-xs text-red-300">Tests error: {testsErr}</div> : null}
+        {testsLoading ? <div className="mt-1 text-xs text-white/50">Loading tests…</div> : null}
+        {testsErr ? <div className="mt-1 text-xs text-red-300">Tests error: {testsErr}</div> : null}
       </div>
 
       <div>
-        <label className="block text-[11px] uppercase tracking-widest text-white/55 mb-2">From</label>
+        <label className="block text-xs text-white/60 mb-1">From</label>
         <input
           type="date"
           value={fromDate}
           onChange={(e) => setFromDate(e.target.value)}
-          className="h-11 rounded-xl bg-white/8 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
+          className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
         />
       </div>
       <div>
-        <label className="block text-[11px] uppercase tracking-widest text-white/55 mb-2">To</label>
+        <label className="block text-xs text-white/60 mb-1">To</label>
         <input
           type="date"
           value={toDate}
           onChange={(e) => setToDate(e.target.value)}
-          className="h-11 rounded-xl bg-white/8 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
+          className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
         />
       </div>
 
       <button
         onClick={loadMain}
-        className="h-11 rounded-xl bg-white text-black px-5 text-sm font-semibold hover:bg-white/90 active:scale-[0.99] transition"
+        className="h-10 rounded-xl bg-white text-black px-4 text-sm font-medium hover:bg-white/90 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
       >
         Apply
       </button>
     </div>
   );
 
+  const Card = ({ children }: { children: any }) => (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      {children}
+    </div>
+  );
+
   return (
     <div className="min-h-screen p-6 space-y-6 text-white">
-      {/* Premium header */}
-      <GradientCard className="overflow-hidden">
-        <div className="px-6 py-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/55">Beta</div>
-                <div className="h-[1px] w-10 bg-white/10" />
-                <div className="text-[11px] text-white/45">Analytics Console</div>
-              </div>
+      {/* ensures MindCanvas continuity even when outer page forgets background */}
+      <MindCanvasBackdrop />
 
-              <div className="mt-2">
-                <div className="text-3xl font-semibold tracking-tight">Dashboard v2</div>
-                <div className="mt-1 text-sm text-white/60">
-                  Drill-down link analytics that feels like a product — not a spreadsheet.
-                </div>
-              </div>
+      {/* Header */}
+      {!embedded ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl relative overflow-hidden">
+          {/* subtle header sheen */}
+          <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.35),transparent_60%)]" />
 
-              {debug ? (
-                <div className="mt-3 text-xs text-white/40 font-mono">
-                  org={org}
-                  {data?.filters?.orgId ? ` · orgId=${data.filters.orgId}` : ""}
-                  {selectedTestId ? ` · testId=${selectedTestId}` : ""}
-                </div>
-              ) : null}
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
+              <h1 className="text-2xl font-semibold">Dashboard v2</h1>
+              <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
             </div>
-
             {FiltersRow}
           </div>
         </div>
-      </GradientCard>
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
+              <div className="text-lg font-semibold">Dashboard v2</div>
+            </div>
+            {FiltersRow}
+          </div>
+        </div>
+      )}
 
       {loading && <div className="text-white/70">Loading…</div>}
-      {err && (
-        <GradientCard glow={false}>
-          <div className="p-5 text-red-200">Error: {err}</div>
-        </GradientCard>
-      )}
+      {err && <div className="text-red-300">Error: {err}</div>}
 
       {!loading && !err && data?.ok && (
         <>
-          {/* KPI row */}
+          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard label="Submissions" value={fmtNum(data.kpis.submissions)} accent="cyan" />
-            <StatCard
-              label="Unique takers"
-              value={fmtNum(data.kpis.uniqueTakers)}
-              sub={
-                data.kpis.uniqueTakers != null && data.kpis.submissions
+            <Card>
+              <div className="text-xs text-white/60">Submissions</div>
+              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.submissions)}</div>
+              <div className="mt-3 h-[3px] w-full rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full w-2/3 rounded-full bg-[linear-gradient(90deg,rgba(100,186,226,0.85),rgba(45,143,196,0.85),rgba(1,90,139,0.85))]" />
+              </div>
+            </Card>
+
+            <Card>
+              <div className="text-xs text-white/60">Unique takers</div>
+              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
+              <div className="text-xs text-white/50 mt-1">
+                {data.kpis.uniqueTakers != null && data.kpis.submissions
                   ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.submissions)} unique`
-                  : undefined
-              }
-              accent="blue"
-            />
-            <StatCard label="Active links" value={fmtNum(data.kpis.activeLinks)} accent="emerald" />
+                  : ""}
+              </div>
+            </Card>
+
+            <Card>
+              <div className="text-xs text-white/60">Active links</div>
+              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.activeLinks)}</div>
+            </Card>
           </div>
 
-          {/* Timeline + insights */}
+          {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <GradientCard className="lg:col-span-2">
-              <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold">Submissions over time</div>
-                    <div className="mt-1 text-xs text-white/55">
-                      {data.filters.from ? isoToDateInput(data.filters.from) : ""} →{" "}
-                      {data.filters.to ? isoToDateInput(data.filters.to) : ""}
-                    </div>
-                  </div>
-                  <Pill>Daily</Pill>
-                </div>
-
-                <div className="mt-4">
-                  {sortedTimeline.length ? (
-                    <MiniBars data={sortedTimeline} />
-                  ) : (
-                    <div className="text-sm text-white/60">No activity in this range.</div>
-                  )}
+            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold">Submissions over time</h2>
+                <div className="text-xs text-white/50">
+                  {data.filters.from ? isoToDateInput(data.filters.from) : ""} →{" "}
+                  {data.filters.to ? isoToDateInput(data.filters.to) : ""}
                 </div>
               </div>
-            </GradientCard>
-
-            <GradientCard>
-              <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">Insights</div>
-                  {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
-                </div>
-
-                {!insights && !insightsLoading ? (
-                  <div className="mt-3 text-sm text-white/60">
-                    Insights unavailable (non-blocking). Dashboard data is still valid.
-                  </div>
-                ) : null}
-
-                {insights ? (
-                  <div className="mt-4 space-y-4 text-sm">
-                    <div className="text-xs text-white/55">
-                      Confidence: <span className="font-semibold text-white/80">{insights.confidence.level}</span> · n=
-                      {fmtNum(insights.confidence.sampleSize)}
-                    </div>
-
-                    <div>
-                      <div className="text-[11px] uppercase tracking-widest text-white/55 mb-2">What you’re seeing</div>
-                      <ul className="list-disc pl-5 space-y-1 text-white/85">
-                        {insights.whatYoureSeeing.slice(0, 4).map((s, i) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div>
-                      <div className="text-[11px] uppercase tracking-widest text-white/55 mb-2">
-                        Recommended next steps
-                      </div>
-                      <ul className="list-disc pl-5 space-y-1 text-white/85">
-                        {insights.recommendedNextSteps.slice(0, 3).map((s, i) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </GradientCard>
-          </div>
-
-          {/* Links console */}
-          <GradientCard>
-            <div className="p-5">
-              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-                <div>
-                  <div className="text-lg font-semibold tracking-tight">Links</div>
-                  <div className="text-sm text-white/60">Search, sort, drill down, export.</div>
-                  <div className="mt-2 text-xs text-white/50">
-                    Showing {linksFiltered.length} · {nonZeroCount} with usage · {zeroCount} with zero usage
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                  <div className="min-w-[280px]">
-                    <label className="block text-[11px] uppercase tracking-widest text-white/55 mb-2">Search</label>
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search link name or label…"
-                      className="h-11 w-full rounded-xl bg-white/8 border border-white/10 px-3 text-sm text-white outline-none placeholder:text-white/40 focus:border-white/20"
-                    />
-                  </div>
-
-                  <div className="min-w-[210px]">
-                    <label className="block text-[11px] uppercase tracking-widest text-white/55 mb-2">Sort</label>
-                    <select
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value as any)}
-                      className="h-11 w-full rounded-xl bg-white/8 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
-                    >
-                      <option value="tests_desc">Most tests taken</option>
-                      <option value="created_desc">Newest created</option>
-                      <option value="name_asc">Name (A→Z)</option>
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={downloadMainCsv}
-                    className="h-11 rounded-xl border border-white/10 bg-white/5 px-5 text-sm font-semibold hover:bg-white/10 active:scale-[0.99] transition"
-                    title="Download links as CSV"
-                  >
-                    Download CSV
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {linksFiltered.length === 0 ? (
-                  <div className="text-sm text-white/60">No links match your search.</div>
+              <div className="mt-3">
+                {sortedTimeline.length ? (
+                  <SimpleBars data={sortedTimeline} />
                 ) : (
-                  linksFiltered.map((l) => {
-                    const title = l.name || l.label || "Untitled link";
-                    const subtitle = l.label && l.name ? l.label : null;
-                    const topP = l.topProfilesByCount?.slice(0, 2) || [];
-                    const topF = l.topFrequencyByCount;
-
-                    const accent =
-                      l.isActive === false
-                        ? "from-red-400/35"
-                        : (l.testsTaken || 0) > 0
-                        ? "from-cyan-400/35"
-                        : "from-white/15";
-
-                    return (
-                      <button
-                        key={l.linkId}
-                        onClick={() => openLink(l.token)}
-                        className={[
-                          "w-full text-left group rounded-2xl p-[1px]",
-                          "bg-gradient-to-r",
-                          accent,
-                          "to-transparent",
-                          "hover:to-white/5 transition",
-                        ].join(" ")}
-                        type="button"
-                      >
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl px-5 py-4 hover:bg-white/[0.05] transition">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <div className="text-base font-semibold truncate">{title}</div>
-                                <span
-                                  className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${badgeClass(
-                                    l.isActive
-                                  )}`}
-                                >
-                                  {l.isActive === false ? "Inactive" : "Active"}
-                                </span>
-                                {debug ? <span className="text-[11px] text-white/35 font-mono">{l.token}</span> : null}
-                              </div>
-
-                              {subtitle ? <div className="text-xs text-white/50 truncate mt-1">{subtitle}</div> : null}
-
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <Pill title="Tests taken">
-                                  <span className="text-white/60 mr-1">Tests</span>
-                                  <span className="font-semibold text-white/90">{fmtNum(l.testsTaken)}</span>
-                                </Pill>
-
-                                {topF ? (
-                                  <Pill title={`${fmtNum(topF.count)} · ${fmtPct(topF.pct)}`}>
-                                    <span className="text-white/60 mr-1">Top freq</span>
-                                    <span className="text-white/90">{topF.name}</span>
-                                    <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
-                                  </Pill>
-                                ) : null}
-
-                                {topP.map((p) => (
-                                  <Pill key={p.code} title={`${fmtNum(p.count)} · ${fmtPct(p.pct)}`}>
-                                    <span className="text-white/60 mr-1">Top</span>
-                                    <span className="text-white/90">{p.name}</span>
-                                    <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
-                                  </Pill>
-                                ))}
-                              </div>
-
-                              <div className="mt-3 text-xs text-white/45">
-                                Created: <span className="text-white/60">{fmtDateTime(l.createdAt)}</span>
-                                {l.expiresAt ? (
-                                  <>
-                                    {" "}
-                                    · Expires: <span className="text-white/60">{fmtDateTime(l.expiresAt)}</span>
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-
-                            <div className="shrink-0 text-sm text-white/65 group-hover:text-white transition">
-                              View →
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
+                  <div className="text-sm text-white/60">No activity in this range.</div>
                 )}
               </div>
             </div>
-          </GradientCard>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold">Insights (Beta)</h2>
+                {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
+              </div>
+
+              {!insights && !insightsLoading ? (
+                <div className="mt-3 text-sm text-white/60">
+                  Insights unavailable (non-blocking). Dashboard data is still valid.
+                </div>
+              ) : null}
+
+              {insights ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  <div className="text-xs text-white/50">
+                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n=
+                    {fmtNum(insights.confidence.sampleSize)}
+                  </div>
+
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-1">What you’re seeing</div>
+                    <ul className="list-disc pl-5 space-y-1 text-white/85">
+                      {insights.whatYoureSeeing.slice(0, 4).map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Recommended next steps</div>
+                    <ul className="list-disc pl-5 space-y-1 text-white/85">
+                      {insights.recommendedNextSteps.slice(0, 3).map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Links */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Links</h2>
+                <p className="text-sm text-white/60">Search, sort, drill down, export.</p>
+                <div className="text-xs text-white/50 mt-1">
+                  Showing {links.length} · {nonZeroLinks.length} with usage · {zeroLinks.length} with zero usage
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={downloadMainCsv}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                  title="Download link table as CSV"
+                >
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-[980px] w-full text-sm">
+                <thead className="text-white/70">
+                  <tr className="border-b border-white/10">
+                    <th className="py-2 text-left font-medium">Link</th>
+                    <th className="py-2 text-left font-medium">Status</th>
+                    <th className="py-2 text-right font-medium">Tests taken</th>
+                    <th className="py-2 text-left font-medium">Top profiles</th>
+                    <th className="py-2 text-left font-medium">Top frequency</th>
+                    <th className="py-2 text-left font-medium">Created</th>
+                    <th className="py-2 text-left font-medium">Expires</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {links.map((l) => {
+                    const topP = l.topProfilesByCount?.slice(0, 3) || [];
+                    const topF = l.topFrequencyByCount;
+
+                    return (
+                      <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="py-3 pr-3">
+                          <button className="text-left" onClick={() => openLink(l.token)}>
+                            <div className="font-medium hover:underline">{l.name || l.label || "Untitled link"}</div>
+                            {l.label && l.name ? <div className="text-xs text-white/50">Label: {l.label}</div> : null}
+                          </button>
+                        </td>
+
+                        <td className="py-3 pr-3">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(
+                              l.isActive
+                            )}`}
+                          >
+                            {l.isActive === false ? "Inactive" : "Active"}
+                          </span>
+                        </td>
+
+                        <td className="py-3 pr-3 text-right font-semibold">{fmtNum(l.testsTaken)}</td>
+
+                        <td className="py-3 pr-3">
+                          {topP.length ? (
+                            <div className="flex flex-wrap gap-2">
+                              {topP.map((p) => (
+                                <span
+                                  key={p.code}
+                                  className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
+                                  title={`${fmtNum(p.count)} (${fmtPct(p.pct)})`}
+                                >
+                                  {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-white/50">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3 pr-3">
+                          {topF ? (
+                            <span
+                              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
+                              title={`${fmtNum(topF.count)} (${fmtPct(topF.pct)})`}
+                            >
+                              {topF.name} <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
+                            </span>
+                          ) : (
+                            <span className="text-white/50">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3 pr-3 text-white/70">{fmtDateTime(l.createdAt)}</td>
+                        <td className="py-3 pr-3 text-white/70">{fmtDateTime(l.expiresAt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Drawer */}
           {drawerOpen && (
             <div className="fixed inset-0 z-50">
               <div
-                className="absolute inset-0 bg-black/65"
+                className="absolute inset-0 bg-black/60"
                 onClick={() => {
                   setDrawerOpen(false);
                   setSelectedToken(null);
                   setDrawerData(null);
                 }}
               />
-              <div className="absolute right-0 top-0 h-full w-full max-w-[600px] p-[1px] bg-gradient-to-b from-white/12 via-white/6 to-white/10">
-                <div className="h-full bg-[#050914] border-l border-white/10 backdrop-blur-xl overflow-y-auto">
-                  <div className="p-5 border-b border-white/10">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-widest text-white/55">Link analytics</div>
-                        <div className="mt-1 text-xl font-semibold truncate">
-                          {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
-                        </div>
-                        {debug && selectedToken ? (
-                          <div className="mt-2 text-xs text-white/35 font-mono break-all">{selectedToken}</div>
-                        ) : null}
-                      </div>
-
-                      <div className="flex gap-2">
-                        {fullAnalyticsHref ? (
-                          <Link
-                            href={fullAnalyticsHref}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 transition"
-                            title="Open full analytics page"
-                          >
-                            Open full analytics
-                          </Link>
-                        ) : null}
-
-                        <button
-                          onClick={downloadDrawerCsv}
-                          disabled={!drawerData?.ok}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50 transition"
-                          title="Download link analytics as CSV"
-                        >
-                          Download CSV
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setDrawerOpen(false);
-                            setSelectedToken(null);
-                            setDrawerData(null);
-                          }}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 transition"
-                        >
-                          Close
-                        </button>
-                      </div>
+              <div className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-[#050914] border-l border-white/10 p-4 overflow-y-auto">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs text-white/50">Link deep dive</div>
+                    <div className="text-lg font-semibold truncate">
+                      {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
                     </div>
                   </div>
 
-                  <div className="p-5">
-                    {drawerLoading && <div className="text-white/70">Loading link analytics…</div>}
-                    {drawerErr && <div className="text-red-300">Error: {drawerErr}</div>}
+                  <div className="flex gap-2">
+                    {fullAnalyticsHref ? (
+                      <Link
+                        href={fullAnalyticsHref}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                        title="Open full analytics page"
+                      >
+                        Open full analytics
+                      </Link>
+                    ) : null}
 
-                    {!drawerLoading && !drawerErr && drawerData?.ok && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-3">
-                          <StatCard label="Tests" value={fmtNum(drawerData?.kpis?.testsTaken)} accent="cyan" />
-                          <StatCard label="Unique" value={fmtNum(drawerData?.kpis?.uniqueTakers)} accent="blue" />
-                          <GradientCard glow={false}>
-                            <div className="p-5">
-                              <div className="text-xs uppercase tracking-wide text-white/55">Last used</div>
-                              <div className="mt-3 text-sm text-white/85">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
-                            </div>
-                          </GradientCard>
-                        </div>
+                    <button
+                      onClick={downloadDrawerCsv}
+                      disabled={!drawerData?.ok}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                      title="Download link analytics as CSV"
+                    >
+                      Download CSV
+                    </button>
 
-                        <GradientCard>
-                          <div className="p-5">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm font-semibold">Insights</div>
-                              {drawerData?._insights?.confidence ? (
-                                <div className="text-xs text-white/55">
-                                  {drawerData._insights.confidence.level} · n={fmtNum(drawerData._insights.confidence.sampleSize)}
-                                </div>
-                              ) : (
-                                <div className="text-xs text-white/55">Generating…</div>
-                              )}
-                            </div>
-
-                            {drawerData?._insights ? (
-                              <div className="mt-4 text-sm">
-                                <ul className="list-disc pl-5 space-y-1 text-white/85">
-                                  {(drawerData._insights.whatYoureSeeing || []).slice(0, 4).map((s: string, i: number) => (
-                                    <li key={i}>{s}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ) : null}
-                          </div>
-                        </GradientCard>
-
-                        <GradientCard>
-                          <div className="p-5">
-                            <div className="text-sm font-semibold">Top profiles</div>
-                            <div className="mt-4 space-y-2">
-                              {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
-                                <div key={p.code} className="flex items-center justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="font-medium truncate">{p.name}</div>
-                                    <div className="text-xs text-white/50">
-                                      {fmtNum(p.count)} · {fmtPct(p.pct)}
-                                    </div>
-                                  </div>
-                                  <Pill>avg {fmtNum(p.avgPoints || 0)}</Pill>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </GradientCard>
-
-                        <GradientCard>
-                          <div className="p-5">
-                            <div className="text-sm font-semibold">Top frequencies</div>
-                            <div className="mt-4 space-y-2">
-                              {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
-                                <div key={f.code} className="flex items-center justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="font-medium truncate">{f.name}</div>
-                                    <div className="text-xs text-white/50">
-                                      {fmtNum(f.count)} · {fmtPct(f.pct)}
-                                    </div>
-                                  </div>
-                                  <Pill>avg {fmtNum(f.avgPoints || 0)}</Pill>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </GradientCard>
-
-                        <GradientCard>
-                          <div className="p-5">
-                            <div className="text-sm font-semibold">Company segmentation</div>
-                            <div className="mt-4 space-y-2">
-                              {(drawerData?.segments?.companies || []).length ? (
-                                (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
-                                  <div key={c.company} className="flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="font-medium truncate">{c.company}</div>
-                                      <div className="text-xs text-white/50">
-                                        {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-sm text-white/60">No company data captured for this link.</div>
-                              )}
-                            </div>
-                          </div>
-                        </GradientCard>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        setSelectedToken(null);
+                        setDrawerData(null);
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                    >
+                      Close
+                    </button>
                   </div>
                 </div>
+
+                {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
+                {drawerErr && <div className="mt-4 text-red-300">Error: {drawerErr}</div>}
+
+                {!drawerLoading && !drawerErr && drawerData?.ok && (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                        <div className="text-xs text-white/60">Tests taken</div>
+                        <div className="text-xl font-semibold">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                        <div className="text-xs text-white/60">Unique takers</div>
+                        <div className="text-xl font-semibold">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
+                      </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                        <div className="text-xs text-white/60">Last used</div>
+                        <div className="text-xs text-white/80 mt-1">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">Insights (Beta)</h3>
+                        {drawerData?._insights?.confidence ? (
+                          <div className="text-xs text-white/50">
+                            {drawerData._insights.confidence.level} · n={fmtNum(drawerData._insights.confidence.sampleSize)}
+                          </div>
+                        ) : null}
+                      </div>
+                      {drawerData?._insights ? (
+                        <div className="mt-3 text-sm">
+                          <ul className="list-disc pl-5 space-y-1 text-white/85">
+                            {(drawerData._insights.whatYoureSeeing || []).slice(0, 4).map((s: string, i: number) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="mt-3 text-sm text-white/60">Generating link insights…</div>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <h3 className="font-semibold">Top profiles</h3>
+                      <div className="mt-3 space-y-2">
+                        {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
+                          <div key={p.code} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{p.name}</div>
+                              <div className="text-xs text-white/50">
+                                {fmtNum(p.count)} · {fmtPct(p.pct)}
+                              </div>
+                            </div>
+                            <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <h3 className="font-semibold">Top frequencies</h3>
+                      <div className="mt-3 space-y-2">
+                        {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
+                          <div key={f.code} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{f.name}</div>
+                              <div className="text-xs text-white/50">
+                                {fmtNum(f.count)} · {fmtPct(f.pct)}
+                              </div>
+                            </div>
+                            <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <h3 className="font-semibold">Company segmentation</h3>
+                      <div className="mt-3 space-y-2">
+                        {(drawerData?.segments?.companies || []).length ? (
+                          (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
+                            <div key={c.company} className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{c.company}</div>
+                                <div className="text-xs text-white/50">
+                                  {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-white/60">No company data captured for this link.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1067,4 +945,5 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
     </div>
   );
 }
+
 

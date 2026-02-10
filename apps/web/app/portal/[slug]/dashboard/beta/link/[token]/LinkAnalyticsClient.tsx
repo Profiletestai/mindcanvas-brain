@@ -44,28 +44,6 @@ type LinkApiPayload = {
   segments: { companies: CompanyItem[] };
 };
 
-type CompanySubmission = {
-  submissionId: string;
-  createdAt: string;
-  takerId: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  company?: string | null;
-  meta?: any;
-};
-
-type CompanySubsPayload = {
-  ok: true;
-  token: string;
-  company: string;
-  from: string;
-  to: string;
-  total: number;
-  submissions: CompanySubmission[];
-};
-
 function clampPct(p: number) {
   if (!Number.isFinite(p)) return 0;
   return Math.max(0, Math.min(1, p));
@@ -87,12 +65,32 @@ function fmtDateTime(iso: string | null) {
   return d.toLocaleString();
 }
 
+/** MindCanvas background layer (grid + glow) */
+function MindCanvasBackdrop() {
+  return (
+    <div aria-hidden className="fixed inset-0 -z-10">
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_50%_-10%,rgba(17,49,73,0.95)_0%,rgba(8,18,27,0.92)_55%,rgba(6,14,22,0.96)_100%)]" />
+      <div className="absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.45),transparent_60%)]" />
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/50" />
+    </div>
+  );
+}
+
 /** CSV helpers */
 function csvEscape(v: any) {
   const s = v == null ? "" : String(v);
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
+
 function downloadCsvLines(filename: string, lines: string[]) {
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -104,30 +102,43 @@ function downloadCsvLines(filename: string, lines: string[]) {
   a.remove();
   URL.revokeObjectURL(url);
 }
-function downloadCsv(filename: string, header: string[], rows: any[][]) {
-  const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
-  downloadCsvLines(filename, lines);
-}
 
 function SimpleBars({ data }: { data: TimelinePoint[] }) {
   const max = Math.max(1, ...data.map((d) => d.submissions || 0));
+
   return (
     <div className="w-full">
-      <div className="flex items-end gap-1.5 h-24">
-        {data.map((p) => {
-          const h = Math.round((p.submissions / max) * 96);
+      <div className="flex items-end gap-1 h-28">
+        {data.map((p, idx) => {
+          const v = Math.max(0, p.submissions || 0);
+          const h = Math.round((v / max) * 108);
+
+          const glow =
+            idx % 3 === 0 ? "rgba(100,186,226,0.45)" : idx % 3 === 1 ? "rgba(45,143,196,0.42)" : "rgba(1,90,139,0.38)";
+
           return (
-            <div key={p.date} className="flex-1 min-w-[6px]">
-              <div
-                className="w-full rounded-sm bg-white/70 hover:bg-white/90 transition"
-                style={{ height: `${h}px` }}
-                title={`${p.date}: ${Math.round(p.submissions)}`}
-              />
+            <div key={p.date} className="flex-1 min-w-[6px] group">
+              <div className="relative w-full">
+                <div
+                  className="absolute bottom-0 left-0 right-0 rounded-sm blur-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ height: `${Math.max(6, h)}px`, background: `linear-gradient(180deg, ${glow}, transparent 75%)` }}
+                />
+                <div
+                  className="w-full rounded-sm border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
+                  style={{
+                    height: `${Math.max(2, h)}px`,
+                    background:
+                      "linear-gradient(180deg, rgba(100,186,226,0.90) 0%, rgba(45,143,196,0.75) 45%, rgba(1,90,139,0.60) 100%)",
+                  }}
+                  title={`${p.date}: ${Math.round(v)}`}
+                />
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="mt-2 flex justify-between text-[11px] text-white/55">
+
+      <div className="mt-2 flex justify-between text-[11px] text-white/60">
         <span>{data[0]?.date ?? ""}</span>
         <span>{data[data.length - 1]?.date ?? ""}</span>
       </div>
@@ -148,56 +159,15 @@ function TabButton({
     <button
       onClick={onClick}
       className={[
-        "rounded-full px-3.5 py-1.5 text-xs border transition",
+        "rounded-full px-3 py-1 text-xs border transition-all",
         active
-          ? "bg-white text-black border-white shadow-[0_0_0_1px_rgba(255,255,255,0.15)]"
+          ? "bg-white text-black border-white shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
           : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10",
       ].join(" ")}
       type="button"
     >
       {children}
     </button>
-  );
-}
-
-function initials(first?: string | null, last?: string | null, email?: string | null) {
-  const a = (first || "").trim();
-  const b = (last || "").trim();
-  const e = (email || "").trim();
-  const f = a ? a[0] : e ? e[0] : "?";
-  const l = b ? b[0] : a && a.length > 1 ? a[1] : "";
-  return (f + l).toUpperCase();
-}
-
-function Meter({ pct }: { pct: number }) {
-  const p = clampPct(pct);
-  return (
-    <div className="h-2 w-28 sm:w-36 rounded-full bg-white/10 border border-white/10 overflow-hidden">
-      <div
-        className="h-full bg-white/70"
-        style={{ width: `${Math.round(p * 100)}%` }}
-      />
-    </div>
-  );
-}
-
-function StatusPill({ active }: { active: boolean | null | undefined }) {
-  const cls =
-    active === false
-      ? "bg-red-500/10 text-red-200 border-red-500/20"
-      : "bg-emerald-500/10 text-emerald-200 border-emerald-500/20";
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs ${cls}`}>
-      {active === false ? "Inactive" : "Active"}
-    </span>
-  );
-}
-
-function CardShell({ children }: { children: any }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-      {children}
-    </div>
   );
 }
 
@@ -217,16 +187,7 @@ export default function LinkAnalyticsClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [data, setData] = useState<LinkApiPayload | null>(null);
-
   const [tab, setTab] = useState<"companies" | "profiles" | "frequencies">("companies");
-
-  // Company drill-down drawer
-  const [companyOpen, setCompanyOpen] = useState(false);
-  const [companyName, setCompanyName] = useState<string>("");
-  const [companyLoading, setCompanyLoading] = useState(false);
-  const [companyErr, setCompanyErr] = useState("");
-  const [companyData, setCompanyData] = useState<CompanySubsPayload | null>(null);
-  const [companySearch, setCompanySearch] = useState<string>("");
 
   useEffect(() => {
     let alive = true;
@@ -256,7 +217,7 @@ export default function LinkAnalyticsClient({
     return () => {
       alive = false;
     };
-  }, [token, from, to, testId]);
+  }, [token, from, to]);
 
   const title = useMemo(() => {
     const l = data?.link;
@@ -282,10 +243,11 @@ export default function LinkAnalyticsClient({
     return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
   }, [orgSlug, testId]);
 
-  function downloadCsvAllSections() {
+  function downloadCsv() {
     if (!data?.ok) return;
 
     const lines: string[] = [];
+
     const pushSection = (sectionTitle: string, header: string[], rows: any[][]) => {
       lines.push(csvEscape(sectionTitle));
       lines.push(header.map(csvEscape).join(","));
@@ -319,441 +281,189 @@ export default function LinkAnalyticsClient({
     pushSection("Profiles", ["profile_name", "profile_code", "count", "pct", "avg_points"], profiles);
     pushSection("Frequencies", ["frequency_name", "frequency_code", "count", "pct", "avg_points"], freqs);
 
-    const filename = `link_analytics_${orgSlug}_${safeName}.csv`;
-    downloadCsvLines(filename, lines);
+    downloadCsvLines(`link_analytics_${orgSlug}_${safeName}.csv`, lines);
   }
 
-  async function openCompany(c: string) {
-    const company = (c || "").trim() || "Unknown";
-    setCompanyName(company);
-    setCompanyOpen(true);
-    setCompanySearch("");
-    setCompanyErr("");
-    setCompanyData(null);
-    setCompanyLoading(true);
-
-    try {
-      const q = new URLSearchParams();
-      q.set("token", token);
-      q.set("company", company);
-      if (from) q.set("from", from);
-      if (to) q.set("to", to);
-
-      const res = await fetch(`/api/portal-dashboard-v2/link/company-submissions?${q.toString()}`, {
-        cache: "no-store",
-      });
-      const j = await res.json();
-      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
-
-      setCompanyData(j as CompanySubsPayload);
-    } catch (e: any) {
-      setCompanyErr(String(e?.message || e));
-    } finally {
-      setCompanyLoading(false);
-    }
-  }
-
-  function closeCompany() {
-    setCompanyOpen(false);
-    setCompanyName("");
-    setCompanyData(null);
-    setCompanyErr("");
-    setCompanyLoading(false);
-    setCompanySearch("");
-  }
-
-  const filteredCompanySubs = useMemo(() => {
-    const subs = companyData?.submissions || [];
-    const q = (companySearch || "").trim().toLowerCase();
-    if (!q) return subs;
-
-    return subs.filter((s) => {
-      const name = `${s.firstName || ""} ${s.lastName || ""}`.toLowerCase();
-      const email = (s.email || "").toLowerCase();
-      const phone = (s.phone || "").toLowerCase();
-      return name.includes(q) || email.includes(q) || phone.includes(q);
-    });
-  }, [companyData, companySearch]);
-
-  function exportCompanyCsv() {
-    if (!companyData?.ok) return;
-
-    const header = [
-      "submitted_at",
-      "company",
-      "first_name",
-      "last_name",
-      "email",
-      "phone",
-      "taker_id",
-      "submission_id",
-    ];
-
-    const rows = (filteredCompanySubs || []).map((s) => [
-      s.createdAt || "",
-      companyData.company || "",
-      s.firstName || "",
-      s.lastName || "",
-      s.email || "",
-      s.phone || "",
-      s.takerId || "",
-      s.submissionId || "",
-    ]);
-
-    const safeCompany = String(companyData.company || "company").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
-    const filename = `company_submissions_${orgSlug}_${safeName}_${safeCompany}.csv`;
-    downloadCsv(filename, header, rows);
-  }
+  const Card = ({ children }: { children: any }) => (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      {children}
+    </div>
+  );
 
   return (
     <div className="min-h-screen p-6 text-white space-y-6">
-      {/* HERO HEADER */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(1000px_400px_at_20%_0%,rgba(255,255,255,0.10),transparent_60%)]" />
-        </div>
+      <MindCanvasBackdrop />
 
+      {/* Header */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.35),transparent_60%)]" />
         <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-[0.25em] text-white/55">Link Analytics</div>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-semibold truncate">{title}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/60">
-              <StatusPill active={data?.link?.isActive ?? null} />
+            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
+            <h1 className="text-2xl font-semibold truncate">{title}</h1>
+            <div className="text-sm text-white/60 mt-1">
               {data?.filters?.from && data?.filters?.to ? (
-                <span className="text-white/60">
-                  {fmtDateTime(data.filters.from)} → {fmtDateTime(data.filters.to)}
-                </span>
+                <>
+                  Date range: <span className="text-white/80">{fmtDateTime(data.filters.from)}</span> →{" "}
+                  <span className="text-white/80">{fmtDateTime(data.filters.to)}</span>
+                </>
               ) : null}
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
             <button
-              onClick={downloadCsvAllSections}
+              onClick={downloadCsv}
               disabled={!data?.ok}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50 transition"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
               type="button"
             >
-              Download summary CSV
+              Download CSV
             </button>
-            <Link
-              href={backHref}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
-            >
-              Back
+            <Link href={backHref} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
+              Back to dashboard
             </Link>
           </div>
         </div>
       </div>
 
-      {loading && (
-        <CardShell>
-          <div className="p-5 text-white/70">Loading…</div>
-        </CardShell>
-      )}
-
-      {err && (
-        <CardShell>
-          <div className="p-5 text-red-300">Error: {err}</div>
-        </CardShell>
-      )}
+      {loading && <div className="text-white/70">Loading…</div>}
+      {err && <div className="text-red-300">Error: {err}</div>}
 
       {!loading && !err && data?.ok && (
         <>
-          {/* KPI ROW */}
+          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CardShell>
-              <div className="p-5">
-                <div className="text-xs text-white/55">Tests taken</div>
-                <div className="mt-1 text-4xl font-semibold">{fmtNum(data.kpis.testsTaken)}</div>
+            <Card>
+              <div className="text-xs text-white/60">Tests taken</div>
+              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.testsTaken)}</div>
+              <div className="mt-3 h-[3px] w-full rounded-full bg-white/5 overflow-hidden">
+                <div className="h-full w-2/3 rounded-full bg-[linear-gradient(90deg,rgba(100,186,226,0.85),rgba(45,143,196,0.85),rgba(1,90,139,0.85))]" />
               </div>
-            </CardShell>
+            </Card>
 
-            <CardShell>
-              <div className="p-5">
-                <div className="text-xs text-white/55">Unique takers</div>
-                <div className="mt-1 text-4xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
-                <div className="mt-2 text-xs text-white/50">
-                  {data.kpis.uniqueTakers != null && data.kpis.testsTaken
-                    ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.testsTaken)} unique`
-                    : ""}
-                </div>
+            <Card>
+              <div className="text-xs text-white/60">Unique takers</div>
+              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
+              <div className="text-xs text-white/50 mt-1">
+                {data.kpis.uniqueTakers != null && data.kpis.testsTaken
+                  ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.testsTaken)} unique`
+                  : ""}
               </div>
-            </CardShell>
+            </Card>
 
-            <CardShell>
-              <div className="p-5">
-                <div className="text-xs text-white/55">Last used</div>
-                <div className="mt-3 text-sm text-white/80">{fmtDateTime(data.kpis.lastUsedAt)}</div>
-              </div>
-            </CardShell>
+            <Card>
+              <div className="text-xs text-white/60">Last used</div>
+              <div className="text-sm text-white/80 mt-2">{fmtDateTime(data.kpis.lastUsedAt)}</div>
+            </Card>
           </div>
 
-          {/* TIMELINE */}
-          <CardShell>
-            <div className="p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Activity</h2>
-                <div className="text-xs text-white/50">Daily submissions</div>
+          {/* Timeline */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Activity over time</h2>
+              <div className="text-xs text-white/50">Daily submissions</div>
+            </div>
+            <div className="mt-3">
+              {timelineSorted.length ? <SimpleBars data={timelineSorted} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
+            </div>
+          </Card>
+
+          {/* Segmentation */}
+          <Card>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Segmentation</h2>
+                <p className="text-sm text-white/60">Switch tabs to explore companies, profiles, and frequencies.</p>
               </div>
-              <div className="mt-4">
-                {timelineSorted.length ? (
-                  <SimpleBars data={timelineSorted} />
-                ) : (
-                  <div className="text-sm text-white/60">No activity in this range.</div>
-                )}
+
+              <div className="flex gap-2">
+                <TabButton active={tab === "companies"} onClick={() => setTab("companies")}>
+                  Companies
+                </TabButton>
+                <TabButton active={tab === "profiles"} onClick={() => setTab("profiles")}>
+                  Profiles
+                </TabButton>
+                <TabButton active={tab === "frequencies"} onClick={() => setTab("frequencies")}>
+                  Frequencies
+                </TabButton>
               </div>
             </div>
-          </CardShell>
 
-          {/* SEGMENTATION */}
-          <CardShell>
-            <div className="p-5">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Segmentation</h2>
-                  <p className="text-sm text-white/60">
-                    Clean drill-down views. Click a company to see individual submissions and export.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <TabButton active={tab === "companies"} onClick={() => setTab("companies")}>
-                    Companies
-                  </TabButton>
-                  <TabButton active={tab === "profiles"} onClick={() => setTab("profiles")}>
-                    Profiles
-                  </TabButton>
-                  <TabButton active={tab === "frequencies"} onClick={() => setTab("frequencies")}>
-                    Frequencies
-                  </TabButton>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {tab === "companies" ? (
-                  <div className="space-y-2">
-                    {(data.segments?.companies || []).length ? (
-                      (data.segments.companies || []).slice(0, 60).map((c) => {
-                        const name = (c.company || "").trim() || "Unknown";
-                        return (
-                          <button
-                            key={name}
-                            type="button"
-                            onClick={() => openCompany(name)}
-                            className="w-full text-left group rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{name}</div>
-                                <div className="mt-1 flex items-center gap-3 text-xs text-white/55">
-                                  <span>{fmtNum(c.testsTaken)} tests</span>
-                                  <span className="text-white/30">•</span>
-                                  <span>{fmtPct(c.pct)}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3">
-                                <Meter pct={c.pct} />
-                                <span className="text-xs text-white/55 group-hover:text-white/80 transition">
-                                  View →
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="text-sm text-white/60">No company data captured for this link.</div>
-                    )}
-                  </div>
-                ) : null}
-
-                {tab === "profiles" ? (
-                  <div className="space-y-2">
-                    {(data.distributions?.profiles || []).length ? (
-                      (data.distributions.profiles || []).slice(0, 80).map((p) => (
-                        <div
-                          key={p.code}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-medium truncate">{p.name}</div>
-                              <div className="mt-1 flex items-center gap-3 text-xs text-white/55">
-                                <span>{fmtNum(p.count)} tests</span>
-                                <span className="text-white/30">•</span>
-                                <span>{fmtPct(p.pct)}</span>
-                                <span className="text-white/30">•</span>
-                                <span>avg {fmtNum(p.avgPoints)}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Meter pct={p.pct} />
-                              <div className="text-xs text-white/55">{fmtPct(p.pct)}</div>
-                            </div>
+            <div className="mt-4">
+              {tab === "companies" ? (
+                <div className="space-y-2">
+                  {(data.segments?.companies || []).length ? (
+                    (data.segments.companies || []).slice(0, 25).map((c) => (
+                      <div
+                        key={c.company}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/7 transition"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{c.company || "Unknown"}</div>
+                          <div className="text-xs text-white/50">
+                            {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-white/60">No profile data.</div>
-                    )}
-                  </div>
-                ) : null}
+                        <div className="text-xs text-white/70">tests {fmtNum(c.testsTaken)}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-white/60">No company data captured for this link.</div>
+                  )}
+                </div>
+              ) : null}
 
-                {tab === "frequencies" ? (
-                  <div className="space-y-2">
-                    {(data.distributions?.frequencies || []).length ? (
-                      (data.distributions.frequencies || []).slice(0, 40).map((f) => (
-                        <div
-                          key={f.code}
-                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-medium truncate">{f.name}</div>
-                              <div className="mt-1 flex items-center gap-3 text-xs text-white/55">
-                                <span>{fmtNum(f.count)} tests</span>
-                                <span className="text-white/30">•</span>
-                                <span>{fmtPct(f.pct)}</span>
-                                <span className="text-white/30">•</span>
-                                <span>avg {fmtNum(f.avgPoints)}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Meter pct={f.pct} />
-                              <div className="text-xs text-white/55">{fmtPct(f.pct)}</div>
-                            </div>
+              {tab === "profiles" ? (
+                <div className="space-y-2">
+                  {(data.distributions?.profiles || []).length ? (
+                    (data.distributions.profiles || []).slice(0, 30).map((p) => (
+                      <div
+                        key={p.code}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/7 transition"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{p.name}</div>
+                          <div className="text-xs text-white/50">
+                            {fmtNum(p.count)} · {fmtPct(p.pct)}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-white/60">No frequency data.</div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </CardShell>
-        </>
-      )}
-
-      {/* COMPANY DRAWER */}
-      {companyOpen ? (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60" onClick={closeCompany} />
-
-          <div className="absolute right-0 top-0 h-full w-full max-w-[860px] bg-[#050914] border-l border-white/10 overflow-hidden">
-            {/* Drawer header */}
-            <div className="p-5 border-b border-white/10 bg-white/5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs text-white/55">Company submissions</div>
-                  <div className="mt-1 text-xl font-semibold truncate">{companyName}</div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/55">
-                    {from || to ? <span>Range: {from || "—"} → {to || "—"}</span> : null}
-                    {companyData?.ok ? (
-                      <>
-                        <span className="text-white/30">•</span>
-                        <span>Total: <span className="text-white/80">{fmtNum(companyData.total)}</span></span>
-                      </>
-                    ) : null}
-                  </div>
+                        <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints)}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-white/60">No profile data.</div>
+                  )}
                 </div>
+              ) : null}
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={exportCompanyCsv}
-                    disabled={!companyData?.ok}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50 transition"
-                    type="button"
-                  >
-                    Export CSV
-                  </button>
-                  <button
-                    onClick={closeCompany}
-                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
-                    type="button"
-                  >
-                    Close
-                  </button>
+              {tab === "frequencies" ? (
+                <div className="space-y-2">
+                  {(data.distributions?.frequencies || []).length ? (
+                    (data.distributions.frequencies || []).slice(0, 20).map((f) => (
+                      <div
+                        key={f.code}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/7 transition"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{f.name}</div>
+                          <div className="text-xs text-white/50">
+                            {fmtNum(f.count)} · {fmtPct(f.pct)}
+                          </div>
+                        </div>
+                        <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints)}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-white/60">No frequency data.</div>
+                  )}
                 </div>
-              </div>
-
-              {/* Search */}
-              <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <input
-                  value={companySearch}
-                  onChange={(e) => setCompanySearch(e.target.value)}
-                  placeholder="Search name, email, phone…"
-                  className="h-11 w-full rounded-xl bg-white/10 border border-white/10 px-4 text-sm text-white outline-none focus:bg-white/15 transition"
-                />
-                <div className="text-xs text-white/55">
-                  {companyData?.ok ? (
-                    <>
-                      Showing <span className="text-white/80">{fmtNum(filteredCompanySubs.length)}</span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-            {/* Drawer body */}
-            <div className="p-5 overflow-y-auto h-[calc(100%-170px)]">
-              {companyLoading ? <div className="text-white/70">Loading submissions…</div> : null}
-              {companyErr ? <div className="text-red-300">Error: {companyErr}</div> : null}
-
-              {!companyLoading && !companyErr && companyData?.ok ? (
-                <>
-                  <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5">
-                    <table className="min-w-[1000px] w-full text-sm">
-                      <thead className="text-white/70 sticky top-0 bg-[#0b1220]">
-                        <tr className="border-b border-white/10">
-                          <th className="py-3 px-4 text-left font-medium">Taker</th>
-                          <th className="py-3 px-4 text-left font-medium">Email</th>
-                          <th className="py-3 px-4 text-left font-medium">Phone</th>
-                          <th className="py-3 px-4 text-left font-medium">Submitted</th>
-                          <th className="py-3 px-4 text-left font-medium">Submission ID</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredCompanySubs.map((s) => {
-                          const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim() || "Unknown";
-                          return (
-                            <tr key={s.submissionId} className="border-b border-white/5 hover:bg-white/5 transition">
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-9 w-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-xs">
-                                    {initials(s.firstName, s.lastName, s.email)}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="font-medium truncate">{fullName}</div>
-                                    <div className="text-xs text-white/50 truncate">{s.company || companyName}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4 text-white/80">{s.email || "—"}</td>
-                              <td className="py-3 px-4 text-white/80">{s.phone || "—"}</td>
-                              <td className="py-3 px-4 text-white/70">{fmtDateTime(s.createdAt)}</td>
-                              <td className="py-3 px-4 text-white/60 font-mono text-xs">{s.submissionId}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {!filteredCompanySubs.length ? (
-                    <div className="mt-4 text-sm text-white/60">No submissions match your search.</div>
-                  ) : null}
-                </>
               ) : null}
             </div>
-          </div>
-        </div>
-      ) : null}
+          </Card>
+        </>
+      )}
     </div>
   );
 }
+
