@@ -1,6 +1,7 @@
 // apps/web/app/portal/dashboard-v2/DashboardV2Client.tsx
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -53,6 +54,23 @@ type InsightsPayload = {
   };
 };
 
+type SegCompany = { company: string; testsTaken: number; pct: number };
+type SegPurpose = { purpose: string; testsTaken: number; pct: number };
+
+type SegmentsPayload = {
+  ok: true;
+  filters: { orgId: string; org: string | null; testId: string | null; from: string; to: string };
+  segments: {
+    companies: SegCompany[];
+    purposes: SegPurpose[];
+    profilesByCount: TopByCount[];
+    profilesByAvg: TopByAvg[];
+    frequenciesByCount: TopByCount[];
+    frequenciesByAvg: TopByAvg[];
+    totals?: { submissions?: number };
+  };
+};
+
 function isoToDateInput(iso: string) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
@@ -79,14 +97,16 @@ function clampPct(p: number) {
   return Math.max(0, Math.min(1, p));
 }
 
+// ✅ Always round percentages to whole numbers (e.g. 23%)
 function fmtPct(p: number) {
-  const v = clampPct(p) * 100;
-  return `${v.toFixed(v < 10 ? 1 : 0)}%`;
+  const v = Math.round(clampPct(p) * 100);
+  return `${v}%`;
 }
 
+// ✅ Always round numbers to whole numbers (counts/averages)
 function fmtNum(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return "—";
-  return String(n);
+  return String(Math.round(n));
 }
 
 function fmtDateTime(iso: string | null) {
@@ -114,7 +134,7 @@ function SimpleBars({ data }: { data: TimelinePoint[] }) {
               <div
                 className="w-full rounded-sm bg-white/70"
                 style={{ height: `${h}px` }}
-                title={`${p.date}: ${p.submissions}`}
+                title={`${p.date}: ${Math.round(p.submissions)}`}
               />
             </div>
           );
@@ -128,10 +148,35 @@ function SimpleBars({ data }: { data: TimelinePoint[] }) {
   );
 }
 
-export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
+/** CSV helpers */
+function csvEscape(v: any) {
+  const s = v == null ? "" : String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(filename: string, header: string[], rows: any[][]) {
+  const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export default function DashboardV2Client({
+  orgSlug,
+  embedded = false,
+}: {
+  orgSlug?: string;
+  embedded?: boolean;
+}) {
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
-
 
   // Default: last 30 days
   const now = new Date();
@@ -149,6 +194,10 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
   const [data, setData] = useState<DashboardV2Payload | null>(null);
+
+  const [segmentsLoading, setSegmentsLoading] = useState(false);
+  const [segmentsErr, setSegmentsErr] = useState("");
+  const [segments, setSegments] = useState<SegmentsPayload["segments"] | null>(null);
 
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insights, setInsights] = useState<InsightsPayload["summary"] | null>(null);
@@ -185,11 +234,40 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
     }
   }
 
+  async function loadSegments(filters: DashboardV2Payload["filters"]) {
+    try {
+      setSegmentsLoading(true);
+      setSegmentsErr("");
+      setSegments(null);
+
+      const q = new URLSearchParams();
+      // Prefer orgId (most reliable), but keep org slug for clarity/debugging
+      if (filters?.orgId) q.set("orgId", filters.orgId);
+      q.set("org", org);
+      if (selectedTestId) q.set("testId", selectedTestId);
+      if (filters?.from) q.set("from", filters.from);
+      if (filters?.to) q.set("to", filters.to);
+
+      const res = await fetch(`/api/portal-dashboard-v2/segments?${q.toString()}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+
+      setSegments((j as SegmentsPayload).segments || null);
+    } catch (e: any) {
+      setSegmentsErr(String(e?.message || e));
+      setSegments(null);
+    } finally {
+      setSegmentsLoading(false);
+    }
+  }
+
   async function loadMain() {
     try {
       setLoading(true);
       setErr("");
       setInsights(null);
+      setSegments(null);
+      setSegmentsErr("");
 
       const q = new URLSearchParams();
       q.set("org", org);
@@ -200,10 +278,18 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
       const res = await fetch(`/api/portal-dashboard-v2?${q.toString()}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
-      setData(j as DashboardV2Payload);
+
+      const payload = j as DashboardV2Payload;
+      setData(payload);
+
+      // Fire & forget (non-blocking widgets)
+      if (payload?.ok && payload?.filters?.orgId) {
+        loadSegments(payload.filters);
+      }
     } catch (e: any) {
       setErr(String(e?.message || e));
       setData(null);
+      setSegments(null);
     } finally {
       setLoading(false);
     }
@@ -257,6 +343,8 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
     try {
       const q = new URLSearchParams();
       q.set("token", token);
+      q.set("org", org);
+      if (selectedTestId) q.set("testId", selectedTestId);
       if (appliedFromIso) q.set("from", appliedFromIso);
       if (appliedToIso) q.set("to", appliedToIso);
 
@@ -302,13 +390,151 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
     }
   }
 
+  function downloadMainCsv() {
+    const d = data;
+    if (!d?.ok) return;
+
+    const header = [
+      "link_name",
+      "label",
+      "token",
+      "status",
+      "tests_taken",
+      "top_profile_1",
+      "top_profile_1_pct",
+      "top_profile_2",
+      "top_profile_2_pct",
+      "top_profile_3",
+      "top_profile_3_pct",
+      "top_frequency",
+      "top_frequency_pct",
+      "created_at",
+      "expires_at",
+    ];
+
+    const rows = (d.links || []).map((l) => {
+      const topP = l.topProfilesByCount?.slice(0, 3) || [];
+      const p1 = topP[0],
+        p2 = topP[1],
+        p3 = topP[2];
+      const topF = l.topFrequencyByCount;
+
+      return [
+        l.name || "",
+        l.label || "",
+        l.token,
+        l.isActive === false ? "inactive" : "active",
+        Math.round(l.testsTaken || 0),
+        p1?.name || "",
+        p1 ? Math.round(clampPct(p1.pct) * 100) : "",
+        p2?.name || "",
+        p2 ? Math.round(clampPct(p2.pct) * 100) : "",
+        p3?.name || "",
+        p3 ? Math.round(clampPct(p3.pct) * 100) : "",
+        topF?.name || "",
+        topF ? Math.round(clampPct(topF.pct) * 100) : "",
+        l.createdAt || "",
+        l.expiresAt || "",
+      ];
+    });
+
+    const filename = `dashboard_links_${org}_${fromDate}_to_${toDate}${selectedTestId ? `_test_${selectedTestId}` : ""}.csv`;
+    downloadCsv(filename, header, rows);
+  }
+
+  function downloadSegmentsCsv() {
+    if (!segments || !data?.ok) return;
+
+    const header = ["segment_type", "name", "code", "count", "pct", "avg_points", "n"];
+    const rows: any[][] = [];
+
+    for (const c of segments.companies || []) {
+      rows.push(["company", c.company, "", Math.round(c.testsTaken || 0), Math.round(clampPct(c.pct) * 100), "", ""]);
+    }
+
+    for (const p of segments.purposes || []) {
+      rows.push(["purpose", p.purpose, "", Math.round(p.testsTaken || 0), Math.round(clampPct(p.pct) * 100), "", ""]);
+    }
+
+    for (const p of segments.profilesByCount || []) {
+      rows.push(["profile_by_count", p.name, p.code, Math.round(p.count || 0), Math.round(clampPct(p.pct) * 100), "", ""]);
+    }
+
+    for (const p of segments.profilesByAvg || []) {
+      rows.push(["profile_by_avg", p.name, p.code, "", "", Math.round(p.avgPoints || 0), Math.round(p.n || 0)]);
+    }
+
+    for (const f of segments.frequenciesByCount || []) {
+      rows.push(["frequency_by_count", f.name, f.code, Math.round(f.count || 0), Math.round(clampPct(f.pct) * 100), "", ""]);
+    }
+
+    for (const f of segments.frequenciesByAvg || []) {
+      rows.push(["frequency_by_avg", f.name, f.code, "", "", Math.round(f.avgPoints || 0), Math.round(f.n || 0)]);
+    }
+
+    const filename = `dashboard_segments_${org}_${fromDate}_to_${toDate}${selectedTestId ? `_test_${selectedTestId}` : ""}.csv`;
+    downloadCsv(filename, header, rows);
+  }
+
+  function downloadDrawerCsv() {
+    if (!drawerData?.ok) return;
+
+    const linkName = drawerData?.link?.name || drawerData?.link?.label || "link";
+    const safeName = String(linkName).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
+
+    const lines: string[] = [];
+
+    const pushSection = (title: string, header: string[], rows: any[][]) => {
+      lines.push(csvEscape(title));
+      lines.push(header.map(csvEscape).join(","));
+      for (const r of rows) lines.push(r.map(csvEscape).join(","));
+      lines.push("");
+    };
+
+    const profiles = (drawerData?.distributions?.profiles || []).map((p: any) => [
+      p.name || "",
+      p.code || "",
+      Math.round(p.count || 0),
+      Math.round(clampPct(p.pct || 0) * 100),
+      Math.round(p.avgPoints || 0),
+    ]);
+
+    const freqs = (drawerData?.distributions?.frequencies || []).map((f: any) => [
+      f.name || "",
+      f.code || "",
+      Math.round(f.count || 0),
+      Math.round(clampPct(f.pct || 0) * 100),
+      Math.round(f.avgPoints || 0),
+    ]);
+
+    const companies = (drawerData?.segments?.companies || []).map((c: any) => [
+      c.company || "",
+      Math.round(c.testsTaken || c.count || 0),
+      Math.round(clampPct(c.pct || 0) * 100),
+    ]);
+
+    pushSection("Top profiles", ["profile_name", "profile_code", "count", "pct", "avg_points"], profiles);
+    pushSection("Top frequencies", ["frequency_name", "frequency_code", "count", "pct", "avg_points"], freqs);
+    pushSection("Companies", ["company", "tests_taken", "pct"], companies);
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `link_analytics_${org}_${safeName}_${fromDate}_to_${toDate}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Load tests + initial dashboard
   useEffect(() => {
     loadTests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org]);
 
-  // Reload dashboard whenever filters change
+  // Reload dashboard whenever org/test changes (date is applied via Apply button)
   useEffect(() => {
     loadMain();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,83 +556,108 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
     return t;
   }, [data]);
 
+  // Used for the “Open full analytics” link (preserve filters)
+  const linkFullAnalyticsQuery = useMemo(() => {
+    const q = new URLSearchParams();
+    if (appliedFromIso) q.set("from", appliedFromIso);
+    if (appliedToIso) q.set("to", appliedToIso);
+    if (selectedTestId) q.set("testId", selectedTestId);
+    const s = q.toString();
+    return s ? `?${s}` : "";
+  }, [appliedFromIso, appliedToIso, selectedTestId]);
+
+  const FiltersRow = (
+    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+      <div className="min-w-[240px]">
+        <label className="block text-xs text-white/60 mb-1">Test</label>
+        <select
+          value={selectedTestId}
+          onChange={(e) => setSelectedTestId(e.target.value)}
+          className="h-10 w-full rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+        >
+          <option value="">All tests</option>
+          {tests.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        {testsLoading ? <div className="mt-1 text-xs text-white/50">Loading tests…</div> : null}
+        {testsErr ? <div className="mt-1 text-xs text-red-300">Tests error: {testsErr}</div> : null}
+      </div>
+
+      <div>
+        <label className="block text-xs text-white/60 mb-1">From</label>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="h-10 rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-white/60 mb-1">To</label>
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="h-10 rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+        />
+      </div>
+
+      <button
+        onClick={loadMain}
+        className="h-10 rounded-lg bg-white text-black px-4 text-sm font-medium hover:bg-white/90"
+      >
+        Apply
+      </button>
+    </div>
+  );
+
   return (
     <div className="min-h-screen p-6 space-y-6 text-white">
-      {/* Beta banner */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
-            <h1 className="text-2xl font-semibold">Dashboard v2</h1>
-            <p className="text-sm text-white/70">
-              Drill-down analytics for links, profiles, and frequencies (safe parallel build).
-            </p>
+      {/* Standalone banner (hide when embedded in PortalChrome to avoid duplicate headers) */}
+      {!embedded ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
+              <h1 className="text-2xl font-semibold">Dashboard v2</h1>
+              <p className="text-sm text-white/70">
+                Drill-down analytics for links, profiles, frequencies, and segmentation (safe parallel build).
+              </p>
+            </div>
+
+            {FiltersRow}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            {/* Test selector */}
-            <div className="min-w-[240px]">
-              <label className="block text-xs text-white/60 mb-1">Test</label>
-              <select
-                value={selectedTestId}
-                onChange={(e) => setSelectedTestId(e.target.value)}
-                className="h-10 w-full rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
-              >
-                <option value="">All tests</option>
-                {tests.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-              {testsLoading ? <div className="mt-1 text-xs text-white/50">Loading tests…</div> : null}
-              {testsErr ? <div className="mt-1 text-xs text-red-300">Tests error: {testsErr}</div> : null}
-            </div>
-
-            {/* Date range */}
-            <div>
-              <label className="block text-xs text-white/60 mb-1">From</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="h-10 rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-white/60 mb-1">To</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="h-10 rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
-              />
-            </div>
-            <button
-              onClick={loadMain}
-              className="h-10 rounded-lg bg-white text-black px-4 text-sm font-medium hover:bg-white/90"
-            >
-              Apply
-            </button>
+          <div className="mt-3 text-xs text-white/50">
+            org=<span className="font-mono">{org}</span>
+            {data?.filters?.orgId ? (
+              <>
+                {" "}
+                · orgId=<span className="font-mono">{data.filters.orgId}</span>
+              </>
+            ) : null}
+            {selectedTestId ? (
+              <>
+                {" "}
+                · testId=<span className="font-mono">{selectedTestId}</span>
+              </>
+            ) : null}
           </div>
         </div>
-
-        <div className="mt-3 text-xs text-white/50">
-          org=<span className="font-mono">{org}</span>
-          {data?.filters?.orgId ? (
-            <>
-              {" "}
-              · orgId=<span className="font-mono">{data.filters.orgId}</span>
-            </>
-          ) : null}
-          {selectedTestId ? (
-            <>
-              {" "}
-              · testId=<span className="font-mono">{selectedTestId}</span>
-            </>
-          ) : null}
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
+              <div className="text-lg font-semibold">Dashboard v2</div>
+            </div>
+            {FiltersRow}
+          </div>
         </div>
-      </div>
+      )}
 
       {loading && <div className="text-white/70">Loading…</div>}
       {err && <div className="text-red-300">Error: {err}</div>}
@@ -432,6 +683,124 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
               <div className="text-xs text-white/60">Active links</div>
               <div className="text-3xl font-semibold">{fmtNum(data.kpis.activeLinks)}</div>
             </div>
+          </div>
+
+          {/* Segmentation (Org/Test level) */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Segmentation</h2>
+                <p className="text-sm text-white/60">
+                  Company, purpose (link label/name), and overall distributions for this org/test + date range.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {segmentsLoading ? <div className="text-xs text-white/50">Loading…</div> : null}
+                {segmentsErr ? <div className="text-xs text-red-300">Error: {segmentsErr}</div> : null}
+                <button
+                  onClick={downloadSegmentsCsv}
+                  disabled={!segments}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                  title="Download segmentation as CSV"
+                >
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            {!segmentsLoading && !segments && !segmentsErr ? (
+              <div className="mt-3 text-sm text-white/60">No segmentation available.</div>
+            ) : null}
+
+            {segments ? (
+              <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Companies */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <h3 className="font-semibold">Top companies</h3>
+                  <div className="mt-3 space-y-2">
+                    {(segments.companies || []).length ? (
+                      (segments.companies || []).slice(0, 12).map((c) => (
+                        <div key={c.company} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{c.company}</div>
+                            <div className="text-xs text-white/50">
+                              {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-white/60">No company data captured.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Purpose */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <h3 className="font-semibold">Purpose (link label/name)</h3>
+                  <div className="mt-3 space-y-2">
+                    {(segments.purposes || []).length ? (
+                      (segments.purposes || []).slice(0, 12).map((p) => (
+                        <div key={p.purpose} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{p.purpose}</div>
+                            <div className="text-xs text-white/50">
+                              {fmtNum(p.testsTaken)} · {fmtPct(p.pct)}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-white/60">No purpose data captured.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Overall distributions */}
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <h3 className="font-semibold">Overall distributions</h3>
+
+                  <div className="mt-3">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Top profiles (by count)</div>
+                    {(segments.profilesByCount || []).length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(segments.profilesByCount || []).slice(0, 8).map((p) => (
+                          <span
+                            key={p.code}
+                            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
+                            title={`${p.code} · ${fmtNum(p.count)} (${fmtPct(p.pct)})`}
+                          >
+                            {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-white/60">—</div>
+                    )}
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Top frequencies (by count)</div>
+                    {(segments.frequenciesByCount || []).length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(segments.frequenciesByCount || []).slice(0, 6).map((f) => (
+                          <span
+                            key={f.code}
+                            className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
+                            title={`${f.code} · ${fmtNum(f.count)} (${fmtPct(f.pct)})`}
+                          >
+                            {f.name} <span className="ml-2 text-white/50">{fmtPct(f.pct)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-white/60">—</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Timeline + Insights */}
@@ -469,7 +838,7 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="text-xs text-white/50">
                     Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n=
-                    {insights.confidence.sampleSize}
+                    {fmtNum(insights.confidence.sampleSize)}
                   </div>
 
                   <div>
@@ -496,15 +865,25 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
 
           {/* Links table */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-2">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Link performance</h2>
                 <p className="text-sm text-white/60">
                   Click a link to drill down into distributions, segments, and link-level insights.
                 </p>
               </div>
-              <div className="text-xs text-white/50">
-                {nonZeroLinks.length} links with usage · {zeroLinks.length} with zero usage
+
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-white/50">
+                  {nonZeroLinks.length} links with usage · {zeroLinks.length} with zero usage
+                </div>
+                <button
+                  onClick={downloadMainCsv}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                  title="Download the link table as CSV"
+                >
+                  Download CSV
+                </button>
               </div>
             </div>
 
@@ -529,19 +908,27 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                     return (
                       <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-3 pr-3">
-                          <button className="text-left hover:underline" onClick={() => openLink(l.token)} title={l.token}>
+                          <button
+                            className="text-left hover:underline"
+                            onClick={() => openLink(l.token)}
+                            title={l.token}
+                          >
                             <div className="font-medium">{l.name || l.label || "Untitled link"}</div>
                             <div className="text-xs text-white/50 font-mono">{l.token}</div>
                           </button>
                         </td>
 
                         <td className="py-3 pr-3">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(l.isActive)}`}>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(
+                              l.isActive
+                            )}`}
+                          >
                             {l.isActive === false ? "Inactive" : "Active"}
                           </span>
                         </td>
 
-                        <td className="py-3 pr-3 text-right font-semibold">{l.testsTaken}</td>
+                        <td className="py-3 pr-3 text-right font-semibold">{fmtNum(l.testsTaken)}</td>
 
                         <td className="py-3 pr-3">
                           {topP.length ? (
@@ -550,7 +937,7 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                                 <span
                                   key={p.code}
                                   className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                                  title={`${p.code} · ${p.count} (${fmtPct(p.pct)})`}
+                                  title={`${p.code} · ${fmtNum(p.count)} (${fmtPct(p.pct)})`}
                                 >
                                   {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
                                 </span>
@@ -565,7 +952,7 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                           {topF ? (
                             <span
                               className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                              title={`${topF.code} · ${topF.count} (${fmtPct(topF.pct)})`}
+                              title={`${topF.code} · ${fmtNum(topF.count)} (${fmtPct(topF.pct)})`}
                             >
                               {topF.name} <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
                             </span>
@@ -604,16 +991,38 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                     </div>
                     <div className="text-xs text-white/50 font-mono break-all">{selectedToken}</div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setDrawerOpen(false);
-                      setSelectedToken(null);
-                      setDrawerData(null);
-                    }}
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                  >
-                    Close
-                  </button>
+
+                  <div className="flex gap-2">
+                    {selectedToken ? (
+                      <Link
+                        href={`/portal/${org}/dashboard/beta/link/${selectedToken}${linkFullAnalyticsQuery}`}
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                        title="Open full analytics page for this link"
+                      >
+                        Open full analytics
+                      </Link>
+                    ) : null}
+
+                    <button
+                      onClick={downloadDrawerCsv}
+                      disabled={!drawerData?.ok}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                      title="Download link analytics as CSV"
+                    >
+                      CSV
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        setSelectedToken(null);
+                        setDrawerData(null);
+                      }}
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
 
                 {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
@@ -641,7 +1050,8 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                         <h3 className="font-semibold">Insights (Beta)</h3>
                         {drawerData?._insights?.confidence ? (
                           <div className="text-xs text-white/50">
-                            {drawerData._insights.confidence.level} · n={drawerData._insights.confidence.sampleSize}
+                            {drawerData._insights.confidence.level} · n=
+                            {fmtNum(drawerData._insights.confidence.sampleSize)}
                           </div>
                         ) : null}
                       </div>
@@ -666,10 +1076,10 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                             <div className="min-w-0">
                               <div className="font-medium truncate">{p.name}</div>
                               <div className="text-xs text-white/50">
-                                {p.code} · {p.count} · {fmtPct(p.pct)}
+                                {p.code} · {fmtNum(p.count)} · {fmtPct(p.pct)}
                               </div>
                             </div>
-                            <div className="text-xs text-white/70">avg {Number(p.avgPoints || 0).toFixed(1)}</div>
+                            <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
                           </div>
                         ))}
                       </div>
@@ -683,10 +1093,10 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                             <div className="min-w-0">
                               <div className="font-medium truncate">{f.name}</div>
                               <div className="text-xs text-white/50">
-                                {f.code} · {f.count} · {fmtPct(f.pct)}
+                                {f.code} · {fmtNum(f.count)} · {fmtPct(f.pct)}
                               </div>
                             </div>
-                            <div className="text-xs text-white/70">avg {Number(f.avgPoints || 0).toFixed(1)}</div>
+                            <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
                           </div>
                         ))}
                       </div>
@@ -701,7 +1111,7 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
                               <div className="min-w-0">
                                 <div className="font-medium truncate">{c.company}</div>
                                 <div className="text-xs text-white/50">
-                                  {c.testsTaken} · {fmtPct(c.pct)}
+                                  {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
                                 </div>
                               </div>
                             </div>
@@ -721,3 +1131,4 @@ export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
     </div>
   );
 }
+
