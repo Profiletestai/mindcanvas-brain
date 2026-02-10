@@ -44,6 +44,26 @@ type LinkApiPayload = {
   segments: { companies: CompanyItem[] };
 };
 
+type CompanySubmissionsPayload = {
+  ok: true;
+  token: string;
+  company: string;
+  from: string;
+  to: string;
+  total: number;
+  submissions: Array<{
+    submissionId: string;
+    createdAt: string | null;
+    takerId: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    phone: string | null;
+    company: string | null;
+    meta: any | null;
+  }>;
+};
+
 function clampPct(p: number) {
   if (!Number.isFinite(p)) return 0;
   return Math.max(0, Math.min(1, p));
@@ -65,163 +85,6 @@ function fmtDateTime(iso: string | null) {
   return d.toLocaleString();
 }
 
-/** MindCanvas background layer (grid + glow) */
-function MindCanvasBackdrop() {
-  return (
-    <div aria-hidden className="fixed inset-0 -z-10">
-      <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_50%_-10%,rgba(17,49,73,0.95)_0%,rgba(8,18,27,0.92)_55%,rgba(6,14,22,0.96)_100%)]" />
-      <div className="absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.45),transparent_60%)]" />
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/50" />
-    </div>
-  );
-}
-
-/** Neon sparkline with area glow */
-function Sparkline({
-  data,
-  height = 150,
-}: {
-  data: TimelinePoint[];
-  height?: number;
-}) {
-  const width = 920;
-  const padX = 10;
-  const padY = 12;
-
-  const values = data.map((d) => Math.max(0, d.submissions || 0));
-  const max = Math.max(1, ...values);
-  const min = 0;
-
-  const n = Math.max(2, data.length);
-  const dx = (width - padX * 2) / (n - 1);
-
-  const pts = data.map((d, i) => {
-    const v = Math.max(0, d.submissions || 0);
-    const t = (v - min) / (max - min || 1);
-    const x = padX + i * dx;
-    const y = padY + (1 - t) * (height - padY * 2);
-    return { x, y, v, date: d.date };
-  });
-
-  function pathSmooth(points: { x: number; y: number }[]) {
-    if (points.length < 2) return "";
-    const p = points;
-    let d = `M ${p[0].x} ${p[0].y}`;
-    for (let i = 0; i < p.length - 1; i++) {
-      const p0 = p[i - 1] || p[i];
-      const p1 = p[i];
-      const p2 = p[i + 1];
-      const p3 = p[i + 2] || p2;
-
-      const c1x = p1.x + (p2.x - p0.x) / 6;
-      const c1y = p1.y + (p2.y - p0.y) / 6;
-      const c2x = p2.x - (p3.x - p1.x) / 6;
-      const c2y = p2.y - (p3.y - p1.y) / 6;
-
-      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
-    }
-    return d;
-  }
-
-  const linePath = pathSmooth(pts);
-  const baselineY = height - padY;
-  const areaPath =
-    pts.length >= 2
-      ? `${linePath} L ${pts[pts.length - 1].x} ${baselineY} L ${pts[0].x} ${baselineY} Z`
-      : "";
-
-  const leftLabel = data[0]?.date ?? "";
-  const rightLabel = data[data.length - 1]?.date ?? "";
-
-  return (
-    <div className="w-full">
-      <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-        <div className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(800px_220px_at_50%_0%,rgba(100,186,226,0.18),transparent_60%)]" />
-
-        <svg viewBox={`0 0 ${width} ${height}`} className="block w-full" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="mcLine2" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="rgba(100,186,226,0.95)" />
-              <stop offset="50%" stopColor="rgba(45,143,196,0.95)" />
-              <stop offset="100%" stopColor="rgba(1,90,139,0.95)" />
-            </linearGradient>
-
-            <linearGradient id="mcArea2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(100,186,226,0.30)" />
-              <stop offset="60%" stopColor="rgba(45,143,196,0.14)" />
-              <stop offset="100%" stopColor="rgba(1,90,139,0.0)" />
-            </linearGradient>
-
-            <filter id="glow2">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feColorMatrix
-                in="blur"
-                type="matrix"
-                values="
-                  1 0 0 0 0
-                  0 1 0 0 0
-                  0 0 1 0 0
-                  0 0 0 0.9 0"
-                result="coloredBlur"
-              />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          {[0.2, 0.4, 0.6, 0.8].map((t, i) => {
-            const y = padY + t * (height - padY * 2);
-            return (
-              <line
-                key={i}
-                x1={padX}
-                x2={width - padX}
-                y1={y}
-                y2={y}
-                stroke="rgba(255,255,255,0.06)"
-                strokeWidth="1"
-              />
-            );
-          })}
-
-          {areaPath ? <path d={areaPath} fill="url(#mcArea2)" /> : null}
-
-          {linePath ? (
-            <path d={linePath} fill="none" stroke="url(#mcLine2)" strokeWidth="6" opacity="0.22" filter="url(#glow2)" />
-          ) : null}
-          {linePath ? <path d={linePath} fill="none" stroke="url(#mcLine2)" strokeWidth="2.8" /> : null}
-
-          {pts.map((p, idx) => (
-            <g key={idx}>
-              <circle cx={p.x} cy={p.y} r="3.4" fill="rgba(255,255,255,0.85)" opacity="0.35" />
-              <circle cx={p.x} cy={p.y} r="2.0" fill="rgba(100,186,226,0.95)">
-                <title>
-                  {p.date}: {Math.round(p.v)}
-                </title>
-              </circle>
-            </g>
-          ))}
-        </svg>
-      </div>
-
-      <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
-    </div>
-  );
-}
-
 /** CSV helpers */
 function csvEscape(v: any) {
   const s = v == null ? "" : String(v);
@@ -241,6 +104,145 @@ function downloadCsvLines(filename: string, lines: string[]) {
   URL.revokeObjectURL(url);
 }
 
+/** MindCanvas grid overlay (self contained for wow-factor consistency) */
+function MindCanvasGrid() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_-10%,#113149_0%,#08121b_55%,#060e16_100%)]" />
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      <div className="absolute inset-0 bg-[#050914]/55" />
+    </div>
+  );
+}
+
+/** Neon sparkline (curve + area glow) */
+function SparklineNeon({
+  data,
+  height = 140,
+}: {
+  data: TimelinePoint[];
+  height?: number;
+}) {
+  const width = 900;
+  const padX = 14;
+  const padY = 14;
+
+  const pts = useMemo(() => {
+    const items = (data || []).slice();
+    items.sort((a, b) => (a.date < b.date ? -1 : 1));
+    const n = items.length;
+    if (!n) return { items, points: [] as { x: number; y: number; v: number }[] };
+
+    const maxV = Math.max(1, ...items.map((d) => d.submissions || 0));
+    const innerW = width - padX * 2;
+    const innerH = height - padY * 2;
+
+    const points = items.map((d, i) => {
+      const x = padX + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+      const v = d.submissions || 0;
+      const y = padY + (1 - v / maxV) * innerH;
+      return { x, y, v };
+    });
+
+    return { items, points };
+  }, [data, height]);
+
+  const path = useMemo(() => {
+    const p = pts.points;
+    if (!p.length) return "";
+    if (p.length === 1) return `M ${p[0].x} ${p[0].y}`;
+
+    let d = `M ${p[0].x} ${p[0].y}`;
+    for (let i = 1; i < p.length; i++) {
+      const prev = p[i - 1];
+      const cur = p[i];
+      const midX = (prev.x + cur.x) / 2;
+      const midY = (prev.y + cur.y) / 2;
+      d += ` Q ${prev.x} ${prev.y} ${midX} ${midY}`;
+    }
+    const last = p[p.length - 1];
+    d += ` T ${last.x} ${last.y}`;
+    return d;
+  }, [pts.points]);
+
+  const area = useMemo(() => {
+    const p = pts.points;
+    if (!p.length) return "";
+    const baseline = height - 10;
+    return `${path} L ${p[p.length - 1].x} ${baseline} L ${p[0].x} ${baseline} Z`;
+  }, [path, pts.points, height]);
+
+  const leftLabel = pts.items[0]?.date ?? "";
+  const rightLabel = pts.items[pts.items.length - 1]?.date ?? "";
+
+  return (
+    <div className="w-full">
+      <svg
+        viewBox={`0 0 900 ${height}`}
+        className="w-full h-[170px] rounded-2xl border border-white/10 bg-white/5 overflow-hidden"
+        role="img"
+        aria-label="Activity over time"
+      >
+        <defs>
+          <linearGradient id="mcLine2" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#64bae2" />
+            <stop offset="45%" stopColor="#2d8fc4" />
+            <stop offset="100%" stopColor="#7c5cff" />
+          </linearGradient>
+
+          <linearGradient id="mcArea2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#64bae2" stopOpacity="0.28" />
+            <stop offset="60%" stopColor="#2d8fc4" stopOpacity="0.10" />
+            <stop offset="100%" stopColor="#050914" stopOpacity="0" />
+          </linearGradient>
+
+          <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <pattern id="mcGrid2" width="56" height="56" patternUnits="userSpaceOnUse">
+            <path d="M 56 0 L 0 0 0 56" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+          </pattern>
+
+          <radialGradient id="mcRad2" cx="30%" cy="10%" r="80%">
+            <stop offset="0%" stopColor="rgba(100,186,226,0.20)" />
+            <stop offset="40%" stopColor="rgba(45,143,196,0.10)" />
+            <stop offset="100%" stopColor="rgba(5,9,20,0)" />
+          </radialGradient>
+        </defs>
+
+        <rect x="0" y="0" width="900" height={height} fill="url(#mcRad2)" />
+        <rect x="0" y="0" width="900" height={height} fill="url(#mcGrid2)" opacity="0.55" />
+
+        {area ? <path d={area} fill="url(#mcArea2)" /> : null}
+
+        {path ? (
+          <>
+            <path d={path} stroke="url(#mcLine2)" strokeWidth="3.2" fill="none" filter="url(#glow2)" />
+            <path d={path} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
+          </>
+        ) : null}
+      </svg>
+
+      <div className="mt-2 flex justify-between text-[11px] text-white/60">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 function TabButton({
   active,
   children,
@@ -254,9 +256,9 @@ function TabButton({
     <button
       onClick={onClick}
       className={[
-        "rounded-full px-3 py-1 text-xs border transition-all",
+        "rounded-full px-3 py-1 text-xs border transition",
         active
-          ? "bg-white text-black border-white shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+          ? "bg-white text-black border-white"
           : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10",
       ].join(" ")}
       type="button"
@@ -284,6 +286,13 @@ export default function LinkAnalyticsClient({
   const [data, setData] = useState<LinkApiPayload | null>(null);
 
   const [tab, setTab] = useState<"companies" | "profiles" | "frequencies">("companies");
+
+  // Company drilldown drawer
+  const [companyDrawerOpen, setCompanyDrawerOpen] = useState(false);
+  const [companyDrawerCompany, setCompanyDrawerCompany] = useState<string>("");
+  const [companyDrawerLoading, setCompanyDrawerLoading] = useState(false);
+  const [companyDrawerErr, setCompanyDrawerErr] = useState<string>("");
+  const [companyDrawerData, setCompanyDrawerData] = useState<CompanySubmissionsPayload | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -326,7 +335,20 @@ export default function LinkAnalyticsClient({
     return String(base).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
   }, [title]);
 
-  function downloadCsv() {
+  const backHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (testId) q.set("testId", testId);
+    const qs = q.toString();
+    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
+  }, [orgSlug, testId]);
+
+  const timelineSorted = useMemo(() => {
+    const t = (data?.timeline || []).slice();
+    t.sort((a, b) => (a.date < b.date ? -1 : 1));
+    return t;
+  }, [data]);
+
+  function downloadAllCsv() {
     if (!data?.ok) return;
 
     const lines: string[] = [];
@@ -368,33 +390,68 @@ export default function LinkAnalyticsClient({
     downloadCsvLines(filename, lines);
   }
 
-  const backHref = useMemo(() => {
-    const q = new URLSearchParams();
-    if (testId) q.set("testId", testId);
-    const qs = q.toString();
-    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
-  }, [orgSlug, testId]);
+  async function openCompany(company: string) {
+    const c = (company || "").trim() || "Unknown";
+    setCompanyDrawerCompany(c);
+    setCompanyDrawerOpen(true);
+    setCompanyDrawerLoading(true);
+    setCompanyDrawerErr("");
+    setCompanyDrawerData(null);
 
-  const timelineSorted = useMemo(() => {
-    const t = (data?.timeline || []).slice();
-    t.sort((a, b) => (a.date < b.date ? -1 : 1));
-    return t;
-  }, [data]);
+    try {
+      const q = new URLSearchParams();
+      q.set("token", token);
+      q.set("company", c);
+      if (from) q.set("from", from);
+      if (to) q.set("to", to);
 
-  const Card = ({ children }: { children: any }) => (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-      {children}
-    </div>
-  );
+      const res = await fetch(`/api/portal-dashboard-v2/link/company-submissions?${q.toString()}`, {
+        cache: "no-store",
+      });
+
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+
+      setCompanyDrawerData(j as CompanySubmissionsPayload);
+    } catch (e: any) {
+      setCompanyDrawerErr(String(e?.message || e));
+    } finally {
+      setCompanyDrawerLoading(false);
+    }
+  }
+
+  function downloadCompanyCsv() {
+    if (!companyDrawerData?.ok) return;
+
+    const rows = (companyDrawerData.submissions || []).map((r) => {
+      const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
+      return [
+        companyDrawerData.company || "",
+        r.createdAt || "",
+        name,
+        r.email || "",
+        r.phone || "",
+        r.submissionId || "",
+        r.takerId || "",
+      ];
+    });
+
+    const lines: string[] = [];
+    lines.push(csvEscape("Company submissions"));
+    lines.push(["company", "created_at", "name", "email", "phone", "submission_id", "taker_id"].map(csvEscape).join(","));
+    for (const r of rows) lines.push(r.map(csvEscape).join(","));
+
+    const fileSafeCompany = String(companyDrawerData.company || "company").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
+    downloadCsvLines(`company_submissions_${orgSlug}_${fileSafeCompany}.csv`, lines);
+  }
 
   return (
-    <div className="min-h-screen p-6 text-white space-y-6">
-      <MindCanvasBackdrop />
+    <div className="relative min-h-screen p-6 text-white space-y-6">
+      <MindCanvasGrid />
 
       {/* Header */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.35),transparent_60%)]" />
-        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
             <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
             <h1 className="text-2xl font-semibold truncate">{title}</h1>
@@ -410,9 +467,9 @@ export default function LinkAnalyticsClient({
 
           <div className="flex gap-2">
             <button
-              onClick={downloadCsv}
+              onClick={downloadAllCsv}
               disabled={!data?.ok}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
               title="Download as CSV"
               type="button"
             >
@@ -420,7 +477,7 @@ export default function LinkAnalyticsClient({
             </button>
             <Link
               href={backHref}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
             >
               Back to dashboard
             </Link>
@@ -435,47 +492,48 @@ export default function LinkAnalyticsClient({
         <>
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-xs text-white/60">Tests taken</div>
-              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.testsTaken)}</div>
-              <div className="mt-3 h-[3px] w-full rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full w-2/3 rounded-full bg-[linear-gradient(90deg,rgba(100,186,226,0.85),rgba(45,143,196,0.85),rgba(1,90,139,0.85))]" />
-              </div>
-            </Card>
-
-            <Card>
+              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.testsTaken)}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-xs text-white/60">Unique takers</div>
-              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
+              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.uniqueTakers)}</div>
               <div className="text-xs text-white/50 mt-1">
                 {data.kpis.uniqueTakers != null && data.kpis.testsTaken
                   ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.testsTaken)} unique`
                   : ""}
               </div>
-            </Card>
-
-            <Card>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-xs text-white/60">Last used</div>
               <div className="text-sm text-white/80 mt-2">{fmtDateTime(data.kpis.lastUsedAt)}</div>
-            </Card>
+            </div>
           </div>
 
           {/* Timeline */}
-          <Card>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold">Activity over time</h2>
-              <div className="text-xs text-white/50">Daily submissions</div>
+              <div className="text-xs text-white/50">Sparkline · daily submissions</div>
             </div>
-            <div className="mt-3">
-              {timelineSorted.length ? <Sparkline data={timelineSorted} height={150} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
+            <div className="mt-4">
+              {timelineSorted.length ? (
+                <SparklineNeon data={timelineSorted} />
+              ) : (
+                <div className="text-sm text-white/60">No activity in this range.</div>
+              )}
             </div>
-          </Card>
+          </div>
 
-          {/* Segmentation (Tabbed) */}
-          <Card>
+          {/* Segmentation */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Segmentation</h2>
-                <p className="text-sm text-white/60">Cleaner view: switch tabs to explore companies, profiles, and frequencies.</p>
+                <p className="text-sm text-white/60">
+                  Click a company to drill down into takers and export a targeted list.
+                </p>
               </div>
 
               <div className="flex gap-2">
@@ -491,23 +549,28 @@ export default function LinkAnalyticsClient({
               </div>
             </div>
 
-            <div className="mt-4">
+            <div className="mt-5">
               {tab === "companies" ? (
                 <div className="space-y-2">
                   {(data.segments?.companies || []).length ? (
-                    (data.segments.companies || []).slice(0, 25).map((c) => (
-                      <div
-                        key={c.company}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
+                    (data.segments.companies || []).slice(0, 30).map((c) => (
+                      <button
+                        key={c.company || "Unknown"}
+                        onClick={() => openCompany(c.company || "Unknown")}
+                        className="w-full text-left flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 hover:bg-white/10 transition"
+                        type="button"
+                        title="View submissions for this company"
                       >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{c.company || "Unknown"}</div>
                           <div className="text-xs text-white/50">
-                            {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
+                            {fmtNum(c.testsTaken)} submissions · {fmtPct(c.pct)}
                           </div>
                         </div>
-                        <div className="text-xs text-white/70">tests {fmtNum(c.testsTaken)}</div>
-                      </div>
+                        <div className="text-xs text-white/70">
+                          View →
+                        </div>
+                      </button>
                     ))
                   ) : (
                     <div className="text-sm text-white/60">No company data captured for this link.</div>
@@ -518,10 +581,10 @@ export default function LinkAnalyticsClient({
               {tab === "profiles" ? (
                 <div className="space-y-2">
                   {(data.distributions?.profiles || []).length ? (
-                    (data.distributions.profiles || []).slice(0, 30).map((p) => (
+                    (data.distributions.profiles || []).slice(0, 40).map((p) => (
                       <div
                         key={p.code}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
                       >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{p.name}</div>
@@ -544,7 +607,7 @@ export default function LinkAnalyticsClient({
                     (data.distributions.frequencies || []).slice(0, 20).map((f) => (
                       <div
                         key={f.code}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
                       >
                         <div className="min-w-0">
                           <div className="font-medium truncate">{f.name}</div>
@@ -561,10 +624,113 @@ export default function LinkAnalyticsClient({
                 </div>
               ) : null}
             </div>
-          </Card>
+          </div>
         </>
+      )}
+
+      {/* Company submissions drawer */}
+      {companyDrawerOpen && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => {
+              setCompanyDrawerOpen(false);
+              setCompanyDrawerCompany("");
+              setCompanyDrawerData(null);
+              setCompanyDrawerErr("");
+            }}
+          />
+
+          <div className="absolute right-0 top-0 h-full w-full max-w-[720px] bg-[#050914] border-l border-white/10 p-5 overflow-y-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs text-white/50">Company submissions</div>
+                <div className="text-xl font-semibold truncate">{companyDrawerCompany || "Unknown"}</div>
+                <div className="text-xs text-white/50 mt-1">
+                  Targeted export list (for coaching programmes / CRM sync later)
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={downloadCompanyCsv}
+                  disabled={!companyDrawerData?.ok}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                >
+                  Export CSV
+                </button>
+                <button
+                  onClick={() => {
+                    setCompanyDrawerOpen(false);
+                    setCompanyDrawerCompany("");
+                    setCompanyDrawerData(null);
+                    setCompanyDrawerErr("");
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {companyDrawerLoading ? <div className="mt-5 text-white/70">Loading submissions…</div> : null}
+            {companyDrawerErr ? <div className="mt-5 text-red-300">Error: {companyDrawerErr}</div> : null}
+
+            {!companyDrawerLoading && !companyDrawerErr && companyDrawerData?.ok ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-white/60">Total submissions</div>
+                    <div className="text-3xl font-semibold mt-1">{fmtNum(companyDrawerData.total)}</div>
+                  </div>
+                  <div className="text-xs text-white/50">
+                    Showing newest first
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[860px] w-full text-sm">
+                      <thead className="text-white/70">
+                        <tr className="border-b border-white/10">
+                          <th className="py-3 px-4 text-left font-medium">Name</th>
+                          <th className="py-3 px-4 text-left font-medium">Email</th>
+                          <th className="py-3 px-4 text-left font-medium">Phone</th>
+                          <th className="py-3 px-4 text-left font-medium">Submitted</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(companyDrawerData.submissions || []).map((r) => {
+                          const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim() || "—";
+                          return (
+                            <tr key={r.submissionId} className="border-b border-white/5 hover:bg-white/5">
+                              <td className="py-3 px-4">
+                                <div className="font-medium">{name}</div>
+                                <div className="text-xs text-white/40">ID: {String(r.submissionId).slice(0, 8)}…</div>
+                              </td>
+                              <td className="py-3 px-4 text-white/80">{r.email || "—"}</td>
+                              <td className="py-3 px-4 text-white/80">{r.phone || "—"}</td>
+                              <td className="py-3 px-4 text-white/70">{fmtDateTime(r.createdAt)}</td>
+                            </tr>
+                          );
+                        })}
+
+                        {!(companyDrawerData.submissions || []).length ? (
+                          <tr>
+                            <td colSpan={4} className="py-6 px-4 text-white/60">
+                              No submissions found for this company in the selected range.
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
       )}
     </div>
   );
 }
-

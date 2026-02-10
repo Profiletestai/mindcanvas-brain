@@ -51,14 +51,18 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
 
     const token = url.searchParams.get("token")?.trim() || "";
-    const companyParam = url.searchParams.get("company")?.trim() || "";
+    const companyParamRaw = url.searchParams.get("company")?.trim() || "";
 
     if (!token) {
       return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
     }
-    if (!companyParam) {
+    if (!companyParamRaw) {
       return NextResponse.json({ ok: false, error: "Missing company" }, { status: 400 });
     }
+
+    const companyParam = companyParamRaw.trim();
+    const wantUnknown =
+      companyParam.toLowerCase() === "unknown" || companyParam === "—" || companyParam === "-";
 
     const fromQ = parseDateParam(url.searchParams.get("from"));
     const toQ = parseDateParam(url.searchParams.get("to"));
@@ -67,21 +71,29 @@ export async function GET(req: Request) {
     const supa = supaAdmin();
 
     // 1) Find submissions for this link+company within range
-    // NOTE: We use the expanded view because it already has `company`.
-    const expRes = await supa
+    // NOTE: v_submission_scores_expanded_submissions already has company.
+    let expQuery = supa
       .from("v_submission_scores_expanded_submissions")
       .select("submission_id, created_at, company, link_token")
       .eq("link_token", token)
-      .eq("company", companyParam)
       .gte("created_at", toIso(from))
       .lte("created_at", toIso(to));
 
+    // If "Unknown": treat as NULL or empty or whitespace
+    // Supabase JS can't express complex OR easily without .or()
+    // We'll use .or() to match company is null OR company.eq.'' OR company.ilike.'   '
+    // (the ilike part is best-effort; whitespace-only still tricky without SQL)
+    if (wantUnknown) {
+      expQuery = expQuery.or("company.is.null,company.eq.");
+    } else {
+      expQuery = expQuery.eq("company", companyParam);
+    }
+
+    const expRes = await expQuery;
     if (expRes.error) throw expRes.error;
     const expanded = (expRes.data || []) as ExpandedRow[];
 
-    const submissionIds = Array.from(
-      new Set(expanded.map((r) => r.submission_id).filter(Boolean))
-    );
+    const submissionIds = Array.from(new Set(expanded.map((r) => r.submission_id).filter(Boolean)));
 
     if (!submissionIds.length) {
       return NextResponse.json({
@@ -105,29 +117,21 @@ export async function GET(req: Request) {
     if (usageRes.error) throw usageRes.error;
     const usage = (usageRes.data || []) as UsageRow[];
 
-    // Map submission -> (taker_id, created_at)
     const usageBySub = new Map<string, { takerId: string | null; createdAt: string }>();
     for (const u of usage) {
       if (!u.submission_id) continue;
-      // Prefer the created_at from usage (submission timestamp)
       usageBySub.set(u.submission_id, {
         takerId: (u.taker_id as any) ?? null,
         createdAt: u.created_at,
       });
     }
 
-    // 3) Fetch taker rows (best-effort) — select("*") so we don't break if columns differ across environments
-    const takerIds = Array.from(
-      new Set(usage.map((u) => (u.taker_id ? String(u.taker_id) : "")).filter(Boolean))
-    );
+    // 3) Fetch taker rows (best-effort)
+    const takerIds = Array.from(new Set(usage.map((u) => (u.taker_id ? String(u.taker_id) : "")).filter(Boolean)));
 
     let takersById = new Map<string, any>();
     if (takerIds.length) {
-      const takersRes = await supa
-        .from("test_takers")
-        .select("*")
-        .in("id", takerIds);
-
+      const takersRes = await supa.from("test_takers").select("*").in("id", takerIds);
       if (takersRes.error) throw takersRes.error;
 
       for (const t of takersRes.data || []) {
@@ -142,15 +146,13 @@ export async function GET(req: Request) {
         const takerId = u?.takerId ?? null;
         const t = takerId ? takersById.get(String(takerId)) : null;
 
-        // common field fallbacks (covers different column naming conventions)
-        const firstName =
-          t?.first_name ?? t?.firstname ?? t?.firstName ?? t?.name_first ?? null;
-        const lastName =
-          t?.last_name ?? t?.lastname ?? t?.lastName ?? t?.name_last ?? null;
+        const firstName = t?.first_name ?? t?.firstname ?? t?.firstName ?? t?.name_first ?? null;
+        const lastName = t?.last_name ?? t?.lastname ?? t?.lastName ?? t?.name_last ?? null;
         const email = t?.email ?? t?.Email ?? null;
         const phone = t?.phone ?? t?.mobile ?? t?.tel ?? null;
+
         const company =
-          t?.company ?? t?.company_name ?? t?.organisation ?? t?.organization ?? companyParam;
+          t?.company ?? t?.company_name ?? t?.organisation ?? t?.organization ?? (wantUnknown ? "Unknown" : companyParam);
 
         return {
           submissionId: sid,
@@ -165,22 +167,19 @@ export async function GET(req: Request) {
         };
       })
       .filter((r) => !!r.submissionId)
-      // sort newest first
       .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
     return NextResponse.json({
       ok: true,
       token,
-      company: companyParam,
+      company: wantUnknown ? "Unknown" : companyParam,
       from: toIso(from),
       to: toIso(to),
       total: submissions.length,
       submissions,
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || String(err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
   }
 }
+

@@ -103,194 +103,6 @@ function badgeClass(active: boolean | null) {
   return "bg-white/5 text-white/70 border-white/10";
 }
 
-/** MindCanvas background layer (grid + glow) */
-function MindCanvasBackdrop() {
-  return (
-    <div aria-hidden className="fixed inset-0 -z-10">
-      <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_50%_-10%,rgba(17,49,73,0.95)_0%,rgba(8,18,27,0.92)_55%,rgba(6,14,22,0.96)_100%)]" />
-      <div className="absolute -top-40 left-1/2 h-[520px] w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.45),transparent_60%)]" />
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/50" />
-    </div>
-  );
-}
-
-/** Neon sparkline with area glow */
-function Sparkline({
-  data,
-  height = 140,
-}: {
-  data: TimelinePoint[];
-  height?: number;
-}) {
-  const width = 920; // virtual width for consistent geometry
-  const padX = 10;
-  const padY = 12;
-
-  const values = data.map((d) => Math.max(0, d.submissions || 0));
-  const max = Math.max(1, ...values);
-  const min = 0;
-
-  const n = Math.max(2, data.length);
-  const dx = (width - padX * 2) / (n - 1);
-
-  // Build points
-  const pts = data.map((d, i) => {
-    const v = Math.max(0, d.submissions || 0);
-    const t = (v - min) / (max - min || 1); // 0..1
-    const x = padX + i * dx;
-    const y = padY + (1 - t) * (height - padY * 2);
-    return { x, y, v, date: d.date };
-  });
-
-  // Smoothing: Catmull-Rom to Bezier
-  function pathSmooth(points: { x: number; y: number }[]) {
-    if (points.length < 2) return "";
-    const p = points;
-    let d = `M ${p[0].x} ${p[0].y}`;
-
-    for (let i = 0; i < p.length - 1; i++) {
-      const p0 = p[i - 1] || p[i];
-      const p1 = p[i];
-      const p2 = p[i + 1];
-      const p3 = p[i + 2] || p2;
-
-      const c1x = p1.x + (p2.x - p0.x) / 6;
-      const c1y = p1.y + (p2.y - p0.y) / 6;
-      const c2x = p2.x - (p3.x - p1.x) / 6;
-      const c2y = p2.y - (p3.y - p1.y) / 6;
-
-      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
-    }
-    return d;
-  }
-
-  const linePath = pathSmooth(pts);
-  const baselineY = height - padY;
-
-  const areaPath =
-    pts.length >= 2
-      ? `${linePath} L ${pts[pts.length - 1].x} ${baselineY} L ${pts[0].x} ${baselineY} Z`
-      : "";
-
-  const leftLabel = data[0]?.date ?? "";
-  const rightLabel = data[data.length - 1]?.date ?? "";
-
-  return (
-    <div className="w-full">
-      <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-        {/* subtle inner glow */}
-        <div className="pointer-events-none absolute inset-0 opacity-70 bg-[radial-gradient(800px_220px_at_50%_0%,rgba(100,186,226,0.18),transparent_60%)]" />
-
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="block w-full"
-          role="img"
-          aria-label="Submissions timeline"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <linearGradient id="mcLine" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="rgba(100,186,226,0.95)" />
-              <stop offset="50%" stopColor="rgba(45,143,196,0.95)" />
-              <stop offset="100%" stopColor="rgba(1,90,139,0.95)" />
-            </linearGradient>
-
-            <linearGradient id="mcArea" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(100,186,226,0.30)" />
-              <stop offset="60%" stopColor="rgba(45,143,196,0.14)" />
-              <stop offset="100%" stopColor="rgba(1,90,139,0.0)" />
-            </linearGradient>
-
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feColorMatrix
-                in="blur"
-                type="matrix"
-                values="
-                  1 0 0 0 0
-                  0 1 0 0 0
-                  0 0 1 0 0
-                  0 0 0 0.9 0"
-                result="coloredBlur"
-              />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          {/* grid-ish horizontal guides */}
-          {[0.2, 0.4, 0.6, 0.8].map((t, i) => {
-            const y = padY + t * (height - padY * 2);
-            return (
-              <line
-                key={i}
-                x1={padX}
-                x2={width - padX}
-                y1={y}
-                y2={y}
-                stroke="rgba(255,255,255,0.06)"
-                strokeWidth="1"
-              />
-            );
-          })}
-
-          {/* area */}
-          {areaPath ? <path d={areaPath} fill="url(#mcArea)" /> : null}
-
-          {/* glow line (under) */}
-          {linePath ? (
-            <path
-              d={linePath}
-              fill="none"
-              stroke="url(#mcLine)"
-              strokeWidth="6"
-              opacity="0.22"
-              filter="url(#glow)"
-            />
-          ) : null}
-
-          {/* main line */}
-          {linePath ? (
-            <path d={linePath} fill="none" stroke="url(#mcLine)" strokeWidth="2.8" />
-          ) : null}
-
-          {/* dots */}
-          {pts.map((p, idx) => (
-            <g key={idx}>
-              <circle cx={p.x} cy={p.y} r="3.4" fill="rgba(255,255,255,0.85)" opacity="0.35" />
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r="2.0"
-                fill="rgba(100,186,226,0.95)"
-              >
-                <title>
-                  {p.date}: {Math.round(p.v)}
-                </title>
-              </circle>
-            </g>
-          ))}
-        </svg>
-      </div>
-
-      <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
-    </div>
-  );
-}
-
 /** CSV helpers */
 function csvEscape(v: any) {
   const s = v == null ? "" : String(v);
@@ -311,6 +123,128 @@ function downloadCsv(filename: string, header: string[], rows: any[][]) {
   URL.revokeObjectURL(url);
 }
 
+/** Neon sparkline (minimal, wow-factor, no libs) */
+function SparklineNeon({
+  data,
+  height = 120,
+}: {
+  data: TimelinePoint[];
+  height?: number;
+}) {
+  const width = 820; // virtual viewBox width
+  const padX = 14;
+  const padY = 14;
+
+  const pts = useMemo(() => {
+    const items = (data || []).slice();
+    items.sort((a, b) => (a.date < b.date ? -1 : 1));
+    const n = items.length;
+    if (!n) return { items, points: [] as { x: number; y: number; v: number }[] };
+
+    const maxV = Math.max(1, ...items.map((d) => d.submissions || 0));
+    const innerW = width - padX * 2;
+    const innerH = height - padY * 2;
+
+    const points = items.map((d, i) => {
+      const x = padX + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+      const v = d.submissions || 0;
+      const y = padY + (1 - v / maxV) * innerH;
+      return { x, y, v };
+    });
+
+    return { items, points };
+  }, [data, height]);
+
+  const path = useMemo(() => {
+    const p = pts.points;
+    if (!p.length) return "";
+    if (p.length === 1) return `M ${p[0].x} ${p[0].y}`;
+    // Smooth curve (Catmull-Rom-ish via quadratic)
+    let d = `M ${p[0].x} ${p[0].y}`;
+    for (let i = 1; i < p.length; i++) {
+      const prev = p[i - 1];
+      const cur = p[i];
+      const midX = (prev.x + cur.x) / 2;
+      const midY = (prev.y + cur.y) / 2;
+      d += ` Q ${prev.x} ${prev.y} ${midX} ${midY}`;
+    }
+    // last segment
+    const last = p[p.length - 1];
+    d += ` T ${last.x} ${last.y}`;
+    return d;
+  }, [pts.points]);
+
+  const area = useMemo(() => {
+    const p = pts.points;
+    if (!p.length) return "";
+    const baseline = height - 10;
+    return `${path} L ${p[p.length - 1].x} ${baseline} L ${p[0].x} ${baseline} Z`;
+  }, [path, pts.points, height]);
+
+  const leftLabel = pts.items[0]?.date ?? "";
+  const rightLabel = pts.items[pts.items.length - 1]?.date ?? "";
+
+  return (
+    <div className="w-full">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-[140px] rounded-2xl border border-white/10 bg-white/5 overflow-hidden"
+        role="img"
+        aria-label="Submissions over time"
+      >
+        <defs>
+          <linearGradient id="mcLine" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#64bae2" />
+            <stop offset="45%" stopColor="#2d8fc4" />
+            <stop offset="100%" stopColor="#7c5cff" />
+          </linearGradient>
+
+          <linearGradient id="mcArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#64bae2" stopOpacity="0.28" />
+            <stop offset="60%" stopColor="#2d8fc4" stopOpacity="0.10" />
+            <stop offset="100%" stopColor="#050914" stopOpacity="0" />
+          </linearGradient>
+
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <pattern id="mcGrid" width="56" height="56" patternUnits="userSpaceOnUse">
+            <path d="M 56 0 L 0 0 0 56" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+          </pattern>
+
+          <radialGradient id="mcRad" cx="30%" cy="10%" r="80%">
+            <stop offset="0%" stopColor="rgba(100,186,226,0.20)" />
+            <stop offset="40%" stopColor="rgba(45,143,196,0.10)" />
+            <stop offset="100%" stopColor="rgba(5,9,20,0)" />
+          </radialGradient>
+        </defs>
+
+        <rect x="0" y="0" width={width} height={height} fill="url(#mcRad)" />
+        <rect x="0" y="0" width={width} height={height} fill="url(#mcGrid)" opacity="0.55" />
+
+        {area ? <path d={area} fill="url(#mcArea)" /> : null}
+
+        {path ? (
+          <>
+            <path d={path} stroke="url(#mcLine)" strokeWidth="3.2" fill="none" filter="url(#glow)" />
+            <path d={path} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
+          </>
+        ) : null}
+      </svg>
+
+      <div className="mt-2 flex justify-between text-[11px] text-white/60">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardV2Client({
   orgSlug,
   embedded = false,
@@ -321,7 +255,6 @@ export default function DashboardV2Client({
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
 
-  // Default: last 30 days
   const now = new Date();
   const defaultTo = isoToDateInput(now.toISOString());
   const defaultFrom = isoToDateInput(new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString());
@@ -332,7 +265,7 @@ export default function DashboardV2Client({
   const [testsLoading, setTestsLoading] = useState(false);
   const [testsErr, setTestsErr] = useState("");
   const [tests, setTests] = useState<PortalTestsPayload["tests"]>([]);
-  const [selectedTestId, setSelectedTestId] = useState<string>(""); // empty = all tests
+  const [selectedTestId, setSelectedTestId] = useState<string>("");
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string>("");
@@ -618,15 +551,16 @@ export default function DashboardV2Client({
     return t;
   }, [data]);
 
-  // ✅ FIX: point to the existing full analytics page route you already have
+  // ✅ FIX: Open full analytics must go to /portal/[slug]/dashboard/beta/link/[token]
   const fullAnalyticsHref = useMemo(() => {
     if (!selectedToken) return null;
     const q = new URLSearchParams();
+    // keep filters so the link page uses the same window
     if (selectedTestId) q.set("testId", selectedTestId);
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
     const qs = q.toString();
-    return `/portal/${encodeURIComponent(org)}/dashboard/beta/link/${encodeURIComponent(selectedToken)}${qs ? `?${qs}` : ""}`;
+    return `/portal/${org}/dashboard/beta/link/${selectedToken}${qs ? `?${qs}` : ""}`;
   }, [selectedToken, org, selectedTestId, appliedFromIso, appliedToIso]);
 
   const FiltersRow = (
@@ -636,7 +570,7 @@ export default function DashboardV2Client({
         <select
           value={selectedTestId}
           onChange={(e) => setSelectedTestId(e.target.value)}
-          className="h-10 w-full rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20 focus:bg-white/12"
+          className="h-11 w-full rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         >
           <option value="">All tests</option>
           {tests.map((t) => (
@@ -655,7 +589,7 @@ export default function DashboardV2Client({
           type="date"
           value={fromDate}
           onChange={(e) => setFromDate(e.target.value)}
-          className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
+          className="h-11 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         />
       </div>
       <div>
@@ -664,43 +598,36 @@ export default function DashboardV2Client({
           type="date"
           value={toDate}
           onChange={(e) => setToDate(e.target.value)}
-          className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none focus:border-white/20"
+          className="h-11 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         />
       </div>
 
       <button
         onClick={loadMain}
-        className="h-10 rounded-xl bg-white text-black px-4 text-sm font-medium hover:bg-white/90 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+        className="h-11 rounded-xl bg-white text-black px-4 text-sm font-semibold hover:bg-white/90"
       >
         Apply
       </button>
     </div>
   );
 
-  const Card = ({ children }: { children: any }) => (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-      {children}
-    </div>
-  );
-
   return (
     <div className="min-h-screen p-6 space-y-6 text-white">
-      <MindCanvasBackdrop />
-
       {!embedded ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl relative overflow-hidden">
-          <div className="pointer-events-none absolute -top-24 left-1/2 h-56 w-[900px] -translate-x-1/2 rounded-full blur-3xl opacity-40 bg-[radial-gradient(circle_at_center,rgba(100,186,226,0.35),transparent_60%)]" />
-          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
               <h1 className="text-2xl font-semibold">Dashboard v2</h1>
-              <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
+              <p className="text-sm text-white/70">
+                Link analytics console (drill-down + export).
+              </p>
             </div>
             {FiltersRow}
           </div>
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
@@ -716,50 +643,46 @@ export default function DashboardV2Client({
 
       {!loading && !err && data?.ok && (
         <>
+          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-xs text-white/60">Submissions</div>
-              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.submissions)}</div>
-              <div className="mt-3 h-[3px] w-full rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full w-2/3 rounded-full bg-[linear-gradient(90deg,rgba(100,186,226,0.85),rgba(45,143,196,0.85),rgba(1,90,139,0.85))]" />
-              </div>
-            </Card>
-
-            <Card>
+              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.submissions)}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-xs text-white/60">Unique takers</div>
-              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
+              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.uniqueTakers)}</div>
               <div className="text-xs text-white/50 mt-1">
                 {data.kpis.uniqueTakers != null && data.kpis.submissions
                   ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.submissions)} unique`
                   : ""}
               </div>
-            </Card>
-
-            <Card>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-xs text-white/60">Active links</div>
-              <div className="mt-1 text-3xl font-semibold">{fmtNum(data.kpis.activeLinks)}</div>
-            </Card>
+              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.activeLinks)}</div>
+            </div>
           </div>
 
+          {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Submissions over time</h2>
                 <div className="text-xs text-white/50">
-                  {data.filters.from ? isoToDateInput(data.filters.from) : ""} →{" "}
-                  {data.filters.to ? isoToDateInput(data.filters.to) : ""}
+                  {isoToDateInput(data.filters.from)} → {isoToDateInput(data.filters.to)}
                 </div>
               </div>
-              <div className="mt-3">
+              <div className="mt-4">
                 {sortedTimeline.length ? (
-                  <Sparkline data={sortedTimeline} height={150} />
+                  <SparklineNeon data={sortedTimeline} />
                 ) : (
                   <div className="text-sm text-white/60">No activity in this range.</div>
                 )}
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Insights (Beta)</h2>
                 {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
@@ -800,21 +723,22 @@ export default function DashboardV2Client({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+          {/* Links */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Links</h2>
                 <p className="text-sm text-white/60">Search, sort, drill down, export.</p>
                 <div className="text-xs text-white/50 mt-1">
-                  Showing {links.length} · {nonZeroLinks.length} with usage · {zeroLinks.length} with zero usage
+                  {links.length} links · {nonZeroLinks.length} with usage · {zeroLinks.length} with zero usage
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <button
                   onClick={downloadMainCsv}
-                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                  title="Download link table as CSV"
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+                  title="Download the link table as CSV"
                 >
                   Download CSV
                 </button>
@@ -842,8 +766,8 @@ export default function DashboardV2Client({
                     return (
                       <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
                         <td className="py-3 pr-3">
-                          <button className="text-left" onClick={() => openLink(l.token)}>
-                            <div className="font-medium hover:underline">{l.name || l.label || "Untitled link"}</div>
+                          <button className="text-left hover:underline" onClick={() => openLink(l.token)}>
+                            <div className="font-medium">{l.name || l.label || "Untitled link"}</div>
                             {l.label && l.name ? <div className="text-xs text-white/50">Label: {l.label}</div> : null}
                           </button>
                         </td>
@@ -925,8 +849,7 @@ export default function DashboardV2Client({
                     {fullAnalyticsHref ? (
                       <Link
                         href={fullAnalyticsHref}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                        title="Open full analytics page"
+                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
                       >
                         Open full analytics
                       </Link>
@@ -935,10 +858,10 @@ export default function DashboardV2Client({
                     <button
                       onClick={downloadDrawerCsv}
                       disabled={!drawerData?.ok}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
                       title="Download link analytics as CSV"
                     >
-                      Download CSV
+                      CSV
                     </button>
 
                     <button
@@ -947,7 +870,7 @@ export default function DashboardV2Client({
                         setSelectedToken(null);
                         setDrawerData(null);
                       }}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
                     >
                       Close
                     </button>
@@ -995,60 +918,6 @@ export default function DashboardV2Client({
                       ) : (
                         <div className="mt-3 text-sm text-white/60">Generating link insights…</div>
                       )}
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <h3 className="font-semibold">Top profiles</h3>
-                      <div className="mt-3 space-y-2">
-                        {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
-                          <div key={p.code} className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-medium truncate">{p.name}</div>
-                              <div className="text-xs text-white/50">
-                                {fmtNum(p.count)} · {fmtPct(p.pct)}
-                              </div>
-                            </div>
-                            <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <h3 className="font-semibold">Top frequencies</h3>
-                      <div className="mt-3 space-y-2">
-                        {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
-                          <div key={f.code} className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-medium truncate">{f.name}</div>
-                              <div className="text-xs text-white/50">
-                                {fmtNum(f.count)} · {fmtPct(f.pct)}
-                              </div>
-                            </div>
-                            <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <h3 className="font-semibold">Company segmentation</h3>
-                      <div className="mt-3 space-y-2">
-                        {(drawerData?.segments?.companies || []).length ? (
-                          (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
-                            <div key={c.company} className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{c.company}</div>
-                                <div className="text-xs text-white/50">
-                                  {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-sm text-white/60">No company data captured for this link.</div>
-                        )}
-                      </div>
                     </div>
                   </div>
                 )}
