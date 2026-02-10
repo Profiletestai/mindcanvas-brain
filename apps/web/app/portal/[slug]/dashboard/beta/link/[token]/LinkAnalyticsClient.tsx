@@ -48,14 +48,11 @@ type CompanySubmission = {
   submissionId: string;
   createdAt: string;
   takerId: string | null;
-  // PII / client-owned fields (best-effort from test_takers row)
   firstName?: string | null;
   lastName?: string | null;
   email?: string | null;
   phone?: string | null;
   company?: string | null;
-
-  // optional extras if present
   meta?: any;
 };
 
@@ -96,7 +93,6 @@ function csvEscape(v: any) {
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
-
 function downloadCsvLines(filename: string, lines: string[]) {
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -108,7 +104,6 @@ function downloadCsvLines(filename: string, lines: string[]) {
   a.remove();
   URL.revokeObjectURL(url);
 }
-
 function downloadCsv(filename: string, header: string[], rows: any[][]) {
   const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
   downloadCsvLines(filename, lines);
@@ -118,13 +113,13 @@ function SimpleBars({ data }: { data: TimelinePoint[] }) {
   const max = Math.max(1, ...data.map((d) => d.submissions || 0));
   return (
     <div className="w-full">
-      <div className="flex items-end gap-1 h-24">
+      <div className="flex items-end gap-1.5 h-24">
         {data.map((p) => {
           const h = Math.round((p.submissions / max) * 96);
           return (
             <div key={p.date} className="flex-1 min-w-[6px]">
               <div
-                className="w-full rounded-sm bg-white/70"
+                className="w-full rounded-sm bg-white/70 hover:bg-white/90 transition"
                 style={{ height: `${h}px` }}
                 title={`${p.date}: ${Math.round(p.submissions)}`}
               />
@@ -132,7 +127,7 @@ function SimpleBars({ data }: { data: TimelinePoint[] }) {
           );
         })}
       </div>
-      <div className="mt-2 flex justify-between text-[11px] text-white/60">
+      <div className="mt-2 flex justify-between text-[11px] text-white/55">
         <span>{data[0]?.date ?? ""}</span>
         <span>{data[data.length - 1]?.date ?? ""}</span>
       </div>
@@ -153,9 +148,9 @@ function TabButton({
     <button
       onClick={onClick}
       className={[
-        "rounded-full px-3 py-1 text-xs border",
+        "rounded-full px-3.5 py-1.5 text-xs border transition",
         active
-          ? "bg-white text-black border-white"
+          ? "bg-white text-black border-white shadow-[0_0_0_1px_rgba(255,255,255,0.15)]"
           : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10",
       ].join(" ")}
       type="button"
@@ -172,6 +167,38 @@ function initials(first?: string | null, last?: string | null, email?: string | 
   const f = a ? a[0] : e ? e[0] : "?";
   const l = b ? b[0] : a && a.length > 1 ? a[1] : "";
   return (f + l).toUpperCase();
+}
+
+function Meter({ pct }: { pct: number }) {
+  const p = clampPct(pct);
+  return (
+    <div className="h-2 w-28 sm:w-36 rounded-full bg-white/10 border border-white/10 overflow-hidden">
+      <div
+        className="h-full bg-white/70"
+        style={{ width: `${Math.round(p * 100)}%` }}
+      />
+    </div>
+  );
+}
+
+function StatusPill({ active }: { active: boolean | null | undefined }) {
+  const cls =
+    active === false
+      ? "bg-red-500/10 text-red-200 border-red-500/20"
+      : "bg-emerald-500/10 text-emerald-200 border-emerald-500/20";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs ${cls}`}>
+      {active === false ? "Inactive" : "Active"}
+    </span>
+  );
+}
+
+function CardShell({ children }: { children: any }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+      {children}
+    </div>
+  );
 }
 
 export default function LinkAnalyticsClient({
@@ -242,11 +269,23 @@ export default function LinkAnalyticsClient({
     return String(base).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
   }, [title]);
 
+  const timelineSorted = useMemo(() => {
+    const t = (data?.timeline || []).slice();
+    t.sort((a, b) => (a.date < b.date ? -1 : 1));
+    return t;
+  }, [data]);
+
+  const backHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (testId) q.set("testId", testId);
+    const qs = q.toString();
+    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
+  }, [orgSlug, testId]);
+
   function downloadCsvAllSections() {
     if (!data?.ok) return;
 
     const lines: string[] = [];
-
     const pushSection = (sectionTitle: string, header: string[], rows: any[][]) => {
       lines.push(csvEscape(sectionTitle));
       lines.push(header.map(csvEscape).join(","));
@@ -284,19 +323,6 @@ export default function LinkAnalyticsClient({
     downloadCsvLines(filename, lines);
   }
 
-  const backHref = useMemo(() => {
-    const q = new URLSearchParams();
-    if (testId) q.set("testId", testId);
-    const qs = q.toString();
-    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
-  }, [orgSlug, testId]);
-
-  const timelineSorted = useMemo(() => {
-    const t = (data?.timeline || []).slice();
-    t.sort((a, b) => (a.date < b.date ? -1 : 1));
-    return t;
-  }, [data]);
-
   async function openCompany(c: string) {
     const company = (c || "").trim() || "Unknown";
     setCompanyName(company);
@@ -312,10 +338,10 @@ export default function LinkAnalyticsClient({
       q.set("company", company);
       if (from) q.set("from", from);
       if (to) q.set("to", to);
-      // org/testId not required by the API route; keep optional for future checks
-      // q.set("org", orgSlug);
 
-      const res = await fetch(`/api/portal-dashboard-v2/link/company-submissions?${q.toString()}`, { cache: "no-store" });
+      const res = await fetch(`/api/portal-dashboard-v2/link/company-submissions?${q.toString()}`, {
+        cache: "no-store",
+      });
       const j = await res.json();
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
 
@@ -381,290 +407,347 @@ export default function LinkAnalyticsClient({
 
   return (
     <div className="min-h-screen p-6 text-white space-y-6">
-      {/* Header */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* HERO HEADER */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(1000px_400px_at_20%_0%,rgba(255,255,255,0.10),transparent_60%)]" />
+        </div>
+
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
-            <h1 className="text-2xl font-semibold truncate">{title}</h1>
-            <div className="text-sm text-white/60 mt-1">
+            <div className="text-xs uppercase tracking-[0.25em] text-white/55">Link Analytics</div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-semibold truncate">{title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white/60">
+              <StatusPill active={data?.link?.isActive ?? null} />
               {data?.filters?.from && data?.filters?.to ? (
-                <>
-                  Date range: <span className="text-white/80">{fmtDateTime(data.filters.from)}</span> →{" "}
-                  <span className="text-white/80">{fmtDateTime(data.filters.to)}</span>
-                </>
+                <span className="text-white/60">
+                  {fmtDateTime(data.filters.from)} → {fmtDateTime(data.filters.to)}
+                </span>
               ) : null}
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={downloadCsvAllSections}
               disabled={!data?.ok}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-              title="Download summary sections as CSV"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50 transition"
               type="button"
             >
-              Download CSV
+              Download summary CSV
             </button>
             <Link
               href={backHref}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
             >
-              Back to dashboard
+              Back
             </Link>
           </div>
         </div>
       </div>
 
-      {loading && <div className="text-white/70">Loading…</div>}
-      {err && <div className="text-red-300">Error: {err}</div>}
+      {loading && (
+        <CardShell>
+          <div className="p-5 text-white/70">Loading…</div>
+        </CardShell>
+      )}
+
+      {err && (
+        <CardShell>
+          <div className="p-5 text-red-300">Error: {err}</div>
+        </CardShell>
+      )}
 
       {!loading && !err && data?.ok && (
         <>
-          {/* KPIs */}
+          {/* KPI ROW */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-white/60">Tests taken</div>
-              <div className="text-3xl font-semibold">{fmtNum(data.kpis.testsTaken)}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-white/60">Unique takers</div>
-              <div className="text-3xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
-              <div className="text-xs text-white/50 mt-1">
-                {data.kpis.uniqueTakers != null && data.kpis.testsTaken
-                  ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.testsTaken)} unique`
-                  : ""}
+            <CardShell>
+              <div className="p-5">
+                <div className="text-xs text-white/55">Tests taken</div>
+                <div className="mt-1 text-4xl font-semibold">{fmtNum(data.kpis.testsTaken)}</div>
               </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs text-white/60">Last used</div>
-              <div className="text-sm text-white/80 mt-2">{fmtDateTime(data.kpis.lastUsedAt)}</div>
-            </div>
+            </CardShell>
+
+            <CardShell>
+              <div className="p-5">
+                <div className="text-xs text-white/55">Unique takers</div>
+                <div className="mt-1 text-4xl font-semibold">{fmtNum(data.kpis.uniqueTakers)}</div>
+                <div className="mt-2 text-xs text-white/50">
+                  {data.kpis.uniqueTakers != null && data.kpis.testsTaken
+                    ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.testsTaken)} unique`
+                    : ""}
+                </div>
+              </div>
+            </CardShell>
+
+            <CardShell>
+              <div className="p-5">
+                <div className="text-xs text-white/55">Last used</div>
+                <div className="mt-3 text-sm text-white/80">{fmtDateTime(data.kpis.lastUsedAt)}</div>
+              </div>
+            </CardShell>
           </div>
 
-          {/* Timeline */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Activity over time</h2>
-              <div className="text-xs text-white/50">Daily submissions</div>
-            </div>
-            <div className="mt-3">
-              {timelineSorted.length ? (
-                <SimpleBars data={timelineSorted} />
-              ) : (
-                <div className="text-sm text-white/60">No activity in this range.</div>
-              )}
-            </div>
-          </div>
-
-          {/* Segmentation (Tabbed) */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Segmentation</h2>
-                <p className="text-sm text-white/60">
-                  Click a company to drill down into individual submissions and export.
-                </p>
+          {/* TIMELINE */}
+          <CardShell>
+            <div className="p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold">Activity</h2>
+                <div className="text-xs text-white/50">Daily submissions</div>
               </div>
-
-              <div className="flex gap-2">
-                <TabButton active={tab === "companies"} onClick={() => setTab("companies")}>
-                  Companies
-                </TabButton>
-                <TabButton active={tab === "profiles"} onClick={() => setTab("profiles")}>
-                  Profiles
-                </TabButton>
-                <TabButton active={tab === "frequencies"} onClick={() => setTab("frequencies")}>
-                  Frequencies
-                </TabButton>
+              <div className="mt-4">
+                {timelineSorted.length ? (
+                  <SimpleBars data={timelineSorted} />
+                ) : (
+                  <div className="text-sm text-white/60">No activity in this range.</div>
+                )}
               </div>
             </div>
+          </CardShell>
 
-            <div className="mt-4">
-              {tab === "companies" ? (
-                <div className="space-y-2">
-                  {(data.segments?.companies || []).length ? (
-                    (data.segments.companies || []).slice(0, 50).map((c) => {
-                      const name = (c.company || "").trim() || "Unknown";
-                      return (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => openCompany(name)}
-                          className="w-full text-left flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3 hover:bg-white/10"
-                          title="View submissions for this company"
+          {/* SEGMENTATION */}
+          <CardShell>
+            <div className="p-5">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Segmentation</h2>
+                  <p className="text-sm text-white/60">
+                    Clean drill-down views. Click a company to see individual submissions and export.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <TabButton active={tab === "companies"} onClick={() => setTab("companies")}>
+                    Companies
+                  </TabButton>
+                  <TabButton active={tab === "profiles"} onClick={() => setTab("profiles")}>
+                    Profiles
+                  </TabButton>
+                  <TabButton active={tab === "frequencies"} onClick={() => setTab("frequencies")}>
+                    Frequencies
+                  </TabButton>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                {tab === "companies" ? (
+                  <div className="space-y-2">
+                    {(data.segments?.companies || []).length ? (
+                      (data.segments.companies || []).slice(0, 60).map((c) => {
+                        const name = (c.company || "").trim() || "Unknown";
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => openCompany(name)}
+                            className="w-full text-left group rounded-2xl border border-white/10 bg-white/5 px-4 py-3 hover:bg-white/10 transition"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{name}</div>
+                                <div className="mt-1 flex items-center gap-3 text-xs text-white/55">
+                                  <span>{fmtNum(c.testsTaken)} tests</span>
+                                  <span className="text-white/30">•</span>
+                                  <span>{fmtPct(c.pct)}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <Meter pct={c.pct} />
+                                <span className="text-xs text-white/55 group-hover:text-white/80 transition">
+                                  View →
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="text-sm text-white/60">No company data captured for this link.</div>
+                    )}
+                  </div>
+                ) : null}
+
+                {tab === "profiles" ? (
+                  <div className="space-y-2">
+                    {(data.distributions?.profiles || []).length ? (
+                      (data.distributions.profiles || []).slice(0, 80).map((p) => (
+                        <div
+                          key={p.code}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
                         >
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{name}</div>
-                            <div className="text-xs text-white/50">
-                              {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{p.name}</div>
+                              <div className="mt-1 flex items-center gap-3 text-xs text-white/55">
+                                <span>{fmtNum(p.count)} tests</span>
+                                <span className="text-white/30">•</span>
+                                <span>{fmtPct(p.pct)}</span>
+                                <span className="text-white/30">•</span>
+                                <span>avg {fmtNum(p.avgPoints)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Meter pct={p.pct} />
+                              <div className="text-xs text-white/55">{fmtPct(p.pct)}</div>
                             </div>
                           </div>
-                          <div className="text-xs text-white/70">
-                            View submissions →
-                          </div>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="text-sm text-white/60">No company data captured for this link.</div>
-                  )}
-                </div>
-              ) : null}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-white/60">No profile data.</div>
+                    )}
+                  </div>
+                ) : null}
 
-              {tab === "profiles" ? (
-                <div className="space-y-2">
-                  {(data.distributions?.profiles || []).length ? (
-                    (data.distributions.profiles || []).slice(0, 60).map((p) => (
-                      <div
-                        key={p.code}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{p.name}</div>
-                          <div className="text-xs text-white/50">
-                            {fmtNum(p.count)} · {fmtPct(p.pct)}
+                {tab === "frequencies" ? (
+                  <div className="space-y-2">
+                    {(data.distributions?.frequencies || []).length ? (
+                      (data.distributions.frequencies || []).slice(0, 40).map((f) => (
+                        <div
+                          key={f.code}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{f.name}</div>
+                              <div className="mt-1 flex items-center gap-3 text-xs text-white/55">
+                                <span>{fmtNum(f.count)} tests</span>
+                                <span className="text-white/30">•</span>
+                                <span>{fmtPct(f.pct)}</span>
+                                <span className="text-white/30">•</span>
+                                <span>avg {fmtNum(f.avgPoints)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Meter pct={f.pct} />
+                              <div className="text-xs text-white/55">{fmtPct(f.pct)}</div>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints)}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-white/60">No profile data.</div>
-                  )}
-                </div>
-              ) : null}
-
-              {tab === "frequencies" ? (
-                <div className="space-y-2">
-                  {(data.distributions?.frequencies || []).length ? (
-                    (data.distributions.frequencies || []).slice(0, 30).map((f) => (
-                      <div
-                        key={f.code}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{f.name}</div>
-                          <div className="text-xs text-white/50">
-                            {fmtNum(f.count)} · {fmtPct(f.pct)}
-                          </div>
-                        </div>
-                        <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints)}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-white/60">No frequency data.</div>
-                  )}
-                </div>
-              ) : null}
+                      ))
+                    ) : (
+                      <div className="text-sm text-white/60">No frequency data.</div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
+          </CardShell>
         </>
       )}
 
-      {/* Company drill-down drawer */}
+      {/* COMPANY DRAWER */}
       {companyOpen ? (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/60" onClick={closeCompany} />
-          <div className="absolute right-0 top-0 h-full w-full max-w-[720px] bg-[#050914] border-l border-white/10 p-4 overflow-y-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs text-white/50">Company submissions</div>
-                <div className="text-lg font-semibold truncate">{companyName}</div>
-                <div className="text-xs text-white/50 mt-1">
-                  {from || to ? (
+
+          <div className="absolute right-0 top-0 h-full w-full max-w-[860px] bg-[#050914] border-l border-white/10 overflow-hidden">
+            {/* Drawer header */}
+            <div className="p-5 border-b border-white/10 bg-white/5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-white/55">Company submissions</div>
+                  <div className="mt-1 text-xl font-semibold truncate">{companyName}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/55">
+                    {from || to ? <span>Range: {from || "—"} → {to || "—"}</span> : null}
+                    {companyData?.ok ? (
+                      <>
+                        <span className="text-white/30">•</span>
+                        <span>Total: <span className="text-white/80">{fmtNum(companyData.total)}</span></span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportCompanyCsv}
+                    disabled={!companyData?.ok}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50 transition"
+                    type="button"
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={closeCompany}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
+                    type="button"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <input
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                  placeholder="Search name, email, phone…"
+                  className="h-11 w-full rounded-xl bg-white/10 border border-white/10 px-4 text-sm text-white outline-none focus:bg-white/15 transition"
+                />
+                <div className="text-xs text-white/55">
+                  {companyData?.ok ? (
                     <>
-                      Range: {from || "—"} → {to || "—"}
+                      Showing <span className="text-white/80">{fmtNum(filteredCompanySubs.length)}</span>
                     </>
                   ) : null}
                 </div>
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={exportCompanyCsv}
-                  disabled={!companyData?.ok}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-                  type="button"
-                  title="Export filtered submissions"
-                >
-                  Export CSV
-                </button>
-                <button
-                  onClick={closeCompany}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                  type="button"
-                >
-                  Close
-                </button>
-              </div>
             </div>
 
-            <div className="mt-4">
+            {/* Drawer body */}
+            <div className="p-5 overflow-y-auto h-[calc(100%-170px)]">
               {companyLoading ? <div className="text-white/70">Loading submissions…</div> : null}
               {companyErr ? <div className="text-red-300">Error: {companyErr}</div> : null}
 
               {!companyLoading && !companyErr && companyData?.ok ? (
                 <>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                    <div className="text-sm text-white/70">
-                      Total: <span className="text-white">{fmtNum(companyData.total)}</span>
-                    </div>
-
-                    <div className="flex gap-2 items-center">
-                      <input
-                        value={companySearch}
-                        onChange={(e) => setCompanySearch(e.target.value)}
-                        placeholder="Search name, email, phone…"
-                        className="h-10 w-full sm:w-[320px] rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[980px] w-full text-sm">
-                      <thead className="text-white/70">
+                  <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5">
+                    <table className="min-w-[1000px] w-full text-sm">
+                      <thead className="text-white/70 sticky top-0 bg-[#0b1220]">
                         <tr className="border-b border-white/10">
-                          <th className="py-2 text-left font-medium">Taker</th>
-                          <th className="py-2 text-left font-medium">Email</th>
-                          <th className="py-2 text-left font-medium">Phone</th>
-                          <th className="py-2 text-left font-medium">Submitted</th>
-                          <th className="py-2 text-left font-medium">Submission ID</th>
+                          <th className="py-3 px-4 text-left font-medium">Taker</th>
+                          <th className="py-3 px-4 text-left font-medium">Email</th>
+                          <th className="py-3 px-4 text-left font-medium">Phone</th>
+                          <th className="py-3 px-4 text-left font-medium">Submitted</th>
+                          <th className="py-3 px-4 text-left font-medium">Submission ID</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(filteredCompanySubs || []).map((s) => {
+                        {filteredCompanySubs.map((s) => {
                           const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim() || "Unknown";
                           return (
-                            <tr key={s.submissionId} className="border-b border-white/5 hover:bg-white/5">
-                              <td className="py-3 pr-3">
+                            <tr key={s.submissionId} className="border-b border-white/5 hover:bg-white/5 transition">
+                              <td className="py-3 px-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="h-8 w-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-xs">
+                                  <div className="h-9 w-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-xs">
                                     {initials(s.firstName, s.lastName, s.email)}
                                   </div>
                                   <div className="min-w-0">
                                     <div className="font-medium truncate">{fullName}</div>
-                                    <div className="text-xs text-white/50 truncate">
-                                      {s.company || companyName}
-                                    </div>
+                                    <div className="text-xs text-white/50 truncate">{s.company || companyName}</div>
                                   </div>
                                 </div>
                               </td>
-                              <td className="py-3 pr-3 text-white/80">{s.email || "—"}</td>
-                              <td className="py-3 pr-3 text-white/80">{s.phone || "—"}</td>
-                              <td className="py-3 pr-3 text-white/70">{fmtDateTime(s.createdAt)}</td>
-                              <td className="py-3 pr-3 text-white/60 font-mono text-xs">{s.submissionId}</td>
+                              <td className="py-3 px-4 text-white/80">{s.email || "—"}</td>
+                              <td className="py-3 px-4 text-white/80">{s.phone || "—"}</td>
+                              <td className="py-3 px-4 text-white/70">{fmtDateTime(s.createdAt)}</td>
+                              <td className="py-3 px-4 text-white/60 font-mono text-xs">{s.submissionId}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
-
-                    {!filteredCompanySubs.length ? (
-                      <div className="mt-3 text-sm text-white/60">No submissions match your search.</div>
-                    ) : null}
                   </div>
+
+                  {!filteredCompanySubs.length ? (
+                    <div className="mt-4 text-sm text-white/60">No submissions match your search.</div>
+                  ) : null}
                 </>
               ) : null}
             </div>

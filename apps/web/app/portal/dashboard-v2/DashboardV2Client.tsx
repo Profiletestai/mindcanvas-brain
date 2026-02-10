@@ -31,7 +31,13 @@ type LinkRow = {
 
 type DashboardV2Payload = {
   ok: true;
-  filters: { orgId: string; org: string | null; testId: string | null; from: string; to: string };
+  filters: {
+    orgId: string;
+    org: string | null;
+    testId: string | null;
+    from: string;
+    to: string;
+  };
   kpis: { submissions: number; uniqueTakers: number | null; activeLinks: number };
   timeline: TimelinePoint[];
   links: LinkRow[];
@@ -80,9 +86,10 @@ function clampPct(p: number) {
   return Math.max(0, Math.min(1, p));
 }
 
-// Always round percentages to whole numbers (e.g. 23%)
+// Always round percentages to whole numbers
 function fmtPct(p: number) {
-  return `${Math.round(clampPct(p) * 100)}%`;
+  const v = Math.round(clampPct(p) * 100);
+  return `${v}%`;
 }
 
 // Always round numbers to whole numbers (counts/averages)
@@ -150,6 +157,23 @@ function downloadCsv(filename: string, header: string[], rows: any[][]) {
   URL.revokeObjectURL(url);
 }
 
+function Pill({
+  children,
+  title,
+}: {
+  children: any;
+  title?: string;
+}) {
+  return (
+    <span
+      title={title}
+      className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/80"
+    >
+      {children}
+    </span>
+  );
+}
+
 export default function DashboardV2Client({
   orgSlug,
   embedded = false,
@@ -159,6 +183,7 @@ export default function DashboardV2Client({
 }) {
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
+  const debug = sp?.get("debug") === "1";
 
   // Default: last 30 days
   const now = new Date();
@@ -185,6 +210,10 @@ export default function DashboardV2Client({
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerErr, setDrawerErr] = useState<string>("");
   const [drawerData, setDrawerData] = useState<any>(null);
+
+  // Console controls
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"tests_desc" | "created_desc" | "name_asc">("tests_desc");
 
   const appliedFromIso = useMemo(() => dateInputToIsoStart(fromDate), [fromDate]);
   const appliedToIso = useMemo(() => dateInputToIsoEnd(toDate), [toDate]);
@@ -283,10 +312,11 @@ export default function DashboardV2Client({
     try {
       const q = new URLSearchParams();
       q.set("token", token);
+      q.set("org", org);
+      if (selectedTestId) q.set("testId", selectedTestId);
       if (appliedFromIso) q.set("from", appliedFromIso);
       if (appliedToIso) q.set("to", appliedToIso);
 
-      // API is token-only (org/testId not needed here)
       const res = await fetch(`/api/portal-dashboard-v2/link?${q.toString()}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
@@ -386,7 +416,6 @@ export default function DashboardV2Client({
     const safeName = String(linkName).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
 
     const lines: string[] = [];
-
     const pushSection = (title: string, header: string[], rows: any[][]) => {
       lines.push(csvEscape(title));
       lines.push(header.map(csvEscape).join(","));
@@ -431,24 +460,23 @@ export default function DashboardV2Client({
     URL.revokeObjectURL(url);
   }
 
+  // Load tests + initial dashboard
   useEffect(() => {
     loadTests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org]);
 
+  // Reload dashboard whenever org/test changes
   useEffect(() => {
     loadMain();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [org, selectedTestId]);
 
+  // Auto-refresh insights whenever main payload changes
   useEffect(() => {
     if (data?.ok) loadInsights(data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.filters?.from, data?.filters?.to, data?.kpis?.submissions, data?.filters?.testId]);
-
-  const links = useMemo(() => data?.links ?? [], [data]);
-  const nonZeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) > 0), [links]);
-  const zeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) === 0), [links]);
 
   const sortedTimeline = useMemo(() => {
     const t = (data?.timeline ?? []).slice();
@@ -456,18 +484,43 @@ export default function DashboardV2Client({
     return t;
   }, [data]);
 
-  // ✅ Correct FULL analytics route (existing beta link page)
+  const linksFiltered = useMemo(() => {
+    const list = (data?.links ?? []).slice();
+
+    const q = query.trim().toLowerCase();
+    const filtered = q
+      ? list.filter((l) => {
+          const name = (l.name || "").toLowerCase();
+          const label = (l.label || "").toLowerCase();
+          return name.includes(q) || label.includes(q);
+        })
+      : list;
+
+    filtered.sort((a, b) => {
+      if (sort === "tests_desc") return (b.testsTaken || 0) - (a.testsTaken || 0);
+      if (sort === "created_desc") return (b.createdAt || "").localeCompare(a.createdAt || "");
+      // name_asc
+      const an = (a.name || a.label || "").toLowerCase();
+      const bn = (b.name || b.label || "").toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    return filtered;
+  }, [data, query, sort]);
+
+  const nonZeroCount = useMemo(() => linksFiltered.filter((l) => (l.testsTaken || 0) > 0).length, [linksFiltered]);
+  const zeroCount = useMemo(() => linksFiltered.filter((l) => (l.testsTaken || 0) === 0).length, [linksFiltered]);
+
+  // Canonical “full analytics” route (the one you already have working)
   const fullAnalyticsHref = useMemo(() => {
     if (!selectedToken) return null;
-
     const q = new URLSearchParams();
+    if (selectedTestId) q.set("testId", selectedTestId);
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
-    if (selectedTestId) q.set("testId", selectedTestId);
-
     const qs = q.toString();
     return `/portal/${org}/dashboard/beta/link/${selectedToken}${qs ? `?${qs}` : ""}`;
-  }, [selectedToken, org, appliedFromIso, appliedToIso, selectedTestId]);
+  }, [selectedToken, org, selectedTestId, appliedFromIso, appliedToIso]);
 
   const FiltersRow = (
     <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -519,14 +572,33 @@ export default function DashboardV2Client({
 
   return (
     <div className="min-h-screen p-6 space-y-6 text-white">
+      {/* Header */}
       {!embedded ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
               <h1 className="text-2xl font-semibold">Dashboard v2</h1>
-              <p className="text-sm text-white/70">Drill-down analytics for links, profiles, and frequencies.</p>
+              <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
+              {debug ? (
+                <div className="mt-2 text-xs text-white/40">
+                  org=<span className="font-mono text-white/60">{org}</span>
+                  {data?.filters?.orgId ? (
+                    <>
+                      {" "}
+                      · orgId=<span className="font-mono text-white/60">{data.filters.orgId}</span>
+                    </>
+                  ) : null}
+                  {selectedTestId ? (
+                    <>
+                      {" "}
+                      · testId=<span className="font-mono text-white/60">{selectedTestId}</span>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
+
             {FiltersRow}
           </div>
         </div>
@@ -536,6 +608,7 @@ export default function DashboardV2Client({
             <div>
               <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
               <div className="text-lg font-semibold">Dashboard v2</div>
+              <div className="text-xs text-white/60">Analytics console</div>
             </div>
             {FiltersRow}
           </div>
@@ -579,7 +652,11 @@ export default function DashboardV2Client({
                 </div>
               </div>
               <div className="mt-3">
-                {sortedTimeline.length ? <SimpleBars data={sortedTimeline} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
+                {sortedTimeline.length ? (
+                  <SimpleBars data={sortedTimeline} />
+                ) : (
+                  <div className="text-sm text-white/60">No activity in this range.</div>
+                )}
               </div>
             </div>
 
@@ -590,13 +667,16 @@ export default function DashboardV2Client({
               </div>
 
               {!insights && !insightsLoading ? (
-                <div className="mt-3 text-sm text-white/60">Insights unavailable (non-blocking).</div>
+                <div className="mt-3 text-sm text-white/60">
+                  Insights unavailable (non-blocking). Dashboard data is still valid.
+                </div>
               ) : null}
 
               {insights ? (
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="text-xs text-white/50">
-                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n={fmtNum(insights.confidence.sampleSize)}
+                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n=
+                    {fmtNum(insights.confidence.sampleSize)}
                   </div>
 
                   <div>
@@ -621,101 +701,131 @@ export default function DashboardV2Client({
             </div>
           </div>
 
-          {/* Links table */}
+          {/* Link Console */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Link performance</h2>
-                <p className="text-sm text-white/60">Click a link to drill down into link-level insights.</p>
+                <h2 className="text-lg font-semibold">Links</h2>
+                <p className="text-sm text-white/60">Search, sort, drill down, export.</p>
+                <div className="mt-1 text-xs text-white/50">
+                  Showing {linksFiltered.length} · {nonZeroCount} with usage · {zeroCount} with zero usage
+                </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="text-xs text-white/50">
-                  {nonZeroLinks.length} links with usage · {zeroLinks.length} with zero usage
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                <div className="min-w-[260px]">
+                  <label className="block text-xs text-white/60 mb-1">Search</label>
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search link name or label…"
+                    className="h-10 w-full rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none placeholder:text-white/40"
+                  />
                 </div>
+
+                <div className="min-w-[210px]">
+                  <label className="block text-xs text-white/60 mb-1">Sort</label>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value as any)}
+                    className="h-10 w-full rounded-lg bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+                  >
+                    <option value="tests_desc">Most tests taken</option>
+                    <option value="created_desc">Newest created</option>
+                    <option value="name_asc">Name (A→Z)</option>
+                  </select>
+                </div>
+
                 <button
                   onClick={downloadMainCsv}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                  title="Download link table as CSV"
+                  className="h-10 rounded-lg border border-white/10 bg-white/5 px-4 text-sm hover:bg-white/10"
+                  title="Download links as CSV"
                 >
                   Download CSV
                 </button>
               </div>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-[980px] w-full text-sm">
-                <thead className="text-white/70">
-                  <tr className="border-b border-white/10">
-                    <th className="py-2 text-left font-medium">Link</th>
-                    <th className="py-2 text-left font-medium">Status</th>
-                    <th className="py-2 text-right font-medium">Tests taken</th>
-                    <th className="py-2 text-left font-medium">Top profiles</th>
-                    <th className="py-2 text-left font-medium">Top frequency</th>
-                    <th className="py-2 text-left font-medium">Created</th>
-                    <th className="py-2 text-left font-medium">Expires</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {links.map((l) => {
-                    const topP = l.topProfilesByCount?.slice(0, 3) || [];
-                    const topF = l.topFrequencyByCount;
+            <div className="mt-4 space-y-2">
+              {linksFiltered.length === 0 ? (
+                <div className="text-sm text-white/60">No links match your search.</div>
+              ) : (
+                linksFiltered.map((l) => {
+                  const title = l.name || l.label || "Untitled link";
+                  const subtitle = l.label && l.name ? l.label : null;
 
-                    return (
-                      <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-3 pr-3">
-                          <button className="text-left hover:underline" onClick={() => openLink(l.token)}>
-                            <div className="font-medium">{l.name || l.label || "Untitled link"}</div>
-                            {l.label && l.name ? <div className="text-xs text-white/50">Label: {l.label}</div> : null}
-                          </button>
-                        </td>
+                  const topP = l.topProfilesByCount?.slice(0, 2) || [];
+                  const topF = l.topFrequencyByCount;
 
-                        <td className="py-3 pr-3">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(l.isActive)}`}>
-                            {l.isActive === false ? "Inactive" : "Active"}
-                          </span>
-                        </td>
-
-                        <td className="py-3 pr-3 text-right font-semibold">{fmtNum(l.testsTaken)}</td>
-
-                        <td className="py-3 pr-3">
-                          {topP.length ? (
-                            <div className="flex flex-wrap gap-2">
-                              {topP.map((p) => (
-                                <span
-                                  key={p.code}
-                                  className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                                  title={`${fmtNum(p.count)} (${fmtPct(p.pct)})`}
-                                >
-                                  {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-white/50">—</span>
-                          )}
-                        </td>
-
-                        <td className="py-3 pr-3">
-                          {topF ? (
+                  return (
+                    <button
+                      key={l.linkId}
+                      onClick={() => openLink(l.token)}
+                      className="w-full text-left group rounded-2xl border border-white/10 bg-white/5 px-4 py-4 hover:bg-white/7 hover:border-white/15 transition"
+                      type="button"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-base font-semibold truncate">{title}</div>
                             <span
-                              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                              title={`${fmtNum(topF.count)} (${fmtPct(topF.pct)})`}
+                              className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${badgeClass(
+                                l.isActive
+                              )}`}
                             >
-                              {topF.name} <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
+                              {l.isActive === false ? "Inactive" : "Active"}
                             </span>
-                          ) : (
-                            <span className="text-white/50">—</span>
-                          )}
-                        </td>
+                            {debug ? (
+                              <span className="text-[11px] text-white/40 font-mono">
+                                {l.token}
+                              </span>
+                            ) : null}
+                          </div>
 
-                        <td className="py-3 pr-3 text-white/70">{fmtDateTime(l.createdAt)}</td>
-                        <td className="py-3 pr-3 text-white/70">{fmtDateTime(l.expiresAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          {subtitle ? <div className="text-xs text-white/50 truncate mt-1">{subtitle}</div> : null}
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Pill title="Tests taken">
+                              <span className="text-white/60 mr-1">Tests</span>
+                              <span className="font-semibold text-white/90">{fmtNum(l.testsTaken)}</span>
+                            </Pill>
+
+                            {topF ? (
+                              <Pill title={`${fmtNum(topF.count)} · ${fmtPct(topF.pct)}`}>
+                                <span className="text-white/60 mr-1">Top freq</span>
+                                <span className="text-white/90">{topF.name}</span>
+                                <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
+                              </Pill>
+                            ) : null}
+
+                            {topP.map((p) => (
+                              <Pill key={p.code} title={`${fmtNum(p.count)} · ${fmtPct(p.pct)}`}>
+                                <span className="text-white/60 mr-1">Top</span>
+                                <span className="text-white/90">{p.name}</span>
+                                <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
+                              </Pill>
+                            ))}
+                          </div>
+
+                          <div className="mt-3 text-xs text-white/45">
+                            Created: <span className="text-white/60">{fmtDateTime(l.createdAt)}</span>
+                            {l.expiresAt ? (
+                              <>
+                                {" "}
+                                · Expires: <span className="text-white/60">{fmtDateTime(l.expiresAt)}</span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 text-sm text-white/70 group-hover:text-white">
+                          View →
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -733,10 +843,14 @@ export default function DashboardV2Client({
               <div className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-[#050914] border-l border-white/10 p-4 overflow-y-auto">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-xs text-white/50">Link deep dive</div>
+                    <div className="text-xs text-white/50">Link analytics</div>
                     <div className="text-lg font-semibold truncate">
                       {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
                     </div>
+                    {/* token hidden (debug only) */}
+                    {debug && selectedToken ? (
+                      <div className="text-xs text-white/40 font-mono break-all mt-1">{selectedToken}</div>
+                    ) : null}
                   </div>
 
                   <div className="flex gap-2">
