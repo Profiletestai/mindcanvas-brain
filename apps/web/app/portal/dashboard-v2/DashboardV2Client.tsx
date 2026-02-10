@@ -128,9 +128,10 @@ function SimpleBars({ data }: { data: TimelinePoint[] }) {
   );
 }
 
-export default function DashboardV2Client() {
+export default function DashboardV2Client({ orgSlug }: { orgSlug?: string }) {
   const sp = useSearchParams();
-  const org = sp?.get("org") ?? "team-puzzle";
+  const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
+
 
   // Default: last 30 days
   const now = new Date();
