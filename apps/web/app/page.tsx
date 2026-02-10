@@ -117,7 +117,7 @@ export default function Landing() {
       {/* --- FOOTER --- */}
       <footer className="relative z-10 pb-10 text-center text-xs text-slate-500 space-y-2">
         <div>
-          © {new Date().getFullYear()} MindCanvas. All rights reserved.
+          © {new Date().getFullYear()} Powered by Profiletest.ai. All rights reserved.
         </div>
         <div className="space-x-3">
           <a

@@ -1158,7 +1158,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
           </section>
 
           <footer className="mt-4 border-t border-slate-800 pt-4 text-xs text-slate-400">
-            © {new Date().getFullYear()} MindCanvas
+            © {new Date().getFullYear()} Powered by Profiletest.ai
           </footer>
         </div>
       </div>

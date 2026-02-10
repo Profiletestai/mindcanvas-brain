@@ -64,7 +64,7 @@ export default function TestReportShell({
       </main>
 
       <footer className="mc-container py-8 text-sm mc-muted">
-        © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+        © {new Date().getFullYear()} Powered by Profiletest.ai
       </footer>
     </div>
   );

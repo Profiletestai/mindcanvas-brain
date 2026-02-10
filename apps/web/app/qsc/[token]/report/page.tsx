@@ -760,7 +760,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
         </section>
 
         <footer className="pt-4 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>
