@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type TimelinePoint = { date: string; submissions: number };
 
@@ -85,6 +85,15 @@ function fmtDateTime(iso: string | null) {
   return d.toLocaleString();
 }
 
+function ymd(iso: string) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 /** CSV helpers */
 function csvEscape(v: any) {
   const s = v == null ? "" : String(v);
@@ -104,7 +113,7 @@ function downloadCsvLines(filename: string, lines: string[]) {
   URL.revokeObjectURL(url);
 }
 
-/** MindCanvas grid overlay (self contained for wow-factor consistency) */
+/** MindCanvas grid overlay (self contained) */
 function MindCanvasGrid() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -122,17 +131,19 @@ function MindCanvasGrid() {
   );
 }
 
-/** Neon sparkline (curve + area glow) */
+/** Neon sparkline curve + glow */
 function SparklineNeon({
   data,
   height = 140,
+  compact = false,
 }: {
   data: TimelinePoint[];
   height?: number;
+  compact?: boolean;
 }) {
-  const width = 900;
-  const padX = 14;
-  const padY = 14;
+  const width = compact ? 220 : 900;
+  const padX = compact ? 10 : 14;
+  const padY = compact ? 10 : 14;
 
   const pts = useMemo(() => {
     const items = (data || []).slice();
@@ -152,13 +163,12 @@ function SparklineNeon({
     });
 
     return { items, points };
-  }, [data, height]);
+  }, [data, height, width, padX, padY]);
 
   const path = useMemo(() => {
     const p = pts.points;
     if (!p.length) return "";
     if (p.length === 1) return `M ${p[0].x} ${p[0].y}`;
-
     let d = `M ${p[0].x} ${p[0].y}`;
     for (let i = 1; i < p.length; i++) {
       const prev = p[i - 1];
@@ -175,9 +185,9 @@ function SparklineNeon({
   const area = useMemo(() => {
     const p = pts.points;
     if (!p.length) return "";
-    const baseline = height - 10;
+    const baseline = height - (compact ? 8 : 10);
     return `${path} L ${p[p.length - 1].x} ${baseline} L ${p[0].x} ${baseline} Z`;
-  }, [path, pts.points, height]);
+  }, [path, pts.points, height, compact]);
 
   const leftLabel = pts.items[0]?.date ?? "";
   const rightLabel = pts.items[pts.items.length - 1]?.date ?? "";
@@ -185,60 +195,58 @@ function SparklineNeon({
   return (
     <div className="w-full">
       <svg
-        viewBox={`0 0 900 ${height}`}
-        className="w-full h-[170px] rounded-2xl border border-white/10 bg-white/5 overflow-hidden"
+        viewBox={`0 0 ${width} ${height}`}
+        className={[
+          "w-full rounded-2xl border border-white/10 bg-white/5 overflow-hidden",
+          compact ? "h-[54px]" : "h-[170px]",
+        ].join(" ")}
         role="img"
-        aria-label="Activity over time"
+        aria-label="Activity sparkline"
       >
         <defs>
-          <linearGradient id="mcLine2" x1="0" y1="0" x2="1" y2="0">
+          <linearGradient id={compact ? "mcLineMini" : "mcLine"} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#64bae2" />
             <stop offset="45%" stopColor="#2d8fc4" />
             <stop offset="100%" stopColor="#7c5cff" />
           </linearGradient>
 
-          <linearGradient id="mcArea2" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#64bae2" stopOpacity="0.28" />
-            <stop offset="60%" stopColor="#2d8fc4" stopOpacity="0.10" />
+          <linearGradient id={compact ? "mcAreaMini" : "mcArea"} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#64bae2" stopOpacity={compact ? "0.22" : "0.28"} />
+            <stop offset="60%" stopColor="#2d8fc4" stopOpacity={compact ? "0.07" : "0.10"} />
             <stop offset="100%" stopColor="#050914" stopOpacity="0" />
           </linearGradient>
 
-          <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+          <filter id={compact ? "glowMini" : "glow"} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation={compact ? "3" : "4"} result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-
-          <pattern id="mcGrid2" width="56" height="56" patternUnits="userSpaceOnUse">
-            <path d="M 56 0 L 0 0 0 56" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-          </pattern>
-
-          <radialGradient id="mcRad2" cx="30%" cy="10%" r="80%">
-            <stop offset="0%" stopColor="rgba(100,186,226,0.20)" />
-            <stop offset="40%" stopColor="rgba(45,143,196,0.10)" />
-            <stop offset="100%" stopColor="rgba(5,9,20,0)" />
-          </radialGradient>
         </defs>
 
-        <rect x="0" y="0" width="900" height={height} fill="url(#mcRad2)" />
-        <rect x="0" y="0" width="900" height={height} fill="url(#mcGrid2)" opacity="0.55" />
-
-        {area ? <path d={area} fill="url(#mcArea2)" /> : null}
+        {area ? <path d={area} fill={`url(#${compact ? "mcAreaMini" : "mcArea"})`} /> : null}
 
         {path ? (
           <>
-            <path d={path} stroke="url(#mcLine2)" strokeWidth="3.2" fill="none" filter="url(#glow2)" />
-            <path d={path} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
+            <path
+              d={path}
+              stroke={`url(#${compact ? "mcLineMini" : "mcLine"})`}
+              strokeWidth={compact ? "2.6" : "3.2"}
+              fill="none"
+              filter={`url(#${compact ? "glowMini" : "glow"})`}
+            />
+            <path d={path} stroke="rgba(255,255,255,0.30)" strokeWidth="1" fill="none" />
           </>
         ) : null}
       </svg>
 
-      <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
-      </div>
+      {!compact ? (
+        <div className="mt-2 flex justify-between text-[11px] text-white/60">
+          <span>{leftLabel}</span>
+          <span>{rightLabel}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -268,6 +276,24 @@ function TabButton({
   );
 }
 
+/** Build daily timeline from raw submissions */
+function buildTimelineFromSubmissions(subs: Array<{ createdAt: string | null }>, maxDays = 14): TimelinePoint[] {
+  const map = new Map<string, number>();
+  for (const s of subs || []) {
+    if (!s.createdAt) continue;
+    const key = ymd(s.createdAt);
+    if (!key) continue;
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+  const items = Array.from(map.entries())
+    .map(([date, submissions]) => ({ date, submissions }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  // Keep last N days worth of points for the micro-sparkline
+  if (items.length > maxDays) return items.slice(items.length - maxDays);
+  return items;
+}
+
 export default function LinkAnalyticsClient({
   orgSlug,
   token,
@@ -287,12 +313,25 @@ export default function LinkAnalyticsClient({
 
   const [tab, setTab] = useState<"companies" | "profiles" | "frequencies">("companies");
 
+  // Company list UX
+  const [companyQuery, setCompanyQuery] = useState("");
+  const [companySort, setCompanySort] = useState<"most" | "az">("most");
+
+  // Company micro-sparkline cache (real data)
+  const companySparkCache = useRef<Map<string, TimelinePoint[]>>(new Map());
+  const [sparkVersion, setSparkVersion] = useState(0); // trigger re-render when cache updates
+
   // Company drilldown drawer
   const [companyDrawerOpen, setCompanyDrawerOpen] = useState(false);
   const [companyDrawerCompany, setCompanyDrawerCompany] = useState<string>("");
   const [companyDrawerLoading, setCompanyDrawerLoading] = useState(false);
   const [companyDrawerErr, setCompanyDrawerErr] = useState<string>("");
   const [companyDrawerData, setCompanyDrawerData] = useState<CompanySubmissionsPayload | null>(null);
+
+  // Drawer filters
+  const [takerQuery, setTakerQuery] = useState("");
+  const [filterHasEmail, setFilterHasEmail] = useState(false);
+  const [filterHasPhone, setFilterHasPhone] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -348,11 +387,26 @@ export default function LinkAnalyticsClient({
     return t;
   }, [data]);
 
+  const companiesFilteredSorted = useMemo(() => {
+    const list = (data?.segments?.companies || []).slice();
+
+    const q = companyQuery.trim().toLowerCase();
+    const filtered = q
+      ? list.filter((c) => String(c.company || "Unknown").toLowerCase().includes(q))
+      : list;
+
+    if (companySort === "az") {
+      filtered.sort((a, b) => String(a.company || "Unknown").localeCompare(String(b.company || "Unknown")));
+    } else {
+      filtered.sort((a, b) => (b.testsTaken || 0) - (a.testsTaken || 0));
+    }
+    return filtered;
+  }, [data, companyQuery, companySort]);
+
   function downloadAllCsv() {
     if (!data?.ok) return;
 
     const lines: string[] = [];
-
     const pushSection = (sectionTitle: string, header: string[], rows: any[][]) => {
       lines.push(csvEscape(sectionTitle));
       lines.push(header.map(csvEscape).join(","));
@@ -390,6 +444,34 @@ export default function LinkAnalyticsClient({
     downloadCsvLines(filename, lines);
   }
 
+  async function fetchCompanySubmissions(company: string) {
+    const c = (company || "").trim() || "Unknown";
+    const q = new URLSearchParams();
+    q.set("token", token);
+    q.set("company", c);
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+
+    const res = await fetch(`/api/portal-dashboard-v2/link/company-submissions?${q.toString()}`, { cache: "no-store" });
+    const j = await res.json();
+    if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+    return j as CompanySubmissionsPayload;
+  }
+
+  async function warmCompanySpark(company: string) {
+    const key = (company || "").trim() || "Unknown";
+    if (companySparkCache.current.has(key)) return;
+
+    try {
+      const payload = await fetchCompanySubmissions(key);
+      const tl = buildTimelineFromSubmissions(payload.submissions || [], 14);
+      companySparkCache.current.set(key, tl);
+      setSparkVersion((v) => v + 1);
+    } catch {
+      // no-op (sparkline is non-blocking)
+    }
+  }
+
   async function openCompany(company: string) {
     const c = (company || "").trim() || "Unknown";
     setCompanyDrawerCompany(c);
@@ -398,21 +480,19 @@ export default function LinkAnalyticsClient({
     setCompanyDrawerErr("");
     setCompanyDrawerData(null);
 
+    // reset drawer filters
+    setTakerQuery("");
+    setFilterHasEmail(false);
+    setFilterHasPhone(false);
+
     try {
-      const q = new URLSearchParams();
-      q.set("token", token);
-      q.set("company", c);
-      if (from) q.set("from", from);
-      if (to) q.set("to", to);
+      const payload = await fetchCompanySubmissions(c);
+      setCompanyDrawerData(payload);
 
-      const res = await fetch(`/api/portal-dashboard-v2/link/company-submissions?${q.toString()}`, {
-        cache: "no-store",
-      });
-
-      const j = await res.json();
-      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
-
-      setCompanyDrawerData(j as CompanySubmissionsPayload);
+      // also cache sparkline
+      const tl = buildTimelineFromSubmissions(payload.submissions || [], 14);
+      companySparkCache.current.set(c, tl);
+      setSparkVersion((v) => v + 1);
     } catch (e: any) {
       setCompanyDrawerErr(String(e?.message || e));
     } finally {
@@ -420,15 +500,36 @@ export default function LinkAnalyticsClient({
     }
   }
 
-  function downloadCompanyCsv() {
+  const drawerFilteredSubmissions = useMemo(() => {
+    const subs = (companyDrawerData?.submissions || []).slice();
+
+    const q = takerQuery.trim().toLowerCase();
+    const filtered = subs.filter((r) => {
+      const name = [r.firstName, r.lastName].filter(Boolean).join(" ").toLowerCase();
+      const email = (r.email || "").toLowerCase();
+      const phone = (r.phone || "").toLowerCase();
+
+      if (filterHasEmail && !r.email) return false;
+      if (filterHasPhone && !r.phone) return false;
+
+      if (!q) return true;
+      return name.includes(q) || email.includes(q) || phone.includes(q);
+    });
+
+    // newest first
+    filtered.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    return filtered;
+  }, [companyDrawerData, takerQuery, filterHasEmail, filterHasPhone]);
+
+  function downloadCompanyCsvFiltered() {
     if (!companyDrawerData?.ok) return;
 
-    const rows = (companyDrawerData.submissions || []).map((r) => {
+    const rows = drawerFilteredSubmissions.map((r) => {
       const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
       return [
         companyDrawerData.company || "",
         r.createdAt || "",
-        name,
+        name || "",
         r.email || "",
         r.phone || "",
         r.submissionId || "",
@@ -437,25 +538,30 @@ export default function LinkAnalyticsClient({
     });
 
     const lines: string[] = [];
-    lines.push(csvEscape("Company submissions"));
+    lines.push(csvEscape("Company submissions (filtered)"));
     lines.push(["company", "created_at", "name", "email", "phone", "submission_id", "taker_id"].map(csvEscape).join(","));
     for (const r of rows) lines.push(r.map(csvEscape).join(","));
 
     const fileSafeCompany = String(companyDrawerData.company || "company").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
-    downloadCsvLines(`company_submissions_${orgSlug}_${fileSafeCompany}.csv`, lines);
+    downloadCsvLines(`company_submissions_${orgSlug}_${fileSafeCompany}_filtered.csv`, lines);
   }
+
+  const wowCard =
+    "relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]";
 
   return (
     <div className="relative min-h-screen p-6 text-white space-y-6">
       <MindCanvasGrid />
 
       {/* Header */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className={`${wowCard} p-6`}>
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(900px_260px_at_20%_0%,rgba(100,186,226,0.35),transparent_65%)]" />
+        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(700px_220px_at_90%_30%,rgba(124,92,255,0.30),transparent_60%)]" />
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
-            <h1 className="text-2xl font-semibold truncate">{title}</h1>
-            <div className="text-sm text-white/60 mt-1">
+            <div className="text-xs uppercase tracking-widest text-white/60">MindCanvas · Analytics</div>
+            <h1 className="text-3xl font-semibold truncate mt-1">{title}</h1>
+            <div className="text-sm text-white/60 mt-2">
               {data?.filters?.from && data?.filters?.to ? (
                 <>
                   Date range: <span className="text-white/80">{fmtDateTime(data.filters.from)}</span> →{" "}
@@ -470,69 +576,74 @@ export default function LinkAnalyticsClient({
               onClick={downloadAllCsv}
               disabled={!data?.ok}
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-              title="Download as CSV"
               type="button"
             >
               Download CSV
             </button>
-            <Link
-              href={backHref}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-            >
+            <Link href={backHref} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10">
               Back to dashboard
             </Link>
           </div>
         </div>
       </div>
 
-      {loading && <div className="text-white/70">Loading…</div>}
-      {err && <div className="text-red-300">Error: {err}</div>}
+      {loading && (
+        <div className={`${wowCard} p-6`}>
+          <div className="animate-pulse text-white/60">Loading analytics…</div>
+        </div>
+      )}
+      {err && (
+        <div className={`${wowCard} p-6`}>
+          <div className="text-red-300">Error: {err}</div>
+        </div>
+      )}
 
       {!loading && !err && data?.ok && (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className={`${wowCard} p-5`}>
               <div className="text-xs text-white/60">Tests taken</div>
-              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.testsTaken)}</div>
+              <div className="text-5xl font-semibold mt-2">{fmtNum(data.kpis.testsTaken)}</div>
+              <div className="text-xs text-white/50 mt-2">Across this link in the selected range</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className={`${wowCard} p-5`}>
               <div className="text-xs text-white/60">Unique takers</div>
-              <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.uniqueTakers)}</div>
-              <div className="text-xs text-white/50 mt-1">
+              <div className="text-5xl font-semibold mt-2">{fmtNum(data.kpis.uniqueTakers)}</div>
+              <div className="text-xs text-white/50 mt-2">
                 {data.kpis.uniqueTakers != null && data.kpis.testsTaken
                   ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.testsTaken)} unique`
                   : ""}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className={`${wowCard} p-5`}>
               <div className="text-xs text-white/60">Last used</div>
-              <div className="text-sm text-white/80 mt-2">{fmtDateTime(data.kpis.lastUsedAt)}</div>
+              <div className="text-sm text-white/85 mt-3">{fmtDateTime(data.kpis.lastUsedAt)}</div>
+              <div className="text-xs text-white/50 mt-2">Most recent submission timestamp</div>
             </div>
           </div>
 
           {/* Timeline */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+          <div className={`${wowCard} p-5`}>
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">Activity over time</h2>
-              <div className="text-xs text-white/50">Sparkline · daily submissions</div>
+              <div>
+                <h2 className="font-semibold text-lg">Activity over time</h2>
+                <div className="text-xs text-white/50 mt-1">Neon sparkline · daily submissions</div>
+              </div>
+              <div className="text-xs text-white/50">{timelineSorted.length ? `${timelineSorted.length} points` : ""}</div>
             </div>
             <div className="mt-4">
-              {timelineSorted.length ? (
-                <SparklineNeon data={timelineSorted} />
-              ) : (
-                <div className="text-sm text-white/60">No activity in this range.</div>
-              )}
+              {timelineSorted.length ? <SparklineNeon data={timelineSorted} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
             </div>
           </div>
 
           {/* Segmentation */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+          <div className={`${wowCard} p-5`}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Segmentation</h2>
                 <p className="text-sm text-white/60">
-                  Click a company to drill down into takers and export a targeted list.
+                  Companies show real micro-sparklines based on submission timestamps. Click to drill down + export.
                 </p>
               </div>
 
@@ -549,81 +660,143 @@ export default function LinkAnalyticsClient({
               </div>
             </div>
 
-            <div className="mt-5">
-              {tab === "companies" ? (
-                <div className="space-y-2">
-                  {(data.segments?.companies || []).length ? (
-                    (data.segments.companies || []).slice(0, 30).map((c) => (
-                      <button
-                        key={c.company || "Unknown"}
-                        onClick={() => openCompany(c.company || "Unknown")}
-                        className="w-full text-left flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 hover:bg-white/10 transition"
-                        type="button"
-                        title="View submissions for this company"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium truncate">{c.company || "Unknown"}</div>
-                          <div className="text-xs text-white/50">
-                            {fmtNum(c.testsTaken)} submissions · {fmtPct(c.pct)}
+            {tab === "companies" ? (
+              <>
+                {/* Search + sort */}
+                <div className="mt-5 flex flex-col md:flex-row md:items-center gap-3">
+                  <div className="flex-1">
+                    <input
+                      value={companyQuery}
+                      onChange={(e) => setCompanyQuery(e.target.value)}
+                      placeholder="Search company…"
+                      className="w-full h-11 rounded-xl bg-white/10 border border-white/10 px-4 text-sm text-white outline-none placeholder:text-white/40"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCompanySort("most")}
+                      className={[
+                        "h-11 rounded-xl px-4 text-sm border transition",
+                        companySort === "most"
+                          ? "bg-white text-black border-white"
+                          : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10",
+                      ].join(" ")}
+                      type="button"
+                    >
+                      Sort: Most
+                    </button>
+                    <button
+                      onClick={() => setCompanySort("az")}
+                      className={[
+                        "h-11 rounded-xl px-4 text-sm border transition",
+                        companySort === "az"
+                          ? "bg-white text-black border-white"
+                          : "bg-white/5 text-white/80 border-white/10 hover:bg-white/10",
+                      ].join(" ")}
+                      type="button"
+                    >
+                      Sort: A–Z
+                    </button>
+                  </div>
+                </div>
+
+                {/* Company cards */}
+                <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {companiesFilteredSorted.length ? (
+                    companiesFilteredSorted.slice(0, 40).map((c) => {
+                      const name = (c.company || "Unknown").trim() || "Unknown";
+                      const mini = companySparkCache.current.get(name);
+                      // use sparkVersion to re-render when cache updates
+                      void sparkVersion;
+
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => openCompany(name)}
+                          onMouseEnter={() => warmCompanySpark(name)}
+                          className="group relative w-full text-left rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition overflow-hidden"
+                          type="button"
+                          title="View takers + export"
+                        >
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition opacity-20 bg-[radial-gradient(420px_160px_at_20%_0%,rgba(100,186,226,0.40),transparent_65%)]" />
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition opacity-15 bg-[radial-gradient(360px_160px_at_90%_70%,rgba(124,92,255,0.35),transparent_65%)]" />
+
+                          <div className="relative flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-semibold truncate text-white/95">{name}</div>
+                              <div className="text-xs text-white/55 mt-1">
+                                {fmtNum(c.testsTaken)} submissions · {fmtPct(c.pct)}
+                              </div>
+                            </div>
+
+                            <div className="w-[240px] max-w-[45%]">
+                              {mini && mini.length ? (
+                                <SparklineNeon data={mini} compact />
+                              ) : (
+                                <div className="h-[54px] rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-xs text-white/40">
+                                  hover to preview
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-xs text-white/70">
-                          View →
-                        </div>
-                      </button>
-                    ))
+
+                          <div className="relative mt-3 flex items-center justify-between text-xs text-white/50">
+                            <span>Targeted taker list</span>
+                            <span className="text-white/70">Open →</span>
+                          </div>
+                        </button>
+                      );
+                    })
                   ) : (
-                    <div className="text-sm text-white/60">No company data captured for this link.</div>
+                    <div className="text-sm text-white/60">No companies match your search.</div>
                   )}
                 </div>
-              ) : null}
+              </>
+            ) : null}
 
-              {tab === "profiles" ? (
-                <div className="space-y-2">
-                  {(data.distributions?.profiles || []).length ? (
-                    (data.distributions.profiles || []).slice(0, 40).map((p) => (
-                      <div
-                        key={p.code}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
-                      >
+            {tab === "profiles" ? (
+              <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {(data.distributions?.profiles || []).length ? (
+                  (data.distributions.profiles || []).slice(0, 50).map((p) => (
+                    <div key={p.code} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-medium truncate">{p.name}</div>
-                          <div className="text-xs text-white/50">
+                          <div className="font-semibold truncate">{p.name}</div>
+                          <div className="text-xs text-white/50 mt-1">
                             {fmtNum(p.count)} · {fmtPct(p.pct)}
                           </div>
                         </div>
                         <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints)}</div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-white/60">No profile data.</div>
-                  )}
-                </div>
-              ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-white/60">No profile data.</div>
+                )}
+              </div>
+            ) : null}
 
-              {tab === "frequencies" ? (
-                <div className="space-y-2">
-                  {(data.distributions?.frequencies || []).length ? (
-                    (data.distributions.frequencies || []).slice(0, 20).map((f) => (
-                      <div
-                        key={f.code}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
-                      >
+            {tab === "frequencies" ? (
+              <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {(data.distributions?.frequencies || []).length ? (
+                  (data.distributions.frequencies || []).slice(0, 30).map((f) => (
+                    <div key={f.code} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-medium truncate">{f.name}</div>
-                          <div className="text-xs text-white/50">
+                          <div className="font-semibold truncate">{f.name}</div>
+                          <div className="text-xs text-white/50 mt-1">
                             {fmtNum(f.count)} · {fmtPct(f.pct)}
                           </div>
                         </div>
                         <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints)}</div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-sm text-white/60">No frequency data.</div>
-                  )}
-                </div>
-              ) : null}
-            </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-white/60">No frequency data.</div>
+                )}
+              </div>
+            ) : null}
           </div>
         </>
       )}
@@ -641,93 +814,125 @@ export default function LinkAnalyticsClient({
             }}
           />
 
-          <div className="absolute right-0 top-0 h-full w-full max-w-[720px] bg-[#050914] border-l border-white/10 p-5 overflow-y-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs text-white/50">Company submissions</div>
-                <div className="text-xl font-semibold truncate">{companyDrawerCompany || "Unknown"}</div>
-                <div className="text-xs text-white/50 mt-1">
-                  Targeted export list (for coaching programmes / CRM sync later)
+          <div className="absolute right-0 top-0 h-full w-full max-w-[820px] bg-[#050914] border-l border-white/10 overflow-y-auto">
+            {/* Sticky header */}
+            <div className="sticky top-0 z-10 border-b border-white/10 bg-[#050914]/90 backdrop-blur p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs text-white/50">Company submissions</div>
+                  <div className="text-2xl font-semibold truncate">{companyDrawerCompany || "Unknown"}</div>
+                  <div className="text-xs text-white/50 mt-1">
+                    {companyDrawerData?.ok
+                      ? `${fmtNum(drawerFilteredSubmissions.length)} shown · ${fmtNum(companyDrawerData.total)} total`
+                      : "Targeted export list for coaching & CRM sync"}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={downloadCompanyCsvFiltered}
+                    disabled={!companyDrawerData?.ok}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCompanyDrawerOpen(false);
+                      setCompanyDrawerCompany("");
+                      setCompanyDrawerData(null);
+                      setCompanyDrawerErr("");
+                    }}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={downloadCompanyCsv}
-                  disabled={!companyDrawerData?.ok}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-                >
-                  Export CSV
-                </button>
-                <button
-                  onClick={() => {
-                    setCompanyDrawerOpen(false);
-                    setCompanyDrawerCompany("");
-                    setCompanyDrawerData(null);
-                    setCompanyDrawerErr("");
-                  }}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-                >
-                  Close
-                </button>
+              {/* Filters */}
+              <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                <div className="flex-1">
+                  <input
+                    value={takerQuery}
+                    onChange={(e) => setTakerQuery(e.target.value)}
+                    placeholder="Search name / email / phone…"
+                    className="w-full h-11 rounded-xl bg-white/10 border border-white/10 px-4 text-sm text-white outline-none placeholder:text-white/40"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-white/80">
+                  <input
+                    type="checkbox"
+                    checked={filterHasEmail}
+                    onChange={(e) => setFilterHasEmail(e.target.checked)}
+                    className="h-4 w-4 accent-white"
+                  />
+                  Has email
+                </label>
+                <label className="flex items-center gap-2 text-sm text-white/80">
+                  <input
+                    type="checkbox"
+                    checked={filterHasPhone}
+                    onChange={(e) => setFilterHasPhone(e.target.checked)}
+                    className="h-4 w-4 accent-white"
+                  />
+                  Has phone
+                </label>
               </div>
             </div>
 
-            {companyDrawerLoading ? <div className="mt-5 text-white/70">Loading submissions…</div> : null}
-            {companyDrawerErr ? <div className="mt-5 text-red-300">Error: {companyDrawerErr}</div> : null}
+            <div className="p-5">
+              {companyDrawerLoading ? <div className="text-white/70">Loading submissions…</div> : null}
+              {companyDrawerErr ? <div className="text-red-300">Error: {companyDrawerErr}</div> : null}
 
-            {!companyDrawerLoading && !companyDrawerErr && companyDrawerData?.ok ? (
-              <div className="mt-5 space-y-4">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs text-white/60">Total submissions</div>
-                    <div className="text-3xl font-semibold mt-1">{fmtNum(companyDrawerData.total)}</div>
-                  </div>
-                  <div className="text-xs text-white/50">
-                    Showing newest first
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[860px] w-full text-sm">
-                      <thead className="text-white/70">
-                        <tr className="border-b border-white/10">
-                          <th className="py-3 px-4 text-left font-medium">Name</th>
-                          <th className="py-3 px-4 text-left font-medium">Email</th>
-                          <th className="py-3 px-4 text-left font-medium">Phone</th>
-                          <th className="py-3 px-4 text-left font-medium">Submitted</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(companyDrawerData.submissions || []).map((r) => {
-                          const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim() || "—";
-                          return (
-                            <tr key={r.submissionId} className="border-b border-white/5 hover:bg-white/5">
-                              <td className="py-3 px-4">
-                                <div className="font-medium">{name}</div>
-                                <div className="text-xs text-white/40">ID: {String(r.submissionId).slice(0, 8)}…</div>
-                              </td>
-                              <td className="py-3 px-4 text-white/80">{r.email || "—"}</td>
-                              <td className="py-3 px-4 text-white/80">{r.phone || "—"}</td>
-                              <td className="py-3 px-4 text-white/70">{fmtDateTime(r.createdAt)}</td>
-                            </tr>
-                          );
-                        })}
-
-                        {!(companyDrawerData.submissions || []).length ? (
-                          <tr>
-                            <td colSpan={4} className="py-6 px-4 text-white/60">
-                              No submissions found for this company in the selected range.
-                            </td>
+              {!companyDrawerLoading && !companyDrawerErr && companyDrawerData?.ok ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-[980px] w-full text-sm">
+                        <thead className="text-white/70">
+                          <tr className="border-b border-white/10">
+                            <th className="py-3 px-4 text-left font-medium">Name</th>
+                            <th className="py-3 px-4 text-left font-medium">Email</th>
+                            <th className="py-3 px-4 text-left font-medium">Phone</th>
+                            <th className="py-3 px-4 text-left font-medium">Submitted</th>
                           </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {drawerFilteredSubmissions.map((r) => {
+                            const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim() || "—";
+                            return (
+                              <tr key={r.submissionId} className="border-b border-white/5 hover:bg-white/5">
+                                <td className="py-3 px-4">
+                                  <div className="font-medium">{name}</div>
+                                  <div className="text-xs text-white/40">ID: {String(r.submissionId).slice(0, 8)}…</div>
+                                </td>
+                                <td className="py-3 px-4 text-white/85">{r.email || "—"}</td>
+                                <td className="py-3 px-4 text-white/85">{r.phone || "—"}</td>
+                                <td className="py-3 px-4 text-white/70">{fmtDateTime(r.createdAt)}</td>
+                              </tr>
+                            );
+                          })}
+
+                          {!drawerFilteredSubmissions.length ? (
+                            <tr>
+                              <td colSpan={4} className="py-8 px-4 text-white/60">
+                                No submissions match your filters.
+                              </td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-white/50">
+                    Export will include <span className="text-white/80">only the filtered rows</span>.
                   </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </div>
       )}
