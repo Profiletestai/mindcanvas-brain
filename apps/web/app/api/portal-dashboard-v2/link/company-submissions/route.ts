@@ -32,6 +32,13 @@ function clampRange(from: Date | null, to: Date | null) {
   return { from: fromD, to: toD };
 }
 
+function normCompany(v: any): string {
+  const s = String(v ?? "").trim();
+  if (!s) return "Unknown";
+  if (s.toLowerCase() === "unknown") return "Unknown";
+  return s;
+}
+
 type ExpandedRow = {
   submission_id: string;
   created_at: string;
@@ -53,16 +60,10 @@ export async function GET(req: Request) {
     const token = url.searchParams.get("token")?.trim() || "";
     const companyParamRaw = url.searchParams.get("company")?.trim() || "";
 
-    if (!token) {
-      return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
-    }
-    if (!companyParamRaw) {
-      return NextResponse.json({ ok: false, error: "Missing company" }, { status: 400 });
-    }
+    if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
+    if (!companyParamRaw) return NextResponse.json({ ok: false, error: "Missing company" }, { status: 400 });
 
-    const companyParam = companyParamRaw.trim();
-    const wantUnknown =
-      companyParam.toLowerCase() === "unknown" || companyParam === "—" || companyParam === "-";
+    const companyParam = normCompany(companyParamRaw);
 
     const fromQ = parseDateParam(url.searchParams.get("from"));
     const toQ = parseDateParam(url.searchParams.get("to"));
@@ -70,28 +71,19 @@ export async function GET(req: Request) {
 
     const supa = supaAdmin();
 
-    // 1) Find submissions for this link+company within range
-    // NOTE: v_submission_scores_expanded_submissions already has company.
-    let expQuery = supa
+    // Pull expanded rows for the link in range, then filter by normalized company.
+    // (This avoids edge cases where "Unknown" is stored as NULL/empty/etc.)
+    const expRes = await supa
       .from("v_submission_scores_expanded_submissions")
       .select("submission_id, created_at, company, link_token")
       .eq("link_token", token)
       .gte("created_at", toIso(from))
       .lte("created_at", toIso(to));
 
-    // If "Unknown": treat as NULL or empty or whitespace
-    // Supabase JS can't express complex OR easily without .or()
-    // We'll use .or() to match company is null OR company.eq.'' OR company.ilike.'   '
-    // (the ilike part is best-effort; whitespace-only still tricky without SQL)
-    if (wantUnknown) {
-      expQuery = expQuery.or("company.is.null,company.eq.");
-    } else {
-      expQuery = expQuery.eq("company", companyParam);
-    }
-
-    const expRes = await expQuery;
     if (expRes.error) throw expRes.error;
-    const expanded = (expRes.data || []) as ExpandedRow[];
+    const expandedAll = (expRes.data || []) as ExpandedRow[];
+
+    const expanded = expandedAll.filter((r) => normCompany(r.company) === companyParam);
 
     const submissionIds = Array.from(new Set(expanded.map((r) => r.submission_id).filter(Boolean)));
 
@@ -107,7 +99,7 @@ export async function GET(req: Request) {
       });
     }
 
-    // 2) Pull usage rows for those submissions to get taker_id + created_at
+    // Usage rows (taker + created_at)
     const usageRes = await supa
       .from("v_usage_submissions")
       .select("submission_id, taker_id, created_at, link_token")
@@ -126,7 +118,6 @@ export async function GET(req: Request) {
       });
     }
 
-    // 3) Fetch taker rows (best-effort)
     const takerIds = Array.from(new Set(usage.map((u) => (u.taker_id ? String(u.taker_id) : "")).filter(Boolean)));
 
     let takersById = new Map<string, any>();
@@ -139,7 +130,6 @@ export async function GET(req: Request) {
       }
     }
 
-    // 4) Build payload rows
     const submissions = submissionIds
       .map((sid) => {
         const u = usageBySub.get(sid);
@@ -151,8 +141,9 @@ export async function GET(req: Request) {
         const email = t?.email ?? t?.Email ?? null;
         const phone = t?.phone ?? t?.mobile ?? t?.tel ?? null;
 
-        const company =
-          t?.company ?? t?.company_name ?? t?.organisation ?? t?.organization ?? (wantUnknown ? "Unknown" : companyParam);
+        const company = normCompany(
+          t?.company ?? t?.company_name ?? t?.organisation ?? t?.organization ?? companyParam
+        );
 
         return {
           submissionId: sid,
@@ -172,7 +163,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       token,
-      company: wantUnknown ? "Unknown" : companyParam,
+      company: companyParam,
       from: toIso(from),
       to: toIso(to),
       total: submissions.length,

@@ -123,135 +123,117 @@ function downloadCsv(filename: string, header: string[], rows: any[][]) {
   URL.revokeObjectURL(url);
 }
 
-/** Neon sparkline (minimal, wow-factor, no libs) */
-function SparklineNeon({
-  data,
-  height = 120,
-}: {
-  data: TimelinePoint[];
-  height?: number;
-}) {
-  const width = 820; // virtual viewBox width
-  const padX = 14;
-  const padY = 14;
+/** MindCanvas background (gradient + grid) */
+function MindCanvasBg({ dim = false }: { dim?: boolean }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      {/* depth gradient */}
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_-10%,#113149_0%,#08121b_55%,#060e16_100%)]" />
+      {/* grid */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      {/* slight dark wash for readability */}
+      <div className={["absolute inset-0 bg-[#050914]", dim ? "opacity-45" : "opacity-25"].join(" ")} />
+    </div>
+  );
+}
 
-  const pts = useMemo(() => {
-    const items = (data || []).slice();
-    items.sort((a, b) => (a.date < b.date ? -1 : 1));
-    const n = items.length;
-    if (!n) return { items, points: [] as { x: number; y: number; v: number }[] };
+function SparklineGlow({ data, height = 120 }: { data: TimelinePoint[]; height?: number }) {
+  const w = 900;
+  const h = height;
+  const padX = 10;
+  const padY = 12;
 
-    const maxV = Math.max(1, ...items.map((d) => d.submissions || 0));
-    const innerW = width - padX * 2;
-    const innerH = height - padY * 2;
+  const values = data.map((d) => Number(d.submissions || 0));
+  const maxV = Math.max(1, ...values);
+  const minV = 0;
 
-    const points = items.map((d, i) => {
-      const x = padX + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
-      const v = d.submissions || 0;
-      const y = padY + (1 - v / maxV) * innerH;
-      return { x, y, v };
-    });
+  const n = Math.max(2, data.length);
+  const step = (w - padX * 2) / (n - 1);
 
-    return { items, points };
-  }, [data, height]);
+  const points = data.map((d, i) => {
+    const x = padX + i * step;
+    const t = (Number(d.submissions || 0) - minV) / (maxV - minV || 1);
+    const y = padY + (1 - t) * (h - padY * 2);
+    return { x, y };
+  });
 
-  const path = useMemo(() => {
-    const p = pts.points;
-    if (!p.length) return "";
-    if (p.length === 1) return `M ${p[0].x} ${p[0].y}`;
-    // Smooth curve (Catmull-Rom-ish via quadratic)
-    let d = `M ${p[0].x} ${p[0].y}`;
-    for (let i = 1; i < p.length; i++) {
-      const prev = p[i - 1];
-      const cur = p[i];
-      const midX = (prev.x + cur.x) / 2;
-      const midY = (prev.y + cur.y) / 2;
-      d += ` Q ${prev.x} ${prev.y} ${midX} ${midY}`;
-    }
-    // last segment
-    const last = p[p.length - 1];
-    d += ` T ${last.x} ${last.y}`;
-    return d;
-  }, [pts.points]);
+  const lineD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+    .join(" ");
 
-  const area = useMemo(() => {
-    const p = pts.points;
-    if (!p.length) return "";
-    const baseline = height - 10;
-    return `${path} L ${p[p.length - 1].x} ${baseline} L ${p[0].x} ${baseline} Z`;
-  }, [path, pts.points, height]);
-
-  const leftLabel = pts.items[0]?.date ?? "";
-  const rightLabel = pts.items[pts.items.length - 1]?.date ?? "";
+  const areaD =
+    lineD +
+    ` L ${(padX + (n - 1) * step).toFixed(2)} ${(h - padY).toFixed(2)}` +
+    ` L ${padX.toFixed(2)} ${(h - padY).toFixed(2)} Z`;
 
   return (
     <div className="w-full">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-[140px] rounded-2xl border border-white/10 bg-white/5 overflow-hidden"
-        role="img"
-        aria-label="Submissions over time"
-      >
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} role="img" aria-label="Submissions over time">
         <defs>
-          <linearGradient id="mcLine" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#64bae2" />
-            <stop offset="45%" stopColor="#2d8fc4" />
-            <stop offset="100%" stopColor="#7c5cff" />
+          <linearGradient id="mc-line" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#64bae2" />
+            <stop offset="0.45" stopColor="#8b6cff" />
+            <stop offset="1" stopColor="#2d8fc4" />
           </linearGradient>
 
-          <linearGradient id="mcArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#64bae2" stopOpacity="0.28" />
-            <stop offset="60%" stopColor="#2d8fc4" stopOpacity="0.10" />
-            <stop offset="100%" stopColor="#050914" stopOpacity="0" />
+          <linearGradient id="mc-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#64bae2" stopOpacity="0.35" />
+            <stop offset="0.65" stopColor="#8b6cff" stopOpacity="0.10" />
+            <stop offset="1" stopColor="#050914" stopOpacity="0" />
           </linearGradient>
 
-          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+          <filter id="mc-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="
+                1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.85 0"
+              result="colored"
+            />
             <feMerge>
-              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="colored" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-
-          <pattern id="mcGrid" width="56" height="56" patternUnits="userSpaceOnUse">
-            <path d="M 56 0 L 0 0 0 56" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-          </pattern>
-
-          <radialGradient id="mcRad" cx="30%" cy="10%" r="80%">
-            <stop offset="0%" stopColor="rgba(100,186,226,0.20)" />
-            <stop offset="40%" stopColor="rgba(45,143,196,0.10)" />
-            <stop offset="100%" stopColor="rgba(5,9,20,0)" />
-          </radialGradient>
         </defs>
 
-        <rect x="0" y="0" width={width} height={height} fill="url(#mcRad)" />
-        <rect x="0" y="0" width={width} height={height} fill="url(#mcGrid)" opacity="0.55" />
+        {/* subtle chart grid */}
+        <g opacity="0.18">
+          {Array.from({ length: 12 }).map((_, i) => {
+            const x = (i / 11) * w;
+            return <line key={`vx-${i}`} x1={x} y1={0} x2={x} y2={h} stroke="white" strokeWidth="1" />;
+          })}
+          {Array.from({ length: 6 }).map((_, i) => {
+            const y = (i / 5) * h;
+            return <line key={`hy-${i}`} x1={0} y1={y} x2={w} y2={y} stroke="white" strokeWidth="1" />;
+          })}
+        </g>
 
-        {area ? <path d={area} fill="url(#mcArea)" /> : null}
-
-        {path ? (
-          <>
-            <path d={path} stroke="url(#mcLine)" strokeWidth="3.2" fill="none" filter="url(#glow)" />
-            <path d={path} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
-          </>
-        ) : null}
+        <path d={areaD} fill="url(#mc-area)" />
+        <path d={lineD} stroke="url(#mc-line)" strokeWidth="6" fill="none" filter="url(#mc-glow)" strokeLinecap="round" />
+        <path d={lineD} stroke="url(#mc-line)" strokeWidth="2.75" fill="none" strokeLinecap="round" />
       </svg>
 
       <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{leftLabel}</span>
-        <span>{rightLabel}</span>
+        <span>{data[0]?.date ?? ""}</span>
+        <span>{data[data.length - 1]?.date ?? ""}</span>
       </div>
     </div>
   );
 }
 
-export default function DashboardV2Client({
-  orgSlug,
-  embedded = false,
-}: {
-  orgSlug?: string;
-  embedded?: boolean;
-}) {
+export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSlug?: string; embedded?: boolean }) {
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
 
@@ -474,58 +456,6 @@ export default function DashboardV2Client({
     downloadCsv(filename, header, rows);
   }
 
-  function downloadDrawerCsv() {
-    if (!drawerData?.ok) return;
-
-    const linkName = drawerData?.link?.name || drawerData?.link?.label || "link";
-    const safeName = String(linkName).replace(/[^a-z0-9_-]+/gi, "_").slice(0, 40);
-
-    const lines: string[] = [];
-
-    const pushSection = (title: string, header: string[], rows: any[][]) => {
-      lines.push(csvEscape(title));
-      lines.push(header.map(csvEscape).join(","));
-      for (const r of rows) lines.push(r.map(csvEscape).join(","));
-      lines.push("");
-    };
-
-    const profiles = (drawerData?.distributions?.profiles || []).map((p: any) => [
-      p.name || "",
-      p.code || "",
-      Math.round(p.count || 0),
-      Math.round(clampPct(p.pct || 0) * 100),
-      Math.round(p.avgPoints || 0),
-    ]);
-
-    const freqs = (drawerData?.distributions?.frequencies || []).map((f: any) => [
-      f.name || "",
-      f.code || "",
-      Math.round(f.count || 0),
-      Math.round(clampPct(f.pct || 0) * 100),
-      Math.round(f.avgPoints || 0),
-    ]);
-
-    const companies = (drawerData?.segments?.companies || []).map((c: any) => [
-      c.company || "",
-      Math.round(c.testsTaken || c.count || 0),
-      Math.round(clampPct(c.pct || 0) * 100),
-    ]);
-
-    pushSection("Top profiles", ["profile_name", "profile_code", "count", "pct", "avg_points"], profiles);
-    pushSection("Top frequencies", ["frequency_name", "frequency_code", "count", "pct", "avg_points"], freqs);
-    pushSection("Companies", ["company", "tests_taken", "pct"], companies);
-
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `link_analytics_${org}_${safeName}_${fromDate}_to_${toDate}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
   useEffect(() => {
     loadTests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -542,8 +472,6 @@ export default function DashboardV2Client({
   }, [data?.filters?.from, data?.filters?.to, data?.kpis?.submissions, data?.filters?.testId]);
 
   const links = useMemo(() => data?.links ?? [], [data]);
-  const nonZeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) > 0), [links]);
-  const zeroLinks = useMemo(() => links.filter((l) => (l.testsTaken || 0) === 0), [links]);
 
   const sortedTimeline = useMemo(() => {
     const t = (data?.timeline ?? []).slice();
@@ -551,11 +479,11 @@ export default function DashboardV2Client({
     return t;
   }, [data]);
 
-  // ✅ FIX: Open full analytics must go to /portal/[slug]/dashboard/beta/link/[token]
+  // ✅ Real “full analytics” route (no 404):
+  // /portal/[slug]/dashboard/beta/link/[token]
   const fullAnalyticsHref = useMemo(() => {
     if (!selectedToken) return null;
     const q = new URLSearchParams();
-    // keep filters so the link page uses the same window
     if (selectedTestId) q.set("testId", selectedTestId);
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
@@ -565,12 +493,12 @@ export default function DashboardV2Client({
 
   const FiltersRow = (
     <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-      <div className="min-w-[260px]">
+      <div className="min-w-[240px]">
         <label className="block text-xs text-white/60 mb-1">Test</label>
         <select
           value={selectedTestId}
           onChange={(e) => setSelectedTestId(e.target.value)}
-          className="h-11 w-full rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+          className="h-10 w-full rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         >
           <option value="">All tests</option>
           {tests.map((t) => (
@@ -589,7 +517,7 @@ export default function DashboardV2Client({
           type="date"
           value={fromDate}
           onChange={(e) => setFromDate(e.target.value)}
-          className="h-11 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+          className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         />
       </div>
       <div>
@@ -598,45 +526,32 @@ export default function DashboardV2Client({
           type="date"
           value={toDate}
           onChange={(e) => setToDate(e.target.value)}
-          className="h-11 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+          className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         />
       </div>
 
-      <button
-        onClick={loadMain}
-        className="h-11 rounded-xl bg-white text-black px-4 text-sm font-semibold hover:bg-white/90"
-      >
+      <button onClick={loadMain} className="h-10 rounded-xl bg-white text-black px-4 text-sm font-medium hover:bg-white/90">
         Apply
       </button>
     </div>
   );
 
   return (
-    <div className="min-h-screen p-6 space-y-6 text-white">
-      {!embedded ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
-              <h1 className="text-2xl font-semibold">Dashboard v2</h1>
-              <p className="text-sm text-white/70">
-                Link analytics console (drill-down + export).
-              </p>
-            </div>
-            {FiltersRow}
+    <div className="relative min-h-screen p-6 space-y-6 text-white">
+      {/* Global background */}
+      <MindCanvasBg dim={embedded} />
+
+      {/* Header */}
+      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
+            <h1 className="text-2xl font-semibold">Dashboard v2</h1>
+            <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
           </div>
+          {FiltersRow}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
-              <div className="text-lg font-semibold">Dashboard v2</div>
-            </div>
-            {FiltersRow}
-          </div>
-        </div>
-      )}
+      </div>
 
       {loading && <div className="text-white/70">Loading…</div>}
       {err && <div className="text-red-300">Error: {err}</div>}
@@ -645,44 +560,58 @@ export default function DashboardV2Client({
         <>
           {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="text-xs text-white/60">Submissions</div>
               <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.submissions)}</div>
+              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mt-3 text-xs text-white/55">Total across selected range</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="text-xs text-white/60">Unique takers</div>
               <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.uniqueTakers)}</div>
-              <div className="text-xs text-white/50 mt-1">
+              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mt-3 text-xs text-white/55">
                 {data.kpis.uniqueTakers != null && data.kpis.submissions
                   ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.submissions)} unique`
-                  : ""}
+                  : "—"}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="text-xs text-white/60">Active links</div>
               <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.activeLinks)}</div>
+              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mt-3 text-xs text-white/55">Currently usable links</div>
             </div>
           </div>
 
           {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Submissions over time</h2>
-                <div className="text-xs text-white/50">
-                  {isoToDateInput(data.filters.from)} → {isoToDateInput(data.filters.to)}
+            <div className="lg:col-span-2 rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-semibold">Submissions over time</h2>
+                  <div className="text-xs text-white/50 mt-1">
+                    {data.filters.from ? isoToDateInput(data.filters.from) : ""} →{" "}
+                    {data.filters.to ? isoToDateInput(data.filters.to) : ""}
+                  </div>
+                </div>
+                <div className="text-xs text-white/50 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                  Sparkline
                 </div>
               </div>
+
               <div className="mt-4">
                 {sortedTimeline.length ? (
-                  <SparklineNeon data={sortedTimeline} />
+                  <SparklineGlow data={sortedTimeline} height={130} />
                 ) : (
                   <div className="text-sm text-white/60">No activity in this range.</div>
                 )}
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Insights (Beta)</h2>
                 {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
@@ -724,104 +653,86 @@ export default function DashboardV2Client({
           </div>
 
           {/* Links */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Links</h2>
-                <p className="text-sm text-white/60">Search, sort, drill down, export.</p>
-                <div className="text-xs text-white/50 mt-1">
-                  {links.length} links · {nonZeroLinks.length} with usage · {zeroLinks.length} with zero usage
-                </div>
+                <p className="text-sm text-white/60">Click a link to drill down into link-level insights + segmentation.</p>
               </div>
 
               <div className="flex items-center gap-3">
                 <button
                   onClick={downloadMainCsv}
                   className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-                  title="Download the link table as CSV"
+                  title="Download link table as CSV"
                 >
                   Download CSV
                 </button>
               </div>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-[980px] w-full text-sm">
-                <thead className="text-white/70">
-                  <tr className="border-b border-white/10">
-                    <th className="py-2 text-left font-medium">Link</th>
-                    <th className="py-2 text-left font-medium">Status</th>
-                    <th className="py-2 text-right font-medium">Tests taken</th>
-                    <th className="py-2 text-left font-medium">Top profiles</th>
-                    <th className="py-2 text-left font-medium">Top frequency</th>
-                    <th className="py-2 text-left font-medium">Created</th>
-                    <th className="py-2 text-left font-medium">Expires</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {links.map((l) => {
-                    const topP = l.topProfilesByCount?.slice(0, 3) || [];
-                    const topF = l.topFrequencyByCount;
+            <div className="mt-4 space-y-3">
+              {links.map((l) => {
+                const topP = l.topProfilesByCount?.slice(0, 3) || [];
+                const topF = l.topFrequencyByCount;
 
-                    return (
-                      <tr key={l.linkId} className="border-b border-white/5 hover:bg-white/5">
-                        <td className="py-3 pr-3">
-                          <button className="text-left hover:underline" onClick={() => openLink(l.token)}>
-                            <div className="font-medium">{l.name || l.label || "Untitled link"}</div>
-                            {l.label && l.name ? <div className="text-xs text-white/50">Label: {l.label}</div> : null}
-                          </button>
-                        </td>
-
-                        <td className="py-3 pr-3">
+                return (
+                  <button
+                    key={l.linkId}
+                    onClick={() => openLink(l.token)}
+                    className="w-full text-left rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] transition px-4 py-4"
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold truncate">{l.name || l.label || "Untitled link"}</div>
                           <span
-                            className={`inline-flex items-center rounded-full border px-2 py-1 text-xs ${badgeClass(
+                            className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${badgeClass(
                               l.isActive
                             )}`}
                           >
                             {l.isActive === false ? "Inactive" : "Active"}
                           </span>
-                        </td>
+                        </div>
 
-                        <td className="py-3 pr-3 text-right font-semibold">{fmtNum(l.testsTaken)}</td>
+                        {l.label && l.name ? (
+                          <div className="text-xs text-white/50 mt-1">Label: {l.label}</div>
+                        ) : (
+                          <div className="text-xs text-white/50 mt-1">
+                            Created {fmtDateTime(l.createdAt)} · Expires {fmtDateTime(l.expiresAt)}
+                          </div>
+                        )}
+                      </div>
 
-                        <td className="py-3 pr-3">
-                          {topP.length ? (
-                            <div className="flex flex-wrap gap-2">
-                              {topP.map((p) => (
-                                <span
-                                  key={p.code}
-                                  className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                                  title={`${fmtNum(p.count)} (${fmtPct(p.pct)})`}
-                                >
-                                  {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-white/50">—</span>
-                          )}
-                        </td>
+                      <div className="text-right">
+                        <div className="text-xs text-white/60">Tests</div>
+                        <div className="text-2xl font-semibold">{fmtNum(l.testsTaken)}</div>
+                      </div>
+                    </div>
 
-                        <td className="py-3 pr-3">
-                          {topF ? (
-                            <span
-                              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                              title={`${fmtNum(topF.count)} (${fmtPct(topF.pct)})`}
-                            >
-                              {topF.name} <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
-                            </span>
-                          ) : (
-                            <span className="text-white/50">—</span>
-                          )}
-                        </td>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {topF ? (
+                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs">
+                          Top freq <span className="ml-2 text-white/85">{topF.name}</span>
+                          <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
+                        </span>
+                      ) : null}
 
-                        <td className="py-3 pr-3 text-white/70">{fmtDateTime(l.createdAt)}</td>
-                        <td className="py-3 pr-3 text-white/70">{fmtDateTime(l.expiresAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      {topP.map((p) => (
+                        <span
+                          key={p.code}
+                          className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
+                        >
+                          {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
+                        </span>
+                      ))}
+
+                      {!topP.length && !topF ? <span className="text-white/50 text-sm">—</span> : null}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -836,91 +747,176 @@ export default function DashboardV2Client({
                   setDrawerData(null);
                 }}
               />
-              <div className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-[#050914] border-l border-white/10 p-4 overflow-y-auto">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs text-white/50">Link deep dive</div>
-                    <div className="text-lg font-semibold truncate">
-                      {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
-                    </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    {fullAnalyticsHref ? (
-                      <Link
-                        href={fullAnalyticsHref}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+              <div className="absolute right-0 top-0 h-full w-full max-w-[600px] bg-[#050914] border-l border-white/10 p-5 overflow-y-auto">
+                {/* local background */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-25"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+                    backgroundSize: "64px 64px",
+                    maskImage: "radial-gradient(circle at 30% 10%, black 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -top-40 left-1/2 h-[80vh] w-[120vw] -translate-x-1/2 blur-3xl opacity-30"
+                  style={{
+                    background:
+                      "radial-gradient(60% 40% at 50% 0%, rgba(100,186,226,.35), transparent 60%), radial-gradient(45% 35% at 20% 10%, rgba(139,108,255,.25), transparent 55%)",
+                  }}
+                />
+
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs text-white/50">Link deep dive</div>
+                      <div className="text-lg font-semibold truncate">
+                        {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
+                      </div>
+                      {/* token intentionally hidden */}
+                    </div>
+
+                    <div className="flex gap-2">
+                      {fullAnalyticsHref ? (
+                        <Link
+                          href={fullAnalyticsHref}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                          title="Open full analytics page"
+                        >
+                          Open full analytics
+                        </Link>
+                      ) : null}
+
+                      <button
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          setSelectedToken(null);
+                          setDrawerData(null);
+                        }}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
                       >
-                        Open full analytics
-                      </Link>
-                    ) : null}
-
-                    <button
-                      onClick={downloadDrawerCsv}
-                      disabled={!drawerData?.ok}
-                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-                      title="Download link analytics as CSV"
-                    >
-                      CSV
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setDrawerOpen(false);
-                        setSelectedToken(null);
-                        setDrawerData(null);
-                      }}
-                      className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-
-                {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
-                {drawerErr && <div className="mt-4 text-red-300">Error: {drawerErr}</div>}
-
-                {!drawerLoading && !drawerErr && drawerData?.ok && (
-                  <div className="mt-4 space-y-4">
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="text-xs text-white/60">Tests taken</div>
-                        <div className="text-xl font-semibold">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="text-xs text-white/60">Unique takers</div>
-                        <div className="text-xl font-semibold">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <div className="text-xs text-white/60">Last used</div>
-                        <div className="text-xs text-white/80 mt-1">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
-                      </div>
+                        Close
+                      </button>
                     </div>
+                  </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">Insights (Beta)</h3>
-                        {drawerData?._insights?.confidence ? (
-                          <div className="text-xs text-white/50">
-                            {drawerData._insights.confidence.level} · n=
-                            {fmtNum(drawerData._insights.confidence.sampleSize)}
-                          </div>
-                        ) : null}
-                      </div>
-                      {drawerData?._insights ? (
-                        <div className="mt-3 text-sm">
-                          <ul className="list-disc pl-5 space-y-1 text-white/85">
-                            {(drawerData._insights.whatYoureSeeing || []).slice(0, 4).map((s: string, i: number) => (
-                              <li key={i}>{s}</li>
-                            ))}
-                          </ul>
+                  {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
+                  {drawerErr && <div className="mt-4 text-red-300">Error: {drawerErr}</div>}
+
+                  {!drawerLoading && !drawerErr && drawerData?.ok && (
+                    <div className="mt-5 space-y-4">
+                      {/* KPIs */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                          <div className="text-xs text-white/60">Tests taken</div>
+                          <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
                         </div>
-                      ) : (
-                        <div className="mt-3 text-sm text-white/60">Generating link insights…</div>
-                      )}
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                          <div className="text-xs text-white/60">Unique takers</div>
+                          <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                          <div className="text-xs text-white/60">Last used</div>
+                          <div className="text-xs text-white/80 mt-2">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
+                        </div>
+                      </div>
+
+                      {/* Insights */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">Insights (Beta)</h3>
+                          {drawerData?._insights?.confidence ? (
+                            <div className="text-xs text-white/50">
+                              {drawerData._insights.confidence.level} · n=
+                              {fmtNum(drawerData._insights.confidence.sampleSize)}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {drawerData?._insights ? (
+                          <div className="mt-3 text-sm">
+                            {/* ✅ FIX: wrap map in braces */}
+                            <ul className="list-disc pl-5 space-y-1 text-white/85">
+                              {(drawerData._insights.whatYoureSeeing || [])
+                                .slice(0, 4)
+                                .map((s: string, i: number) => (
+                                  <li key={i}>{s}</li>
+                                ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="mt-3 text-sm text-white/60">Generating link insights…</div>
+                        )}
+                      </div>
+
+                      {/* ✅ Top Profiles (restored) */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <h3 className="font-semibold">Top profiles</h3>
+                        <div className="mt-3 space-y-2">
+                          {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
+                            <div key={p.code} className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{p.name}</div>
+                                <div className="text-xs text-white/50">
+                                  {fmtNum(p.count)} · {fmtPct(p.pct)}
+                                </div>
+                              </div>
+                              <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
+                            </div>
+                          ))}
+                          {!((drawerData?.distributions?.profiles || []).length) ? (
+                            <div className="text-sm text-white/60">No profile data.</div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* ✅ Top Frequencies (restored) */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <h3 className="font-semibold">Top frequencies</h3>
+                        <div className="mt-3 space-y-2">
+                          {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
+                            <div key={f.code} className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{f.name}</div>
+                                <div className="text-xs text-white/50">
+                                  {fmtNum(f.count)} · {fmtPct(f.pct)}
+                                </div>
+                              </div>
+                              <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
+                            </div>
+                          ))}
+                          {!((drawerData?.distributions?.frequencies || []).length) ? (
+                            <div className="text-sm text-white/60">No frequency data.</div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* ✅ Companies (restored) */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <h3 className="font-semibold">Top companies</h3>
+                        <div className="mt-3 space-y-2">
+                          {(drawerData?.segments?.companies || []).length ? (
+                            (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
+                              <div key={c.company} className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="font-medium truncate">{c.company}</div>
+                                  <div className="text-xs text-white/50">
+                                    {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-sm text-white/60">No company data captured for this link.</div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -929,4 +925,3 @@ export default function DashboardV2Client({
     </div>
   );
 }
-
