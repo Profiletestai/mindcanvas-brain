@@ -47,8 +47,7 @@ function toZeroBasedSelected(row: any): number | null {
   return null;
 }
 
-const asNumber = (x: any, d = 0) =>
-  Number.isFinite(Number(x)) ? Number(x) : d;
+const asNumber = (x: any, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
 
 function normalizeEmail(v: any): string {
   const s = typeof v === "string" ? v.trim() : "";
@@ -154,6 +153,28 @@ async function loadLinkBehavior(
     next_steps_url: null,
     email_report: false,
   };
+}
+
+/**
+ * Add a query param to a URL that may already have ?... (and may have #hash),
+ * without duplicating the param.
+ */
+function addQueryParam(rawUrl: string, key: string, value: string): string {
+  const urlStr = String(rawUrl || "").trim();
+  if (!urlStr || !key || !value) return urlStr;
+
+  const [beforeHash, hash] = urlStr.split("#", 2);
+
+  // do not duplicate if already present
+  const hasParam = new RegExp(`([?&])${key}=`, "i").test(beforeHash);
+  if (hasParam) return urlStr;
+
+  const sep = beforeHash.includes("?") ? "&" : "?";
+  const updated = `${beforeHash}${sep}${encodeURIComponent(
+    key
+  )}=${encodeURIComponent(value)}`;
+
+  return hash ? `${updated}#${hash}` : updated;
 }
 
 export const dynamic = "force-dynamic";
@@ -480,28 +501,46 @@ export async function POST(
     const origin = getBaseUrl();
 
     // These are useful for both redirect + email/debugging
-    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
-    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(taker.id)}`;
+    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+      taker.id
+    )}`;
+    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
+      taker.id
+    )}`;
 
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
     // QSC report (public-facing)
-    const qscReportPath = `/qsc/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
-    const qscReportUrl = `${origin}${qscReportPath}`;
+    const qscReportPath = `/qsc/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+      taker.id
+    )}`;
+    let qscReportUrl = `${origin}${qscReportPath}`;
+
+    // ✅ Choose QSC report view deterministically for EMAIL + LINKS
+    // Default: entrepreneur -> growth (prevents Buyer Snapshot fallback)
+    // You can later move this to tests.meta (e.g. meta.qsc_report_view) if you want per-test control.
+    const metaReportView =
+      String(meta?.qsc_report_view || meta?.default_report_view || "").trim();
+    const qscReportView =
+      metaReportView || (isQscEntrepreneur ? "growth" : "");
+
+    if (qscReportView) {
+      qscReportUrl = addQueryParam(qscReportUrl, "view", qscReportView);
+    }
 
     // Email the report page (not /result)
     const reportUrlForEmail = isQscEntrepreneur ? qscReportUrl : baseReportUrl;
 
-    // ✅ NEW: Decide redirect deterministically using show_results
-    // - show_results=true  -> go to report (or QSC report)
-    // - show_results=false -> go to redirect_url if present, else fall back to /result (hidden message screen)
+    // ✅ Decide redirect deterministically using show_results
     const redirectUrl: string =
       linkBehavior.show_results === true
-        ? (isQscEntrepreneur ? qscReportPath : reportPath)
-        : (linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
-            ? linkBehavior.redirect_url.trim()
-            : resultPath);
+        ? isQscEntrepreneur
+          ? addQueryParam(qscReportPath, "view", qscReportView || "growth") // keep redirects aligned
+          : reportPath
+        : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
+        ? linkBehavior.redirect_url.trim()
+        : resultPath;
 
     // Load org (needed for email template placeholders)
     const { data: orgRow } = await sb
@@ -529,6 +568,10 @@ export async function POST(
             first_name: taker.first_name || "there",
             test_name: (test.name as string) || slug || "your assessment",
             report_link: reportUrlForEmail,
+            // ✅ also pass report_view so emailTemplates.ts can enforce it too
+            ...(isQscEntrepreneur && qscReportView
+              ? { report_view: qscReportView }
+              : {}),
             org_name: orgName,
             support_email: supportEmail,
           },
@@ -600,10 +643,8 @@ export async function POST(
         email_report: linkBehavior.email_report,
       },
 
-      // ✅ redirect is now ALWAYS a string (path or external URL)
       redirect: redirectUrl,
 
-      // keep these as-is for existing client logic + debugging
       result_url: baseResultUrl,
       report_url: baseReportUrl,
 
@@ -617,4 +658,3 @@ export async function POST(
     );
   }
 }
-
