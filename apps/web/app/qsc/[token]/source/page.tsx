@@ -436,7 +436,7 @@ export default function QscExtendedSourceCodePage({
 
         {/* Footer */}
         <footer className="pt-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>

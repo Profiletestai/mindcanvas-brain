@@ -49,7 +49,7 @@ export default function ReportShell({ data }: { data: ReportData }) {
       </section>
 
       <footer className="pt-4 border-t text-xs opacity-70">
-        © {new Date().getFullYear()} MindCanvas · Report v1
+        © {new Date().getFullYear()} Powered by Profiletest.ai
       </footer>
     </div>
   );

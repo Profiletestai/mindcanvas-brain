@@ -660,7 +660,7 @@ export default function QscExtendedPage({ params }: { params: { token: string } 
             </div>
 
             <footer className="pt-2 pb-8 text-xs text-slate-500 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <span>© {new Date().getFullYear()} MindCanvas — Profiletest.ai</span>
+              <span>© {new Date().getFullYear()} Powered by Profiletest.ai </span>
               <span className="text-[11px] text-slate-500">
                 Internal use only — Extended Source Code for test owners.
               </span>

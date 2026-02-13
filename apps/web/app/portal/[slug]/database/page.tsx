@@ -397,5 +397,3 @@ export default async function DatabasePage({
     );
   }
 }
-
-

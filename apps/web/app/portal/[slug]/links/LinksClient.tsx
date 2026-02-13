@@ -18,9 +18,22 @@ type LinkRow = {
   show_results: boolean | null;
   is_active: boolean | null;
   expires_at: string | null;
-  test_name: string | null;
+
+  // NEW (from API)
+  test_id: string | null;
+  test_name: string; // actual test name (portal.tests.name)
+  link_name: string | null; // saved purpose/name on link (portal.test_links.name)
+
   contact_owner: string | null;
   email_report: boolean;
+
+  // NEW
+  redirect_url: string | null;
+  next_steps_url: string | null;
+
+  // NEW
+  use_count: number;
+  max_uses: number | null;
 };
 
 export default function LinksClient(props: {
@@ -56,7 +69,7 @@ export default function LinksClient(props: {
   const [loadingLinks, setLoadingLinks] = useState(false);
 
   const baseUrl = getBaseUrl();
-  
+
   // fetch helpers (uncached)
   const fetchJSON = async (url: string) => {
     const r = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`);
@@ -177,7 +190,6 @@ export default function LinksClient(props: {
           emailReport,
           hiddenResultsMessage: messageToSave,
 
-          // NEW
           redirectUrl: !showResults ? redirectUrl.trim() : null,
           nextStepsUrl: showResults ? nextStepsUrl.trim() : null,
 
@@ -202,13 +214,12 @@ export default function LinksClient(props: {
           testDisplayName || selectedTest?.name || "Profile Test";
 
         try {
-          // ✅ This endpoint will now use sendTemplatedEmail("send_test_link")
           const emailRes = await fetch("/api/portal/links/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              orgId,                 // ✅ NEW (so templates + org profile can be loaded)
-              orgSlug,               // optional, but useful for debugging
+              orgId,
+              orgSlug,
               email: recipientEmail,
               linkUrl: url,
               orgName,
@@ -473,19 +484,33 @@ export default function LinksClient(props: {
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left font-medium">Test name / Test purpose</th>
+                <th className="px-3 py-2 text-left font-medium">
+                  Test name / Test purpose
+                </th>
+
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Test</th>
+
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Uses</th>
+
                 <th className="px-3 py-2 text-left font-medium">Created</th>
                 <th className="px-3 py-2 text-left font-medium">Results</th>
+
+                {/* ✅ NEW */}
+                <th className="px-3 py-2 text-left font-medium">Redirect link</th>
+
                 <th className="px-3 py-2 text-left font-medium">Expiry</th>
                 <th className="px-3 py-2 text-left font-medium">Link</th>
                 <th className="px-3 py-2 text-left font-medium">Copy</th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {links.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-gray-500">
+                  <td colSpan={10} className="py-6 text-center text-gray-500">
                     No links yet.
                   </td>
                 </tr>
@@ -493,35 +518,91 @@ export default function LinksClient(props: {
 
               {links.map((r, idx) => {
                 const url = fullLink(r.token);
-                const expired = r.expires_at ? new Date(r.expires_at) < new Date() : false;
+                const expired = r.expires_at
+                  ? new Date(r.expires_at) < new Date()
+                  : false;
                 const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
+
+                // Redirect link: if results are hidden use redirect_url,
+                // otherwise show next_steps_url (still useful to see in table)
+                const redirectOrNext =
+                  (r.show_results ? r.next_steps_url : r.redirect_url) || "";
 
                 return (
                   <tr key={r.id} className={`${rowBg} border-t`}>
+                    {/* Purpose / label */}
                     <td className="px-3 py-2 align-top">
-                      <div className="font-medium">{r.test_name || "Untitled link"}</div>
+                      <div className="font-medium">
+                        {r.link_name || "Untitled link"}
+                      </div>
                       {r.contact_owner && (
-                        <div className="text-xs text-gray-500">Owner: {r.contact_owner}</div>
+                        <div className="text-xs text-gray-500">
+                          Owner: {r.contact_owner}
+                        </div>
                       )}
                     </td>
 
+                    {/* ✅ Test */}
                     <td className="px-3 py-2 align-top">
-                      {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                      <div className="text-sm text-gray-900">{r.test_name || "—"}</div>
                     </td>
 
+                    {/* ✅ Uses */}
                     <td className="px-3 py-2 align-top">
-                      {r.show_results ? "Shown" : "Hidden"}
-                      {!r.email_report && (
-                        <div className="text-xs text-gray-500">Report not emailed</div>
-                      )}
+                      <div className="text-sm text-gray-900 tabular-nums">
+                        {typeof r.use_count === "number" ? r.use_count : 0}
+                        {r.max_uses ? ` / ${r.max_uses}` : ""}
+                      </div>
                     </td>
 
+                    {/* Created */}
                     <td className="px-3 py-2 align-top">
-                      {r.expires_at
-                        ? `${new Date(r.expires_at).toLocaleString()}${expired ? " (expired)" : ""}`
+                      {r.created_at
+                        ? new Date(r.created_at).toLocaleString()
                         : "—"}
                     </td>
 
+                    {/* Results */}
+                    <td className="px-3 py-2 align-top">
+                      {r.show_results ? "Shown" : "Hidden"}
+                      {!r.email_report && (
+                        <div className="text-xs text-gray-500">
+                          Report not emailed
+                        </div>
+                      )}
+                    </td>
+
+                    {/* ✅ Redirect link */}
+                    <td className="px-3 py-2 align-top">
+                      {redirectOrNext ? (
+                        <button
+                          type="button"
+                          className="text-blue-600 underline"
+                          onClick={() => window.open(redirectOrNext, "_blank")}
+                          title={redirectOrNext}
+                        >
+                          Open
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                      {redirectOrNext ? (
+                        <div className="mt-1 text-xs text-gray-500 truncate max-w-[220px]">
+                          {redirectOrNext}
+                        </div>
+                      ) : null}
+                    </td>
+
+                    {/* Expiry */}
+                    <td className="px-3 py-2 align-top">
+                      {r.expires_at
+                        ? `${new Date(r.expires_at).toLocaleString()}${
+                            expired ? " (expired)" : ""
+                          }`
+                        : "—"}
+                    </td>
+
+                    {/* Link */}
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
@@ -532,6 +613,7 @@ export default function LinksClient(props: {
                       </button>
                     </td>
 
+                    {/* Copy */}
                     <td className="px-3 py-2 align-top">
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -543,7 +625,12 @@ export default function LinksClient(props: {
 
                         <button
                           className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
-                          onClick={() => downloadTxt(embedCode(url), `mindcanvas-embed-${r.token}.txt`)}
+                          onClick={() =>
+                            downloadTxt(
+                              embedCode(url),
+                              `mindcanvas-embed-${r.token}.txt`
+                            )
+                          }
                           title="Download the embed code as a .txt file"
                         >
                           Download embed
@@ -558,6 +645,7 @@ export default function LinksClient(props: {
                       </div>
                     </td>
 
+                    {/* Actions */}
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
@@ -579,3 +667,4 @@ export default function LinksClient(props: {
     </div>
   );
 }
+

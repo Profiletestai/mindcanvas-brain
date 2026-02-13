@@ -766,7 +766,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               </button>
             </div>
 
-            <footer className="pt-4 text-xs text-slate-400">© {new Date().getFullYear()} MindCanvas</footer>
+            <footer className="pt-4 text-xs text-slate-400">© {new Date().getFullYear()} Powered by Profiletest.ai </footer>
           </main>
         </div>
       </div>

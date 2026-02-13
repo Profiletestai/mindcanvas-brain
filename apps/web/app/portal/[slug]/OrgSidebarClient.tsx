@@ -1,3 +1,4 @@
+// apps/web/app/portal/[slug]/OrgSidebarClient.tsx
 'use client';
 
 import Link from 'next/link';
@@ -29,10 +30,15 @@ export default function OrgSidebarClient({ slug }: { slug: string }) {
           setOrg(j.org as Org);
         }
       } catch (e: any) {
-        if (ok) { setErr(String(e?.message || e)); setOrg(null); }
+        if (ok) {
+          setErr(String(e?.message || e));
+          setOrg(null);
+        }
       }
     })();
-    return () => { ok = false; };
+    return () => {
+      ok = false;
+    };
   }, [slug]);
 
   return (
@@ -55,11 +61,24 @@ export default function OrgSidebarClient({ slug }: { slug: string }) {
       </div>
 
       <nav className="space-y-2">
-        <Link href={`/portal/${slug}`} className="block px-3 py-2 rounded hover:bg-white/10">Dashboard</Link>
-        <Link href={`/portal/${slug}/database`} className="block px-3 py-2 rounded hover:bg-white/10">Database</Link>
-        <Link href={`/portal/${slug}/tests`} className="block px-3 py-2 rounded hover:bg-white/10">Tests</Link>
-        <Link href={`/portal/${slug}/profile`} className="block px-3 py-2 rounded hover:bg-white/10">Profile</Link>
-        <Link href={`/portal/${slug}/settings`} className="block px-3 py-2 rounded hover:bg-white/10">Settings</Link>
+        <Link href={`/portal/${slug}`} className="block px-3 py-2 rounded hover:bg-white/10">
+          Dashboard
+        </Link>
+        <Link href={`/portal/${slug}/database`} className="block px-3 py-2 rounded hover:bg-white/10">
+          Database
+        </Link>
+
+        {/* ✅ CHANGE: Default Tests tab goes to the link generator/table page */}
+        <Link href={`/portal/${slug}/tests/links`} className="block px-3 py-2 rounded hover:bg-white/10">
+          Tests
+        </Link>
+
+        <Link href={`/portal/${slug}/profile`} className="block px-3 py-2 rounded hover:bg-white/10">
+          Profile
+        </Link>
+        <Link href={`/portal/${slug}/settings`} className="block px-3 py-2 rounded hover:bg-white/10">
+          Settings
+        </Link>
       </nav>
     </div>
   );

@@ -714,7 +714,7 @@ export default function QscLeaderStrategicReportPage({
         </section>
 
         <footer className="pt-4 pb-6 text-xs text-slate-400">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>
