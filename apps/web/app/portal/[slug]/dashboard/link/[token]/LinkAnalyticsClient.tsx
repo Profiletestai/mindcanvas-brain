@@ -1,4 +1,4 @@
-// apps/web/app/portal/[slug]/dashboard/beta/link/[token]/LinkAnalyticsClient.tsx
+// apps/web/app/portal/[slug]/dashboard/link/[token]/LinkAnalyticsClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -48,6 +48,25 @@ type CompanySubmissionsPayload = {
   ok: true;
   token: string;
   company: string;
+  from: string;
+  to: string;
+  total: number;
+  submissions: Array<{
+    submissionId: string;
+    createdAt: string | null;
+    takerId: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    phone: string | null;
+    company: string | null;
+    meta: any | null;
+  }>;
+};
+
+type AllSubmissionsPayload = {
+  ok: true;
+  token: string;
   from: string;
   to: string;
   total: number;
@@ -211,13 +230,13 @@ function SparklineNeon({
           </linearGradient>
 
           <linearGradient id={compact ? "mcAreaMini" : "mcArea"} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#64bae2" stopOpacity={compact ? "0.22" : "0.28"} />
-            <stop offset="60%" stopColor="#2d8fc4" stopOpacity={compact ? "0.07" : "0.10"} />
-            <stop offset="100%" stopColor="#050914" stopOpacity="0" />
+            <stop offset="0%" stopColor="#64bae2" stopOpacity={compact ? 0.22 : 0.28} />
+            <stop offset="60%" stopColor="#2d8fc4" stopOpacity={compact ? 0.07 : 0.1} />
+            <stop offset="100%" stopColor="#050914" stopOpacity={0} />
           </linearGradient>
 
           <filter id={compact ? "glowMini" : "glow"} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation={compact ? "3" : "4"} result="coloredBlur" />
+            <feGaussianBlur stdDeviation={compact ? 3 : 4} result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
               <feMergeNode in="SourceGraphic" />
@@ -232,11 +251,11 @@ function SparklineNeon({
             <path
               d={path}
               stroke={`url(#${compact ? "mcLineMini" : "mcLine"})`}
-              strokeWidth={compact ? "2.6" : "3.2"}
+              strokeWidth={compact ? 2.6 : 3.2}
               fill="none"
               filter={`url(#${compact ? "glowMini" : "glow"})`}
             />
-            <path d={path} stroke="rgba(255,255,255,0.30)" strokeWidth="1" fill="none" />
+            <path d={path} stroke="rgba(255,255,255,0.30)" strokeWidth={1} fill="none" />
           </>
         ) : null}
       </svg>
@@ -251,23 +270,13 @@ function SparklineNeon({
   );
 }
 
-function TabButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: any;
-  onClick: () => void;
-}) {
+function TabButton({ active, children, onClick }: { active: boolean; children: any; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className={[
         "rounded-full px-3 py-1 text-xs border transition",
-        active
-          ? "bg-white text-black border-white"
-          : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10",
+        active ? "bg-white text-black border-white" : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10",
       ].join(" ")}
       type="button"
     >
@@ -288,8 +297,6 @@ function buildTimelineFromSubmissions(subs: Array<{ createdAt: string | null }>,
   const items = Array.from(map.entries())
     .map(([date, submissions]) => ({ date, submissions }))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
-
-  // Keep last N days worth of points for the micro-sparkline
   if (items.length > maxDays) return items.slice(items.length - maxDays);
   return items;
 }
@@ -319,7 +326,7 @@ export default function LinkAnalyticsClient({
 
   // Company micro-sparkline cache (real data)
   const companySparkCache = useRef<Map<string, TimelinePoint[]>>(new Map());
-  const [sparkVersion, setSparkVersion] = useState(0); // trigger re-render when cache updates
+  const [sparkVersion, setSparkVersion] = useState(0);
 
   // Company drilldown drawer
   const [companyDrawerOpen, setCompanyDrawerOpen] = useState(false);
@@ -332,6 +339,12 @@ export default function LinkAnalyticsClient({
   const [takerQuery, setTakerQuery] = useState("");
   const [filterHasEmail, setFilterHasEmail] = useState(false);
   const [filterHasPhone, setFilterHasPhone] = useState(false);
+
+  // Export ALL takers loading state
+  const [exportAllLoading, setExportAllLoading] = useState(false);
+
+  // force rerender when sparklines warm
+  const _sparkTick = sparkVersion;
 
   useEffect(() => {
     let alive = true;
@@ -378,7 +391,7 @@ export default function LinkAnalyticsClient({
     const q = new URLSearchParams();
     if (testId) q.set("testId", testId);
     const qs = q.toString();
-    return `/portal/${orgSlug}/dashboard/beta${qs ? `?${qs}` : ""}`;
+    return `/portal/${orgSlug}/dashboard${qs ? `?${qs}` : ""}`;
   }, [orgSlug, testId]);
 
   const timelineSorted = useMemo(() => {
@@ -389,11 +402,8 @@ export default function LinkAnalyticsClient({
 
   const companiesFilteredSorted = useMemo(() => {
     const list = (data?.segments?.companies || []).slice();
-
     const q = companyQuery.trim().toLowerCase();
-    const filtered = q
-      ? list.filter((c) => String(c.company || "Unknown").toLowerCase().includes(q))
-      : list;
+    const filtered = q ? list.filter((c) => String(c.company || "Unknown").toLowerCase().includes(q)) : list;
 
     if (companySort === "az") {
       filtered.sort((a, b) => String(a.company || "Unknown").localeCompare(String(b.company || "Unknown")));
@@ -402,47 +412,6 @@ export default function LinkAnalyticsClient({
     }
     return filtered;
   }, [data, companyQuery, companySort]);
-
-  function downloadAllCsv() {
-    if (!data?.ok) return;
-
-    const lines: string[] = [];
-    const pushSection = (sectionTitle: string, header: string[], rows: any[][]) => {
-      lines.push(csvEscape(sectionTitle));
-      lines.push(header.map(csvEscape).join(","));
-      for (const r of rows) lines.push(r.map(csvEscape).join(","));
-      lines.push("");
-    };
-
-    const companies = (data.segments?.companies || []).map((c) => [
-      c.company || "",
-      fmtNum(c.testsTaken),
-      Math.round(clampPct(c.pct) * 100),
-    ]);
-
-    const profiles = (data.distributions?.profiles || []).map((p) => [
-      p.name || "",
-      p.code || "",
-      fmtNum(p.count),
-      Math.round(clampPct(p.pct) * 100),
-      fmtNum(p.avgPoints),
-    ]);
-
-    const freqs = (data.distributions?.frequencies || []).map((f) => [
-      f.name || "",
-      f.code || "",
-      fmtNum(f.count),
-      Math.round(clampPct(f.pct) * 100),
-      fmtNum(f.avgPoints),
-    ]);
-
-    pushSection("Companies", ["company", "tests_taken", "pct"], companies);
-    pushSection("Profiles", ["profile_name", "profile_code", "count", "pct", "avg_points"], profiles);
-    pushSection("Frequencies", ["frequency_name", "frequency_code", "count", "pct", "avg_points"], freqs);
-
-    const filename = `link_analytics_${orgSlug}_${safeName}.csv`;
-    downloadCsvLines(filename, lines);
-  }
 
   async function fetchCompanySubmissions(company: string) {
     const c = (company || "").trim() || "Unknown";
@@ -458,6 +427,18 @@ export default function LinkAnalyticsClient({
     return j as CompanySubmissionsPayload;
   }
 
+  async function fetchAllSubmissions() {
+    const q = new URLSearchParams();
+    q.set("token", token);
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+
+    const res = await fetch(`/api/portal-dashboard-v2/link/all-submissions?${q.toString()}`, { cache: "no-store" });
+    const j = await res.json();
+    if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+    return j as AllSubmissionsPayload;
+  }
+
   async function warmCompanySpark(company: string) {
     const key = (company || "").trim() || "Unknown";
     if (companySparkCache.current.has(key)) return;
@@ -468,7 +449,7 @@ export default function LinkAnalyticsClient({
       companySparkCache.current.set(key, tl);
       setSparkVersion((v) => v + 1);
     } catch {
-      // no-op (sparkline is non-blocking)
+      // non-blocking
     }
   }
 
@@ -480,7 +461,6 @@ export default function LinkAnalyticsClient({
     setCompanyDrawerErr("");
     setCompanyDrawerData(null);
 
-    // reset drawer filters
     setTakerQuery("");
     setFilterHasEmail(false);
     setFilterHasPhone(false);
@@ -489,7 +469,6 @@ export default function LinkAnalyticsClient({
       const payload = await fetchCompanySubmissions(c);
       setCompanyDrawerData(payload);
 
-      // also cache sparkline
       const tl = buildTimelineFromSubmissions(payload.submissions || [], 14);
       companySparkCache.current.set(c, tl);
       setSparkVersion((v) => v + 1);
@@ -502,8 +481,8 @@ export default function LinkAnalyticsClient({
 
   const drawerFilteredSubmissions = useMemo(() => {
     const subs = (companyDrawerData?.submissions || []).slice();
-
     const q = takerQuery.trim().toLowerCase();
+
     const filtered = subs.filter((r) => {
       const name = [r.firstName, r.lastName].filter(Boolean).join(" ").toLowerCase();
       const email = (r.email || "").toLowerCase();
@@ -516,7 +495,6 @@ export default function LinkAnalyticsClient({
       return name.includes(q) || email.includes(q) || phone.includes(q);
     });
 
-    // newest first
     filtered.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     return filtered;
   }, [companyDrawerData, takerQuery, filterHasEmail, filterHasPhone]);
@@ -546,6 +524,38 @@ export default function LinkAnalyticsClient({
     downloadCsvLines(`company_submissions_${orgSlug}_${fileSafeCompany}_filtered.csv`, lines);
   }
 
+  async function exportAllTakersCsv() {
+    try {
+      setExportAllLoading(true);
+      const payload = await fetchAllSubmissions();
+
+      const lines: string[] = [];
+      lines.push(csvEscape("All link submissions"));
+      lines.push(["company", "created_at", "name", "email", "phone", "submission_id", "taker_id"].map(csvEscape).join(","));
+
+      for (const r of payload.submissions || []) {
+        const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
+        lines.push(
+          [
+            r.company || "",
+            r.createdAt || "",
+            name || "",
+            r.email || "",
+            r.phone || "",
+            r.submissionId || "",
+            r.takerId || "",
+          ].map(csvEscape).join(",")
+        );
+      }
+
+      downloadCsvLines(`all_takers_${orgSlug}_${safeName}.csv`, lines);
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+    } finally {
+      setExportAllLoading(false);
+    }
+  }
+
   const wowCard =
     "relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]";
 
@@ -553,7 +563,6 @@ export default function LinkAnalyticsClient({
     <div className="relative min-h-screen p-6 text-white space-y-6">
       <MindCanvasGrid />
 
-      {/* Header */}
       <div className={`${wowCard} p-6`}>
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(900px_260px_at_20%_0%,rgba(100,186,226,0.35),transparent_65%)]" />
         <div className="absolute inset-0 opacity-15 bg-[radial-gradient(700px_220px_at_90%_30%,rgba(124,92,255,0.30),transparent_60%)]" />
@@ -572,14 +581,6 @@ export default function LinkAnalyticsClient({
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={downloadAllCsv}
-              disabled={!data?.ok}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-              type="button"
-            >
-              Download CSV
-            </button>
             <Link href={backHref} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10">
               Back to dashboard
             </Link>
@@ -600,7 +601,6 @@ export default function LinkAnalyticsClient({
 
       {!loading && !err && data?.ok && (
         <>
-          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className={`${wowCard} p-5`}>
               <div className="text-xs text-white/60">Tests taken</div>
@@ -623,21 +623,18 @@ export default function LinkAnalyticsClient({
             </div>
           </div>
 
-          {/* Timeline */}
           <div className={`${wowCard} p-5`}>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-semibold text-lg">Activity over time</h2>
                 <div className="text-xs text-white/50 mt-1">Neon sparkline · daily submissions</div>
               </div>
-              <div className="text-xs text-white/50">{timelineSorted.length ? `${timelineSorted.length} points` : ""}</div>
             </div>
             <div className="mt-4">
               {timelineSorted.length ? <SparklineNeon data={timelineSorted} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
             </div>
           </div>
 
-          {/* Segmentation */}
           <div className={`${wowCard} p-5`}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
@@ -662,8 +659,7 @@ export default function LinkAnalyticsClient({
 
             {tab === "companies" ? (
               <>
-                {/* Search + sort */}
-                <div className="mt-5 flex flex-col md:flex-row md:items-center gap-3">
+                <div className="mt-5 flex flex-col lg:flex-row lg:items-center gap-3">
                   <div className="flex-1">
                     <input
                       value={companyQuery}
@@ -672,7 +668,8 @@ export default function LinkAnalyticsClient({
                       className="w-full h-11 rounded-xl bg-white/10 border border-white/10 px-4 text-sm text-white outline-none placeholder:text-white/40"
                     />
                   </div>
-                  <div className="flex gap-2">
+
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setCompanySort("most")}
                       className={[
@@ -697,17 +694,25 @@ export default function LinkAnalyticsClient({
                     >
                       Sort: A–Z
                     </button>
+
+                    {/* ✅ Export ALL takers across the whole link */}
+                    <button
+                      onClick={exportAllTakersCsv}
+                      disabled={exportAllLoading}
+                      className="h-11 rounded-xl px-4 text-sm border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                      type="button"
+                      title="Export all takers across all companies for this link"
+                    >
+                      {exportAllLoading ? "Exporting…" : "Export ALL takers"}
+                    </button>
                   </div>
                 </div>
 
-                {/* Company cards */}
                 <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {companiesFilteredSorted.length ? (
                     companiesFilteredSorted.slice(0, 40).map((c) => {
                       const name = (c.company || "Unknown").trim() || "Unknown";
                       const mini = companySparkCache.current.get(name);
-                      // use sparkVersion to re-render when cache updates
-                      void sparkVersion;
 
                       return (
                         <button
@@ -751,6 +756,9 @@ export default function LinkAnalyticsClient({
                     <div className="text-sm text-white/60">No companies match your search.</div>
                   )}
                 </div>
+
+                {/* keep _sparkTick referenced so sparklines refresh */}
+                <span className="hidden">{_sparkTick}</span>
               </>
             ) : null}
 
@@ -815,7 +823,6 @@ export default function LinkAnalyticsClient({
           />
 
           <div className="absolute right-0 top-0 h-full w-full max-w-[820px] bg-[#050914] border-l border-white/10 overflow-y-auto">
-            {/* Sticky header */}
             <div className="sticky top-0 z-10 border-b border-white/10 bg-[#050914]/90 backdrop-blur p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -850,7 +857,6 @@ export default function LinkAnalyticsClient({
                 </div>
               </div>
 
-              {/* Filters */}
               <div className="mt-4 flex flex-col lg:flex-row lg:items-center gap-3">
                 <div className="flex-1">
                   <input
@@ -939,3 +945,4 @@ export default function LinkAnalyticsClient({
     </div>
   );
 }
+

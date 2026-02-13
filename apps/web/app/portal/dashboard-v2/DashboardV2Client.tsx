@@ -1,4 +1,3 @@
-// apps/web/app/portal/dashboard-v2/DashboardV2Client.tsx
 "use client";
 
 import Link from "next/link";
@@ -54,6 +53,23 @@ type InsightsPayload = {
   };
 };
 
+function MindCanvasGrid() {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_-10%,#113149_0%,#08121b_55%,#060e16_100%)]" />
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      <div className="absolute inset-0 bg-[#050914]/55" />
+    </div>
+  );
+}
+
 function isoToDateInput(iso: string) {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
@@ -103,71 +119,27 @@ function badgeClass(active: boolean | null) {
   return "bg-white/5 text-white/70 border-white/10";
 }
 
-/** CSV helpers */
-function csvEscape(v: any) {
-  const s = v == null ? "" : String(v);
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function downloadCsv(filename: string, header: string[], rows: any[][]) {
-  const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-/** MindCanvas background (gradient + grid) */
-function MindCanvasBg({ dim = false }: { dim?: boolean }) {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-      {/* depth gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_-10%,#113149_0%,#08121b_55%,#060e16_100%)]" />
-      {/* grid */}
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
-      {/* slight dark wash for readability */}
-      <div className={["absolute inset-0 bg-[#050914]", dim ? "opacity-45" : "opacity-25"].join(" ")} />
-    </div>
-  );
-}
-
-function SparklineGlow({ data, height = 120 }: { data: TimelinePoint[]; height?: number }) {
+function SparklineGlow({ data, height = 130 }: { data: TimelinePoint[]; height?: number }) {
   const w = 900;
   const h = height;
   const padX = 10;
   const padY = 12;
 
-  const values = data.map((d) => Number(d.submissions || 0));
+  const ordered = (data || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const values = ordered.map((d) => Number(d.submissions || 0));
   const maxV = Math.max(1, ...values);
-  const minV = 0;
 
-  const n = Math.max(2, data.length);
+  const n = Math.max(2, ordered.length);
   const step = (w - padX * 2) / (n - 1);
 
-  const points = data.map((d, i) => {
+  const points = ordered.map((d, i) => {
     const x = padX + i * step;
-    const t = (Number(d.submissions || 0) - minV) / (maxV - minV || 1);
+    const t = Number(d.submissions || 0) / (maxV || 1);
     const y = padY + (1 - t) * (h - padY * 2);
     return { x, y };
   });
 
-  const lineD = points
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
-    .join(" ");
-
+  const lineD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const areaD =
     lineD +
     ` L ${(padX + (n - 1) * step).toFixed(2)} ${(h - padY).toFixed(2)}` +
@@ -191,34 +163,12 @@ function SparklineGlow({ data, height = 120 }: { data: TimelinePoint[]; height?:
 
           <filter id="mc-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" result="blur" />
-            <feColorMatrix
-              in="blur"
-              type="matrix"
-              values="
-                1 0 0 0 0
-                0 1 0 0 0
-                0 0 1 0 0
-                0 0 0 0.85 0"
-              result="colored"
-            />
             <feMerge>
-              <feMergeNode in="colored" />
+              <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
-
-        {/* subtle chart grid */}
-        <g opacity="0.18">
-          {Array.from({ length: 12 }).map((_, i) => {
-            const x = (i / 11) * w;
-            return <line key={`vx-${i}`} x1={x} y1={0} x2={x} y2={h} stroke="white" strokeWidth="1" />;
-          })}
-          {Array.from({ length: 6 }).map((_, i) => {
-            const y = (i / 5) * h;
-            return <line key={`hy-${i}`} x1={0} y1={y} x2={w} y2={y} stroke="white" strokeWidth="1" />;
-          })}
-        </g>
 
         <path d={areaD} fill="url(#mc-area)" />
         <path d={lineD} stroke="url(#mc-line)" strokeWidth="6" fill="none" filter="url(#mc-glow)" strokeLinecap="round" />
@@ -226,17 +176,38 @@ function SparklineGlow({ data, height = 120 }: { data: TimelinePoint[]; height?:
       </svg>
 
       <div className="mt-2 flex justify-between text-[11px] text-white/60">
-        <span>{data[0]?.date ?? ""}</span>
-        <span>{data[data.length - 1]?.date ?? ""}</span>
+        <span>{ordered[0]?.date ?? ""}</span>
+        <span>{ordered[ordered.length - 1]?.date ?? ""}</span>
       </div>
     </div>
   );
+}
+
+/** CSV helpers */
+function csvEscape(v: any) {
+  const s = v == null ? "" : String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(filename: string, header: string[], rows: any[][]) {
+  const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSlug?: string; embedded?: boolean }) {
   const sp = useSearchParams();
   const org = orgSlug ?? sp?.get("org") ?? "team-puzzle";
 
+  // Default: last 30 days
   const now = new Date();
   const defaultTo = isoToDateInput(now.toISOString());
   const defaultFrom = isoToDateInput(new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString());
@@ -479,8 +450,8 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
     return t;
   }, [data]);
 
-  // ✅ Real “full analytics” route (no 404):
-  // /portal/[slug]/dashboard/beta/link/[token]
+  // ✅ Full analytics page (no beta)
+  // /portal/[slug]/dashboard/link/[token]
   const fullAnalyticsHref = useMemo(() => {
     if (!selectedToken) return null;
     const q = new URLSearchParams();
@@ -488,7 +459,7 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
     if (appliedFromIso) q.set("from", appliedFromIso);
     if (appliedToIso) q.set("to", appliedToIso);
     const qs = q.toString();
-    return `/portal/${org}/dashboard/beta/link/${selectedToken}${qs ? `?${qs}` : ""}`;
+    return `/portal/${org}/dashboard/link/${selectedToken}${qs ? `?${qs}` : ""}`;
   }, [selectedToken, org, selectedTestId, appliedFromIso, appliedToIso]);
 
   const FiltersRow = (
@@ -520,6 +491,7 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
           className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
         />
       </div>
+
       <div>
         <label className="block text-xs text-white/60 mb-1">To</label>
         <input
@@ -537,97 +509,81 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
   );
 
   return (
-    <div className="relative min-h-screen p-6 space-y-6 text-white">
-      {/* Global background */}
-      <MindCanvasBg dim={embedded} />
+    <div className="min-h-screen p-6 space-y-6 text-white">
+      <MindCanvasGrid />
 
-      {/* Header */}
       <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-widest text-white/60">Beta</div>
-            <h1 className="text-2xl font-semibold">Dashboard v2</h1>
+            <div className="text-xs uppercase tracking-widest text-white/60">MindCanvas</div>
+            <h1 className="text-2xl font-semibold">Dashboard</h1>
             <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
           </div>
-          {FiltersRow}
+          {!embedded ? FiltersRow : null}
         </div>
       </div>
+
+      {embedded ? (
+        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+          {FiltersRow}
+        </div>
+      ) : null}
 
       {loading && <div className="text-white/70">Loading…</div>}
       {err && <div className="text-red-300">Error: {err}</div>}
 
       {!loading && !err && data?.ok && (
         <>
-          {/* KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="text-xs text-white/60">Submissions</div>
               <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.submissions)}</div>
-              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-              <div className="mt-3 text-xs text-white/55">Total across selected range</div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="text-xs text-white/60">Unique takers</div>
               <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.uniqueTakers)}</div>
-              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-              <div className="mt-3 text-xs text-white/55">
-                {data.kpis.uniqueTakers != null && data.kpis.submissions
-                  ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.submissions)} unique`
-                  : "—"}
+              <div className="mt-2 text-xs text-white/55">
+                {data.kpis.uniqueTakers != null && data.kpis.submissions ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.submissions)} unique` : "—"}
               </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="text-xs text-white/60">Active links</div>
               <div className="text-4xl font-semibold mt-1">{fmtNum(data.kpis.activeLinks)}</div>
-              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-              <div className="mt-3 text-xs text-white/55">Currently usable links</div>
             </div>
           </div>
 
-          {/* Timeline + Insights */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="font-semibold">Submissions over time</h2>
                   <div className="text-xs text-white/50 mt-1">
-                    {data.filters.from ? isoToDateInput(data.filters.from) : ""} →{" "}
-                    {data.filters.to ? isoToDateInput(data.filters.to) : ""}
+                    {data.filters.from ? isoToDateInput(data.filters.from) : ""} → {data.filters.to ? isoToDateInput(data.filters.to) : ""}
                   </div>
-                </div>
-                <div className="text-xs text-white/50 rounded-full border border-white/10 bg-white/5 px-3 py-1">
-                  Sparkline
                 </div>
               </div>
 
               <div className="mt-4">
-                {sortedTimeline.length ? (
-                  <SparklineGlow data={sortedTimeline} height={130} />
-                ) : (
-                  <div className="text-sm text-white/60">No activity in this range.</div>
-                )}
+                {sortedTimeline.length ? <SparklineGlow data={sortedTimeline} height={130} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
               </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Insights (Beta)</h2>
+                <h2 className="font-semibold">Insights</h2>
                 {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
               </div>
 
               {!insights && !insightsLoading ? (
-                <div className="mt-3 text-sm text-white/60">
-                  Insights unavailable (non-blocking). Dashboard data is still valid.
-                </div>
+                <div className="mt-3 text-sm text-white/60">Insights unavailable (non-blocking). Dashboard data is still valid.</div>
               ) : null}
 
               {insights ? (
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="text-xs text-white/50">
-                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n=
-                    {fmtNum(insights.confidence.sampleSize)}
+                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n={fmtNum(insights.confidence.sampleSize)}
                   </div>
 
                   <div>
@@ -652,7 +608,6 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
             </div>
           </div>
 
-          {/* Links */}
           <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
@@ -687,22 +642,14 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <div className="font-semibold truncate">{l.name || l.label || "Untitled link"}</div>
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${badgeClass(
-                              l.isActive
-                            )}`}
-                          >
+                          <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${badgeClass(l.isActive)}`}>
                             {l.isActive === false ? "Inactive" : "Active"}
                           </span>
                         </div>
 
-                        {l.label && l.name ? (
-                          <div className="text-xs text-white/50 mt-1">Label: {l.label}</div>
-                        ) : (
-                          <div className="text-xs text-white/50 mt-1">
-                            Created {fmtDateTime(l.createdAt)} · Expires {fmtDateTime(l.expiresAt)}
-                          </div>
-                        )}
+                        <div className="text-xs text-white/50 mt-1">
+                          Created {fmtDateTime(l.createdAt)} · Expires {fmtDateTime(l.expiresAt)}
+                        </div>
                       </div>
 
                       <div className="text-right">
@@ -720,15 +667,10 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
                       ) : null}
 
                       {topP.map((p) => (
-                        <span
-                          key={p.code}
-                          className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs"
-                        >
+                        <span key={p.code} className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs">
                           {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
                         </span>
                       ))}
-
-                      {!topP.length && !topF ? <span className="text-white/50 text-sm">—</span> : null}
                     </div>
                   </button>
                 );
@@ -736,7 +678,6 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
             </div>
           </div>
 
-          {/* Drawer */}
           {drawerOpen && (
             <div className="fixed inset-0 z-50">
               <div
@@ -749,174 +690,101 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
               />
 
               <div className="absolute right-0 top-0 h-full w-full max-w-[600px] bg-[#050914] border-l border-white/10 p-5 overflow-y-auto">
-                {/* local background */}
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 opacity-25"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
-                    backgroundSize: "64px 64px",
-                    maskImage: "radial-gradient(circle at 30% 10%, black 0%, transparent 70%)",
-                  }}
-                />
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute -top-40 left-1/2 h-[80vh] w-[120vw] -translate-x-1/2 blur-3xl opacity-30"
-                  style={{
-                    background:
-                      "radial-gradient(60% 40% at 50% 0%, rgba(100,186,226,.35), transparent 60%), radial-gradient(45% 35% at 20% 10%, rgba(139,108,255,.25), transparent 55%)",
-                  }}
-                />
-
-                <div className="relative">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-xs text-white/50">Link deep dive</div>
-                      <div className="text-lg font-semibold truncate">
-                        {drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}
-                      </div>
-                      {/* token intentionally hidden */}
-                    </div>
-
-                    <div className="flex gap-2">
-                      {fullAnalyticsHref ? (
-                        <Link
-                          href={fullAnalyticsHref}
-                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                          title="Open full analytics page"
-                        >
-                          Open full analytics
-                        </Link>
-                      ) : null}
-
-                      <button
-                        onClick={() => {
-                          setDrawerOpen(false);
-                          setSelectedToken(null);
-                          setDrawerData(null);
-                        }}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-                      >
-                        Close
-                      </button>
-                    </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs text-white/50">Link deep dive</div>
+                    <div className="text-lg font-semibold truncate">{drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}</div>
                   </div>
 
-                  {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
-                  {drawerErr && <div className="mt-4 text-red-300">Error: {drawerErr}</div>}
+                  <div className="flex gap-2">
+                    {fullAnalyticsHref ? (
+                      <Link href={fullAnalyticsHref} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
+                        Open analytics
+                      </Link>
+                    ) : null}
 
-                  {!drawerLoading && !drawerErr && drawerData?.ok && (
-                    <div className="mt-5 space-y-4">
-                      {/* KPIs */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                          <div className="text-xs text-white/60">Tests taken</div>
-                          <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                          <div className="text-xs text-white/60">Unique takers</div>
-                          <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
-                          <div className="text-xs text-white/60">Last used</div>
-                          <div className="text-xs text-white/80 mt-2">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
-                        </div>
+                    <button
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        setSelectedToken(null);
+                        setDrawerData(null);
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
+                {drawerErr && <div className="mt-4 text-red-300">Error: {drawerErr}</div>}
+
+                {!drawerLoading && !drawerErr && drawerData?.ok && (
+                  <div className="mt-5 space-y-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                        <div className="text-xs text-white/60">Tests taken</div>
+                        <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
                       </div>
-
-                      {/* Insights */}
-                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold">Insights (Beta)</h3>
-                          {drawerData?._insights?.confidence ? (
-                            <div className="text-xs text-white/50">
-                              {drawerData._insights.confidence.level} · n=
-                              {fmtNum(drawerData._insights.confidence.sampleSize)}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        {drawerData?._insights ? (
-                          <div className="mt-3 text-sm">
-                            {/* ✅ FIX: wrap map in braces */}
-                            <ul className="list-disc pl-5 space-y-1 text-white/85">
-                              {(drawerData._insights.whatYoureSeeing || [])
-                                .slice(0, 4)
-                                .map((s: string, i: number) => (
-                                  <li key={i}>{s}</li>
-                                ))}
-                            </ul>
-                          </div>
-                        ) : (
-                          <div className="mt-3 text-sm text-white/60">Generating link insights…</div>
-                        )}
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                        <div className="text-xs text-white/60">Unique takers</div>
+                        <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
                       </div>
-
-                      {/* ✅ Top Profiles (restored) */}
-                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-                        <h3 className="font-semibold">Top profiles</h3>
-                        <div className="mt-3 space-y-2">
-                          {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
-                            <div key={p.code} className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{p.name}</div>
-                                <div className="text-xs text-white/50">
-                                  {fmtNum(p.count)} · {fmtPct(p.pct)}
-                                </div>
-                              </div>
-                              <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
-                            </div>
-                          ))}
-                          {!((drawerData?.distributions?.profiles || []).length) ? (
-                            <div className="text-sm text-white/60">No profile data.</div>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* ✅ Top Frequencies (restored) */}
-                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-                        <h3 className="font-semibold">Top frequencies</h3>
-                        <div className="mt-3 space-y-2">
-                          {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
-                            <div key={f.code} className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="font-medium truncate">{f.name}</div>
-                                <div className="text-xs text-white/50">
-                                  {fmtNum(f.count)} · {fmtPct(f.pct)}
-                                </div>
-                              </div>
-                              <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
-                            </div>
-                          ))}
-                          {!((drawerData?.distributions?.frequencies || []).length) ? (
-                            <div className="text-sm text-white/60">No frequency data.</div>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* ✅ Companies (restored) */}
-                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-                        <h3 className="font-semibold">Top companies</h3>
-                        <div className="mt-3 space-y-2">
-                          {(drawerData?.segments?.companies || []).length ? (
-                            (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
-                              <div key={c.company} className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="font-medium truncate">{c.company}</div>
-                                  <div className="text-xs text-white/50">
-                                    {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-sm text-white/60">No company data captured for this link.</div>
-                          )}
-                        </div>
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                        <div className="text-xs text-white/60">Last used</div>
+                        <div className="text-xs text-white/80 mt-2">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
                       </div>
                     </div>
-                  )}
-                </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                      <h3 className="font-semibold">Top profiles</h3>
+                      <div className="mt-3 space-y-2">
+                        {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
+                          <div key={p.code} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{p.name}</div>
+                              <div className="text-xs text-white/50">{fmtNum(p.count)} · {fmtPct(p.pct)}</div>
+                            </div>
+                            <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                      <h3 className="font-semibold">Top frequencies</h3>
+                      <div className="mt-3 space-y-2">
+                        {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
+                          <div key={f.code} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{f.name}</div>
+                              <div className="text-xs text-white/50">{fmtNum(f.count)} · {fmtPct(f.pct)}</div>
+                            </div>
+                            <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                      <h3 className="font-semibold">Top companies</h3>
+                      <div className="mt-3 space-y-2">
+                        {(drawerData?.segments?.companies || []).length ? (
+                          (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
+                            <div key={c.company} className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{c.company}</div>
+                                <div className="text-xs text-white/50">{fmtNum(c.testsTaken)} · {fmtPct(c.pct)}</div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-white/60">No company data captured for this link.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -925,3 +793,4 @@ export default function DashboardV2Client({ orgSlug, embedded = false }: { orgSl
     </div>
   );
 }
+

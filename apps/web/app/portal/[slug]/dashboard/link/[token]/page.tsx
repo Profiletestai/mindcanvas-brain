@@ -1,4 +1,4 @@
-// apps/web/app/portal/[slug]/dashboard/beta/link/[token]/page.tsx
+// apps/web/app/portal/[slug]/dashboard/link/[token]/page.tsx
 import "server-only";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,11 @@ export default async function Page({
         db: { schema: "portal" },
       });
 
-      const { data } = await sb.from("orgs").select("name").eq("slug", orgSlug).maybeSingle();
+      const { data } = await sb
+        .from("orgs")
+        .select("name")
+        .eq("slug", orgSlug)
+        .maybeSingle();
 
       orgName = data?.name ?? null;
     }
@@ -50,4 +54,5 @@ export default async function Page({
     </PortalChrome>
   );
 }
+
 
