@@ -99,9 +99,7 @@ export default function AdminOrgRankingsClient() {
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold">Organisation Performance</h1>
-          <p className="text-sm opacity-70">
-            Highest performing organisations across the selected date range.
-          </p>
+          <p className="text-sm opacity-70">Highest performing organisations across the selected date range.</p>
         </div>
 
         <div className="flex gap-2 items-end flex-wrap">
@@ -160,12 +158,8 @@ export default function AdminOrgRankingsClient() {
                   <td className="py-3 px-3 text-right">{r.activeLinks}</td>
                   <td className="py-3 px-3 text-right">{fmtPct(r.growth)}</td>
                   <td className="py-3 px-3">
-                    <Link
-                      className="underline"
-                      href={`/portal/${r.slug}/dashboard/beta`}
-                      title="Open beta dashboard for this org"
-                    >
-                      Open beta dashboard
+                    <Link className="underline" href={`/portal/${r.slug}/dashboard`} title="Open dashboard for this org">
+                      Open dashboard
                     </Link>
                   </td>
                 </tr>
@@ -184,3 +178,4 @@ export default function AdminOrgRankingsClient() {
     </div>
   );
 }
+

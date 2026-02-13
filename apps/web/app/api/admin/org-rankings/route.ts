@@ -1,14 +1,20 @@
 // apps/web/app/api/admin/org-rankings/route.ts
 import "server-only";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+
+// Must match portal.orgs.slug exactly
+const PROFILETEST_ORG_SLUG = "profiletest-ai";
 
 function defaultRange() {
   const to = new Date();
@@ -22,8 +28,72 @@ function parseISO(s: string | null) {
   return Number.isFinite(d.getTime()) ? d.toISOString() : null;
 }
 
+async function assertProfiletestAdmin() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return { ok: false as const, status: 500, error: "Supabase env not configured" };
+  }
+
+  // ✅ Next typings: cookies() can be async
+  const cookieStore = await cookies();
+
+  // RLS-safe auth client (reads the logged-in user from cookies)
+  const authClient = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
+      },
+    },
+  });
+
+  // 1) Who is logged in?
+  const { data: auth, error: authErr } = await authClient.auth.getUser();
+  const user = auth?.user ?? null;
+  if (authErr || !user) {
+    return { ok: false as const, status: 401, error: "Unauthorised" };
+  }
+
+  // 2) Find profiletest org id
+  const { data: orgRow, error: orgErr } = await authClient
+    .schema("portal")
+    .from("orgs")
+    .select("id, slug")
+    .eq("slug", PROFILETEST_ORG_SLUG)
+    .maybeSingle();
+
+  if (orgErr || !orgRow?.id) {
+    return { ok: false as const, status: 403, error: "Forbidden" };
+  }
+
+  // 3) Must be a member of profiletest org
+  const { data: membership, error: memErr } = await authClient
+    .schema("portal")
+    .from("user_orgs")
+    .select("org_id, role")
+    .eq("org_id", orgRow.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (memErr || !membership) {
+    return { ok: false as const, status: 403, error: "Forbidden" };
+  }
+
+  // Optional: enforce role
+  // const allowed = ["owner", "admin", "super_admin"];
+  // if (!allowed.includes(String(membership.role || ""))) {
+  //   return { ok: false as const, status: 403, error: "Forbidden" };
+  // }
+
+  return { ok: true as const };
+}
+
 export async function GET(req: Request) {
   try {
+    // ✅ Guard this admin endpoint
+    const guard = await assertProfiletestAdmin();
+    if (!guard.ok) {
+      return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+    }
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json({ ok: false, error: "Supabase env not configured" }, { status: 500 });
     }
@@ -63,21 +133,17 @@ export async function GET(req: Request) {
 
     if (takerErr) return NextResponse.json({ ok: false, error: takerErr.message }, { status: 500 });
 
-    // 4) Active links (current state, not date-range usage)
+    // 4) Active links (current state)
     const nowIso = new Date().toISOString();
-    const { data: links, error: linksErr } = await portal
-      .from("test_links")
-      .select("org_id, is_active, expires_at");
+    const { data: links, error: linksErr } = await portal.from("test_links").select("org_id, is_active, expires_at");
 
     if (linksErr) return NextResponse.json({ ok: false, error: linksErr.message }, { status: 500 });
 
-    // 5) Growth: last 7 vs previous 7 within range window
-    // We’ll compute based on submission created_at.
+    // 5) Growth: last 7 vs previous 7 within range window (based on submissions)
     const end = new Date(to);
     const last7Start = new Date(end.getTime() - 7 * 24 * 3600 * 1000);
     const prev7Start = new Date(end.getTime() - 14 * 24 * 3600 * 1000);
 
-    // Aggregate
     const agg = new Map<
       string,
       { submissions: number; uniqueTakers: Set<string>; activeLinks: number; last7: number; prev7: number }
@@ -127,16 +193,16 @@ export async function GET(req: Request) {
       const growth = prev === 0 ? (last > 0 ? 1 : 0) : (last - prev) / prev;
 
       return {
-       orgId: o.id,
-       slug: o.slug,
-       name: o.name,
-       submissions: a.submissions,
-       uniqueTakers: a.uniqueTakers.size,
-       activeLinks: a.activeLinks,
-       last7: last,
-       prev7: prev,
-       growth,
-     };
+        orgId: o.id,
+        slug: o.slug,
+        name: o.name,
+        submissions: a.submissions,
+        uniqueTakers: a.uniqueTakers.size,
+        activeLinks: a.activeLinks,
+        last7: last,
+        prev7: prev,
+        growth,
+      };
     });
 
     rows.sort((a, b) => b.submissions - a.submissions);
@@ -146,3 +212,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Server error" }, { status: 500 });
   }
 }
+
