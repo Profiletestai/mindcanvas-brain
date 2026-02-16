@@ -1,8 +1,12 @@
+// apps/web/app/qsc/[token]/extended/page.tsx
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import AppBackground from "@/components/ui/AppBackground";
 
 type PersonalityKey = "FIRE" | "FLOW" | "FORM" | "FIELD";
 type MindsetKey = "ORIGIN" | "MOMENTUM" | "VECTOR" | "ORBIT" | "QUANTUM";
@@ -11,16 +15,12 @@ type QscResultsRow = {
   id: string;
   test_id: string;
   token: string;
-  personality_totals: Record<string, number> | null;
-  personality_percentages: Partial<Record<PersonalityKey, number>> | null;
-  mindset_totals: Record<string, number> | null;
-  mindset_percentages: Partial<Record<MindsetKey, number>> | null;
   primary_personality: PersonalityKey | null;
   secondary_personality: PersonalityKey | null;
   primary_mindset: MindsetKey | null;
   secondary_mindset: MindsetKey | null;
   combined_profile_code: string | null;
-  qsc_profile_id: string | null;
+  audience: "entrepreneur" | "leader" | null;
   created_at: string;
 };
 
@@ -30,116 +30,179 @@ type QscProfileRow = {
   mindset_level: number | null;
   profile_code: string | null;
   profile_label: string | null;
-  how_to_communicate: string | null;
-  decision_style: string | null;
-  business_challenges: string | null;
-  trust_signals: string | null;
-  offer_fit: string | null;
-  sale_blockers: string | null;
-  // 🆕 new column you’ve populated
-  full_internal_insights: string | null;
 };
 
-type QscPayload = {
+type QscExtendedRow = {
+  persona_label: string | null;
+  personality_label: string | null;
+  mindset_label: string | null;
+  profile_code: string | null;
+
+  personality_layer: string | null;
+  mindset_layer: string | null;
+  combined_quantum_pattern: string | null;
+
+  how_to_communicate: string | null;
+  how_they_make_decisions: string | null;
+  core_business_problems: string | null;
+  what_builds_trust: string | null;
+  what_offer_ready_for: string | null;
+  what_blocks_sale: string | null;
+
+  pre_call_questions: string | null;
+  micro_scripts: string | null;
+  green_red_flags: string | null;
+  real_life_example: string | null;
+  final_summary: string | null;
+};
+
+type QscTakerRow = {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+};
+
+type QscExtendedPayload = {
   results: QscResultsRow;
   profile: QscProfileRow | null;
+  extended: QscExtendedRow | null;
+  taker: QscTakerRow | null;
 };
 
-const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
-  FIRE: "Fire",
-  FLOW: "Flow",
-  FORM: "Form",
-  FIELD: "Field",
+type SectionMeta = {
+  id: string;
+  number: number;
+  title: string;
 };
 
-const MINDSET_LABELS: Record<MindsetKey, string> = {
-  ORIGIN: "Origin",
-  MOMENTUM: "Momentum",
-  VECTOR: "Vector",
-  ORBIT: "Orbit",
-  QUANTUM: "Quantum",
-};
+const SECTIONS: SectionMeta[] = [
+  { id: "sec-1-personality", number: 1, title: "Personality Layer" },
+  { id: "sec-2-mindset", number: 2, title: "Mindset Layer" },
+  { id: "sec-3-quantum", number: 3, title: "Combined Quantum Pattern" },
+  { id: "sec-4-communicate", number: 4, title: "How to Communicate" },
+  { id: "sec-5-decisions", number: 5, title: "How They Make Decisions" },
+  { id: "sec-6-problems", number: 6, title: "Core Business Problems" },
+  { id: "sec-7-trust", number: 7, title: "What Builds Trust" },
+  { id: "sec-8-offer", number: 8, title: "What Offer They Are Ready For" },
+  { id: "sec-9-blockers", number: 9, title: "What Blocks the Sale Completely" },
+  { id: "sec-10-precall", number: 10, title: "Pre-Call Questions" },
+  { id: "sec-11-microscripts", number: 11, title: "Micro Scripts" },
+  { id: "sec-12-flags", number: 12, title: "Green & Red Flags" },
+  { id: "sec-13-example", number: 13, title: "Real-Life Example" },
+  { id: "sec-14-summary", number: 14, title: "Final Summary" },
+];
 
-// ---------------------------------------------------------------------------
-// Helper to parse full_internal_insights into sections
-// ---------------------------------------------------------------------------
-
-type ParsedInsights = {
-  howToCommunicate?: string;
-  decisionStyle?: string;
-  businessChallenges?: string;
-  trustSignals?: string;
-  offerFit?: string;
-  saleBlockers?: string;
-};
-
-function parseFullInternalInsights(
-  text: string | null | undefined
-): ParsedInsights {
-  if (!text) return {};
-
-  const lower = text.toLowerCase();
-
-  const headings: { label: string; key: keyof ParsedInsights }[] = [
-    { label: "How to Communicate", key: "howToCommunicate" },
-    { label: "How They Decide", key: "decisionStyle" },
-    { label: "Core Business Challenges", key: "businessChallenges" },
-    { label: "Trust Signals", key: "trustSignals" },
-    { label: "What They Need to Feel Safe Buying", key: "offerFit" },
-    { label: "Best Offer Fit", key: "offerFit" },
-    { label: "Biggest Sale Blockers", key: "saleBlockers" },
-  ];
-
-  const result: ParsedInsights = {};
-
-  for (let i = 0; i < headings.length; i++) {
-    const { label, key } = headings[i];
-    const startIdxLower = lower.indexOf(label.toLowerCase());
-    if (startIdxLower === -1) continue;
-
-    const contentStart = startIdxLower + label.length;
-
-    // find the next heading (if any) to know where to stop
-    let endIndex = text.length;
-    for (let j = i + 1; j < headings.length; j++) {
-      const nextLabel = headings[j].label;
-      const nextIdxLower = lower.indexOf(nextLabel.toLowerCase());
-      if (nextIdxLower !== -1 && nextIdxLower > startIdxLower) {
-        endIndex = nextIdxLower;
-        break;
-      }
-    }
-
-    const raw = text.slice(contentStart, endIndex).trim();
-    if (raw) {
-      // If multiple headings map to same key (offerFit), append with spacing
-      if (result[key]) {
-        result[key] = (result[key] as string) + "\n\n" + raw;
-      } else {
-        result[key] = raw;
-      }
-    }
-  }
-
-  return result;
+function fallbackCopy(value: string | null | undefined, fallback: string) {
+  const trimmed = (value || "").trim();
+  return trimmed.length > 0 ? trimmed : fallback;
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+function getFullName(taker: QscTakerRow | null | undefined): string | null {
+  if (!taker) return null;
 
-export default function QscExtendedSourceCodePage({
-  params,
-}: {
-  params: { token: string };
-}) {
+  const rawFirst =
+    (typeof taker.first_name === "string" && taker.first_name) ||
+    (typeof taker.firstName === "string" && taker.firstName) ||
+    "";
+  const rawLast =
+    (typeof taker.last_name === "string" && taker.last_name) ||
+    (typeof taker.lastName === "string" && taker.lastName) ||
+    "";
+
+  const first = rawFirst.trim();
+  const last = rawLast.trim();
+  const full = `${first} ${last}`.trim();
+  if (full) return full;
+
+  const email = (taker.email || "").trim();
+  return email || null;
+}
+
+type InsightSectionProps = {
+  id: string;
+  number: number;
+  title: string;
+  kicker?: string;
+  children: string;
+  variant?: "default" | "danger";
+};
+
+function InsightSection({
+  id,
+  number,
+  title,
+  kicker,
+  children,
+  variant = "default",
+}: InsightSectionProps) {
+  const danger = variant === "danger";
+
+  return (
+    <section
+      id={id}
+      className={[
+        "scroll-mt-28 rounded-3xl border p-6 md:p-8 space-y-3 shadow-sm",
+        danger ? "border-rose-200 bg-white" : "border-slate-200 bg-white",
+      ].join(" ")}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={[
+            "mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold border",
+            danger
+              ? "bg-rose-50 text-rose-700 border-rose-200"
+              : "bg-sky-50 text-sky-700 border-sky-200",
+          ].join(" ")}
+        >
+          {number}
+        </div>
+        <div className="space-y-1.5">
+          <h2
+            className={[
+              "text-lg md:text-xl font-semibold",
+              danger ? "text-rose-900" : "text-slate-900",
+            ].join(" ")}
+          >
+            {title}
+          </h2>
+          {kicker && (
+            <p
+              className={[
+                "text-[15px] leading-relaxed",
+                danger ? "text-rose-800/80" : "text-slate-600",
+              ].join(" ")}
+            >
+              {kicker}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div
+        className={[
+          "pt-3 text-[15px] leading-relaxed whitespace-pre-line",
+          danger ? "text-rose-900" : "text-slate-700",
+        ].join(" ")}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export default function QscExtendedPage({ params }: { params: { token: string } }) {
   const token = params.token;
   const searchParams = useSearchParams();
   const tid = searchParams?.get("tid") ?? "";
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [payload, setPayload] = useState<QscPayload | null>(null);
+  const [payload, setPayload] = useState<QscExtendedPayload | null>(null);
+
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -149,34 +212,36 @@ export default function QscExtendedSourceCodePage({
         setLoading(true);
         setErr(null);
 
-        const res = await fetch(
-          `/api/public/qsc/${encodeURIComponent(token)}/result`,
-          { cache: "no-store" }
-        );
+        const apiUrl = tid
+          ? `/api/public/qsc/${encodeURIComponent(token)}/extended?tid=${encodeURIComponent(tid)}`
+          : `/api/public/qsc/${encodeURIComponent(token)}/extended`;
+
+        const res = await fetch(apiUrl, { cache: "no-store" });
 
         const ct = res.headers.get("content-type") || "";
         if (!ct.includes("application/json")) {
           const text = await res.text();
-          throw new Error(
-            `Non-JSON response (${res.status}): ${text.slice(0, 200)}`
-          );
+          throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 200)}`);
         }
 
-        const j = (await res.json()) as {
-          ok?: boolean;
-          error?: string;
-          results?: QscResultsRow;
-          profile?: QscProfileRow | null;
-        };
+        const j = (await res.json()) as any;
 
-        if (!res.ok || j.ok === false) {
-          throw new Error(j.error || `HTTP ${res.status}`);
+        if (!res.ok || j?.ok === false) {
+          // Special handling: ambiguous token now returns 409
+          if (res.status === 409 && String(j?.error || "").includes("AMBIGUOUS_TOKEN_REQUIRES_TID")) {
+            throw new Error(
+              "This link has multiple results. Please open the Extended page from the Snapshot (or add ?tid=...) so we can load the correct report."
+            );
+          }
+          throw new Error(j?.error || `HTTP ${res.status}`);
         }
 
-        if (alive && j.results) {
+        if (alive && j?.results) {
           setPayload({
             results: j.results,
             profile: j.profile ?? null,
+            extended: j.extended ?? null,
+            taker: j.taker ?? null,
           });
         }
       } catch (e: any) {
@@ -189,38 +254,88 @@ export default function QscExtendedSourceCodePage({
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, tid]);
 
-  const result = payload?.results ?? null;
+  async function handleDownloadPdf() {
+    if (!reportRef.current) return;
+
+    const element = reportRef.current;
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#0b1220", // keeps the captured background consistent with dark theme
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    pdf.save(`qsc-extended-${token}.pdf`);
+  }
+
+  const results = payload?.results ?? null;
   const profile = payload?.profile ?? null;
+  const extended = payload?.extended ?? null;
+  const taker = payload?.taker ?? null;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50">
+        <AppBackground />
         <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
             Quantum Source Code
           </p>
-          <h1 className="mt-3 text-3xl font-bold">
-            Preparing Extended Source Code…
-          </h1>
+          <h1 className="mt-3 text-3xl font-bold">Preparing Extended Source Code…</h1>
         </main>
       </div>
     );
   }
 
-  if (err || !result) {
+  if (err || !results) {
+    const snapshotHref = tid
+      ? `/qsc/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
+      : `/qsc/${encodeURIComponent(token)}`;
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50">
+        <AppBackground />
         <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
             Quantum Source Code
           </p>
           <h1 className="text-3xl font-bold">Couldn&apos;t load insights</h1>
-          <p className="text-sm text-slate-300">
-            We weren&apos;t able to load the Extended Source Code internal
-            insights for this profile.
+          <p className="text-[15px] text-slate-300">
+            We weren&apos;t able to load the Extended Source Code internal insights for this profile.
           </p>
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Link
+              href={snapshotHref}
+              className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium hover:bg-slate-800"
+            >
+              ← Back to Snapshot
+            </Link>
+          </div>
+
           <pre className="mt-2 rounded-xl border border-slate-800 bg-slate-950/90 p-3 text-xs text-slate-100 whitespace-pre-wrap">
             {err || "No data"}
           </pre>
@@ -229,73 +344,47 @@ export default function QscExtendedSourceCodePage({
     );
   }
 
-  const createdAt = new Date(result.created_at);
-
+  const createdAt = new Date(results.created_at);
   const personaLabel =
-    profile?.profile_label || result.combined_profile_code || "Quantum profile";
+    extended?.persona_label ||
+    profile?.profile_label ||
+    results.combined_profile_code ||
+    "Quantum profile";
 
-  const backHref = tid
-    ? `/qsc/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
-    : `/qsc/${encodeURIComponent(token)}`;
-
-  // 🧠 NEW: parse the full_internal_insights text
-  const parsed = parseFullInternalInsights(profile?.full_internal_insights);
-
-  const howToCommunicate =
-    parsed.howToCommunicate ||
-    profile?.how_to_communicate ||
-    "No communication guidance is available yet.";
-
-  const decisionStyle =
-    parsed.decisionStyle ||
-    profile?.decision_style ||
-    "No decision style has been defined yet.";
-
-  const businessChallenges =
-    parsed.businessChallenges ||
-    profile?.business_challenges ||
-    "Core business challenges have not been defined yet.";
-
-  const trustSignals =
-    parsed.trustSignals ||
-    profile?.trust_signals ||
-    "Trust signals are not yet defined.";
-
-  const offerFit =
-    parsed.offerFit ||
-    profile?.offer_fit ||
-    "Offer fit guidance has not been defined yet.";
-
-  const saleBlockers =
-    parsed.saleBlockers ||
-    profile?.sale_blockers ||
-    "Sale blockers are not yet defined.";
+  const takerDisplayName = getFullName(taker);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
-      <main className="mx-auto max-w-5xl px-4 py-10 md:py-12 space-y-10">
-        {/* HEADER */}
-        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
+      <AppBackground />
+
+      <main ref={reportRef} className="mx-auto max-w-6xl px-4 py-10 md:py-12 space-y-10">
+        <header className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-3">
             <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
               Quantum Source Code
             </p>
-            <h1 className="mt-3 text-3xl md:text-4xl font-bold tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
               Extended Source Code — Internal Insights
             </h1>
-            <p className="mt-2 text-sm text-slate-300 max-w-2xl">
-              Deep sales and messaging insights for this Quantum buyer profile.
-              Use this as your reference when writing sales pages, email
-              sequences, and live launch scripts.
+            {takerDisplayName && (
+              <p className="text-[15px] text-slate-300">
+                For: <span className="font-semibold text-slate-50">{takerDisplayName}</span>
+              </p>
+            )}
+            <p className="text-[15px] leading-relaxed text-slate-300 max-w-2xl">
+              Deep sales and messaging insights for this Quantum buyer profile. Use this as your reference
+              when designing offers, sales pages, email sequences, and live launch scripts.
             </p>
           </div>
+
           <div className="flex flex-col items-end gap-2 text-xs text-slate-400">
-            <Link
-              href={backHref}
-              className="inline-flex items-center rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium hover:bg-slate-800"
+            <button
+              onClick={handleDownloadPdf}
+              className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-800"
             >
-              ← Back to Snapshot
-            </Link>
+              Download PDF
+            </button>
+
             <span>
               Snapshot created{" "}
               {createdAt.toLocaleString(undefined, {
@@ -306,123 +395,278 @@ export default function QscExtendedSourceCodePage({
                 minute: "2-digit",
               })}
             </span>
+
             <span className="text-[11px] text-slate-500">
-              Profile:{" "}
-              <span className="font-semibold text-slate-100">
-                {personaLabel}
-              </span>
+              Combined profile: <span className="font-semibold text-slate-100">{personaLabel}</span>
             </span>
+
+            {extended && (
+              <span className="text-[11px] text-slate-500">
+                Pattern:{" "}
+                <span className="font-semibold text-slate-100">
+                  {extended.personality_label} • {extended.mindset_label} ({extended.profile_code})
+                </span>
+              </span>
+            )}
           </div>
         </header>
 
-        {/* PROFILE SUMMARY */}
-        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 md:p-8 space-y-3">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/90">
-            Profile summary
-          </p>
-          <h2 className="text-xl font-semibold text-slate-50">
-            How to sell to this buyer
-          </h2>
-          <p className="text-sm text-slate-300 max-w-3xl">
-            This page is for you as the{" "}
-            <span className="font-semibold">test owner</span>. It gives you the
-            core sales, messaging and offer-fit insights you need to convert
-            this profile — without needing to read their entire Strategic Growth
-            Report.
-          </p>
-        </section>
+        <div className="grid gap-8 md:grid-cols-[260px,minmax(0,1fr)] items-start">
+          {/* Sidebar stays dark */}
+          <aside className="rounded-3xl border border-slate-800 bg-slate-950/90 p-5 md:p-6 md:sticky md:top-6 space-y-3">
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-400">
+                Quick index
+              </p>
+              <p className="text-[13px] md:text-[14px] leading-relaxed text-slate-300">
+                Jump straight to the section you need during calls, campaigns or copywriting.
+              </p>
+            </div>
+            <div className="mt-2 flex flex-col gap-2">
+              {SECTIONS.map((sec) => (
+                <a
+                  key={sec.id}
+                  href={`#${sec.id}`}
+                  className="group inline-flex items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-[14px] hover:border-sky-500/80 hover:bg-slate-900"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-[11px] font-semibold text-slate-100 group-hover:bg-sky-500 group-hover:text-slate-950">
+                      {sec.number}
+                    </span>
+                    <span className="font-medium text-slate-100 group-hover:text-sky-50">
+                      {sec.title}
+                    </span>
+                  </div>
+                  <span className="hidden text-[11px] text-slate-500 group-hover:text-sky-200 lg:inline">
+                    View
+                  </span>
+                </a>
+              ))}
+            </div>
+          </aside>
 
-        {/* 1. HOW TO COMMUNICATE */}
-        <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-8 space-y-3">
-          <h2 className="text-lg font-semibold text-slate-50">
-            1. How to communicate with this profile
-          </h2>
-          <p className="text-sm text-slate-300">
-            Tone, pace, level of detail and delivery format that helps this
-            buyer feel understood and safe.
-          </p>
-          <p className="mt-3 text-sm text-slate-100 whitespace-pre-line">
-            {howToCommunicate}
-          </p>
-        </section>
+          <div className="space-y-8">
+            {/* Profile summary now white */}
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 shadow-sm text-slate-800">
+              <div className="space-y-3">
+                <p className="text-[11px] font-semibold tracking-[0.22em] uppercase text-sky-700">
+                  Profile summary
+                </p>
+                <h2 className="text-lg md:text-xl font-semibold text-slate-900">
+                  How to sell to this buyer
+                </h2>
+                <p className="text-[15px] leading-relaxed text-slate-700 max-w-2xl">
+                  This page is for you as the <span className="font-semibold">test owner</span>. It gives
+                  you the core sales, messaging and offer-fit insights you need to convert this profile —
+                  without needing to read their entire Strategic Growth Report.
+                </p>
+              </div>
 
-        {/* 2. HOW THEY MAKE DECISIONS */}
-        <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-8 space-y-3">
-          <h2 className="text-lg font-semibold text-slate-50">
-            2. How they make decisions
-          </h2>
-          <p className="text-sm text-slate-300">
-            Whether they move fast or slow, lean emotional or logical, and
-            whether they tend to decide alone or in collaboration.
-          </p>
-          <p className="mt-3 text-sm text-slate-100 whitespace-pre-line">
-            {decisionStyle}
-          </p>
-        </section>
+              {extended && (
+                <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] text-slate-800 md:grid-cols-2">
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
+                      Personality layer
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-900">{extended.personality_label}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      How they naturally think, lead and relate.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
+                      Mindset layer
+                    </p>
+                    <p className="mt-1 font-semibold text-slate-900">{extended.mindset_label}</p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Where their business is right now and what it needs to grow sustainably.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
 
-        {/* 3. CORE BUSINESS CHALLENGES */}
-        <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-8 space-y-3">
-          <h2 className="text-lg font-semibold text-slate-50">
-            3. Their core business challenges
-          </h2>
-          <p className="text-sm text-slate-300">
-            The patterns and friction points that show up most often for this
-            buyer, based on their Personality and Mindset layers combined.
-          </p>
-          <p className="mt-3 text-sm text-slate-100 whitespace-pre-line">
-            {businessChallenges}
-          </p>
-        </section>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[11px] font-semibold tracking-[0.22em] uppercase text-slate-400">
+                  Diagnostic layers • Who they are &amp; where they are in business
+                </h2>
+                <div className="h-px flex-1 ml-4 bg-gradient-to-r from-slate-700/60 via-slate-800 to-transparent" />
+              </div>
 
-        {/* 4. WHAT THEY NEED TO FEEL SAFE BUYING */}
-        <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-8 space-y-3">
-          <h2 className="text-lg font-semibold text-slate-50">
-            4. What they need to feel safe buying
-          </h2>
-          <p className="text-sm text-slate-300">
-            Trust signals, proof, emotional safety and strategic reassurance
-            that reduces risk in their mind.
-          </p>
-          {/* You still have a separate Trust Signals section; we combine them here */}
-          <p className="mt-3 text-sm text-slate-100 whitespace-pre-line">
-            {trustSignals}
-          </p>
-          <p className="mt-3 text-sm text-slate-100 whitespace-pre-line">
-            {offerFit}
-          </p>
-        </section>
+              <InsightSection
+                id="sec-1-personality"
+                number={1}
+                title="Personality Layer"
+                kicker="How they think, behave and decide at this stage."
+                children={fallbackCopy(
+                  extended?.personality_layer,
+                  "Personality layer details have not been defined yet."
+                )}
+              />
 
-        {/* 5. BEST OFFER FIT */}
-        <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-8 space-y-3">
-          <h2 className="text-lg font-semibold text-slate-50">
-            5. What offer type fits them best
-          </h2>
-          <p className="text-sm text-slate-300">
-            The pricing, structure and level of support most likely to help them
-            say yes and get results.
-          </p>
-          <p className="mt-3 text-sm text-slate-100 whitespace-pre-line">
-            {offerFit}
-          </p>
-        </section>
+              <InsightSection
+                id="sec-2-mindset"
+                number={2}
+                title="Mindset Layer"
+                kicker="Where they are in their current business journey."
+                children={fallbackCopy(
+                  extended?.mindset_layer,
+                  "Mindset layer details have not been defined yet."
+                )}
+              />
 
-        {/* 6. WHAT WILL BLOCK THE SALE */}
-        <section className="rounded-3xl border border-rose-600/50 bg-gradient-to-br from-slate-950 via-slate-950 to-rose-950/40 p-6 md:p-8 space-y-3">
-          <h2 className="text-lg font-semibold text-rose-100">
-            6. What will block the sale
-          </h2>
-          <p className="text-sm text-rose-100/80">
-            The fear triggers, objections, misalignments and risk perceptions
-            that most often stop this buyer from moving ahead.
-          </p>
-          <p className="mt-3 text-sm text-rose-50 whitespace-pre-line">
-            {saleBlockers}
-          </p>
-        </section>
+              <InsightSection
+                id="sec-3-quantum"
+                number={3}
+                title="Combined Quantum Pattern"
+                kicker="How their behaviour and mindset interact to create specific patterns."
+                children={fallbackCopy(
+                  extended?.combined_quantum_pattern,
+                  "Combined Quantum pattern has not been defined yet."
+                )}
+              />
+            </div>
 
-        <footer className="pt-4 pb-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
-        </footer>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between pt-4">
+                <h2 className="text-[11px] font-semibold tracking-[0.22em] uppercase text-slate-400">
+                  Sales playbook • How to communicate, position &amp; sell
+                </h2>
+                <div className="h-px flex-1 ml-4 bg-gradient-to-r from-slate-700/60 via-slate-800 to-transparent" />
+              </div>
+
+              <InsightSection
+                id="sec-4-communicate"
+                number={4}
+                title="How to Communicate"
+                kicker="Tone, language and delivery style that makes this buyer feel understood and safe."
+                children={fallbackCopy(
+                  extended?.how_to_communicate,
+                  "No communication guidance is available yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-5-decisions"
+                number={5}
+                title="How They Make Decisions"
+                kicker="What helps them say yes, what makes them hesitate, and the decision filters they use."
+                children={fallbackCopy(
+                  extended?.how_they_make_decisions,
+                  "Decision style has not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-6-problems"
+                number={6}
+                title="Core Business Problems"
+                kicker="The recurring patterns and friction points that show up most often for this buyer."
+                children={fallbackCopy(
+                  extended?.core_business_problems,
+                  "Core business problems have not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-7-trust"
+                number={7}
+                title="What Builds Trust"
+                kicker="Signals, proof and experiences that help them feel safe moving forward with you."
+                children={fallbackCopy(
+                  extended?.what_builds_trust,
+                  "Trust-building patterns have not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-8-offer"
+                number={8}
+                title="What Offer They Are Ready For"
+                kicker="The pricing, structure and level of support most likely to help them say yes and get results."
+                children={fallbackCopy(
+                  extended?.what_offer_ready_for,
+                  "Offer readiness has not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-9-blockers"
+                number={9}
+                title="What Blocks the Sale Completely"
+                kicker="Fear triggers, misalignments and risk perceptions that stop them from moving ahead."
+                variant="danger"
+                children={fallbackCopy(
+                  extended?.what_blocks_sale,
+                  "Sale blockers have not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-10-precall"
+                number={10}
+                title="Pre-Call Questions"
+                kicker="Conversation starters that reveal both the emotional and structural gaps."
+                children={fallbackCopy(
+                  extended?.pre_call_questions,
+                  "Pre-call questions have not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-11-microscripts"
+                number={11}
+                title="Micro Scripts"
+                kicker="Short lines you can use in sales calls, emails and live launches."
+                children={fallbackCopy(
+                  extended?.micro_scripts,
+                  "Micro scripts have not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-12-flags"
+                number={12}
+                title="Green & Red Flags"
+                kicker="What tells you they are a strong fit — and what tells you to pause or reframe."
+                children={fallbackCopy(
+                  extended?.green_red_flags,
+                  "Green and red flags have not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-13-example"
+                number={13}
+                title="Real-Life Example"
+                kicker="A simple narrative you can keep in mind when speaking to this profile."
+                children={fallbackCopy(
+                  extended?.real_life_example,
+                  "Real-life example has not been defined yet."
+                )}
+              />
+
+              <InsightSection
+                id="sec-14-summary"
+                number={14}
+                title="Final Summary"
+                kicker="How to hold this profile in your mind when designing offers and communication."
+                children={fallbackCopy(
+                  extended?.final_summary,
+                  "Final summary has not been defined yet."
+                )}
+              />
+            </div>
+
+            <footer className="pt-2 pb-8 text-xs text-slate-500 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <span>© {new Date().getFullYear()} Powered by Profiletest.ai </span>
+              <span className="text-[11px] text-slate-500">
+                Internal use only — Extended Source Code for test owners.
+              </span>
+            </footer>
+          </div>
+        </div>
       </main>
     </div>
   );

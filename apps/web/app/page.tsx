@@ -3,6 +3,9 @@ import Link from "next/link";
 
 const P = { c1: "#64bae2", c2: "#2d8fc4", c3: "#015a8b" }; // your palette
 
+const CREATE_ACCOUNT_URL =
+  "https://profiletest.ai/order-qsc?utm_source=profiletest.app&utm_medium=organic&utm_campaign=none&utm_term=clicked_create_account";
+
 export default function Landing() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#050914] text-white">
@@ -91,7 +94,7 @@ export default function Landing() {
           {/* CTAs – only Create Account + Login */}
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/onboarding/create-account"
+              href={CREATE_ACCOUNT_URL}
               className="group inline-flex items-center justify-center rounded-2xl px-6 py-3 text-[15px] font-medium transition-transform hover:scale-[1.02] active:scale-100 shine"
               style={{
                 background: `linear-gradient(135deg, ${P.c1}, ${P.c2} 60%, ${P.c3})`,
@@ -112,11 +115,31 @@ export default function Landing() {
       </section>
 
       {/* --- FOOTER --- */}
-      <footer className="relative z-10 pb-10 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} MindCanvas. All rights reserved.
+      <footer className="relative z-10 pb-10 text-center text-xs text-slate-500 space-y-2">
+        <div>
+          © {new Date().getFullYear()} Powered by Profiletest.ai. All rights reserved.
+        </div>
+        <div className="space-x-3">
+          <a
+            href="https://profiletest.ai/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-slate-300"
+          >
+            Privacy Policy
+          </a>
+          <span>•</span>
+          <a
+            href="https://profiletest.ai/terms--conditions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-slate-300"
+          >
+            Terms &amp; Conditions
+          </a>
+        </div>
       </footer>
     </main>
   );
 }
-
 

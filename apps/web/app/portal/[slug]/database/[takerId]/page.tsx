@@ -6,7 +6,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
-import ResendReportButton from "./ResendReportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,14 +26,8 @@ function parseTotals(totals: Totals): any {
 }
 
 function asPercentMap(values: Record<string, number>): Record<string, number> {
-  const sum = Object.values(values).reduce(
-    (a, b) => a + (Number(b) || 0),
-    0
-  );
-  if (!sum)
-    return Object.fromEntries(
-      Object.keys(values).map((k) => [k, 0])
-    );
+  const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
+  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
   return Object.fromEntries(
     Object.entries(values).map(([k, v]) => [
       k,
@@ -44,19 +37,10 @@ function asPercentMap(values: Record<string, number>): Record<string, number> {
 }
 
 function asDecimalMap(values: Record<string, number>): Record<string, number> {
-  const sum = Object.values(values).reduce(
-    (a, b) => a + (Number(b) || 0),
-    0
-  );
-  if (!sum)
-    return Object.fromEntries(
-      Object.keys(values).map((k) => [k, 0])
-    );
+  const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
+  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
   return Object.fromEntries(
-    Object.entries(values).map(([k, v]) => [
-      k,
-      (Number(v) || 0) / sum,
-    ])
+    Object.entries(values).map(([k, v]) => [k, (Number(v) || 0) / sum])
   );
 }
 
@@ -95,12 +79,12 @@ function BarRow({
           style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
         />
       </div>
-      <div className="w-10 text-right text-sm tabular-nums">
-        {pct}%
-      </div>
+      <div className="w-10 text-right text-sm tabular-nums">{pct}%</div>
     </div>
   );
 }
+
+type QscAudience = "entrepreneur" | "leader";
 
 export default async function TakerDetail({
   params,
@@ -117,6 +101,7 @@ export default async function TakerDetail({
     .maybeSingle();
   if (!org) return notFound();
 
+  // NOTE: do not org-filter taker here; we validate access below (supports wrapper org setups)
   const { data: taker } = await sb
     .from("test_takers")
     .select(
@@ -124,7 +109,37 @@ export default async function TakerDetail({
     )
     .eq("id", takerId)
     .maybeSingle();
-  if (!taker || taker.org_id !== org.id) return notFound();
+
+  if (!taker) return notFound();
+
+  // ✅ Access check:
+  // 1) allow if taker belongs to this org
+  // 2) otherwise allow if taker has ANY submission for a test whose tests.org_id == this org
+  let allowed = taker.org_id === org.id;
+
+  if (!allowed) {
+    const { data: subs } = await sb
+      .from("test_submissions")
+      .select("test_id")
+      .eq("taker_id", taker.id)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    const testIds = Array.from(
+      new Set((subs || []).map((s: any) => s?.test_id).filter(Boolean))
+    ) as string[];
+
+    if (testIds.length) {
+      const { data: testsForSubs } = await sb
+        .from("tests")
+        .select("id, org_id")
+        .in("id", testIds);
+
+      allowed = (testsForSubs || []).some((t: any) => t?.org_id === org.id);
+    }
+  }
+
+  if (!allowed) return notFound();
 
   const { data: test } = await sb
     .from("tests")
@@ -235,10 +250,7 @@ export default async function TakerDetail({
     } else {
       // Assume these are profile scores keyed by profile name
       profileScores = Object.fromEntries(
-        Object.entries(totalsRaw).map(([k, v]) => [
-          String(k),
-          Number(v) || 0,
-        ])
+        Object.entries(totalsRaw).map(([k, v]) => [String(k), Number(v) || 0])
       );
 
       const p2f = Object.fromEntries(
@@ -259,9 +271,7 @@ export default async function TakerDetail({
   // --- Percentages for display (0–100) ------------------------------------
   const freqPct = asPercentMap(frequencyScores);
   const profilePct = asPercentMap(profileScores);
-  const topProfile = sortDesc(profileScores)[0] as
-    | [string, number]
-    | undefined;
+  const topProfile = sortDesc(profileScores)[0] as [string, number] | undefined;
 
   // --- Decimals for coach summary (0–1) -----------------------------------
   const freqDec = asDecimalMap(frequencyScores);
@@ -273,31 +283,21 @@ export default async function TakerDetail({
   }));
 
   const topFreqEntry = sortDesc(freqDec)[0];
-  const topFreqCode = (topFreqEntry
-    ? topFreqEntry[0].toUpperCase()
-    : "A") as "A" | "B" | "C" | "D";
+  const topFreqCode = (topFreqEntry ? topFreqEntry[0].toUpperCase() : "A") as
+    | "A"
+    | "B"
+    | "C"
+    | "D";
 
   const sortedProfileDec = sortDesc(profileDec);
   const primaryDec = sortedProfileDec[0]
-    ? {
-        code: "",
-        name: sortedProfileDec[0][0],
-        pct: sortedProfileDec[0][1],
-      }
+    ? { code: "", name: sortedProfileDec[0][0], pct: sortedProfileDec[0][1] }
     : undefined;
   const secondaryDec = sortedProfileDec[1]
-    ? {
-        code: "",
-        name: sortedProfileDec[1][0],
-        pct: sortedProfileDec[1][1],
-      }
+    ? { code: "", name: sortedProfileDec[1][0], pct: sortedProfileDec[1][1] }
     : undefined;
   const tertiaryDec = sortedProfileDec[2]
-    ? {
-        code: "",
-        name: sortedProfileDec[2][0],
-        pct: sortedProfileDec[2][1],
-      }
+    ? { code: "", name: sortedProfileDec[2][0], pct: sortedProfileDec[2][1] }
     : undefined;
 
   const hasScores =
@@ -320,10 +320,7 @@ export default async function TakerDetail({
           topCode: topFreqCode,
         },
         profiles: {
-          labels: profiles.map((p) => ({
-            code: p.code || "",
-            name: p.name,
-          })),
+          labels: profiles.map((p) => ({ code: p.code || "", name: p.name })),
           percentages: profileDec,
           primary: primaryDec,
           secondary: secondaryDec,
@@ -333,8 +330,7 @@ export default async function TakerDetail({
     : "";
 
   const fullName =
-    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() ||
-    "—";
+    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
 
   // Build top 3 profiles for cards (using percentage profile mix)
   const sortedProfilePct = sortDesc(profilePct);
@@ -346,40 +342,62 @@ export default async function TakerDetail({
 
   const labels = ["Primary profile", "Secondary", "Tertiary"];
 
-  // --- QSC URLs (Snapshot + Extended + Strategic Growth Report) -----------
+  // --- QSC URLs (Portal-only Snapshot + Portal-only Extended + Public Strategic) ---
   const isQsc =
     test?.slug === "qsc-core" ||
+    test?.slug === "qsc-leaders" ||
     (typeof meta?.frameworkType === "string" &&
       meta.frameworkType.toLowerCase() === "qsc");
 
   let qscSnapshotUrl: string | null = null;
   let qscExtendedUrl: string | null = null;
-  let qscEntrepreneurUrl: string | null = null;
+  let qscStrategicUrl: string | null = null;
+
+  // Determine QSC audience server-side so we build correct URLs (leader vs entrepreneur)
+  let qscAudience: QscAudience | null = null;
 
   if (isQsc && taker.link_token) {
+    const { data: qscRow } = await sb
+      .from("qsc_results")
+      .select("audience, created_at")
+      .eq("token", taker.link_token)
+      .eq("taker_id", taker.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const aud = (qscRow?.audience as QscAudience | null) ?? null;
+
+    if (aud === "leader" || aud === "entrepreneur") {
+      qscAudience = aud;
+    } else if (test?.slug === "qsc-leaders") {
+      qscAudience = "leader";
+    } else {
+      qscAudience = "entrepreneur";
+    }
+
     const base = `/qsc/${encodeURIComponent(taker.link_token)}`;
     const query = `?tid=${encodeURIComponent(taker.id)}`;
 
-    // 1) Buyer Persona Snapshot
     qscSnapshotUrl = `${base}${query}`;
 
-    // 2) Extended Source Code Snapshot (existing Extended Source Code page)
-    qscExtendedUrl = `${base}/extended${query}`;
+    const extendedPath = qscAudience === "leader" ? "/extended-leader" : "/extended";
+    qscExtendedUrl = `${base}${extendedPath}${query}`;
 
-    // 3) QSC Entrepreneur — Strategic Growth Report (to be implemented)
-    qscEntrepreneurUrl = `${base}/entrepreneur${query}`;
+    const strategicPath = qscAudience === "leader" ? "/leader" : "/entrepreneur";
+    qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
-  // --- Main report URL (what the test taker saw) --------------------------
+  // --- Main report URL (what "Open test-taker report" should open) ----------
   let reportUrl: string | null = null;
 
-  if (taker.link_token) {
-    // Always send them to the report page with the taker id as ?tid=
+  if (isQsc) {
+    reportUrl = qscStrategicUrl;
+  } else if (taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
-    )}/report?tid=${encodeURIComponent(taker.id)}`;
+    )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
   } else if (taker.last_result_url) {
-    // Fallback: if for some reason we don't have a token, at least use the stored URL
     reportUrl = String(taker.last_result_url);
   }
 
@@ -452,51 +470,53 @@ export default async function TakerDetail({
                 <Link
                   href={reportUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
                 >
                   Open test-taker report
                 </Link>
               )}
             </div>
-            <ResendReportButton
-              takerId={taker.id}
-              canSend={!!taker.email && !!taker.link_token}
-            />
           </div>
         </div>
 
-        {isQsc &&
-          (qscSnapshotUrl || qscExtendedUrl || qscEntrepreneurUrl) && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              {qscSnapshotUrl && (
-                <Link
-                  href={qscSnapshotUrl}
-                  className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
-                >
-                  Buyer Persona Snapshot
-                </Link>
-              )}
+        {/* ✅ QSC buttons now open in a new tab */}
+        {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {qscSnapshotUrl && (
+              <Link
+                href={qscSnapshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+              >
+                Buyer Persona Snapshot
+              </Link>
+            )}
 
-              {qscExtendedUrl && (
-                <Link
-                  href={qscExtendedUrl}
-                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
-                >
-                  Extended Source Code Snapshot
-                </Link>
-              )}
+            {qscExtendedUrl && (
+              <Link
+                href={qscExtendedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
+              >
+                Extended Source Code Snapshot
+              </Link>
+            )}
 
-              {qscEntrepreneurUrl && (
-                <Link
-                  href={qscEntrepreneurUrl}
-                  className="rounded-md border border-amber-600 bg-amber-500 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-400"
-                >
-                  QSC Entrepreneur — Strategic Growth Report
-                </Link>
-              )}
-            </div>
-          )}
+            {qscStrategicUrl && (
+              <Link
+                href={qscStrategicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-amber-600 bg-amber-500 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-400"
+              >
+                QSC — Strategic Growth Report
+              </Link>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2 pt-4">
           <h3 className="font-medium">Frequency mix</h3>
@@ -572,7 +592,7 @@ export default async function TakerDetail({
             <div className="space-y-2 text-sm leading-relaxed text-gray-700">
               {coachSummary
                 .split(/\n{2,}/)
-                .map((p, idx) => p.trim())
+                .map((p) => p.trim())
                 .filter(Boolean)
                 .map((p, idx) => (
                   <p key={idx}>{p}</p>
@@ -584,4 +604,3 @@ export default async function TakerDetail({
     </div>
   );
 }
-

@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { QscMatrix } from "../../QscMatrix";
+import AppBackground from "@/components/ui/AppBackground";
 
 type PersonalityKey = "FIRE" | "FLOW" | "FORM" | "FIELD";
 type MindsetKey = "ORIGIN" | "MOMENTUM" | "VECTOR" | "ORBIT" | "QUANTUM";
@@ -25,6 +28,7 @@ type QscResultsRow = {
   secondary_mindset: MindsetKey | null;
   combined_profile_code: string | null;
   qsc_profile_id: string | null;
+  audience: "entrepreneur" | "leader" | null;
   created_at: string;
 };
 
@@ -59,14 +63,18 @@ type QscPersonaRow = {
 
   one_page_strengths: string | null;
   one_page_risks: string | null;
+
   combined_strengths: string | null;
   combined_risks: string | null;
   combined_big_lever: string | null;
+
   emotional_stabilises: string | null;
   emotional_destabilises: string | null;
   emotional_patterns_to_watch: string | null;
+
   decision_style_long: string | null;
   support_yourself: string | null;
+
   strategic_priority_1: string | null;
   strategic_priority_2: string | null;
   strategic_priority_3: string | null;
@@ -103,17 +111,13 @@ const MINDSET_LABELS: Record<MindsetKey, string> = {
   QUANTUM: "Quantum",
 };
 
-// --- Helpers ---------------------------------------------------------------
+// ------------------------------------------------------
+// Helpers
+// ------------------------------------------------------
 
 function normalisePercent(raw: number | undefined | null): number {
   if (raw == null || !Number.isFinite(raw)) return 0;
-
-  // If it looks like a 0–1 fraction, convert to 0–100.
-  if (raw > 0 && raw <= 1.5) {
-    return Math.min(100, Math.max(0, raw * 100));
-  }
-
-  // Otherwise assume it's already 0–100 and clamp to [0, 100].
+  if (raw > 0 && raw <= 1.5) return Math.min(100, Math.max(0, raw * 100));
   return Math.min(100, Math.max(0, raw));
 }
 
@@ -124,10 +128,10 @@ type FrequencyDonutDatum = {
 };
 
 const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
-  FIRE: "#f97316", // orange
-  FLOW: "#0ea5e9", // sky
-  FORM: "#22c55e", // green
-  FIELD: "#a855f7", // purple
+  FIRE: "#f97316",
+  FLOW: "#0ea5e9",
+  FORM: "#22c55e",
+  FIELD: "#a855f7",
 };
 
 function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
@@ -147,7 +151,6 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
       className="h-40 w-40 md:h-48 md:w-48"
       aria-hidden="true"
     >
-      {/* Background ring */}
       <circle
         cx={center}
         cy={center}
@@ -179,7 +182,6 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         );
       })}
 
-      {/* Inner circle */}
       <circle cx={center} cy={center} r={radius - strokeWidth} fill="#020617" />
 
       <text
@@ -188,10 +190,6 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         textAnchor="middle"
         className="text-[9px] md:text-[10px]"
         fill="#e5e7eb"
-        style={{
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        }}
       >
         BUYER
       </text>
@@ -201,10 +199,6 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         textAnchor="middle"
         className="text-[9px] md:text-[10px]"
         fill="#e5e7eb"
-        style={{
-          fontFamily:
-            "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-        }}
       >
         FREQUENCY
       </text>
@@ -212,7 +206,6 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
   );
 }
 
-// derive primary + secondary from percentages, instead of trusting DB fields
 function derivePrimarySecondary<K extends string>(
   perc: Partial<Record<K, number>>,
   keys: readonly K[]
@@ -225,13 +218,24 @@ function derivePrimarySecondary<K extends string>(
   entries.sort((a, b) => b.value - a.value);
 
   const primary = entries[0] && entries[0].value > 0 ? entries[0].key : null;
-  const secondary =
-    entries[1] && entries[1].value > 0 ? entries[1].key : null;
+  const secondary = entries[1] && entries[1].value > 0 ? entries[1].key : null;
 
   return { primary, secondary };
 }
 
-// --- Main page -------------------------------------------------------------
+function getFullName(taker: QscTakerRow | null | undefined): string | null {
+  if (!taker) return null;
+  const first = (taker.first_name || "").trim();
+  const last = (taker.last_name || "").trim();
+  const full = `${first} ${last}`.trim();
+  if (full) return full;
+  const email = (taker.email || "").trim();
+  return email || null;
+}
+
+// ------------------------------------------------------
+// Page
+// ------------------------------------------------------
 
 export default function QscEntrepreneurStrategicReportPage({
   params,
@@ -241,10 +245,15 @@ export default function QscEntrepreneurStrategicReportPage({
   const token = params.token;
   const searchParams = useSearchParams();
   const tid = searchParams?.get("tid") ?? "";
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [payload, setPayload] = useState<QscPayload | null>(null);
+  const [apiVersion, setApiVersion] = useState<string | null>(null);
+
+  const [downloading, setDownloading] = useState(false);
+  const reportRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -254,10 +263,14 @@ export default function QscEntrepreneurStrategicReportPage({
         setLoading(true);
         setErr(null);
 
-        const res = await fetch(
-          `/api/public/qsc/${encodeURIComponent(token)}/result`,
-          { cache: "no-store" }
-        );
+        // Strategic Growth Report payload for entrepreneur/leader routing
+        const apiUrl = tid
+          ? `/api/public/qsc/${encodeURIComponent(
+              token
+            )}/result?tid=${encodeURIComponent(tid)}`
+          : `/api/public/qsc/${encodeURIComponent(token)}/result`;
+
+        const res = await fetch(apiUrl, { cache: "no-store" });
 
         const ct = res.headers.get("content-type") || "";
         if (!ct.includes("application/json")) {
@@ -270,6 +283,7 @@ export default function QscEntrepreneurStrategicReportPage({
         const j = (await res.json()) as {
           ok?: boolean;
           error?: string;
+          __api_version?: string;
           results?: QscResultsRow;
           profile?: QscProfileRow | null;
           persona?: QscPersonaRow | null;
@@ -280,7 +294,21 @@ export default function QscEntrepreneurStrategicReportPage({
           throw new Error(j.error || `HTTP ${res.status}`);
         }
 
-        if (alive && j.results) {
+        if (alive) setApiVersion(j.__api_version ?? null);
+
+        if (!j.results) {
+          throw new Error("No QSC results found");
+        }
+
+        // If this is a LEADER result, route to Leaders strategic report page
+        if (j.results.audience === "leader") {
+          const base = `/qsc/${encodeURIComponent(token)}/leader`;
+          const href = tid ? `${base}?tid=${encodeURIComponent(tid)}` : base;
+          router.replace(href);
+          return;
+        }
+
+        if (alive) {
           setPayload({
             results: j.results,
             profile: j.profile ?? null,
@@ -298,18 +326,61 @@ export default function QscEntrepreneurStrategicReportPage({
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, tid, router]);
+
+  async function handleDownloadPdf() {
+    if (!reportRef.current || downloading) return;
+
+    try {
+      setDownloading(true);
+
+      const element = reportRef.current;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#020617",
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`qsc-entrepreneur-strategic-${token}.pdf`);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const result = payload?.results ?? null;
   const profile = payload?.profile ?? null;
   const persona = payload?.persona ?? null;
   const taker = payload?.taker ?? null;
 
-  // --- Loading / error states ---------------------------------------------
-
-  if (loading) {
+  if (loading && !result) {
     return (
-      <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="relative min-h-screen bg-[#020617] text-slate-50">
+        <AppBackground />
         <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
             Strategic Growth Report
@@ -317,6 +388,9 @@ export default function QscEntrepreneurStrategicReportPage({
           <h1 className="mt-3 text-3xl font-bold">
             Preparing your QSC Entrepreneur report…
           </h1>
+          {apiVersion && (
+            <p className="text-xs text-slate-500">API: {apiVersion}</p>
+          )}
         </main>
       </div>
     );
@@ -324,7 +398,8 @@ export default function QscEntrepreneurStrategicReportPage({
 
   if (err || !result) {
     return (
-      <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="relative min-h-screen bg-[#020617] text-slate-50">
+        <AppBackground />
         <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
             Strategic Growth Report
@@ -337,34 +412,30 @@ export default function QscEntrepreneurStrategicReportPage({
           <pre className="mt-2 rounded-xl border border-slate-300 bg-white p-3 text-xs text-slate-900 whitespace-pre-wrap">
             {err || "No data"}
           </pre>
+          {apiVersion && (
+            <p className="text-xs text-slate-500">API: {apiVersion}</p>
+          )}
         </main>
       </div>
     );
   }
 
-  // --- Derived values ------------------------------------------------------
-
   const createdAt = new Date(result.created_at);
   const personaName =
     persona?.profile_label ||
     profile?.profile_label ||
-    "Your Quantum Profile";
+    "Your Quantum Buyer Profile";
 
-  const takerDisplayName =
-    taker &&
-    ([taker.first_name, taker.last_name].filter(Boolean).join(" ") ||
-      taker.email ||
-      null);
+  const takerDisplayName = getFullName(taker);
 
-  const backHref = tid
+  // ✅ Snapshot URL (this is what we should call “Back to Snapshot”, NOT Download)
+  const snapshotHref = tid
     ? `/qsc/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
     : `/qsc/${encodeURIComponent(token)}`;
 
-  // Percentages (normalised)
   const rawPersonalityPerc =
     (result.personality_percentages ?? {}) as PersonalityPercMap;
-  const rawMindsetPerc =
-    (result.mindset_percentages ?? {}) as MindsetPercMap;
+  const rawMindsetPerc = (result.mindset_percentages ?? {}) as MindsetPercMap;
 
   const personalityPerc: PersonalityPercMap = {
     FIRE: normalisePercent(rawPersonalityPerc.FIRE ?? 0),
@@ -392,7 +463,6 @@ export default function QscEntrepreneurStrategicReportPage({
     value: personalityPerc[key] ?? 0,
   }));
 
-  // 🔑 Derive primary/secondary from percentages
   const personalityKeys: PersonalityKey[] = ["FIRE", "FLOW", "FORM", "FIELD"];
   const mindsetKeys: MindsetKey[] = [
     "ORIGIN",
@@ -402,26 +472,20 @@ export default function QscEntrepreneurStrategicReportPage({
     "QUANTUM",
   ];
 
-  const {
-    primary: derivedPrimaryPersonality,
-    secondary: derivedSecondaryPersonality,
-  } = derivePrimarySecondary(personalityPerc, personalityKeys);
+  const { primary: derivedPrimaryPersonality } = derivePrimarySecondary(
+    personalityPerc,
+    personalityKeys
+  );
 
-  const {
-    primary: derivedPrimaryMindset,
-    secondary: derivedSecondaryMindset,
-  } = derivePrimarySecondary(mindsetPerc, mindsetKeys);
+  const { primary: derivedPrimaryMindset } = derivePrimarySecondary(
+    mindsetPerc,
+    mindsetKeys
+  );
 
-  // Fallback to DB values only if percentages are all zero
   const effectivePrimaryPersonality: PersonalityKey | null =
     derivedPrimaryPersonality ?? result.primary_personality ?? null;
-  const effectiveSecondaryPersonality: PersonalityKey | null =
-    derivedSecondaryPersonality ?? result.secondary_personality ?? null;
-
   const effectivePrimaryMindset: MindsetKey | null =
     derivedPrimaryMindset ?? result.primary_mindset ?? null;
-  const effectiveSecondaryMindset: MindsetKey | null =
-    derivedSecondaryMindset ?? result.secondary_mindset ?? null;
 
   const primaryPersonalityLabel =
     (effectivePrimaryPersonality &&
@@ -434,7 +498,6 @@ export default function QscEntrepreneurStrategicReportPage({
     effectivePrimaryMindset ||
     "—";
 
-  // Convenience helpers with graceful fallbacks
   const onePageStrengths = persona?.one_page_strengths || "—";
   const onePageRisks = persona?.one_page_risks || "—";
   const combinedStrengths = persona?.combined_strengths || "—";
@@ -442,33 +505,30 @@ export default function QscEntrepreneurStrategicReportPage({
   const combinedLever = persona?.combined_big_lever || "—";
   const emotionalStabilises = persona?.emotional_stabilises || "—";
   const emotionalDestabilises = persona?.emotional_destabilises || "—";
-  const emotionalPatterns = persona?.emotional_patterns_to_watch || "—";
-  const decisionStyleLong =
-    persona?.decision_style_long || profile?.decision_style || "—";
   const supportYourself = persona?.support_yourself || "—";
 
   const strategic1 = persona?.strategic_priority_1 || "—";
   const strategic2 = persona?.strategic_priority_2 || "—";
   const strategic3 = persona?.strategic_priority_3 || "—";
 
-  // --- Render --------------------------------------------------------------
-
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <main className="mx-auto max-w-5xl px-4 py-10 md:py-12 space-y-10">
-        {/* HEADER */}
+    <div className="min-h-screen bg-slate-950 text-slate-300">
+      <AppBackground />
+      <main
+        ref={reportRef}
+        className="mx-auto max-w-5xl px-4 py-10 md:py-12 space-y-10"
+      >
         <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
+            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-100">
               Strategic Growth Report
             </p>
             <h1 className="mt-3 text-3xl md:text-4xl font-bold tracking-tight">
               QSC Entrepreneur — Strategic Growth Report
             </h1>
             {takerDisplayName && (
-              <p className="mt-1 text-sm text-slate-700">
-                For:{" "}
-                <span className="font-semibold">{takerDisplayName}</span>
+              <p className="mt-1 text-sm text-slate-100">
+                For: <span className="font-semibold">{takerDisplayName}</span>
               </p>
             )}
             <p className="mt-2 text-sm text-slate-700 max-w-2xl">
@@ -476,13 +536,20 @@ export default function QscEntrepreneurStrategicReportPage({
               on your Quantum buyer profile and current mindset stage.
             </p>
           </div>
+
           <div className="flex flex-col items-end gap-2 text-xs text-slate-600">
-            <Link
-              href={backHref}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
-            >
-              ← Back to Snapshot
-            </Link>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {downloading ? "Preparing PDF…" : "Download PDF"}
+              </button>
+
+            </div>
+
             <span>
               Created at{" "}
               {createdAt.toLocaleString(undefined, {
@@ -520,9 +587,7 @@ export default function QscEntrepreneurStrategicReportPage({
               </p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold mb-1">
-                Your Mindset Layer
-              </h3>
+              <h3 className="text-sm font-semibold mb-1">Your Mindset Layer</h3>
               <p className="text-sm text-slate-700">
                 Where your business is right now and what stage of growth
                 you&apos;re in. These needs shift as you grow — which is why you
@@ -532,60 +597,14 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* HOW TO USE THIS REPORT */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <h2 className="text-xl font-semibold">How to use this report</h2>
-          <p className="text-sm text-slate-700">
-            This is your personal strategic growth guide — not a personality
-            box. Move through it slowly and come back often.
-          </p>
-          <div className="grid gap-4 md:grid-cols-2 text-sm text-slate-700">
-            <ul className="list-disc pl-5 space-y-1">
-              <li>
-                Start with the Profile Summary to understand your core pattern.
-              </li>
-              <li>
-                Study the Personality Layer to see why you act, respond and
-                decide the way you do.
-              </li>
-              <li>
-                Read the Mindset Layer to understand what your business needs at
-                this stage.
-              </li>
-              <li>
-                Pay close attention to the Combined Pattern — this is where the
-                real insight lives.
-              </li>
-            </ul>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>
-                Use the Strategic Priorities to decide what actually matters in
-                the next 90 days.
-              </li>
-              <li>
-                Use the Reflection Prompts to stay emotionally and
-                strategically aligned.
-              </li>
-              <li>
-                Keep the One Page Summary handy as your quick reference during
-                the week.
-              </li>
-            </ul>
-          </div>
-        </section>
-
         {/* ONE-PAGE SUMMARY */}
         <section className="rounded-3xl bg-[#f5eddc] border border-amber-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-amber-700">
-            One-page Quantum Summary
+            One-page Quantum Profile
           </p>
-          <h2 className="text-xl font-semibold">
-            Your at-a-glance Quantum Profile
+          <h2 className="text-xl font-semibold uppercase text-amber-700">
+            Your at-a-glance growth profile
           </h2>
-          <p className="text-sm text-slate-800">
-            This is the snapshot you can keep open while planning your quarter,
-            designing offers, or making big decisions.
-          </p>
 
           <div className="grid gap-6 md:grid-cols-3 pt-4">
             <div className="rounded-2xl bg-white/70 border border-amber-200 p-4 text-sm space-y-2">
@@ -609,10 +628,6 @@ export default function QscEntrepreneurStrategicReportPage({
             </div>
             <div className="rounded-2xl bg-white/70 border border-amber-200 p-4 text-sm space-y-2">
               <h3 className="font-semibold">Top strategic priorities</h3>
-              <p className="text-slate-700">
-                Use the three Strategic Growth Priorities at the end of this
-                report as your 90-day focus:
-              </p>
               <ul className="mt-2 list-disc pl-4 text-slate-800 space-y-1">
                 <li>{strategic1}</li>
                 <li>{strategic2}</li>
@@ -624,11 +639,11 @@ export default function QscEntrepreneurStrategicReportPage({
 
         {/* FREQUENCY + MINDSET + MATRIX */}
         <section className="grid gap-6 md:grid-cols-2 items-start">
-          {/* Buyer Frequency Type – donut */}
           <div className="rounded-3xl bg-[#020617] text-slate-50 border border-slate-800 p-6 md:p-7 space-y-4">
             <h2 className="text-lg font-semibold">Buyer Frequency Type</h2>
             <p className="text-sm text-slate-300">
-              Your emotional & energetic style across Fire, Flow, Form and Field.
+              Your emotional & energetic style across Fire, Flow, Form and Field
+              in the way you buy and build.
             </p>
 
             <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center">
@@ -642,20 +657,18 @@ export default function QscEntrepreneurStrategicReportPage({
                     className="flex items-center justify-between gap-3"
                   >
                     <span>{d.label}</span>
-                    <span className="tabular-nums">
-                      {Math.round(d.value)}%
-                    </span>
+                    <span className="tabular-nums">{Math.round(d.value)}%</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Buyer Mindset Levels */}
           <div className="rounded-3xl bg-[#020617] text-slate-50 border border-slate-800 p-6 md:p-7 space-y-4">
-            <h2 className="text-lg font-semibold">Buyer Mindset Levels</h2>
+            <h2 className="text-lg font-semibold">Quantum Mindset Levels</h2>
             <p className="text-sm text-slate-300">
-              How your energy is distributed across the 5 Quantum stages.
+              Where your focus and energy are distributed across the 5 Quantum
+              growth stages.
             </p>
 
             <div className="space-y-2 pt-2 text-xs">
@@ -682,7 +695,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* Buyer Persona Matrix */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
             Buyer Persona Matrix
@@ -693,7 +705,7 @@ export default function QscEntrepreneurStrategicReportPage({
           <p className="text-sm text-slate-700">
             Each cell represents a different Quantum buyer persona. Your primary
             pattern is highlighted — this is where your emotional wiring and
-            current business stage meet.
+            current growth stage meet.
           </p>
 
           <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
@@ -712,10 +724,6 @@ export default function QscEntrepreneurStrategicReportPage({
           <h2 className="text-xl font-semibold">
             How you show up emotionally & behaviourally
           </h2>
-          <p className="text-sm text-slate-700">
-            Your Personality Layer describes how you naturally think, act, and
-            make decisions — before strategy, tools or trends enter the room.
-          </p>
 
           <div className="grid gap-6 md:grid-cols-3 pt-2 text-sm">
             <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
@@ -741,54 +749,14 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* MINDSET LAYER */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-emerald-700">
-            Mindset layer
-          </p>
-          <h2 className="text-xl font-semibold">
-            Your current Quantum stage — and what it asks of you
-          </h2>
-          <p className="text-sm text-slate-700">
-            Your Mindset Layer describes the reality your business is currently
-            operating in. Each stage has different requirements — what worked at
-            an earlier stage can now quietly block growth.
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-2 pt-2 text-sm">
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">Your stage</h3>
-              <p className="mt-1 text-slate-700">{primaryMindsetLabel}</p>
-              <p className="mt-2 text-slate-700 whitespace-pre-line">
-                {persona?.show_up_summary || "—"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">How your energy is spread</h3>
-              <p className="mt-1 text-slate-700">
-                You&apos;ll always have some energy spread across multiple
-                stages. The goal is not to force yourself into a perfect box,
-                but to understand where your centre of gravity is right now.
-              </p>
-              <p className="mt-2 text-slate-700 whitespace-pre-line">
-                {emotionalPatterns}
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* COMBINED PATTERN */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-rose-700">
             Combined pattern
           </p>
           <h2 className="text-xl font-semibold">
-            {personaName} — what happens when your personality meets your stage
+            {personaName} — what happens when your style meets your stage
           </h2>
-          <p className="text-sm text-slate-700">
-            This is where the real QSC magic lives. Your personality pattern and
-            Quantum stage combine into one strategic blueprint.
-          </p>
 
           <div className="grid gap-6 md:grid-cols-3 pt-2 text-sm">
             <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
@@ -810,25 +778,6 @@ export default function QscEntrepreneurStrategicReportPage({
               </p>
             </div>
           </div>
-
-          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm">
-            <h3 className="font-semibold mb-2">
-              Reflection prompts for your Quantum pattern
-            </h3>
-            <ul className="list-disc pl-5 space-y-1 text-slate-700">
-              <li>
-                Where am I moving faster than my systems can reliably support?
-              </li>
-              <li>
-                Which decisions am I delaying that would actually create more
-                ease or capacity?
-              </li>
-              <li>
-                What do I keep trying to “handle myself” that really needs a
-                system or a person?
-              </li>
-            </ul>
-          </div>
         </section>
 
         {/* EMOTIONAL & OPERATIONAL SUPPORT */}
@@ -837,7 +786,7 @@ export default function QscEntrepreneurStrategicReportPage({
             Emotional & operational alignment
           </p>
           <h2 className="text-xl font-semibold">
-            How to support yourself inside this Quantum pattern
+            How to support yourself inside this pattern
           </h2>
 
           <div className="grid gap-6 md:grid-cols-3 pt-2 text-sm">
@@ -865,14 +814,7 @@ export default function QscEntrepreneurStrategicReportPage({
         {/* STRATEGIC PRIORITIES */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-orange-700">
-            Strategic growth priorities (next 90 days)
-          </p>
-          <h2 className="text-xl font-semibold">
-            The three levers that shift everything faster
-          </h2>
-          <p className="text-sm text-slate-700">
-            Based on your current Quantum Profile, these are the most leveraged
-            actions you can focus on in the next 90 days.
+            Strategic priorities (next 90 days)
           </p>
           <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-700 whitespace-pre-line">
             <li>{strategic1}</li>
@@ -882,10 +824,9 @@ export default function QscEntrepreneurStrategicReportPage({
         </section>
 
         <footer className="pt-4 pb-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>
   );
 }
-

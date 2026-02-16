@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import AppBackground from "@/components/ui/AppBackground";
 
 type PersonalityKey = "FIRE" | "FLOW" | "FORM" | "FIELD";
 type MindsetKey = "ORIGIN" | "MOMENTUM" | "VECTOR" | "ORBIT" | "QUANTUM";
@@ -149,6 +150,7 @@ export default function QscExtendedSourceCodePage({
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50">
+        <AppBackground />
         <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
           <p className="text-sm font-semibold tracking-[0.25em] uppercase text-sky-300/80">
             Quantum Source Code
@@ -164,6 +166,7 @@ export default function QscExtendedSourceCodePage({
   if (err || !result) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50">
+        <AppBackground />
         <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
           <p className="text-sm font-semibold tracking-[0.25em] uppercase text-sky-300/80">
             Quantum Source Code
@@ -218,6 +221,7 @@ export default function QscExtendedSourceCodePage({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
+      <AppBackground />
       <main className="mx-auto max-w-5xl px-4 py-10 md:py-12 space-y-8">
         {/* Header */}
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -239,15 +243,8 @@ export default function QscExtendedSourceCodePage({
               href={backToSnapshotHref}
               className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800 transition"
             >
-              ← Back to Snapshot
-            </Link>
-            <button
-              className="inline-flex items-center rounded-xl border border-slate-700/70 bg-slate-900/60 px-3 py-1.5 text-xs font-medium text-slate-300 cursor-not-allowed"
-              disabled
-              title="PDF export coming soon"
-            >
               Generate PDF (coming soon)
-            </button>
+            </Link>
           </div>
         </header>
 
@@ -439,7 +436,7 @@ export default function QscExtendedSourceCodePage({
 
         {/* Footer */}
         <footer className="pt-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>
