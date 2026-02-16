@@ -17,11 +17,28 @@ async function supabaseFromCookies() {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) return null;
 
-  const cookieStore = await cookies(); // ✅ Next typings: cookies() may be async
+  // In newer Next typings, cookies() may be async
+  const cookieStore = await cookies();
+
   return createServerClient(url, anon, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll().map((c) => ({
+          name: c.name,
+          value: c.value,
+        }));
+      },
+      setAll(cookiesToSet) {
+        // Only works in Server Actions / Route Handlers if Next allows mutation here,
+        // but we still provide it because @supabase/ssr expects the interface.
+        // If Next disallows mutation in this context, it will no-op safely.
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // ignore (read-only context)
+        }
       },
     },
   });
@@ -57,10 +74,11 @@ export default async function Page() {
 
   if (memErr || !membership) notFound();
 
-  // Optional hardening: only allow certain roles
+  // Optional: role lock
   // const allowed = ["owner", "admin", "super_admin"];
   // if (!allowed.includes(String(membership.role || ""))) notFound();
 
   return <AdminOrgRankingsClient />;
 }
+
 
