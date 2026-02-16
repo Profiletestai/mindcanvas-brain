@@ -1,6 +1,4 @@
 // apps/web/app/admin/page.tsx
-// (or: apps/web/app/portal/admin/page.tsx — use whichever actually maps to /admin in your repo)
-
 import "server-only";
 
 import Link from "next/link";
@@ -14,49 +12,59 @@ export const revalidate = 0;
 
 const PROFILETEST_ORG_SLUG = "profiletest-ai";
 
-function supabaseFromCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function supabaseFromCookies(cookieStore: CookieStore) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anon) return null;
+
+  return createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value;
       },
-    }
-  );
+    },
+  });
 }
 
 export default async function AdminOrgsPage() {
   // ✅ Auth-gated + membership-gated UI (Profiletest.ai only for org performance page link)
   const cookieStore = await cookies();
   const supabase = supabaseFromCookies(cookieStore);
+  if (!supabase) notFound();
 
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth?.user;
-  if (!user) notFound();
+  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  const user = auth?.user ?? null;
+  if (authErr || !user) notFound();
 
   // Check membership in profiletest-ai org (Supabase-auth-level access)
   let canSeeOrgPerformance = false;
+
   try {
-    const { data: orgRow } = await supabase
+    const { data: orgRow, error: orgErr } = await supabase
       .schema("portal")
       .from("orgs")
       .select("id, slug")
       .eq("slug", PROFILETEST_ORG_SLUG)
       .maybeSingle();
 
-    if (orgRow?.id) {
-      const { data: membership } = await supabase
+    if (!orgErr && orgRow?.id) {
+      const { data: membership, error: memErr } = await supabase
         .schema("portal")
         .from("user_orgs")
-        .select("org_id")
+        .select("org_id, role")
         .eq("org_id", orgRow.id)
         .eq("user_id", user.id)
         .maybeSingle();
 
-      canSeeOrgPerformance = !!membership;
+      if (!memErr && membership) {
+        // Optional hardening: only allow certain roles
+        // const allowed = ["owner", "admin", "super_admin"];
+        // canSeeOrgPerformance = allowed.includes(String(membership.role || ""));
+        canSeeOrgPerformance = true;
+      }
     }
   } catch {
     canSeeOrgPerformance = false;
@@ -137,7 +145,3 @@ export default async function AdminOrgsPage() {
     </div>
   );
 }
-
-
-
-
