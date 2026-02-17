@@ -1,7 +1,10 @@
 // apps/web/app/api/portal/[slug]/communications/send/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
-import { sendTemplatedEmail, EmailTemplateType } from "@/lib/server/emailTemplates";
+import {
+  sendTemplatedEmail,
+  EmailTemplateType,
+} from "@/lib/server/emailTemplates";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,7 +23,9 @@ async function getOrgBySlug(slug: string) {
   const supa = supaAdmin();
   const { data, error } = await supa
     .from("orgs")
-    .select("id, slug, name, notification_email, website, support_email, website_url")
+    .select(
+      "id, slug, name, notification_email, website, support_email, website_url"
+    )
     .eq("slug", slug)
     .maybeSingle();
 
@@ -89,7 +94,10 @@ async function getTestById(testId: string) {
     .maybeSingle();
 
   if (error || !data) {
-    console.warn("[communications/send] getTestById missing test", { testId, error });
+    console.warn("[communications/send] getTestById missing test", {
+      testId,
+      error,
+    });
     return {
       id: testId,
       name: "your assessment" as string | null,
@@ -98,16 +106,24 @@ async function getTestById(testId: string) {
     };
   }
 
-  return data as { id: string; name: string | null; slug: string | null; test_type: string | null };
+  return data as {
+    id: string;
+    name: string | null;
+    slug: string | null;
+    test_type: string | null;
+  };
 }
 
 function getBaseUrl() {
   const explicit = process.env.NEXT_PUBLIC_APP_BASE_URL;
-  if (explicit && explicit.trim().length > 0) return explicit.replace(/\/$/, "");
+  if (explicit && explicit.trim().length > 0)
+    return explicit.replace(/\/$/, "");
 
   const vercel = process.env.NEXT_PUBLIC_VERCEL_URL || "";
   if (!vercel) return "";
-  return vercel.startsWith("http") ? vercel.replace(/\/$/, "") : `https://${vercel.replace(/\/$/, "")}`;
+  return vercel.startsWith("http")
+    ? vercel.replace(/\/$/, "")
+    : `https://${vercel.replace(/\/$/, "")}`;
 }
 
 function getQscVariant(opts: { slug?: string | null; testType?: string | null }) {
@@ -115,11 +131,17 @@ function getQscVariant(opts: { slug?: string | null; testType?: string | null })
   const s = (opts.slug || "").toLowerCase();
 
   const hasQsc = t.includes("qsc") || s.includes("qsc");
-  if (!hasQsc) return { isQsc: false as const, variant: null as null | "leader" | "entrepreneur" };
+  if (!hasQsc)
+    return { isQsc: false as const, variant: null as null | "leader" | "entrepreneur" };
 
   let variant: "leader" | "entrepreneur" | null = null;
   if (t.includes("leader") || s.includes("leader")) variant = "leader";
-  else if (t.includes("entrepreneur") || s.includes("entrepreneur") || s.includes("entre")) variant = "entrepreneur";
+  else if (
+    t.includes("entrepreneur") ||
+    s.includes("entrepreneur") ||
+    s.includes("entre")
+  )
+    variant = "entrepreneur";
 
   return { isQsc: true as const, variant };
 }
@@ -145,26 +167,20 @@ function getDefaultInternalEmail() {
  * ✅ NEW: For report emails, use the token that the submission was created with.
  * This prevents token mismatches between email links and taker completion flow.
  */
-async function getLatestSubmissionTokenForTaker(opts: { takerId: string; testId: string }) {
+async function getLatestSubmissionTokenForTaker(opts: {
+  takerId: string;
+  testId: string;
+}) {
   const supa = supaAdmin();
 
+  // NOTE: your provided schema is portal.test_submissions with link_token on the submission row.
+  // So we read from test_submissions, not test_links.
   const { data, error } = await supa
     .from("test_submissions")
-    .select(
-      `
-      id,
-      created_at,
-      test_link_id,
-      test_links:portal.test_links!test_submissions_test_link_id_fkey (
-        id,
-        token,
-        test_id
-      )
-    `
-    )
-    .eq("test_taker_id", opts.takerId)
+    .select("id, created_at, link_token, test_id")
+    .eq("taker_id", opts.takerId)
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(10);
 
   if (error) {
     console.warn("[communications/send] getLatestSubmissionTokenForTaker error", error);
@@ -173,15 +189,12 @@ async function getLatestSubmissionTokenForTaker(opts: { takerId: string; testId:
 
   const rows = (data || []) as any[];
 
-  // Find the most recent submission where link.test_id matches testId
   for (const r of rows) {
-    const link = r?.test_links;
-    if (link?.token && String(link?.test_id) === String(opts.testId)) {
-      return { token: String(link.token), submissionId: String(r.id) };
+    if (String(r?.test_id) === String(opts.testId) && r?.link_token) {
+      return { token: String(r.link_token), submissionId: String(r.id) };
     }
   }
 
-  // No match found for this test
   return { token: null as string | null, submissionId: null as string | null };
 }
 
@@ -198,7 +211,6 @@ function isSafeLastResultUrl(lastResultUrl: string, takerId: string, reportToken
     if (!hasTid) return false;
 
     if (reportToken) {
-      // Accept either /t/<token>/report or /qsc/<token>...
       const tokenOk =
         decoded.includes(`/t/${reportToken}/`) ||
         decoded.includes(`/t/${encodeURIComponent(reportToken)}/`) ||
@@ -208,68 +220,140 @@ function isSafeLastResultUrl(lastResultUrl: string, takerId: string, reportToken
       return tokenOk;
     }
 
-    // If we don't know token, fallback to tid-only check (legacy behaviour)
     return true;
   } catch {
     const hasTid = lastResultUrl.includes("tid=") && lastResultUrl.includes(takerId);
     if (!hasTid) return false;
 
     if (reportToken) {
-      return lastResultUrl.includes(`/t/${reportToken}/`) || lastResultUrl.includes(`/qsc/${reportToken}`);
+      return (
+        lastResultUrl.includes(`/t/${reportToken}/`) ||
+        lastResultUrl.includes(`/qsc/${reportToken}`)
+      );
     }
+
     return true;
   }
+}
+
+/**
+ * ✅ NEW: for QSC test-taker "report" emails we ONLY allow the Growth report URL:
+ *   /qsc/<token>/entrepreneur?tid=...
+ *   /qsc/<token>/leader?tid=...
+ *
+ * We explicitly BLOCK:
+ *   /qsc/<token>/report?... (snapshot-style)
+ */
+function isAllowedQscGrowthUrl(url: string, reportToken: string, variant: "leader" | "entrepreneur" | null) {
+  const u = url.toLowerCase();
+  const token = String(reportToken).toLowerCase();
+
+  // Must reference the token in a qsc path
+  if (!u.includes(`/qsc/${token}`)) return false;
+
+  // Must NOT be the legacy /report route
+  if (u.includes(`/qsc/${token}/report`)) return false;
+
+  // If we know the variant, enforce it
+  if (variant) {
+    if (!u.includes(`/qsc/${token}/${variant}`)) return false;
+  }
+
+  // Must contain tid (we don't check the exact taker here because isSafeLastResultUrl does)
+  if (!u.includes("tid=")) return false;
+
+  return true;
 }
 
 function buildLinks(opts: {
   orgSlug: string;
   testId: string;
+
   // token used to *start* the test (portal take link)
   testLinkToken: string;
+
   // token used to *view the report* (must match submission)
   reportToken: string;
+
   lastResultUrl?: string | null;
   takerId: string;
   testSlug?: string | null;
   testType?: string | null;
+
+  // ✅ controls whether we allow last_result_url to override
+  allowLastResultOverride: boolean;
 }) {
   const base = getBaseUrl();
 
   const testLink = base
-    ? `${base}/portal/${opts.orgSlug}/tests/${opts.testId}/take?token=${encodeURIComponent(opts.testLinkToken)}`
+    ? `${base}/portal/${opts.orgSlug}/tests/${opts.testId}/take?token=${encodeURIComponent(
+        opts.testLinkToken
+      )}`
     : "";
 
   let reportLink = "";
-  if (base) {
-    const { isQsc, variant } = getQscVariant({ slug: opts.testSlug, testType: opts.testType });
+  const { isQsc, variant } = getQscVariant({ slug: opts.testSlug, testType: opts.testType });
 
+  if (base) {
     if (isQsc) {
-      if (variant) {
-        reportLink = `${base}/qsc/${encodeURIComponent(opts.reportToken)}/${variant}?tid=${encodeURIComponent(
-          opts.takerId
-        )}`;
-      } else {
-        reportLink = `${base}/qsc/${encodeURIComponent(opts.reportToken)}?tid=${encodeURIComponent(opts.takerId)}`;
-      }
+      // ✅ Growth report routes (what test takers must receive)
+      // If variant is unknown, default to entrepreneur (your platform expectation)
+      const v = variant || "entrepreneur";
+      reportLink = `${base}/qsc/${encodeURIComponent(opts.reportToken)}/${v}?tid=${encodeURIComponent(
+        opts.takerId
+      )}`;
     } else {
-      reportLink = `${base}/t/${encodeURIComponent(opts.reportToken)}/report?tid=${encodeURIComponent(opts.takerId)}`;
+      reportLink = `${base}/t/${encodeURIComponent(
+        opts.reportToken
+      )}/report?tid=${encodeURIComponent(opts.takerId)}`;
     }
   }
 
-  // ✅ Only override with last_result_url if it's clearly for THIS taker AND matches reportToken
-  if (opts.lastResultUrl && isSafeLastResultUrl(opts.lastResultUrl, opts.takerId, opts.reportToken)) {
-    reportLink = normalizeToAbsolute(base, opts.lastResultUrl);
+  // ✅ Tight override logic
+  if (opts.allowLastResultOverride && opts.lastResultUrl) {
+    const safe = isSafeLastResultUrl(opts.lastResultUrl, opts.takerId, opts.reportToken);
+
+    if (safe) {
+      const abs = normalizeToAbsolute(base, opts.lastResultUrl);
+
+      if (isQsc) {
+        // Only allow last_result_url if it is ALSO a Growth report url
+        if (isAllowedQscGrowthUrl(abs, opts.reportToken, variant)) {
+          reportLink = abs;
+        } else {
+          console.warn("[communications/send] Blocked last_result_url override for QSC (not growth URL)", {
+            last_result_url: opts.lastResultUrl,
+          });
+        }
+      } else {
+        // Non-QSC: allow legacy behaviour
+        reportLink = abs;
+      }
+    }
   }
 
   const nextStepsLink = "";
 
-  const internalReportLink = base ? `${base}/portal/${opts.orgSlug}/database/${opts.takerId}` : "";
-  const internalResultsDashboardLink = base ? `${base}/portal/${opts.orgSlug}/dashboard?testId=${opts.testId}` : "";
+  const internalReportLink = base
+    ? `${base}/portal/${opts.orgSlug}/database/${opts.takerId}`
+    : "";
+  const internalResultsDashboardLink = base
+    ? `${base}/portal/${opts.orgSlug}/dashboard?testId=${opts.testId}`
+    : "";
 
-  return { testLink, reportLink, nextStepsLink, internalReportLink, internalResultsDashboardLink };
+  return {
+    testLink,
+    reportLink,
+    nextStepsLink,
+    internalReportLink,
+    internalResultsDashboardLink,
+  };
 }
 
-export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { slug: string } }
+) {
   try {
     const slug = params.slug;
     const body = (await req.json()) as SendPayload;
@@ -285,20 +369,38 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // - For send_test_link: use takerRow.link_token (the distribution token)
     let reportToken = takerRow.link_token;
 
-    if (type === "report" || type === "resend_report" || type === "test_owner_notification") {
-      const latest = await getLatestSubmissionTokenForTaker({ takerId: takerRow.id, testId: body.testId });
+    if (
+      type === "report" ||
+      type === "resend_report" ||
+      type === "test_owner_notification"
+    ) {
+      const latest = await getLatestSubmissionTokenForTaker({
+        takerId: takerRow.id,
+        testId: body.testId,
+      });
+
       if (latest.token) {
         reportToken = latest.token;
       } else {
-        // Fallback: takerRow.link_token (better than nothing, but may mismatch)
-        console.warn("[communications/send] No matching submission token found; falling back to taker.link_token", {
-          takerId: takerRow.id,
-          testId: body.testId,
-        });
+        console.warn(
+          "[communications/send] No matching submission token found; falling back to taker.link_token",
+          { takerId: takerRow.id, testId: body.testId }
+        );
       }
     }
 
-    const { testLink, reportLink, nextStepsLink, internalReportLink, internalResultsDashboardLink } = buildLinks({
+    // ✅ IMPORTANT: test-taker "report" emails must NOT be overridden by last_result_url
+    // (especially for QSC where /qsc/<token>/report is the snapshot-ish route)
+    const allowLastResultOverride =
+      type === "resend_report" || type === "test_owner_notification";
+
+    const {
+      testLink,
+      reportLink,
+      nextStepsLink,
+      internalReportLink,
+      internalResultsDashboardLink,
+    } = buildLinks({
       orgSlug: slug,
       testId: body.testId,
       testLinkToken: takerRow.link_token,
@@ -307,6 +409,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       takerId: takerRow.id,
       testSlug: testRow.slug,
       testType: testRow.test_type,
+      allowLastResultOverride,
     });
 
     const firstName = takerRow.first_name || "";
@@ -345,7 +448,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     } else {
       sentTo = normalizeEmail(takerRow.email);
       if (!sentTo) {
-        return NextResponse.json({ error: "NO_EMAIL", message: "Test taker has no email address." }, { status: 400 });
+        return NextResponse.json(
+          { error: "NO_EMAIL", message: "Test taker has no email address." },
+          { status: 400 }
+        );
       }
     }
 
@@ -357,7 +463,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
 
     if (!result.ok) {
-      return NextResponse.json({ error: "SEND_FAILED", detail: result }, { status: 500 });
+      return NextResponse.json(
+        { error: "SEND_FAILED", detail: result },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(
@@ -374,6 +483,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         debug: {
           report_token_used: reportToken,
           taker_link_token: takerRow.link_token,
+          last_result_url: takerRow.last_result_url,
+          allow_last_result_override: allowLastResultOverride,
         },
       },
       { status: 200 }
@@ -381,7 +492,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   } catch (err: any) {
     console.error("[communications/send] Error", err);
     const msg = typeof err?.message === "string" ? err.message : "UNKNOWN";
-    const status = msg === "ORG_NOT_FOUND" || msg === "TAKER_NOT_FOUND" ? 404 : 500;
+    const status =
+      msg === "ORG_NOT_FOUND" || msg === "TAKER_NOT_FOUND" ? 404 : 500;
     return NextResponse.json({ error: msg }, { status });
   }
 }
+
