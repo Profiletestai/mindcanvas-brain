@@ -344,12 +344,7 @@ export async function POST(
 
     // Persist submission snapshot (keep wrapper test_id for org reporting)
     const totals = {
-      frequencies: {
-        A: freqTotals.A,
-        B: freqTotals.B,
-        C: freqTotals.C,
-        D: freqTotals.D,
-      },
+      frequencies: { A: freqTotals.A, B: freqTotals.B, C: freqTotals.C, D: freqTotals.D },
       profiles: profileTotals,
       meta: {
         wrapper_test_id: taker.test_id,
@@ -406,16 +401,12 @@ export async function POST(
           })
           .filter((a: any) => a.question_id && a.choice >= 0);
 
-        const scoring = calculateQscScores(
-          questionsForScoring,
-          answersForScoring
-        );
+        const scoring = calculateQscScores(questionsForScoring, answersForScoring);
 
         let qscProfileId: string | null = null;
 
         if (scoring.combinedProfileCode) {
-          const [personalityKey, mindsetKey] =
-            scoring.combinedProfileCode.split("_");
+          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
 
           const personalityMap: Record<string, string> = {
             FIRE: "A",
@@ -442,36 +433,34 @@ export async function POST(
               .eq("mindset_level", mindset_level)
               .maybeSingle();
 
-            if (!qscProfileError)
-              qscProfileId = (qscProfileRow as any)?.id ?? null;
+            if (!qscProfileError) qscProfileId = (qscProfileRow as any)?.id ?? null;
           }
         }
 
-        const { error: qscUpsertError } = await sb.from("qsc_results").upsert(
-          {
-            taker_id: taker.id,
-            test_id: taker.test_id,
-            token,
-            audience: qscAudience,
-            personality_totals: scoring.personalityTotals,
-            personality_percentages: scoring.personalityPercentages,
-            mindset_totals: scoring.mindsetTotals,
-            mindset_percentages: scoring.mindsetPercentages,
-            primary_personality: scoring.primaryPersonality,
-            secondary_personality: scoring.secondaryPersonality,
-            primary_mindset: scoring.primaryMindset,
-            secondary_mindset: scoring.secondaryMindset,
-            combined_profile_code: scoring.combinedProfileCode,
-            qsc_profile_id: qscProfileId,
-          },
-          { onConflict: "taker_id" }
-        );
+        const { error: qscUpsertError } = await sb
+          .from("qsc_results")
+          .upsert(
+            {
+              taker_id: taker.id,
+              test_id: taker.test_id,
+              token,
+              audience: qscAudience,
+              personality_totals: scoring.personalityTotals,
+              personality_percentages: scoring.personalityPercentages,
+              mindset_totals: scoring.mindsetTotals,
+              mindset_percentages: scoring.mindsetPercentages,
+              primary_personality: scoring.primaryPersonality,
+              secondary_personality: scoring.secondaryPersonality,
+              primary_mindset: scoring.primaryMindset,
+              secondary_mindset: scoring.secondaryMindset,
+              combined_profile_code: scoring.combinedProfileCode,
+              qsc_profile_id: qscProfileId,
+            },
+            { onConflict: "taker_id" }
+          );
 
         if (qscUpsertError) {
-          console.error(
-            "QSC scoring: failed to upsert qsc_results",
-            qscUpsertError
-          );
+          console.error("QSC scoring: failed to upsert qsc_results", qscUpsertError);
         }
       } catch (e) {
         console.error("QSC scoring: unexpected error", e);
@@ -482,54 +471,47 @@ export async function POST(
     // ✅ Canonical base for ALL absolute links
     const origin = getBaseUrl();
 
-    // Base test URLs (non-QSC)
-    const reportPath = `/t/${encodeURIComponent(
-      token
-    )}/report?tid=${encodeURIComponent(taker.id)}`;
-    const resultPath = `/t/${encodeURIComponent(
-      token
-    )}/result?tid=${encodeURIComponent(taker.id)}`;
+    // These are useful for both redirect + email/debugging
+    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+      taker.id
+    )}`;
+    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
+      taker.id
+    )}`;
 
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
-    // ✅ QSC public report URLs
-    // IMPORTANT:
-    // - Test takers must ONLY see the "Growth" report for Entrepreneur:
-    //   /qsc/<token>/entrepreneur?tid=<takerId>
-    // - Snapshot (/qsc/<token>/report...) is portal/internal only.
-    const qscGrowthPath = `/qsc/${encodeURIComponent(
-      token
-    )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
+    // ✅ QSC PUBLIC report destination
+    // Test takers must ONLY get the Growth report (entrepreneur) or leader page.
+    const qscGrowthPath = `/qsc/${encodeURIComponent(token)}/entrepreneur?tid=${encodeURIComponent(
+      taker.id
+    )}`;
+    const qscLeaderPath = `/qsc/${encodeURIComponent(token)}/leader?tid=${encodeURIComponent(
+      taker.id
+    )}`;
 
-    const qscLeaderPath = `/qsc/${encodeURIComponent(
-      token
-    )}/leader?tid=${encodeURIComponent(taker.id)}`;
+    const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
+    const qscPublicUrl = `${origin}${qscPublicPath}`;
 
-    const qscPublicReportPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
-    const qscPublicReportUrl = `${origin}${qscPublicReportPath}`;
-
-    // ✅ Mark completed + set last_result_url to the correct *public* report URL
-    // This prevents future resend/email flows from reusing a wrong /report?view=... link.
+    // Mark completed + persist correct last_result_url (prevents old /report links being reused)
     await sb
       .from("test_takers")
       .update({
         status: "completed",
-        last_result_url: isQscTest ? qscPublicReportPath : reportPath,
+        last_result_url: isQscTest ? qscPublicPath : reportPath,
       })
       .eq("id", taker.id)
       .eq("link_token", token);
 
-    // ✅ Email the correct report page (Growth for Entrepreneur)
-    const reportUrlForEmail = isQscTest ? qscPublicReportUrl : baseReportUrl;
+    // Email the correct report page
+    const reportUrlForEmail = isQscTest ? qscPublicUrl : baseReportUrl;
 
     // ✅ Decide redirect deterministically using show_results
-    // - If show_results=true: redirect to the same public report we email
-    // - Else: redirect to configured redirect_url or /result fallback
     const redirectUrl: string =
       linkBehavior.show_results === true
         ? isQscTest
-          ? qscPublicReportPath
+          ? qscPublicPath
           : reportPath
         : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
         ? linkBehavior.redirect_url.trim()
@@ -613,10 +595,7 @@ export async function POST(
         });
 
         if (!ownerNotification?.ok) {
-          console.error(
-            "[submit] test_owner_notification failed",
-            ownerNotification
-          );
+          console.error("[submit] test_owner_notification failed", ownerNotification);
         }
       }
     } catch (e) {
@@ -640,9 +619,9 @@ export async function POST(
       result_url: baseResultUrl,
       report_url: baseReportUrl,
 
-      // Helpful debug
-      qsc_public_report_url: isQscTest ? qscPublicReportUrl : null,
-      qsc_public_report_path: isQscTest ? qscPublicReportPath : null,
+      // Debug helpers
+      qsc_public_path: isQscTest ? qscPublicPath : null,
+      qsc_public_url: isQscTest ? qscPublicUrl : null,
 
       owner_notification: ownerNotification,
       taker_email: takerEmailResult,
