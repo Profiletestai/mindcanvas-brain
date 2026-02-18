@@ -172,7 +172,8 @@ export async function POST(
     }
 
     const body = (await req.json().catch(() => ({}))) as any;
-    const takerId: string | undefined = body.taker_id || body.takerId || body.tid;
+    const takerId: string | undefined =
+      body.taker_id || body.takerId || body.tid;
 
     if (!takerId) {
       return NextResponse.json(
@@ -344,7 +345,12 @@ export async function POST(
 
     // Persist submission snapshot (keep wrapper test_id for org reporting)
     const totals = {
-      frequencies: { A: freqTotals.A, B: freqTotals.B, C: freqTotals.C, D: freqTotals.D },
+      frequencies: {
+        A: freqTotals.A,
+        B: freqTotals.B,
+        C: freqTotals.C,
+        D: freqTotals.D,
+      },
       profiles: profileTotals,
       meta: {
         wrapper_test_id: taker.test_id,
@@ -401,12 +407,16 @@ export async function POST(
           })
           .filter((a: any) => a.question_id && a.choice >= 0);
 
-        const scoring = calculateQscScores(questionsForScoring, answersForScoring);
+        const scoring = calculateQscScores(
+          questionsForScoring,
+          answersForScoring
+        );
 
         let qscProfileId: string | null = null;
 
         if (scoring.combinedProfileCode) {
-          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
+          const [personalityKey, mindsetKey] =
+            scoring.combinedProfileCode.split("_");
 
           const personalityMap: Record<string, string> = {
             FIRE: "A",
@@ -433,7 +443,8 @@ export async function POST(
               .eq("mindset_level", mindset_level)
               .maybeSingle();
 
-            if (!qscProfileError) qscProfileId = (qscProfileRow as any)?.id ?? null;
+            if (!qscProfileError)
+              qscProfileId = (qscProfileRow as any)?.id ?? null;
           }
         }
 
@@ -460,7 +471,10 @@ export async function POST(
           );
 
         if (qscUpsertError) {
-          console.error("QSC scoring: failed to upsert qsc_results", qscUpsertError);
+          console.error(
+            "QSC scoring: failed to upsert qsc_results",
+            qscUpsertError
+          );
         }
       } catch (e) {
         console.error("QSC scoring: unexpected error", e);
@@ -472,24 +486,24 @@ export async function POST(
     const origin = getBaseUrl();
 
     // These are useful for both redirect + email/debugging
-    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-      taker.id
-    )}`;
-    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
-      taker.id
-    )}`;
+    const reportPath = `/t/${encodeURIComponent(
+      token
+    )}/report?tid=${encodeURIComponent(taker.id)}`;
+    const resultPath = `/t/${encodeURIComponent(
+      token
+    )}/result?tid=${encodeURIComponent(taker.id)}`;
 
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
     // ✅ QSC PUBLIC report destination
     // Test takers must ONLY get the Growth report (entrepreneur) or leader page.
-    const qscGrowthPath = `/qsc/${encodeURIComponent(token)}/entrepreneur?tid=${encodeURIComponent(
-      taker.id
-    )}`;
-    const qscLeaderPath = `/qsc/${encodeURIComponent(token)}/leader?tid=${encodeURIComponent(
-      taker.id
-    )}`;
+    const qscGrowthPath = `/qsc/${encodeURIComponent(
+      token
+    )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
+    const qscLeaderPath = `/qsc/${encodeURIComponent(
+      token
+    )}/leader?tid=${encodeURIComponent(taker.id)}`;
 
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
@@ -595,7 +609,10 @@ export async function POST(
         });
 
         if (!ownerNotification?.ok) {
-          console.error("[submit] test_owner_notification failed", ownerNotification);
+          console.error(
+            "[submit] test_owner_notification failed",
+            ownerNotification
+          );
         }
       }
     } catch (e) {
@@ -633,4 +650,5 @@ export async function POST(
     );
   }
 }
+
 
