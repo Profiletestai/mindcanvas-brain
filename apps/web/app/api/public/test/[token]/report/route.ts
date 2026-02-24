@@ -70,7 +70,19 @@ type TestMeta = {
   report_framework_bucket?: string;
   report_framework_version?: string;
 
-  // legacy
+  // ✅ NEW: report engine switching
+  // Set this to "native_v2_blocks" for tests that should use the DB blocks + layout template engine.
+  report_engine?: string;
+
+  // ✅ NEW: framework selector for blocks engine
+  // If tests.framework_id is null, we can resolve framework by this slug
+  framework_slug?: string;
+
+  // ✅ NEW: layout template selector for blocks engine
+  // If present, we look up report_layout_templates.slug == this value (fallback to meta.report_layout)
+  report_layout_template_slug?: string;
+
+  // existing
   frameworkKey?: string;
   frameworkType?: string;
   frequencies?: Array<{ code: AB; label: string }>;
@@ -78,6 +90,9 @@ type TestMeta = {
 
   // legacy storage shape
   reportFramework?: ReportFrameworkMeta;
+
+  // already used by OperatingFrame meta in your DB insert
+  report_layout?: string;
 };
 
 type TestRow = {
@@ -85,10 +100,8 @@ type TestRow = {
   slug: string | null;
   name: string | null;
   meta: any | null;
-
-  // ✅ NEW: Native v2 wiring (non-breaking; nullable)
-  framework_id: string | null;
-  report_layout_template_id: string | null;
+  framework_id?: string | null;
+  report_layout_template_id?: string | null;
 };
 
 type TakerRow = {
@@ -97,45 +110,9 @@ type TakerRow = {
   last_name: string | null;
 };
 
-type ReportSection = {
-  id?: string;
-  title?: string;
-  blocks?: any[];
-};
-
-type SectionsPayload = {
-  common?: ReportSection[] | null;
-  profile?: ReportSection[] | null;
-  report_title?: string | null;
-  profile_missing?: boolean;
-  framework_version?: string | null;
-  framework_bucket?: string | null;
-  framework_path?: string | null;
-
-  // helpful for debugging/visibility
-  template_slug?: string | null;
-  template_version?: string | null;
-  native_v2?: boolean;
-};
-
-type ReportLayoutTemplateRow = {
-  id: string;
-  slug: string;
-  version: string;
-  status: string;
-  sections_json: any;
-};
-
-type FrameworkBlockRow = {
-  id: string;
-  framework_id: string;
-  block_key: string;
-  entity_type: "global" | "frequency" | "profile";
-  entity_code: string | null;
-  version: string;
-  status: string;
-  content_json: any;
-  created_at: string;
+type LayoutItem = {
+  key: string;
+  scope?: "global" | "profile" | "frequency";
 };
 
 // ---------------- utils ----------------
@@ -147,7 +124,6 @@ function safeNumber(x: any, d = 0) {
 
 function safeText(x: any): string {
   if (typeof x === "string") return x;
-  if (Array.isArray(x)) return x.map(String).join(" ");
   if (x == null) return "";
   return String(x);
 }
@@ -485,11 +461,12 @@ async function fetchTestRow(test_id: string): Promise<TestRow | null> {
   const sb = sbAdmin();
   const q = await sb
     .from("tests")
+    // include optional columns if present; harmless if null in data
     .select("id, slug, name, meta, framework_id, report_layout_template_id")
     .eq("id", test_id)
     .maybeSingle();
   if (q.error || !q.data) return null;
-  return q.data as TestRow;
+  return q.data as unknown as TestRow;
 }
 
 async function fetchTakerRow(taker_id: string): Promise<TakerRow | null> {
@@ -552,7 +529,7 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
   return { use: false as const, bucket: "", path: "", version: null as any, source: "none" as const };
 }
 
-// --- Support LEAD v1 schema ---
+// --- Support LEAD v1 schema (storage JSON) ---
 
 function pickCommonSections(frameworkJson: any): any[] | null {
   const fw = frameworkJson?.framework || frameworkJson;
@@ -673,416 +650,126 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
   };
 }
 
-// ---------------- Native v2 helpers ----------------
+// ---------------- NEW: Native V2 Blocks + Layout Template engine ----------------
 
-function parseVersion(v: string) {
-  const parts = String(v || "0").split(".").map((n) => Number(n));
-  return parts.map((n) => (Number.isFinite(n) ? n : 0));
-}
+async function resolveFrameworkIdForBlocks(testRow: TestRow | null, testMeta: TestMeta | null | undefined) {
+  // 1) prefer tests.framework_id when available
+  const direct = (testRow as any)?.framework_id;
+  if (typeof direct === "string" && direct) return direct;
 
-function isVersionNewer(a: string, b: string) {
-  // true if a > b
-  const A = parseVersion(a);
-  const B = parseVersion(b);
-  const len = Math.max(A.length, B.length);
-  for (let i = 0; i < len; i++) {
-    const av = A[i] ?? 0;
-    const bv = B[i] ?? 0;
-    if (av > bv) return true;
-    if (av < bv) return false;
-  }
-  return false;
-}
+  // 2) else use meta.framework_slug if present
+  const slug = String((testMeta as any)?.framework_slug || "").trim();
+  const fallbackSlug = slug || "native-4x8-core";
 
-async function fetchLayoutTemplate(id: string): Promise<ReportLayoutTemplateRow | null> {
   const sb = sbAdmin();
+  const q = await sb.from("frameworks").select("id, slug").eq("slug", fallbackSlug).maybeSingle();
+  if (!q.error && q.data?.id) return q.data.id as string;
+
+  return null;
+}
+
+async function resolveLayoutTemplate(testRow: TestRow | null, testMeta: TestMeta | null | undefined) {
+  const sb = sbAdmin();
+
+  // 1) If tests.report_layout_template_id is set, use it
+  const tid = (testRow as any)?.report_layout_template_id;
+  if (typeof tid === "string" && tid) {
+    const q = await sb.from("report_layout_templates").select("id, slug, version, status, sections_json").eq("id", tid).maybeSingle();
+    if (!q.error && q.data) return q.data as any;
+  }
+
+  // 2) Else resolve by slug: meta.report_layout_template_slug OR meta.report_layout OR "lead"
+  const slug =
+    String((testMeta as any)?.report_layout_template_slug || "").trim() ||
+    String((testMeta as any)?.report_layout || "").trim() ||
+    "lead";
+
   const q = await sb
     .from("report_layout_templates")
     .select("id, slug, version, status, sections_json")
-    .eq("id", id)
+    .eq("slug", slug)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
-  if (q.error || !q.data) return null;
-  return q.data as ReportLayoutTemplateRow;
+
+  if (!q.error && q.data) return q.data as any;
+
+  return null;
 }
 
-async function fetchFrameworkBlocks(framework_id: string): Promise<FrameworkBlockRow[]> {
+function normaliseLayoutItems(sections_json: any): LayoutItem[] {
+  const raw = Array.isArray(sections_json) ? sections_json : [];
+  const out: LayoutItem[] = [];
+
+  for (const it of raw) {
+    if (!it) continue;
+    if (typeof it === "string") out.push({ key: it, scope: "global" });
+    else if (typeof it === "object") {
+      const key = String((it as any).key || "").trim();
+      if (!key) continue;
+      const scopeRaw = String((it as any).scope || "").trim().toLowerCase();
+      const scope =
+        scopeRaw === "profile" ? "profile" : scopeRaw === "frequency" ? "frequency" : "global";
+      out.push({ key, scope });
+    }
+  }
+
+  return out;
+}
+
+async function fetchLatestActiveBlock(
+  framework_id: string,
+  entity_type: "global" | "profile" | "frequency",
+  entity_code: string | null,
+  block_key: string,
+) {
   const sb = sbAdmin();
+
   const q = await sb
     .from("framework_content_blocks")
-    .select("id, framework_id, block_key, entity_type, entity_code, version, status, content_json, created_at")
+    .select("id, block_key, entity_type, entity_code, version, status, content_json, created_at")
     .eq("framework_id", framework_id)
-    .in("status", ["active"])
-    .order("created_at", { ascending: false });
+    .eq("block_key", block_key)
+    .eq("entity_type", entity_type)
+    // entity_code handling
+    .match(entity_code ? { entity_code } : {})
+    .is(entity_code ? undefined : ("entity_code" as any), entity_code ? undefined : null)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (q.error || !Array.isArray(q.data)) return [];
-  return q.data as FrameworkBlockRow[];
+  if (q.error || !q.data) return null;
+  return q.data as any;
 }
 
-function buildBlockIndex(rows: FrameworkBlockRow[]) {
-  // pick latest per (block_key, entity_type, entity_code) with version as tie-break
-  const idx = new Map<string, FrameworkBlockRow>();
+function blockToSection(block_key: string, content_json: any) {
+  // Accept multiple shapes; normalize into: { id, title, blocks }
+  const cj = content_json ?? {};
 
-  for (const r of rows) {
-    const key = `${r.block_key}::${r.entity_type}::${String(r.entity_code || "").toUpperCase()}`;
-    const cur = idx.get(key);
-    if (!cur) {
-      idx.set(key, r);
-      continue;
-    }
-    // rows already ordered by created_at desc; but keep safe version logic
-    if (isVersionNewer(r.version, cur.version)) {
-      idx.set(key, r);
-    }
-  }
-  return idx;
-}
-
-function getBlock(
-  idx: Map<string, FrameworkBlockRow>,
-  block_key: string,
-  entity_type: FrameworkBlockRow["entity_type"],
-  entity_code?: string | null,
-) {
-  const key = `${block_key}::${entity_type}::${String(entity_code || "").toUpperCase()}`;
-  return idx.get(key)?.content_json ?? null;
-}
-
-function ensureNextStepsSection(text?: string | null) {
-  const body = safeText(text).trim();
-  const blocks: any[] = [];
-
-  if (body) blocks.push({ type: "p", text: body });
-
-  // always have something so scroll-to works even if no URL
-  if (!blocks.length) {
-    blocks.push({
-      type: "p",
-      text: "If you have access to a Next Steps link, use the button above. Otherwise, return to this report and choose one small action to focus on this week.",
-    });
-  }
+  // If content_json already looks like a section
+  const title = typeof cj?.title === "string" ? cj.title : null;
+  const blocks =
+    Array.isArray(cj?.blocks) ? cj.blocks :
+    Array.isArray(cj) ? cj :
+    Array.isArray(cj?.content) ? cj.content :
+    [];
 
   return {
-    id: "next-steps",
-    title: "Next Steps",
+    id: block_key,
+    title: title || null,
     blocks,
-  } satisfies ReportSection;
+  };
 }
 
-function nativeV2BuildSections(args: {
-  template: ReportLayoutTemplateRow;
-  blockIdx: Map<string, FrameworkBlockRow>;
-  frequency_labels: Array<{ code: AB; name: string }>;
-  frequency_percentages: Record<AB, number>;
-  profile_labels: Array<{ code: string; name: string }>;
-  profile_percentages: Record<string, number>;
-  top_freq: AB;
-  top_profile_code: string;
-  top_profile_name: string;
-  test_name: string;
-}) {
-  const {
-    template,
-    blockIdx,
-    frequency_labels,
-    frequency_percentages,
-    profile_labels,
-    profile_percentages,
-    top_freq,
-    top_profile_code,
-    top_profile_name,
-    test_name,
-  } = args;
-
-  const sectionsCfg = Array.isArray(template.sections_json) ? template.sections_json : [];
-  const common: ReportSection[] = [];
-  const profile: ReportSection[] = [];
-
-  // Pull global blocks (fail-soft)
-  const welcome = getBlock(blockIdx, "global.welcome_letter", "global", null);
-  const howTo = getBlock(blockIdx, "global.how_to_use", "global", null);
-  const cta = getBlock(blockIdx, "global.cta_next_steps", "global", null);
-
-  // Frequency descriptions
-  const freqDesc = (code: AB) => getBlock(blockIdx, "frequency.description", "frequency", code);
-
-  // Primary profile blocks (by top_profile_code)
-  const profIdentity = getBlock(blockIdx, "profile.identity", "profile", top_profile_code);
-  const profStrengths = getBlock(blockIdx, "profile.strengths", "profile", top_profile_code);
-  const profDev = getBlock(blockIdx, "profile.development_areas", "profile", top_profile_code);
-  const profComms = getBlock(blockIdx, "profile.communication_style", "profile", top_profile_code);
-  const profReflect = getBlock(blockIdx, "profile.reflection_questions", "profile", top_profile_code);
-  const profCollab = getBlock(blockIdx, "profile.collaboration", "profile", top_profile_code);
-
-  // Helpers to build blocks
-  const pctLabel = (v: number | undefined) => `${Math.round((Number.isFinite(v as any) ? (v as any) : 0) * 100)}%`;
-
-  const buildSummarySection = (): ReportSection => {
-    const topFreqName = frequency_labels.find((f) => f.code === top_freq)?.name || top_freq;
-    const freqLines = frequency_labels.map((f) => `${f.name} (${f.code}): ${pctLabel(frequency_percentages?.[f.code] ?? 0)}`);
-
-    // Sort top 3 profiles for a “mix”
-    const sortedProfiles = [...profile_labels]
-      .map((p) => ({ ...p, pct: profile_percentages?.[p.code] ?? 0 }))
-      .sort((a, b) => (b.pct || 0) - (a.pct || 0))
-      .slice(0, 3);
-
-    const mixLine = sortedProfiles
-      .map((p) => `${p.name} (${pctLabel(p.pct)})`)
-      .join(" · ");
-
-    return {
-      id: "high-level-summary",
-      title: "High Level Summary",
-      blocks: [
-        { type: "h3", text: "Your dominant frequency" },
-        { type: "p", text: `${topFreqName} (${top_freq})` },
-        { type: "ul", items: freqLines },
-
-        { type: "divider" },
-
-        { type: "h3", text: "Your profile mix" },
-        { type: "p", text: mixLine || `${top_profile_name}` },
-      ],
-    };
-  };
-
-  const buildFrameworkSection = (): ReportSection => {
-    const freqBlocks: any[] = [];
-
-    freqBlocks.push({ type: "p", text: "The framework is made up of 4 Frequencies and 8 Profiles. Frequencies explain your operating energy; Profiles explain your behavioural pattern." });
-
-    freqBlocks.push({ type: "h3", text: "The 4 Frequencies" });
-
-    const freqItems = (["A", "B", "C", "D"] as AB[]).map((code) => {
-      const name = frequency_labels.find((f) => f.code === code)?.name || code;
-      const d = freqDesc(code);
-      const summary = safeText(d?.summary || d?.description || "").trim();
-      return summary ? `${name} (${code}): ${summary}` : `${name} (${code})`;
-    });
-
-    freqBlocks.push({ type: "ul", items: freqItems });
-
-    freqBlocks.push({ type: "h3", text: "The 8 Profiles" });
-
-    const profItems = profile_labels.map((p) => `${p.name}`);
-    freqBlocks.push({ type: "ul", items: profItems });
-
-    return {
-      id: "framework",
-      title: "The Framework",
-      blocks: freqBlocks,
-    };
-  };
-
-  const buildPrimaryProfileSection = (): ReportSection => {
-    const blocks: any[] = [];
-
-    blocks.push({ type: "p", text: `Your primary profile is ${top_profile_name}. Use this section as your personal operating guide.` });
-
-    const title = safeText(profIdentity?.title || top_profile_name).trim();
-    const coreIdentity = safeText(profIdentity?.core_identity || profIdentity?.body || profIdentity?.summary || "").trim();
-
-    if (title) blocks.push({ type: "h3", text: title });
-    if (coreIdentity) blocks.push({ type: "p", text: coreIdentity });
-
-    // strengths
-    const strengths = Array.isArray(profStrengths?.items) ? profStrengths.items : Array.isArray(profStrengths?.strengths) ? profStrengths.strengths : null;
-    if (Array.isArray(strengths) && strengths.length) {
-      blocks.push({ type: "h4", text: "Strengths" });
-      blocks.push({ type: "ul", items: strengths.map(safeText) });
-    }
-
-    // development
-    const dev = Array.isArray(profDev?.items) ? profDev.items : Array.isArray(profDev?.development_areas) ? profDev.development_areas : null;
-    if (Array.isArray(dev) && dev.length) {
-      blocks.push({ type: "h4", text: "Development areas" });
-      blocks.push({ type: "ul", items: dev.map(safeText) });
-    }
-
-    // comms
-    const commsText = safeText(profComms?.body || profComms?.summary || "").trim();
-    const commsBullets = Array.isArray(profComms?.items) ? profComms.items : null;
-    if (commsText || (Array.isArray(commsBullets) && commsBullets.length)) {
-      blocks.push({ type: "h4", text: "Communication style" });
-      if (commsText) blocks.push({ type: "p", text: commsText });
-      if (Array.isArray(commsBullets) && commsBullets.length) blocks.push({ type: "ul", items: commsBullets.map(safeText) });
-    }
-
-    // reflection
-    const refl = Array.isArray(profReflect?.items) ? profReflect.items : Array.isArray(profReflect?.questions) ? profReflect.questions : null;
-    if (Array.isArray(refl) && refl.length) {
-      blocks.push({ type: "h4", text: "Reflection questions" });
-      blocks.push({ type: "ol", items: refl.map(safeText) });
-    }
-
-    // collaboration
-    const collabText = safeText(profCollab?.body || profCollab?.summary || "").trim();
-    const collabItems = Array.isArray(profCollab?.items) ? profCollab.items : null;
-    if (collabText || (Array.isArray(collabItems) && collabItems.length)) {
-      blocks.push({ type: "h4", text: "Collaboration" });
-      if (collabText) blocks.push({ type: "p", text: collabText });
-      if (Array.isArray(collabItems) && collabItems.length) blocks.push({ type: "ul", items: collabItems.map(safeText) });
-    }
-
-    if (!blocks.length) {
-      blocks.push({
-        type: "p",
-        text: "Profile content is being built for this framework. Check back soon for a deeper breakdown of your strengths, development areas, and collaboration guidance.",
-      });
-    }
-
-    return {
-      id: "primary-profile",
-      title: "Your Primary Profile",
-      blocks,
-    };
-  };
-
-  const buildIntro = (): ReportSection => {
-    const title = safeText(welcome?.title || "Welcome").trim();
-    const body = safeText(welcome?.body || welcome?.text || "").trim();
-    return {
-      id: "welcome",
-      title,
-      blocks: body ? [{ type: "p", text: body }] : [{ type: "p", text: `Welcome to your ${test_name} report.` }],
-    };
-  };
-
-  const buildHowTo = (): ReportSection => {
-    const title = safeText(howTo?.title || "How to Use This Report").trim();
-    const steps = Array.isArray(howTo?.steps) ? howTo.steps : Array.isArray(howTo?.items) ? howTo.items : null;
-    const body = safeText(howTo?.body || "").trim();
-
-    const blocks: any[] = [];
-    if (body) blocks.push({ type: "p", text: body });
-    if (Array.isArray(steps) && steps.length) blocks.push({ type: "ol", items: steps.map(safeText) });
-
-    if (!blocks.length) {
-      blocks.push({
-        type: "ol",
-        items: [
-          "Start with the High Level Summary.",
-          "Read the Framework section to understand the model.",
-          "Go deep into your Primary Profile.",
-          "Use the reflection questions to choose one action to practise this week.",
-        ],
-      });
-    }
-
-    return { id: "how-to-use", title, blocks };
-  };
-
-  const buildConclusion = (): ReportSection => {
-    return {
-      id: "conclusion",
-      title: "Conclusion",
-      blocks: [
-        {
-          type: "p",
-          text: "Awareness creates choice. Use this report as a practical guide — not just something to read once. Pick one strength to leverage and one development area to work on over the next 30 days.",
-        },
-      ],
-    };
-  };
-
-  const buildCTA = (): ReportSection => {
-    const title = safeText(cta?.title || "Next Steps").trim();
-    const note = safeText(cta?.note || "").trim();
-    const label = safeText(cta?.button_label || "").trim();
-
-    const blocks: any[] = [];
-    if (note) blocks.push({ type: "p", text: note });
-    if (label) blocks.push({ type: "p", text: `Use the “${label}” button above when you’re ready.` });
-
-    if (!blocks.length) blocks.push({ type: "p", text: "Use the Next Steps button above when you’re ready." });
-
-    // Ensure there is also a scroll target section for fallback
-    // We keep this separate section with id next-steps so LegacyReportClient scroll logic works even if URL missing.
-    return {
-      id: "cta",
-      title,
-      blocks,
-    };
-  };
-
-  // Build by template ordering, but always ensure next-steps exists.
-  for (const s of sectionsCfg) {
-    const key = String(s?.key || s?.id || "").trim();
-
-    if (key === "cover") {
-      common.push({
-        id: "cover",
-        title: "Index",
-        blocks: [{ type: "p", text: "Use the quick index to jump to any section." }],
-      });
-      continue;
-    }
-
-    if (key === "intro") {
-      common.push(buildIntro());
-      continue;
-    }
-
-    if (key === "summary_dashboard") {
-      common.push(buildSummarySection());
-      continue;
-    }
-
-    if (key === "how_to_use") {
-      common.push(buildHowTo());
-      continue;
-    }
-
-    if (key === "framework_explainer") {
-      common.push(buildFrameworkSection());
-      continue;
-    }
-
-    if (key === "primary_profile") {
-      profile.push(buildPrimaryProfileSection());
-      continue;
-    }
-
-    if (key === "applied_insights") {
-      // For now, applied insights are included in the primary profile section via blocks.
-      // Keep a placeholder that can be expanded later without changing UI.
-      profile.push({
-        id: "applied-insights",
-        title: "Applied Growth Insights",
-        blocks: [
-          {
-            type: "p",
-            text: "Use the strengths and development areas above to choose one behaviour to practise over the next 7 days. Small consistency beats big intention.",
-          },
-        ],
-      });
-      continue;
-    }
-
-    if (key === "conclusion") {
-      common.push(buildConclusion());
-      continue;
-    }
-
-    if (key === "cta") {
-      common.push(buildCTA());
-      continue;
-    }
-  }
-
-  // Always include a Next Steps scroll target section (for LegacyReportClient fallback)
-  // The UI button first tries link.next_steps_url, else scrolls to this.
-  common.push(ensureNextStepsSection(safeText(cta?.note || "").trim() || null));
-
-  return {
-    common,
-    profile,
-    report_title: `${test_name} Report`,
-    profile_missing: profile.length === 0,
-    template_slug: template.slug,
-    template_version: template.version,
-    native_v2: true,
-  } satisfies SectionsPayload;
+function insertAfterKey(sections: any[], afterId: string, toInsert: any) {
+  if (!toInsert) return sections;
+  const idx = sections.findIndex((s) => String(s?.id || "").trim().toLowerCase() === afterId.trim().toLowerCase());
+  if (idx < 0) return [...sections, toInsert];
+  const out = [...sections];
+  out.splice(idx + 1, 0, toInsert);
+  return out;
 }
 
 // ---------------- Handler ----------------
@@ -1118,8 +805,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     // Default: filesystem framework (by org)
     let fw: any = await loadFrameworkBySlug(orgSlug);
-    let frameworkSource: "filesystem" | "storage" = "filesystem";
+    let frameworkSource: "filesystem" | "storage" | "blocks" = "filesystem";
 
+    // We'll decide engine later; storage json may still be used
     if (useStorageFramework && storageChoice.bucket && storageChoice.path) {
       const storageFw = await downloadFrameworkJSON(storageChoice.bucket, storageChoice.path);
       if (storageFw) {
@@ -1178,16 +866,18 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const comp = computeFromAnswers(sub.answers_json, qmap);
 
     const freqTotals: Record<AB, number> = savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
-    const profileTotals: Record<string, number> = savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
+    const profileTotals: Record<string, number> =
+      savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq = (Object.entries(freqTotals) as [AB, number][])
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq =
+      (Object.entries(freqTotals) as [AB, number][])
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry = Object.entries(profileTotals)
-      .sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry =
+      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
 
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
@@ -1195,19 +885,101 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       look.profileByCode.get(top_profile_code)?.name ||
       top_profile_code;
 
-    // ✅ Link behavior comes from resolveLinkMeta() columns
-    const rawLinkMeta = meta.link_meta || null;
-    const linkMeta = isPortalViewer ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
-
-    // ---------------- SECTIONS BUILDER ----------------
-    // 1) If storage framework (LEAD meta) is used, keep existing behavior.
-    // 2) Else, if test has native-v2 wiring (framework_id + report_layout_template_id), build sections from DB blocks.
-    // 3) Else no sections (legacy client will show "No sections returned" but still has the dashboard summary)
-
-    let sections: SectionsPayload | null = null;
+    // --------------------------------------------
+    // ✅ Sections payload:
+    //  - Native V2 blocks engine when enabled
+    //  - Else: existing storage JSON sections (Option A)
+    // --------------------------------------------
+    let sections: any = null;
     let removed_overlap_count = 0;
 
-    if (useStorageFramework && frameworkSource === "storage") {
+    const reportEngine = String((testMeta as any)?.report_engine || "").trim().toLowerCase();
+    const useBlocksEngine = reportEngine === "native_v2_blocks";
+
+    if (useBlocksEngine) {
+      const frameworkId = await resolveFrameworkIdForBlocks(testRow, testMeta);
+      const layout = await resolveLayoutTemplate(testRow, testMeta);
+
+      const layoutItems = normaliseLayoutItems(layout?.sections_json);
+      const hasLayout = layoutItems.length > 0;
+
+      frameworkSource = "blocks";
+
+      const commonOut: any[] = [];
+      const profileOut: any[] = [];
+
+      if (frameworkId && hasLayout) {
+        for (const item of layoutItems) {
+          const key = String(item.key || "").trim();
+          if (!key) continue;
+
+          const scope = item.scope || "global";
+
+          let entity_type: "global" | "profile" | "frequency" = "global";
+          let entity_code: string | null = null;
+
+          if (scope === "profile") {
+            entity_type = "profile";
+            entity_code = top_profile_code;
+          } else if (scope === "frequency") {
+            entity_type = "frequency";
+            entity_code = top_freq;
+          } else {
+            entity_type = "global";
+            entity_code = null;
+          }
+
+          const row = await fetchLatestActiveBlock(frameworkId, entity_type, entity_code, key);
+          if (!row) continue;
+
+          const sec = blockToSection(key, row.content_json);
+          if (scope === "profile") profileOut.push(sec);
+          else commonOut.push(sec);
+        }
+
+        // Add segmentation section (qual questions) into common
+        const qualQs = await fetchQualQuestions(meta.test_id);
+        const segSection = buildSegmentationSection(qualQs, sub.answers_json);
+
+        // Insert segmentation after summary.high_level if present, otherwise append
+        const commonWithSeg = segSection
+          ? insertAfterKey(commonOut, "summary.high_level", segSection)
+          : commonOut;
+
+        sections = {
+          common: dedupeSectionsById(commonWithSeg),
+          profile: dedupeSectionsById(profileOut),
+          report_title: meta.test_name || testRow?.name || pickReportTitle(fw) || null,
+          profile_missing: profileOut.length === 0,
+          framework_version: null,
+          framework_bucket: null,
+          framework_path: null,
+          layout_template: {
+            id: layout?.id || null,
+            slug: layout?.slug || null,
+            version: layout?.version || null,
+          },
+          blocks_framework_id: frameworkId,
+        };
+      } else {
+        // Fail-soft: no framework/template — return empty sections rather than crash
+        sections = {
+          common: [],
+          profile: [],
+          report_title: meta.test_name || testRow?.name || null,
+          profile_missing: true,
+          framework_version: null,
+          framework_bucket: null,
+          framework_path: null,
+          layout_template: {
+            id: layout?.id || null,
+            slug: layout?.slug || null,
+            version: layout?.version || null,
+          },
+          blocks_framework_id: frameworkId,
+        };
+      }
+    } else if (useStorageFramework && frameworkSource === "storage") {
       // Storage sections payload (LEAD) — enforce Option A here
       const commonRaw = pickCommonSections(fw) || [];
       const rep = findProfileReport(fw, top_profile_code);
@@ -1231,34 +1003,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         framework_bucket: storageChoice.bucket || null,
         framework_path: storageChoice.path || null,
       };
-    } else {
-      // ✅ Native v2 builder (no snapshots; DB-driven blocks)
-      const nativeFrameworkId = testRow?.framework_id || null;
-      const nativeTemplateId = testRow?.report_layout_template_id || null;
-
-      if (nativeFrameworkId && nativeTemplateId) {
-        const tpl = await fetchLayoutTemplate(nativeTemplateId);
-        if (!tpl) {
-          console.log("Native v2: missing report_layout_template", { nativeTemplateId });
-        } else {
-          const rows = await fetchFrameworkBlocks(nativeFrameworkId);
-          const blockIdx = buildBlockIndex(rows);
-
-          sections = nativeV2BuildSections({
-            template: tpl,
-            blockIdx,
-            frequency_labels,
-            frequency_percentages,
-            profile_labels,
-            profile_percentages,
-            top_freq,
-            top_profile_code,
-            top_profile_name,
-            test_name: meta.test_name || testRow?.name || testMeta?.test || "Profile Test",
-          });
-        }
-      }
     }
+
+    // ✅ Link behavior comes from resolveLinkMeta() columns
+    const rawLinkMeta = meta.link_meta || null;
+    const linkMeta = isPortalViewer ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
 
     const answersCount = Array.isArray(sub.answers_json) ? sub.answers_json.length : 0;
     const computedSum = Object.values(profileTotals || {}).reduce((a, b) => a + (Number(b) || 0), 0);
@@ -1285,7 +1034,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           last_name: taker?.last_name ?? null,
         },
 
-        // ✅ clients use this for show/hide/redirect/next steps url
+        // ✅ clients use this for show/hide/redirect
         link: linkMeta || undefined,
 
         frequency_labels,
@@ -1308,6 +1057,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           storageFrameworkSource: storageChoice.source,
           storageFrameworkBucket: storageChoice.bucket || null,
           storageFrameworkPath: storageChoice.path || null,
+
+          reportEngine,
+          useBlocksEngine,
 
           schema: "portal",
           test_id: meta.test_id,
@@ -1332,18 +1084,15 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             profile_count: dbLabels.profiles.length,
           },
 
-          native_v2_enabled: !!(testRow?.framework_id && testRow?.report_layout_template_id) && !(useStorageFramework && frameworkSource === "storage"),
-
           src,
           isPortalViewer,
         },
 
-        version:
-          useStorageFramework && frameworkSource === "storage"
+        version: useBlocksEngine
+          ? "portal-native-v2-blocks+layout+labels+qual"
+          : useStorageFramework
             ? "portal-v2-storage-meta+labels+qual"
-            : sections?.native_v2
-              ? "portal-v2-native-db-blocks"
-              : "portal-v1",
+            : "portal-v1",
       },
     });
   } catch (e: any) {

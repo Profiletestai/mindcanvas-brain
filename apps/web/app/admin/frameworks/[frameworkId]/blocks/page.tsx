@@ -1,6 +1,8 @@
 //apps/web/app/admin/frameworks/[frameworkId]/blocks/page.tsx
 import "server-only";
-import { getServiceClient } from "@/app/_lib/supabase";
+import { notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { getServerSupabase, getAdminClient } from "@/app/_lib/portal";
 import BlocksClient, { type BlockRowClient } from "./BlocksClient";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +11,7 @@ export const runtime = "nodejs";
 
 type Params = { frameworkId: string };
 
-type FrameworkRow = {
-  id: string;
-  slug: string;
-  name: string | null;
-};
+type FrameworkRow = { id: string; slug: string; name: string | null };
 
 type BlockRow = {
   id: string;
@@ -32,10 +30,32 @@ function normEntityCode(x: string | null | undefined) {
   return v ? v.toUpperCase() : null;
 }
 
+async function requireSuperadmin() {
+  const sb = await getServerSupabase();
+  const { data: auth, error: authErr } = await sb.auth.getUser();
+  const user = auth?.user ?? null;
+  if (authErr || !user) notFound();
+
+  const admin = await getAdminClient();
+  const portal = admin.schema("portal");
+
+  const { data: row } = await portal
+    .from("superadmin")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!row?.user_id) notFound();
+  return { user };
+}
+
 export default async function Page({ params }: { params: Params }) {
   const frameworkId = params.frameworkId;
-  const sb = getServiceClient();
-  const portal = sb.schema("portal");
+
+  await requireSuperadmin();
+
+  const admin = await getAdminClient();
+  const portal = admin.schema("portal");
 
   const { data: fw, error: fwErr } = await portal
     .from("frameworks")
@@ -45,7 +65,7 @@ export default async function Page({ params }: { params: Params }) {
 
   if (fwErr || !fw) {
     return (
-      <div className="p-6 text-sm text-red-600">
+      <div className="p-6 text-sm text-red-400">
         Framework not found: {fwErr?.message || "unknown"}
       </div>
     );
@@ -60,7 +80,7 @@ export default async function Page({ params }: { params: Params }) {
 
   if (blocksErr) {
     return (
-      <div className="p-6 text-sm text-red-600">
+      <div className="p-6 text-sm text-red-400">
         Failed to load blocks: {blocksErr.message}
       </div>
     );
@@ -82,14 +102,16 @@ export default async function Page({ params }: { params: Params }) {
     "use server";
 
     try {
-      const sb2 = getServiceClient();
-      const portal2 = sb2.schema("portal");
+      await requireSuperadmin();
+
+      const admin2 = await getAdminClient();
+      const portal2 = admin2.schema("portal");
 
       const row = {
         framework_id: frameworkId,
         block_key: payload.block_key.trim(),
         entity_type: payload.entity_type,
-        entity_code: normEntityCode(payload.entity_code ?? null),
+        entity_code: payload.entity_type === "global" ? null : normEntityCode(payload.entity_code ?? null),
         version: String(payload.version || "").trim() || "1.0",
         status: payload.status,
         content_json: payload.content_json ?? {},
@@ -98,6 +120,7 @@ export default async function Page({ params }: { params: Params }) {
       const { error } = await portal2.from("framework_content_blocks").insert(row);
       if (error) return { ok: false, error: error.message };
 
+      revalidatePath(`/admin/frameworks/${frameworkId}/blocks`);
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: String(e?.message || e) };
@@ -113,8 +136,10 @@ export default async function Page({ params }: { params: Params }) {
     "use server";
 
     try {
-      const sb2 = getServiceClient();
-      const portal2 = sb2.schema("portal");
+      await requireSuperadmin();
+
+      const admin2 = await getAdminClient();
+      const portal2 = admin2.schema("portal");
 
       const { data: fromRow, error: fromErr } = await portal2
         .from("framework_content_blocks")
@@ -137,6 +162,7 @@ export default async function Page({ params }: { params: Params }) {
       const { error } = await portal2.from("framework_content_blocks").insert(row);
       if (error) return { ok: false, error: error.message };
 
+      revalidatePath(`/admin/frameworks/${frameworkId}/blocks`);
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: String(e?.message || e) };
@@ -150,8 +176,10 @@ export default async function Page({ params }: { params: Params }) {
     "use server";
 
     try {
-      const sb2 = getServiceClient();
-      const portal2 = sb2.schema("portal");
+      await requireSuperadmin();
+
+      const admin2 = await getAdminClient();
+      const portal2 = admin2.schema("portal");
 
       const { error } = await portal2
         .from("framework_content_blocks")
@@ -159,6 +187,8 @@ export default async function Page({ params }: { params: Params }) {
         .eq("id", payload.id);
 
       if (error) return { ok: false, error: error.message };
+
+      revalidatePath(`/admin/frameworks/${frameworkId}/blocks`);
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: String(e?.message || e) };
