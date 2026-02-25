@@ -25,7 +25,6 @@ type MapEntry = { points: number; profile: string };
 type QuestionMapRow = {
   id: string;
   profile_map: MapEntry[] | null;
-  // Some orgs may store scoring here instead of profile_map
   weights: any | null;
 };
 
@@ -65,10 +64,8 @@ type TestMeta = {
   orgSlug?: string;
   test?: string;
 
-  // V2 switch
   report_engine?: string;
 
-  // Preferred (meta-driven storage framework)
   report_framework_key?: string;
   report_framework_bucket?: string;
   report_framework_version?: string;
@@ -79,7 +76,6 @@ type TestMeta = {
   frequencies?: Array<{ code: AB; label: string }>;
   profiles?: Array<{ code: string; name: string; frequency?: AB; description?: string }>;
 
-  // legacy storage shape
   reportFramework?: ReportFrameworkMeta;
 };
 
@@ -89,7 +85,6 @@ type TestRow = {
   name: string | null;
   meta: any | null;
 
-  // ✅ V2 blocks engine relies on these
   framework_id: string | null;
   report_layout_template_id: string | null;
 };
@@ -133,6 +128,7 @@ function safeNumber(x: any, d = 0) {
 
 function safeText(x: any): string {
   if (typeof x === "string") return x;
+  if (Array.isArray(x)) return x.map(String).join(" ");
   if (x == null) return "";
   return String(x);
 }
@@ -691,9 +687,6 @@ async function fetchLatestActiveBlock(args: {
     .eq("entity_type", entityType)
     .eq("status", "active");
 
-  // Important:
-  // - for global blocks we require entity_code is null
-  // - for profile blocks we require entity_code equals PROFILE_X
   if (entityType === "global") {
     query = query.is("entity_code", null);
   } else if (entityType === "profile") {
@@ -708,12 +701,157 @@ async function fetchLatestActiveBlock(args: {
   return q.data as BlockRow;
 }
 
+function toTitleFromKey(blockKey: string) {
+  const last = String(blockKey || "").split(".").pop() || blockKey || "";
+  const spaced = last.replace(/[_\-]+/g, " ").trim();
+  return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : "";
+}
+
+function labelFromKeyName(name: string) {
+  const s = String(name || "")
+    .replace(/[_\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
+
+/**
+ * Materialize "field style" content_json into blocks when blocks are missing.
+ * Example:
+ *  { title, core_identity: "..." } => [{type:"p", text:"..."}]
+ *  { strengths: ["a","b"] } => [{type:"ul", items:["a","b"]}]
+ */
+function materializeBlocksFromFields(contentJson: any): any[] {
+  const cj = contentJson && typeof contentJson === "object" ? contentJson : {};
+  const blocks: any[] = [];
+
+  const ignore = new Set([
+    "title",
+    "heading",
+    "id",
+    "key",
+    "scope",
+    "order",
+    "version",
+    "status",
+    "created_at",
+    "updated_at",
+  ]);
+
+  // Preferred ordering for known keys (keeps reports consistent)
+  const preferredOrder = [
+    "core_identity",
+    "identity",
+    "overview",
+    "summary",
+
+    "strengths",
+    "development_areas",
+    "communication_style",
+    "reflection_questions",
+    "collaboration",
+
+    "cta",
+    "next_steps",
+  ];
+
+  const keys = Object.keys(cj || {}).filter((k) => !ignore.has(k));
+
+  // Put preferred keys first, then everything else
+  const ordered = [
+    ...preferredOrder.filter((k) => keys.includes(k)),
+    ...keys.filter((k) => !preferredOrder.includes(k)),
+  ];
+
+  for (const k of ordered) {
+    const v = (cj as any)[k];
+    if (v == null) continue;
+
+    // If it's a string -> paragraph
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (!t) continue;
+
+      // If the key isn't "identity/core_identity", add a small header for structure
+      if (k !== "core_identity" && k !== "identity" && k !== "overview" && k !== "summary") {
+        blocks.push({ type: "h4", text: labelFromKeyName(k) });
+      }
+      blocks.push({ type: "p", text: t });
+      continue;
+    }
+
+    // Array of strings -> bullet list
+    if (Array.isArray(v)) {
+      const items = v.map((x) => safeText(x).trim()).filter(Boolean);
+      if (items.length === 0) continue;
+
+      blocks.push({ type: "h4", text: labelFromKeyName(k) });
+      blocks.push({ type: "ul", items });
+      continue;
+    }
+
+    // Object with common shapes
+    if (v && typeof v === "object") {
+      // { items: [...] }
+      if (Array.isArray((v as any).items)) {
+        const items = (v as any).items.map((x: any) => safeText(x).trim()).filter(Boolean);
+        if (items.length) {
+          blocks.push({ type: "h4", text: labelFromKeyName(k) });
+          blocks.push({ type: "ul", items });
+          continue;
+        }
+      }
+
+      // { text: "..." }
+      if (typeof (v as any).text === "string") {
+        const t = String((v as any).text).trim();
+        if (t) {
+          blocks.push({ type: "h4", text: labelFromKeyName(k) });
+          blocks.push({ type: "p", text: t });
+          continue;
+        }
+      }
+
+      // fallback stringify for visibility
+      const s = safeText(v).trim();
+      if (s) {
+        blocks.push({ type: "h4", text: labelFromKeyName(k) });
+        blocks.push({ type: "p", text: s });
+      }
+    }
+  }
+
+  return blocks;
+}
+
+function extractBlocksFromContentJson(cj: any): any[] {
+  if (!cj || typeof cj !== "object") return [];
+
+  // standard + tolerant paths
+  const direct =
+    (Array.isArray(cj?.blocks) && cj.blocks) ||
+    (Array.isArray(cj?.content?.blocks) && cj.content.blocks) ||
+    (Array.isArray(cj?.section?.blocks) && cj.section.blocks) ||
+    (Array.isArray(cj?.sections) && Array.isArray(cj.sections?.[0]?.blocks) && cj.sections[0].blocks) ||
+    [];
+
+  if (Array.isArray(direct) && direct.length > 0) return direct;
+
+  // If there are no blocks arrays, materialize from fields (your current DB shape)
+  return materializeBlocksFromFields(cj);
+}
+
 function blockToReportSection(blockKey: string, layoutTitle: string | undefined, b: BlockRow | null): ReportSection | null {
   if (!b) return null;
 
   const cj = b.content_json && typeof b.content_json === "object" ? b.content_json : {};
-  const title = safeText(cj?.title || layoutTitle || "").trim() || undefined;
-  const blocks = Array.isArray(cj?.blocks) ? cj.blocks : [];
+
+  const title =
+    safeText(cj?.title || cj?.heading || layoutTitle || "").trim() ||
+    toTitleFromKey(blockKey) ||
+    undefined;
+
+  const blocks = extractBlocksFromContentJson(cj);
 
   return {
     id: blockKey,
@@ -726,14 +864,14 @@ async function buildSectionsFromBlocks(args: {
   frameworkId: string;
   layoutId: string;
   topProfileCode: string;
+  topProfileName: string;
   testId: string;
   answers: AnswerShape[] | null | undefined;
 }): Promise<{ sections: any; debug: any }> {
-  const { frameworkId, layoutId, topProfileCode, testId, answers } = args;
+  const { frameworkId, layoutId, topProfileCode, topProfileName, testId, answers } = args;
 
   const layout = await fetchLayoutSections(layoutId);
 
-  // Split by scope so LegacyReportClient continues to merge common+profile.
   const common: ReportSection[] = [];
   const profile: ReportSection[] = [];
 
@@ -742,10 +880,8 @@ async function buildSectionsFromBlocks(args: {
     if (!key) continue;
 
     const scope = String(s?.scope || "").trim().toLowerCase();
-    const title = safeText(s?.title || "");
+    const layoutTitle = safeText(s?.title || "").trim() || undefined;
 
-    // Our convention: keys already include namespace, e.g. global.cover, profile.identity
-    // Scope tells us which entity_type to query.
     const entityType =
       scope === "profile" ? "profile" : scope === "global" ? "global" : scope || "global";
 
@@ -756,11 +892,20 @@ async function buildSectionsFromBlocks(args: {
       entityCode: entityType === "profile" ? topProfileCode : null,
     });
 
-    const rs = blockToReportSection(key, title, br);
+    const rs = blockToReportSection(key, layoutTitle, br);
     if (!rs) continue;
 
-    if (entityType === "profile") profile.push(rs);
-    else common.push(rs);
+    // Optional UX improvement: if profile.identity has title equal to profile name (Activator),
+    // keep it; for subsequent sections we’ll auto-generate titles from key if needed.
+    if (entityType === "profile") {
+      // If the section ended up with a generic title and we can make it nicer:
+      if (!rs.title || rs.title.toLowerCase() === "identity") {
+        if (key === "profile.identity") rs.title = topProfileName;
+      }
+      profile.push(rs);
+    } else {
+      common.push(rs);
+    }
   }
 
   // Inject segmentation responses (qual questions) into common
@@ -795,7 +940,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const token = params.token;
     const takerId = searchParams.get("tid");
 
-    // ✅ portal bypass flag
     const src = (searchParams.get("src") || "").trim().toLowerCase();
     const isPortalViewer = src === "portal";
 
@@ -811,7 +955,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const testRow = await fetchTestRow(meta.test_id);
     const testMeta = (testRow?.meta || {}) as TestMeta;
 
-    // Engine selection (default: legacy)
     const reportEngine = String((testMeta as any)?.report_engine || "").trim().toLowerCase();
     const useBlocksEngine = reportEngine === "native_v2_blocks";
 
@@ -822,11 +965,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach",
     ).trim();
 
-    // Default: filesystem framework (by org)
     let fw: any = await loadFrameworkBySlug(orgSlug);
     let frameworkSource: "filesystem" | "storage" | "blocks" = "filesystem";
 
-    // Only used for legacy/storage sections mode
     if (!useBlocksEngine && useStorageFramework && storageChoice.bucket && storageChoice.path) {
       const storageFw = await downloadFrameworkJSON(storageChoice.bucket, storageChoice.path);
       if (storageFw) {
@@ -842,7 +983,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     const look = buildLookups(fw);
 
-    // Prefer DB labels
     const dbLabels = await fetchDbLabels(meta.test_id);
 
     const metaFreqs = Array.isArray(testMeta?.frequencies) ? testMeta.frequencies : null;
@@ -893,8 +1033,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const top_freq = (Object.entries(freqTotals) as [AB, number][])
       .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry = Object.entries(profileTotals)
-      .sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry =
+      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
 
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
@@ -931,6 +1071,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           frameworkId,
           layoutId,
           topProfileCode: top_profile_code,
+          topProfileName: top_profile_name,
           testId: meta.test_id,
           answers: sub.answers_json,
         });
@@ -939,7 +1080,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         frameworkSource = "blocks";
       }
     } else if (useStorageFramework && frameworkSource === "storage") {
-      // Storage sections payload (LEAD) — enforce Option A here
       const commonRaw = pickCommonSections(fw) || [];
       const rep = findProfileReport(fw, top_profile_code);
 
@@ -964,7 +1104,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       };
     }
 
-    // ✅ Link behavior comes from resolveLinkMeta() columns
     const rawLinkMeta = meta.link_meta || null;
     const linkMeta = isPortalViewer ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
 
@@ -993,7 +1132,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           last_name: taker?.last_name ?? null,
         },
 
-        // ✅ clients use this for show/hide/redirect
         link: linkMeta || undefined,
 
         frequency_labels,
@@ -1049,7 +1187,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           blocks: blocksDebug,
         },
 
-        version: useBlocksEngine ? "portal-native-v2-blocks+layout+labels+qual" : useStorageFramework ? "portal-v2-storage-meta+labels+qual" : "portal-v1",
+        version: useBlocksEngine
+          ? "portal-native-v2-blocks+layout+labels+qual"
+          : useStorageFramework
+            ? "portal-v2-storage-meta+labels+qual"
+            : "portal-v1",
       },
     });
   } catch (e: any) {
