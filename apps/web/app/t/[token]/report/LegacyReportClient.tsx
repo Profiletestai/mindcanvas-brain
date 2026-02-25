@@ -249,7 +249,6 @@ function Donut(props: { value: number; label: string }) {
           y="64%"
           dominantBaseline="middle"
           textAnchor="middle"
-          textAnchor="middle"
           fontSize="10"
           fontWeight="700"
           fill="#64748b"
