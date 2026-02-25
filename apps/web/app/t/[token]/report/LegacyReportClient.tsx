@@ -116,19 +116,6 @@ function getSectionDomId(section: ReportSection, idx: number) {
   return `section-${idx}`;
 }
 
-function findWelcomeIndex(sections: ReportSection[]) {
-  const idx = sections.findIndex((s) => {
-    const id = (s.id || "").toLowerCase();
-    const title = (s.title || "").toLowerCase();
-    return (
-      id.includes("welcome") ||
-      title.includes("welcome from daniel") ||
-      title.includes("welcome from daniel acutt")
-    );
-  });
-  return idx;
-}
-
 function isNextStepsSection(s: ReportSection) {
   const id = (s.id || "").toLowerCase();
   const title = (s.title || "").toLowerCase();
@@ -186,17 +173,11 @@ function buildProfileImageCandidates(base: string, profileName: string) {
   const n = String(profileName || "").trim();
   if (!n) return [];
 
-  const a = spacedLower(n);     // "vision engineer"
-  const b = dashed(n);          // "vision-engineer"
-  const c = underscored(n);     // "vision_engineer"
+  const a = spacedLower(n); // "vision engineer"
+  const b = dashed(n); // "vision-engineer"
+  const c = underscored(n); // "vision_engineer"
 
-  // IMPORTANT: keep spaces un-encoded in the string; browser will request with %20 automatically
-  const candidates = [
-    `${base}/${a}.png`,
-    `${base}/${b}.png`,
-    `${base}/${c}.png`,
-  ];
-
+  const candidates = [`${base}/${a}.png`, `${base}/${b}.png`, `${base}/${c}.png`];
   return Array.from(new Set(candidates));
 }
 
@@ -213,12 +194,8 @@ function ProfileImage({ candidates, alt }: { candidates: string[]; alt: string }
       crossOrigin="anonymous"
       className="hidden sm:block h-16 w-auto rounded-xl border border-white/10 bg-white/5 p-1"
       onError={(e) => {
-        // Try next candidate; if none left, hide.
-        if (idx < candidates.length - 1) {
-          setIdx(idx + 1);
-        } else {
-          e.currentTarget.style.display = "none";
-        }
+        if (idx < candidates.length - 1) setIdx(idx + 1);
+        else e.currentTarget.style.display = "none";
       }}
     />
   );
@@ -271,6 +248,7 @@ function Donut(props: { value: number; label: string }) {
           x="50%"
           y="64%"
           dominantBaseline="middle"
+          textAnchor="middle"
           textAnchor="middle"
           fontSize="10"
           fontWeight="700"
@@ -327,9 +305,12 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   if (type === "divider") return <hr className="my-5 border-slate-200" />;
   if (type === "image") return <ImageRenderer block={block as ImageBlock} />;
 
-  if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
-  if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
-  if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
+  if (type === "h1")
+    return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
+  if (type === "h2")
+    return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
+  if (type === "h3")
+    return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
   if (type === "h4") {
     return (
       <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -441,6 +422,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
 
     const combined = [...common, ...profile].filter(Boolean);
 
+    // dedupe by dom id
     const seen = new Set<string>();
     const deduped: ReportSection[] = [];
     for (let i = 0; i < combined.length; i++) {
@@ -451,13 +433,12 @@ export default function LegacyReportClient(props: { token: string; tid: string }
       deduped.push(s);
     }
 
-    const idx = findWelcomeIndex(deduped);
-    if (idx > 0) {
-      const welcome = deduped[idx];
-      deduped.splice(idx, 1);
-      deduped.unshift(welcome);
-    }
-
+    /**
+     * ✅ IMPORTANT CHANGE:
+     * We no longer force "Welcome" to the top.
+     * That behavior breaks the intended Cover → Welcome flow.
+     * We trust the server-provided order (layout-driven).
+     */
     return deduped;
   }, [data]);
 
@@ -616,7 +597,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
         {/* Header */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="flex items-start gap-4">
-            {/* NEW: profile image (fail-soft) */}
             <ProfileImage candidates={profileImgCandidates} alt={data.top_profile_name} />
 
             <div className="min-w-0 flex-1">
@@ -773,4 +753,3 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     </div>
   );
 }
-
