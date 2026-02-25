@@ -65,24 +65,15 @@ type TestMeta = {
   orgSlug?: string;
   test?: string;
 
+  // V2 switch
+  report_engine?: string;
+
   // Preferred (meta-driven storage framework)
   report_framework_key?: string;
   report_framework_bucket?: string;
   report_framework_version?: string;
 
-  // ✅ NEW: report engine switching
-  // Set this to "native_v2_blocks" for tests that should use the DB blocks + layout template engine.
-  report_engine?: string;
-
-  // ✅ NEW: framework selector for blocks engine
-  // If tests.framework_id is null, we can resolve framework by this slug
-  framework_slug?: string;
-
-  // ✅ NEW: layout template selector for blocks engine
-  // If present, we look up report_layout_templates.slug == this value (fallback to meta.report_layout)
-  report_layout_template_slug?: string;
-
-  // existing
+  // legacy
   frameworkKey?: string;
   frameworkType?: string;
   frequencies?: Array<{ code: AB; label: string }>;
@@ -90,9 +81,6 @@ type TestMeta = {
 
   // legacy storage shape
   reportFramework?: ReportFrameworkMeta;
-
-  // already used by OperatingFrame meta in your DB insert
-  report_layout?: string;
 };
 
 type TestRow = {
@@ -100,8 +88,10 @@ type TestRow = {
   slug: string | null;
   name: string | null;
   meta: any | null;
-  framework_id?: string | null;
-  report_layout_template_id?: string | null;
+
+  // ✅ V2 blocks engine relies on these
+  framework_id: string | null;
+  report_layout_template_id: string | null;
 };
 
 type TakerRow = {
@@ -110,9 +100,28 @@ type TakerRow = {
   last_name: string | null;
 };
 
-type LayoutItem = {
+type LayoutSection = {
   key: string;
-  scope?: "global" | "profile" | "frequency";
+  scope?: "global" | "profile" | "frequency" | string;
+  title?: string;
+};
+
+type BlockRow = {
+  id: string;
+  framework_id: string;
+  block_key: string;
+  entity_type: string;
+  entity_code: string | null;
+  version: string | null;
+  status: string;
+  content_json: any | null;
+  created_at: string;
+};
+
+type ReportSection = {
+  id?: string;
+  title?: string;
+  blocks?: any[];
 };
 
 // ---------------- utils ----------------
@@ -151,13 +160,9 @@ function profileCodeToAB(pcode: string): AB | null {
 }
 
 function selectedIndex(a: any): number {
-  // We allow various shapes; numeric answers should resolve to 0..N-1
   const raw = a?.value ?? a?.index ?? a?.selected ?? a?.selected_index ?? undefined;
-
   const n = Number(raw);
-  // If answer stored as 1..N (radio), convert to 0-based:
   if (Number.isFinite(n)) {
-    // If it's a "value" field and looks 1-based, shift:
     if (a?.value != null) return Math.max(0, n - 1);
     return Math.max(0, n);
   }
@@ -461,12 +466,11 @@ async function fetchTestRow(test_id: string): Promise<TestRow | null> {
   const sb = sbAdmin();
   const q = await sb
     .from("tests")
-    // include optional columns if present; harmless if null in data
     .select("id, slug, name, meta, framework_id, report_layout_template_id")
     .eq("id", test_id)
     .maybeSingle();
   if (q.error || !q.data) return null;
-  return q.data as unknown as TestRow;
+  return q.data as TestRow;
 }
 
 async function fetchTakerRow(taker_id: string): Promise<TakerRow | null> {
@@ -650,126 +654,137 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
   };
 }
 
-// ---------------- NEW: Native V2 Blocks + Layout Template engine ----------------
+// ---------------- V2 blocks engine helpers ----------------
 
-async function resolveFrameworkIdForBlocks(testRow: TestRow | null, testMeta: TestMeta | null | undefined) {
-  // 1) prefer tests.framework_id when available
-  const direct = (testRow as any)?.framework_id;
-  if (typeof direct === "string" && direct) return direct;
-
-  // 2) else use meta.framework_slug if present
-  const slug = String((testMeta as any)?.framework_slug || "").trim();
-  const fallbackSlug = slug || "native-4x8-core";
-
+async function fetchLayoutSections(layoutId: string): Promise<LayoutSection[]> {
   const sb = sbAdmin();
-  const q = await sb.from("frameworks").select("id, slug").eq("slug", fallbackSlug).maybeSingle();
-  if (!q.error && q.data?.id) return q.data.id as string;
-
-  return null;
-}
-
-async function resolveLayoutTemplate(testRow: TestRow | null, testMeta: TestMeta | null | undefined) {
-  const sb = sbAdmin();
-
-  // 1) If tests.report_layout_template_id is set, use it
-  const tid = (testRow as any)?.report_layout_template_id;
-  if (typeof tid === "string" && tid) {
-    const q = await sb.from("report_layout_templates").select("id, slug, version, status, sections_json").eq("id", tid).maybeSingle();
-    if (!q.error && q.data) return q.data as any;
-  }
-
-  // 2) Else resolve by slug: meta.report_layout_template_slug OR meta.report_layout OR "lead"
-  const slug =
-    String((testMeta as any)?.report_layout_template_slug || "").trim() ||
-    String((testMeta as any)?.report_layout || "").trim() ||
-    "lead";
-
   const q = await sb
     .from("report_layout_templates")
-    .select("id, slug, version, status, sections_json")
-    .eq("slug", slug)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .select("sections_json, status")
+    .eq("id", layoutId)
     .maybeSingle();
 
-  if (!q.error && q.data) return q.data as any;
+  if (q.error || !q.data) return [];
+  const status = String((q.data as any)?.status || "").toLowerCase();
+  if (status && status !== "active") return [];
 
-  return null;
+  const sj = (q.data as any)?.sections_json;
+  if (!Array.isArray(sj)) return [];
+  return sj as LayoutSection[];
 }
 
-function normaliseLayoutItems(sections_json: any): LayoutItem[] {
-  const raw = Array.isArray(sections_json) ? sections_json : [];
-  const out: LayoutItem[] = [];
-
-  for (const it of raw) {
-    if (!it) continue;
-    if (typeof it === "string") out.push({ key: it, scope: "global" });
-    else if (typeof it === "object") {
-      const key = String((it as any).key || "").trim();
-      if (!key) continue;
-      const scopeRaw = String((it as any).scope || "").trim().toLowerCase();
-      const scope =
-        scopeRaw === "profile" ? "profile" : scopeRaw === "frequency" ? "frequency" : "global";
-      out.push({ key, scope });
-    }
-  }
-
-  return out;
-}
-
-async function fetchLatestActiveBlock(
-  framework_id: string,
-  entity_type: "global" | "profile" | "frequency",
-  entity_code: string | null,
-  block_key: string,
-) {
+async function fetchLatestActiveBlock(args: {
+  frameworkId: string;
+  blockKey: string;
+  entityType: "global" | "profile" | "frequency" | string;
+  entityCode?: string | null;
+}): Promise<BlockRow | null> {
   const sb = sbAdmin();
 
-  const q = await sb
-    .from("framework_content_blocks")
-    .select("id, block_key, entity_type, entity_code, version, status, content_json, created_at")
-    .eq("framework_id", framework_id)
-    .eq("block_key", block_key)
-    .eq("entity_type", entity_type)
-    // entity_code handling
-    .match(entity_code ? { entity_code } : {})
-    .is(entity_code ? undefined : ("entity_code" as any), entity_code ? undefined : null)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { frameworkId, blockKey, entityType, entityCode } = args;
 
+  let query = sb
+    .from("framework_content_blocks")
+    .select("id, framework_id, block_key, entity_type, entity_code, version, status, content_json, created_at")
+    .eq("framework_id", frameworkId)
+    .eq("block_key", blockKey)
+    .eq("entity_type", entityType)
+    .eq("status", "active");
+
+  // Important:
+  // - for global blocks we require entity_code is null
+  // - for profile blocks we require entity_code equals PROFILE_X
+  if (entityType === "global") {
+    query = query.is("entity_code", null);
+  } else if (entityType === "profile") {
+    query = query.eq("entity_code", String(entityCode || "").toUpperCase());
+  } else if (entityCode) {
+    query = query.eq("entity_code", String(entityCode).toUpperCase());
+  }
+
+  const q = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (q.error || !q.data) return null;
-  return q.data as any;
+
+  return q.data as BlockRow;
 }
 
-function blockToSection(block_key: string, content_json: any) {
-  // Accept multiple shapes; normalize into: { id, title, blocks }
-  const cj = content_json ?? {};
+function blockToReportSection(blockKey: string, layoutTitle: string | undefined, b: BlockRow | null): ReportSection | null {
+  if (!b) return null;
 
-  // If content_json already looks like a section
-  const title = typeof cj?.title === "string" ? cj.title : null;
-  const blocks =
-    Array.isArray(cj?.blocks) ? cj.blocks :
-    Array.isArray(cj) ? cj :
-    Array.isArray(cj?.content) ? cj.content :
-    [];
+  const cj = b.content_json && typeof b.content_json === "object" ? b.content_json : {};
+  const title = safeText(cj?.title || layoutTitle || "").trim() || undefined;
+  const blocks = Array.isArray(cj?.blocks) ? cj.blocks : [];
 
   return {
-    id: block_key,
-    title: title || null,
+    id: blockKey,
+    title,
     blocks,
   };
 }
 
-function insertAfterKey(sections: any[], afterId: string, toInsert: any) {
-  if (!toInsert) return sections;
-  const idx = sections.findIndex((s) => String(s?.id || "").trim().toLowerCase() === afterId.trim().toLowerCase());
-  if (idx < 0) return [...sections, toInsert];
-  const out = [...sections];
-  out.splice(idx + 1, 0, toInsert);
-  return out;
+async function buildSectionsFromBlocks(args: {
+  frameworkId: string;
+  layoutId: string;
+  topProfileCode: string;
+  testId: string;
+  answers: AnswerShape[] | null | undefined;
+}): Promise<{ sections: any; debug: any }> {
+  const { frameworkId, layoutId, topProfileCode, testId, answers } = args;
+
+  const layout = await fetchLayoutSections(layoutId);
+
+  // Split by scope so LegacyReportClient continues to merge common+profile.
+  const common: ReportSection[] = [];
+  const profile: ReportSection[] = [];
+
+  for (const s of layout) {
+    const key = String(s?.key || "").trim();
+    if (!key) continue;
+
+    const scope = String(s?.scope || "").trim().toLowerCase();
+    const title = safeText(s?.title || "");
+
+    // Our convention: keys already include namespace, e.g. global.cover, profile.identity
+    // Scope tells us which entity_type to query.
+    const entityType =
+      scope === "profile" ? "profile" : scope === "global" ? "global" : scope || "global";
+
+    const br = await fetchLatestActiveBlock({
+      frameworkId,
+      blockKey: key,
+      entityType,
+      entityCode: entityType === "profile" ? topProfileCode : null,
+    });
+
+    const rs = blockToReportSection(key, title, br);
+    if (!rs) continue;
+
+    if (entityType === "profile") profile.push(rs);
+    else common.push(rs);
+  }
+
+  // Inject segmentation responses (qual questions) into common
+  const qualQs = await fetchQualQuestions(testId);
+  const segSection = buildSegmentationSection(qualQs, answers);
+  if (segSection) common.push(segSection as any);
+
+  return {
+    sections: {
+      common,
+      profile,
+      report_title: null,
+      profile_missing: profile.length === 0,
+      framework_version: null,
+      framework_bucket: null,
+      framework_path: null,
+    },
+    debug: {
+      layout_sections_count: layout.length,
+      common_sections_count: common.length,
+      profile_sections_count: profile.length,
+      top_profile_code: topProfileCode,
+    },
+  };
 }
 
 // ---------------- Handler ----------------
@@ -796,6 +811,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const testRow = await fetchTestRow(meta.test_id);
     const testMeta = (testRow?.meta || {}) as TestMeta;
 
+    // Engine selection (default: legacy)
+    const reportEngine = String((testMeta as any)?.report_engine || "").trim().toLowerCase();
+    const useBlocksEngine = reportEngine === "native_v2_blocks";
+
     const storageChoice = resolveStorageFramework(testMeta);
     const useStorageFramework = storageChoice.use;
 
@@ -807,8 +826,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     let fw: any = await loadFrameworkBySlug(orgSlug);
     let frameworkSource: "filesystem" | "storage" | "blocks" = "filesystem";
 
-    // We'll decide engine later; storage json may still be used
-    if (useStorageFramework && storageChoice.bucket && storageChoice.path) {
+    // Only used for legacy/storage sections mode
+    if (!useBlocksEngine && useStorageFramework && storageChoice.bucket && storageChoice.path) {
       const storageFw = await downloadFrameworkJSON(storageChoice.bucket, storageChoice.path);
       if (storageFw) {
         fw = storageFw;
@@ -866,18 +885,16 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const comp = computeFromAnswers(sub.answers_json, qmap);
 
     const freqTotals: Record<AB, number> = savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
-    const profileTotals: Record<string, number> =
-      savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
+    const profileTotals: Record<string, number> = savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq =
-      (Object.entries(freqTotals) as [AB, number][])
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq = (Object.entries(freqTotals) as [AB, number][])
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry =
-      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry = Object.entries(profileTotals)
+      .sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
 
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
@@ -885,99 +902,41 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       look.profileByCode.get(top_profile_code)?.name ||
       top_profile_code;
 
-    // --------------------------------------------
-    // ✅ Sections payload:
-    //  - Native V2 blocks engine when enabled
-    //  - Else: existing storage JSON sections (Option A)
-    // --------------------------------------------
+    // ---------------- Sections payload ----------------
     let sections: any = null;
     let removed_overlap_count = 0;
-
-    const reportEngine = String((testMeta as any)?.report_engine || "").trim().toLowerCase();
-    const useBlocksEngine = reportEngine === "native_v2_blocks";
+    let blocksDebug: any = null;
 
     if (useBlocksEngine) {
-      const frameworkId = await resolveFrameworkIdForBlocks(testRow, testMeta);
-      const layout = await resolveLayoutTemplate(testRow, testMeta);
+      const frameworkId = testRow?.framework_id;
+      const layoutId = testRow?.report_layout_template_id;
 
-      const layoutItems = normaliseLayoutItems(layout?.sections_json);
-      const hasLayout = layoutItems.length > 0;
-
-      frameworkSource = "blocks";
-
-      const commonOut: any[] = [];
-      const profileOut: any[] = [];
-
-      if (frameworkId && hasLayout) {
-        for (const item of layoutItems) {
-          const key = String(item.key || "").trim();
-          if (!key) continue;
-
-          const scope = item.scope || "global";
-
-          let entity_type: "global" | "profile" | "frequency" = "global";
-          let entity_code: string | null = null;
-
-          if (scope === "profile") {
-            entity_type = "profile";
-            entity_code = top_profile_code;
-          } else if (scope === "frequency") {
-            entity_type = "frequency";
-            entity_code = top_freq;
-          } else {
-            entity_type = "global";
-            entity_code = null;
-          }
-
-          const row = await fetchLatestActiveBlock(frameworkId, entity_type, entity_code, key);
-          if (!row) continue;
-
-          const sec = blockToSection(key, row.content_json);
-          if (scope === "profile") profileOut.push(sec);
-          else commonOut.push(sec);
-        }
-
-        // Add segmentation section (qual questions) into common
-        const qualQs = await fetchQualQuestions(meta.test_id);
-        const segSection = buildSegmentationSection(qualQs, sub.answers_json);
-
-        // Insert segmentation after summary.high_level if present, otherwise append
-        const commonWithSeg = segSection
-          ? insertAfterKey(commonOut, "summary.high_level", segSection)
-          : commonOut;
-
-        sections = {
-          common: dedupeSectionsById(commonWithSeg),
-          profile: dedupeSectionsById(profileOut),
-          report_title: meta.test_name || testRow?.name || pickReportTitle(fw) || null,
-          profile_missing: profileOut.length === 0,
-          framework_version: null,
-          framework_bucket: null,
-          framework_path: null,
-          layout_template: {
-            id: layout?.id || null,
-            slug: layout?.slug || null,
-            version: layout?.version || null,
-          },
-          blocks_framework_id: frameworkId,
-        };
-      } else {
-        // Fail-soft: no framework/template — return empty sections rather than crash
+      if (!frameworkId || !layoutId) {
+        console.log("native_v2_blocks enabled but framework_id/layout_id missing", {
+          test_id: meta.test_id,
+          frameworkId,
+          layoutId,
+        });
         sections = {
           common: [],
           profile: [],
-          report_title: meta.test_name || testRow?.name || null,
+          report_title: null,
           profile_missing: true,
           framework_version: null,
           framework_bucket: null,
           framework_path: null,
-          layout_template: {
-            id: layout?.id || null,
-            slug: layout?.slug || null,
-            version: layout?.version || null,
-          },
-          blocks_framework_id: frameworkId,
         };
+      } else {
+        const built = await buildSectionsFromBlocks({
+          frameworkId,
+          layoutId,
+          topProfileCode: top_profile_code,
+          testId: meta.test_id,
+          answers: sub.answers_json,
+        });
+        sections = built.sections;
+        blocksDebug = built.debug;
+        frameworkSource = "blocks";
       }
     } else if (useStorageFramework && frameworkSource === "storage") {
       // Storage sections payload (LEAD) — enforce Option A here
@@ -1052,14 +1011,14 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         sections,
 
         debug: {
+          reportEngine,
+          useBlocksEngine,
+
           frameworkSource,
           useStorageFramework,
           storageFrameworkSource: storageChoice.source,
           storageFrameworkBucket: storageChoice.bucket || null,
           storageFrameworkPath: storageChoice.path || null,
-
-          reportEngine,
-          useBlocksEngine,
 
           schema: "portal",
           test_id: meta.test_id,
@@ -1086,13 +1045,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
           src,
           isPortalViewer,
+
+          blocks: blocksDebug,
         },
 
-        version: useBlocksEngine
-          ? "portal-native-v2-blocks+layout+labels+qual"
-          : useStorageFramework
-            ? "portal-v2-storage-meta+labels+qual"
-            : "portal-v1",
+        version: useBlocksEngine ? "portal-native-v2-blocks+layout+labels+qual" : useStorageFramework ? "portal-v2-storage-meta+labels+qual" : "portal-v1",
       },
     });
   } catch (e: any) {
