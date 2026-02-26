@@ -122,21 +122,18 @@ function isNextStepsSection(s: ReportSection) {
   return id === "next-steps" || title === "next steps" || title.includes("next steps");
 }
 
-/** ----------------- NEW: profile image helpers (fail-soft) ----------------- */
+/** ----------------- profile image helpers (fail-soft) ----------------- */
 
 function inferProfileCardsBase(data?: ResultData | null): string {
   const fp = String(data?.sections?.framework_path || "").toLowerCase();
   const tn = String(data?.test_name || "").toLowerCase();
 
-  // Prefer framework_path when available
   if (fp.includes("operatingframe")) return "/images/operatingframe-full-test/profile-cards";
   if (fp.includes("lead")) return "/images/mindCanvas-LEAD-system/profile-cards";
 
-  // Fallback to test name
   if (tn.includes("operating")) return "/images/operatingframe-full-test/profile-cards";
   if (tn.includes("lead")) return "/images/mindCanvas-LEAD-system/profile-cards";
 
-  // Unknown framework
   return "";
 }
 
@@ -173,9 +170,9 @@ function buildProfileImageCandidates(base: string, profileName: string) {
   const n = String(profileName || "").trim();
   if (!n) return [];
 
-  const a = spacedLower(n); // "vision engineer"
-  const b = dashed(n); // "vision-engineer"
-  const c = underscored(n); // "vision_engineer"
+  const a = spacedLower(n);
+  const b = dashed(n);
+  const c = underscored(n);
 
   const candidates = [`${base}/${a}.png`, `${base}/${b}.png`, `${base}/${c}.png`];
   return Array.from(new Set(candidates));
@@ -327,7 +324,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
       <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
-        {items.map((it: any, i: number) => <li key={i}>{safeText(it)}</li>)}
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
       </ul>
     );
   }
@@ -336,7 +335,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
       <ol className="list-decimal pl-5 text-sm text-slate-700 space-y-1">
-        {items.map((it: any, i: number) => <li key={i}>{safeText(it)}</li>)}
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
       </ol>
     );
   }
@@ -354,9 +355,7 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <p className="text-xs font-semibold text-amber-900">
-        Unsupported block type: {String((block as any).type || "unknown")}
-      </p>
+      <p className="text-xs font-semibold text-amber-900">Unsupported block type: {String((block as any).type || "unknown")}</p>
     </div>
   );
 }
@@ -419,9 +418,9 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     const common = (data?.sections?.common || []) as ReportSection[];
     const profile = (data?.sections?.profile || []) as ReportSection[];
 
+    // IMPORTANT: preserve server order. No “Welcome-first” reshuffle.
     const combined = [...common, ...profile].filter(Boolean);
 
-    // dedupe by dom id
     const seen = new Set<string>();
     const deduped: ReportSection[] = [];
     for (let i = 0; i < combined.length; i++) {
@@ -432,12 +431,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
       deduped.push(s);
     }
 
-    /**
-     * ✅ IMPORTANT CHANGE:
-     * We no longer force "Welcome" to the top.
-     * That behavior breaks the intended Cover → Welcome flow.
-     * We trust the server-provided order (layout-driven).
-     */
     return deduped;
   }, [data]);
 
@@ -686,7 +679,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
             <p className="mt-1 text-xs text-slate-300">Jump straight to the section you need.</p>
 
             <div className="mt-4 space-y-2">
-              {quickIndex.slice(0, 30).map((s, i) => (
+              {quickIndex.slice(0, 50).map((s, i) => (
                 <button
                   key={s.id + i}
                   onClick={() => scrollToSection(s.id)}
