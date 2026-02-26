@@ -102,14 +102,7 @@ type ReportSectionBlock =
   | { type: "quote"; text?: string; cite?: string }
   | { type: "divider" }
   | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
-  | {
-      type: "image";
-      src?: string;
-      alt?: string;
-      caption?: string;
-      align?: "left" | "center" | "right";
-      max_h?: number;
-    }
+  | { type: "image"; src?: string; alt?: string; caption?: string; align?: "left" | "center" | "right"; max_h?: number }
   | { type: string; [k: string]: any };
 
 type ReportSection = {
@@ -128,7 +121,8 @@ type SectionsPayload = {
   framework_path?: string | null;
 };
 
-type LayoutSection = { key: string; scope: "global" | "profile" };
+// ✅ Layout now supports optional title (to fix index ordering)
+type LayoutSection = { key: string; scope: "global" | "profile"; title?: string };
 
 // ---------------- utils ----------------
 
@@ -186,12 +180,7 @@ function coerceMapEntries(x: any): MapEntry[] {
   }
 
   if (x && typeof x === "object") {
-    const maybe =
-      (x as any)?.profile_map ||
-      (x as any)?.weights ||
-      (x as any)?.map ||
-      (x as any)?.options ||
-      null;
+    const maybe = (x as any)?.profile_map || (x as any)?.weights || (x as any)?.map || (x as any)?.options || null;
     if (Array.isArray(maybe)) return coerceMapEntries(maybe);
   }
 
@@ -309,9 +298,7 @@ function sbAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url) throw new Error("SUPABASE_URL is required (or NEXT_PUBLIC_SUPABASE_URL).");
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required (or an anon key fallback).");
@@ -436,15 +423,9 @@ async function fetchDbLabels(test_id: string): Promise<{
 }> {
   const sb = sbAdmin();
 
-  const freqsRes = await sb
-    .from("test_frequency_labels")
-    .select("frequency_code, frequency_name")
-    .eq("test_id", test_id);
+  const freqsRes = await sb.from("test_frequency_labels").select("frequency_code, frequency_name").eq("test_id", test_id);
 
-  const profRes = await sb
-    .from("test_profile_labels")
-    .select("profile_code, profile_name, frequency_code")
-    .eq("test_id", test_id);
+  const profRes = await sb.from("test_profile_labels").select("profile_code, profile_name, frequency_code").eq("test_id", test_id);
 
   const freqs =
     Array.isArray(freqsRes.data)
@@ -468,11 +449,7 @@ async function fetchDbLabels(test_id: string): Promise<{
 
 async function fetchTestRow(test_id: string): Promise<TestRow | null> {
   const sb = sbAdmin();
-  const q = await sb
-    .from("tests")
-    .select("id, slug, name, meta, org_id, report_layout_template_id")
-    .eq("id", test_id)
-    .maybeSingle();
+  const q = await sb.from("tests").select("id, slug, name, meta, org_id, report_layout_template_id").eq("id", test_id).maybeSingle();
 
   if (q.error || !q.data) return null;
   return q.data as TestRow;
@@ -551,21 +528,17 @@ type BlockRow = {
 async function fetchLayoutSections(layoutId: string | null | undefined): Promise<LayoutSection[]> {
   if (!layoutId) return [];
   const sb = sbAdmin();
-  const q = await sb
-    .from("report_layout_templates")
-    .select("id, sections_json")
-    .eq("id", layoutId)
-    .maybeSingle();
+  const q = await sb.from("report_layout_templates").select("id, sections_json").eq("id", layoutId).maybeSingle();
 
   if (q.error || !q.data) return [];
   const sections = (q.data as any)?.sections_json;
   if (!Array.isArray(sections)) return [];
+
   return sections
     .map((s: any) => ({
       key: String(s?.key || "").trim(),
-      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as
-        | "global"
-        | "profile",
+      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as "global" | "profile",
+      title: typeof s?.title === "string" ? s.title.trim() : undefined,
     }))
     .filter((s) => !!s.key);
 }
@@ -680,8 +653,7 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
     let answerText = "";
 
     if (String(q.type || "").toLowerCase() === "text") {
-      answerText =
-        safeText((a as any)?.text) || safeText((a as any)?.value) || safeText((a as any)?.answer) || "";
+      answerText = safeText((a as any)?.text) || safeText((a as any)?.value) || safeText((a as any)?.answer) || "";
     } else {
       const opts = Array.isArray(q.options) ? q.options : [];
       const sel = selectedIndex(a);
@@ -701,10 +673,7 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
   return {
     id: "segmentation-responses",
     title: "Your responses",
-    blocks: [
-      { type: "p", text: "These are the answers you provided to the initial questions." },
-      { type: "ul", items: rows },
-    ],
+    blocks: [{ type: "p", text: "These are the answers you provided to the initial questions." }, { type: "ul", items: rows }],
   };
 }
 
@@ -746,10 +715,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         fw = storageFw;
         frameworkSource = useBlocksEngine ? "blocks" : "storage";
       } else {
-        console.log("Storage framework missing; falling back to filesystem", {
-          bucket: storageChoice.bucket,
-          path: storageChoice.path,
-        });
+        console.log("Storage framework missing; falling back to filesystem", { bucket: storageChoice.bucket, path: storageChoice.path });
       }
     }
 
@@ -799,15 +765,12 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq = (Object.entries(freqTotals) as [AB, number][])
-      .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq = (Object.entries(freqTotals) as [AB, number][]).sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
     const top_profile_entry = Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
-      profile_labels.find((p) => p.code === top_profile_code)?.name ||
-      look.profileByCode.get(top_profile_code)?.name ||
-      top_profile_code;
+      profile_labels.find((p) => p.code === top_profile_code)?.name || look.profileByCode.get(top_profile_code)?.name || top_profile_code;
 
     // Secondary / Tertiary
     const sortedProfiles = [...profile_labels]
@@ -828,12 +791,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       SECONDARY_PROFILE_NAME: secondary,
       TERTIARY_PROFILE_NAME: tertiary,
       PROFILE_IMAGE_PRIMARY: `/images/operatingframe-full-test/profile-cards/${String(top_profile_name).toLowerCase()}.png`,
-      PROFILE_IMAGE_SECONDARY: secondary
-        ? `/images/operatingframe-full-test/profile-cards/${String(secondary).toLowerCase()}.png`
-        : "",
-      PROFILE_IMAGE_TERTIARY: tertiary
-        ? `/images/operatingframe-full-test/profile-cards/${String(tertiary).toLowerCase()}.png`
-        : "",
+      PROFILE_IMAGE_SECONDARY: secondary ? `/images/operatingframe-full-test/profile-cards/${String(secondary).toLowerCase()}.png` : "",
+      PROFILE_IMAGE_TERTIARY: tertiary ? `/images/operatingframe-full-test/profile-cards/${String(tertiary).toLowerCase()}.png` : "",
     };
 
     // Sections payload
@@ -848,11 +807,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
       // Blocks live under entity_code = 'GLOBAL' and entity_code = top_profile_code
       const globalBlocks = await fetchBlocksForKeys({ keys: globalKeys, entity_type: "global", entity_code: "GLOBAL" });
-      const profileBlocks = await fetchBlocksForKeys({
-        keys: profileKeys,
-        entity_type: "profile",
-        entity_code: top_profile_code,
-      });
+      const profileBlocks = await fetchBlocksForKeys({ keys: profileKeys, entity_type: "profile", entity_code: top_profile_code });
 
       const common: ReportSection[] = [];
       const profile: ReportSection[] = [];
@@ -864,43 +819,37 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           const row = globalBlocks.get(key);
           const content = row?.content_json || null;
 
-          const built = contentJsonToSection(content, undefined);
+          // ✅ Use layout title as fallback so the index is stable
+          const built = contentJsonToSection(content, s.title);
 
-          const merged = replaceTokensDeep(
-            { title: built.title, blocks: built.blocks },
-            tokenCtx,
-          );
+          const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
 
           common.push({
             id: key,
-            title: safeText(merged.title) || undefined,
-            blocks: Array.isArray(merged.blocks) ? merged.blocks : [],
+            title: safeText((merged as any).title) || undefined,
+            blocks: Array.isArray((merged as any).blocks) ? (merged as any).blocks : [],
           });
         } else {
           const row = profileBlocks.get(key);
           const content = row?.content_json || null;
 
-          // Default title behavior:
-          // - profile.identity uses the profile name as section title
-          // - other profile.* sections can supply their own title (Strengths / etc)
+          // ✅ Prefer layout title; else default behavior
           const defaultTitle =
-            key === "profile.identity"
+            s.title ||
+            (key === "profile.identity"
               ? top_profile_name
               : key.startsWith("profile.")
                 ? key.replace("profile.", "").replaceAll("_", " ")
-                : undefined;
+                : undefined);
 
           const built = contentJsonToSection(content, defaultTitle);
 
-          const merged = replaceTokensDeep(
-            { title: built.title, blocks: built.blocks },
-            tokenCtx,
-          );
+          const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
 
           profile.push({
             id: key,
-            title: safeText(merged.title) || defaultTitle,
-            blocks: Array.isArray(merged.blocks) ? merged.blocks : [],
+            title: safeText((merged as any).title) || defaultTitle,
+            blocks: Array.isArray((merged as any).blocks) ? (merged as any).blocks : [],
           });
         }
       }
@@ -1008,8 +957,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
           blocks: useBlocksEngine
             ? {
-                layout_sections_count:
-                  (sections?.common?.length || 0) + (sections?.profile?.length || 0),
+                layout_sections_count: (sections?.common?.length || 0) + (sections?.profile?.length || 0),
                 common_sections_count: sections?.common?.length || 0,
                 profile_sections_count: sections?.profile?.length || 0,
                 top_profile_code,
