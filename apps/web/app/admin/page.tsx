@@ -2,75 +2,15 @@
 import "server-only";
 
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
-import { createServerClient } from "@supabase/ssr";
 import { createClient as createAdminClient } from "@/lib/server/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const PROFILETEST_ORG_SLUG = "profiletest-ai";
-
-type CookieStore = Awaited<ReturnType<typeof cookies>>;
-
-function supabaseFromCookies(cookieStore: CookieStore) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anon) return null;
-
-  return createServerClient(url, anon, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-    },
-  });
-}
-
 export default async function AdminOrgsPage() {
-  // ✅ Auth-gated + membership-gated UI (Profiletest.ai only for org performance page link)
-  const cookieStore = await cookies();
-  const supabase = supabaseFromCookies(cookieStore);
-  if (!supabase) notFound();
+  // ✅ /admin is already protected by apps/web/app/admin/layout.tsx (superadmin table)
+  // So we don't need additional gating here.
 
-  const { data: auth, error: authErr } = await supabase.auth.getUser();
-  const user = auth?.user ?? null;
-  if (authErr || !user) notFound();
-
-  // Check membership in profiletest-ai org (Supabase-auth-level access)
-  let canSeeOrgPerformance = false;
-
-  try {
-    const { data: orgRow, error: orgErr } = await supabase
-      .schema("portal")
-      .from("orgs")
-      .select("id, slug")
-      .eq("slug", PROFILETEST_ORG_SLUG)
-      .maybeSingle();
-
-    if (!orgErr && orgRow?.id) {
-      const { data: membership, error: memErr } = await supabase
-        .schema("portal")
-        .from("user_orgs")
-        .select("org_id, role")
-        .eq("org_id", orgRow.id)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!memErr && membership) {
-        // Optional hardening: only allow certain roles
-        // const allowed = ["owner", "admin", "super_admin"];
-        // canSeeOrgPerformance = allowed.includes(String(membership.role || ""));
-        canSeeOrgPerformance = true;
-      }
-    }
-  } catch {
-    canSeeOrgPerformance = false;
-  }
-
-  // ✅ Load org list (admin/service role is fine here because this is an admin page anyway)
   const sb = createAdminClient().schema("portal");
   const { data: orgs, error } = await sb
     .from("v_organizations")
@@ -94,16 +34,14 @@ export default async function AdminOrgsPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* ✅ Profiletest.ai-only: Organisation Performance */}
-            {canSeeOrgPerformance ? (
-              <Link
-                href="/admin/analytics/orgs"
-                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white shadow hover:bg-white/10 transition"
-                title="View organisation performance across the platform"
-              >
-                Organisation Performance
-              </Link>
-            ) : null}
+            {/* ✅ Superadmin-only page already, so show this button */}
+            <Link
+              href="/admin/analytics/orgs"
+              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white shadow hover:bg-white/10 transition"
+              title="View organisation performance across the platform"
+            >
+              Organisation Performance
+            </Link>
 
             <Link
               href="/admin/orgs/new"
