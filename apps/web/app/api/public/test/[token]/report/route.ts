@@ -114,6 +114,9 @@ type ReportSection = {
 type SectionsPayload = {
   common?: ReportSection[] | null;
   profile?: ReportSection[] | null;
+
+  // NOTE: We still keep common/profile for backward compatibility,
+  // but we now ensure Conclusion + Next Steps are AFTER profile by moving them.
   report_title?: string | null;
   profile_missing?: boolean;
   framework_version?: string | null;
@@ -121,8 +124,7 @@ type SectionsPayload = {
   framework_path?: string | null;
 };
 
-// ✅ Layout now supports optional title (to fix index ordering)
-type LayoutSection = { key: string; scope: "global" | "profile"; title?: string };
+type LayoutSection = { key: string; scope: "global" | "profile" };
 
 // ---------------- utils ----------------
 
@@ -135,6 +137,14 @@ function safeText(x: any): string {
   if (typeof x === "string") return x;
   if (x == null) return "";
   return String(x);
+}
+
+function titleCaseWords(s: string) {
+  return s
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 function toPercentages<T extends string>(totals: Partial<Record<T, number>>): Record<T, number> {
@@ -298,7 +308,9 @@ function sbAdmin() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url) throw new Error("SUPABASE_URL is required (or NEXT_PUBLIC_SUPABASE_URL).");
   if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required (or an anon key fallback).");
@@ -423,9 +435,15 @@ async function fetchDbLabels(test_id: string): Promise<{
 }> {
   const sb = sbAdmin();
 
-  const freqsRes = await sb.from("test_frequency_labels").select("frequency_code, frequency_name").eq("test_id", test_id);
+  const freqsRes = await sb
+    .from("test_frequency_labels")
+    .select("frequency_code, frequency_name")
+    .eq("test_id", test_id);
 
-  const profRes = await sb.from("test_profile_labels").select("profile_code, profile_name, frequency_code").eq("test_id", test_id);
+  const profRes = await sb
+    .from("test_profile_labels")
+    .select("profile_code, profile_name, frequency_code")
+    .eq("test_id", test_id);
 
   const freqs =
     Array.isArray(freqsRes.data)
@@ -449,7 +467,11 @@ async function fetchDbLabels(test_id: string): Promise<{
 
 async function fetchTestRow(test_id: string): Promise<TestRow | null> {
   const sb = sbAdmin();
-  const q = await sb.from("tests").select("id, slug, name, meta, org_id, report_layout_template_id").eq("id", test_id).maybeSingle();
+  const q = await sb
+    .from("tests")
+    .select("id, slug, name, meta, org_id, report_layout_template_id")
+    .eq("id", test_id)
+    .maybeSingle();
 
   if (q.error || !q.data) return null;
   return q.data as TestRow;
@@ -528,17 +550,21 @@ type BlockRow = {
 async function fetchLayoutSections(layoutId: string | null | undefined): Promise<LayoutSection[]> {
   if (!layoutId) return [];
   const sb = sbAdmin();
-  const q = await sb.from("report_layout_templates").select("id, sections_json").eq("id", layoutId).maybeSingle();
+  const q = await sb
+    .from("report_layout_templates")
+    .select("id, sections_json")
+    .eq("id", layoutId)
+    .maybeSingle();
 
   if (q.error || !q.data) return [];
   const sections = (q.data as any)?.sections_json;
   if (!Array.isArray(sections)) return [];
-
   return sections
     .map((s: any) => ({
       key: String(s?.key || "").trim(),
-      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as "global" | "profile",
-      title: typeof s?.title === "string" ? s.title.trim() : undefined,
+      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as
+        | "global"
+        | "profile",
     }))
     .filter((s) => !!s.key);
 }
@@ -677,6 +703,9 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
   };
 }
 
+// These MUST appear at the END of the whole report (after profile sections)
+const GLOBAL_POST_PROFILE_KEYS = new Set<string>(["global.conclusion", "global.cta_next_steps"]);
+
 // ---------------- Handler ----------------
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -715,7 +744,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         fw = storageFw;
         frameworkSource = useBlocksEngine ? "blocks" : "storage";
       } else {
-        console.log("Storage framework missing; falling back to filesystem", { bucket: storageChoice.bucket, path: storageChoice.path });
+        console.log("Storage framework missing; falling back to filesystem", {
+          bucket: storageChoice.bucket,
+          path: storageChoice.path,
+        });
       }
     }
 
@@ -765,7 +797,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq = (Object.entries(freqTotals) as [AB, number][]).sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq =
+      (Object.entries(freqTotals) as [AB, number][]).sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
     const top_profile_entry = Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
@@ -811,6 +844,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
       const common: ReportSection[] = [];
       const profile: ReportSection[] = [];
+      const postProfile: ReportSection[] = [];
 
       for (const s of layoutSections) {
         const key = s.key;
@@ -819,37 +853,37 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           const row = globalBlocks.get(key);
           const content = row?.content_json || null;
 
-          // ✅ Use layout title as fallback so the index is stable
-          const built = contentJsonToSection(content, s.title);
-
+          const built = contentJsonToSection(content, undefined);
           const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
 
-          common.push({
+          const sectionObj: ReportSection = {
             id: key,
-            title: safeText((merged as any).title) || undefined,
-            blocks: Array.isArray((merged as any).blocks) ? (merged as any).blocks : [],
-          });
+            title: safeText((merged as any)?.title) || undefined,
+            blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
+          };
+
+          // ✅ This is the actual fix:
+          // Push conclusion + next_steps AFTER profile sections, regardless of scope.
+          if (GLOBAL_POST_PROFILE_KEYS.has(key)) postProfile.push(sectionObj);
+          else common.push(sectionObj);
         } else {
           const row = profileBlocks.get(key);
           const content = row?.content_json || null;
 
-          // ✅ Prefer layout title; else default behavior
           const defaultTitle =
-            s.title ||
-            (key === "profile.identity"
+            key === "profile.identity"
               ? top_profile_name
               : key.startsWith("profile.")
-                ? key.replace("profile.", "").replaceAll("_", " ")
-                : undefined);
+                ? titleCaseWords(key.replace("profile.", "").replaceAll("_", " "))
+                : undefined;
 
           const built = contentJsonToSection(content, defaultTitle);
-
           const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
 
           profile.push({
             id: key,
-            title: safeText((merged as any).title) || defaultTitle,
-            blocks: Array.isArray((merged as any).blocks) ? (merged as any).blocks : [],
+            title: safeText((merged as any)?.title) || defaultTitle,
+            blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
           });
         }
       }
@@ -864,6 +898,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         else common.push(segSection as any);
       }
 
+      // ✅ Append "post profile" global sections at the VERY end
+      // This makes Conclusion + Next Steps appear AFTER the profile sections
+      profile.push(...postProfile);
+
       sections = {
         common,
         profile,
@@ -874,7 +912,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         framework_path: storageChoice.path || null,
       };
     } else {
-      // Legacy fallback: leave sections null (legacy renderer already supports no sections)
       sections = null;
     }
 
@@ -961,6 +998,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
                 common_sections_count: sections?.common?.length || 0,
                 profile_sections_count: sections?.profile?.length || 0,
                 top_profile_code,
+                moved_global_post_profile_keys: Array.from(GLOBAL_POST_PROFILE_KEYS),
               }
             : null,
 
