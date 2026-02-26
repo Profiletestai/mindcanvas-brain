@@ -25,8 +25,50 @@ type Props = {
   questions: Question[];
 };
 
+// Small deterministic PRNG (string seed)
+function xmur3(str: string) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  };
+}
+function mulberry32(a: number) {
+  return () => {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function seededShuffle<T>(arr: T[], seedStr: string): T[] {
+  const seed = xmur3(seedStr)();
+  const rand = mulberry32(seed);
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export default function McasTakerClient(props: Props) {
-  const { token, application, framework, questions } = props;
+  const { token, application, framework } = props;
+
+  // Randomise question order per user (deterministic)
+  const questions = useMemo(() => {
+    const shuffledQs = seededShuffle(props.questions, `mcas:${token}:questions`);
+    // Also shuffle option order per question
+    return shuffledQs.map((q) => ({
+      ...q,
+      options: seededShuffle(q.options, `mcas:${token}:${q.code}:options`),
+    }));
+  }, [props.questions, token]);
 
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -83,13 +125,6 @@ export default function McasTakerClient(props: Props) {
             Application: <span className="text-white">{application.application_id}</span>
           </div>
 
-          {total === 0 ? (
-            <div className="mt-6 rounded-xl border border-yellow-400/30 bg-yellow-400/10 p-4 text-yellow-200">
-              This MCAS framework doesn’t have questions loaded yet. Add questions into
-              <span className="font-mono"> mcas.frameworks.definition.questions</span> to begin testing.
-            </div>
-          ) : null}
-
           {done ? (
             <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4">
               <div className="font-semibold">Submitted successfully</div>
@@ -126,9 +161,7 @@ export default function McasTakerClient(props: Props) {
                             ? "border-white/40 bg-white/15"
                             : "border-white/10 bg-white/5 hover:bg-white/10",
                         ].join(" ")}
-                        onClick={() =>
-                          setAnswers((prev) => ({ ...prev, [q.code]: opt.code }))
-                        }
+                        onClick={() => setAnswers((prev) => ({ ...prev, [q.code]: opt.code }))}
                       >
                         <div className="text-sm text-white/60">{opt.code}</div>
                         <div className="mt-1">{opt.label}</div>
@@ -149,9 +182,7 @@ export default function McasTakerClient(props: Props) {
                 onClick={onSubmit}
                 className={[
                   "rounded-xl px-5 py-3 font-medium transition",
-                  canSubmit
-                    ? "bg-white text-black hover:bg-white/90"
-                    : "bg-white/20 text-white/50 cursor-not-allowed",
+                  canSubmit ? "bg-white text-black hover:bg-white/90" : "bg-white/20 text-white/50 cursor-not-allowed",
                 ].join(" ")}
               >
                 {submitting ? "Submitting…" : "Submit"}
