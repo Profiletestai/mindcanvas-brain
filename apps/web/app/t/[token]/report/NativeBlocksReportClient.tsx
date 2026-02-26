@@ -1,7 +1,7 @@
 // /apps/web/app/t/[token]/report/NativeBlocksReportClient.tsx
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef } from "react";
 import AppBackground from "@/components/ui/AppBackground";
 
 type AB = "A" | "B" | "C" | "D";
@@ -30,7 +30,7 @@ type ReportSectionBlock =
       align?: "left" | "center" | "right";
       max_h?: number;
     }
-  // ✅ Premium blocks
+  // Premium blocks
   | {
       type: "callout";
       tone?: "insight" | "warning" | "success" | "neutral";
@@ -47,7 +47,7 @@ type ReportSectionBlock =
   | { type: "scorecard_row"; items?: Array<{ label: string; value: string; hint?: string }> }
   | { type: "chart.frequency_bars" }
   | { type: "chart.profile_bars" }
-  | { type: "profile.triad_cards" } // ✅ NEW: Primary/Secondary/Tertiary UI block
+  | { type: "profiles.triad_cards" } // ✅ NEW: requested block type
   | { type: "cta"; title?: string; text?: string; button_text?: string }
   | { type: string; [k: string]: any };
 
@@ -89,6 +89,8 @@ type ResultData = {
 
   sections?: SectionsPayload | null;
 };
+
+// ---------------- utils ----------------
 
 function safeText(x: any): string {
   if (typeof x === "string") return x;
@@ -133,19 +135,19 @@ function fullName(first?: string | null, last?: string | null) {
 function fallbackTitleFromId(id: string, topProfileName: string) {
   const k = String(id || "").toLowerCase();
 
-  if (k === "global.cover") return "Your personalised report";
+  if (k === "global.cover") return "Your OperatingFrame™ report";
   if (k === "global.welcome_letter") return "Welcome";
-  if (k === "global.summary_dashboard") return "High Level Summary";
-  if (k === "global.how_to_use") return "How to Use This Report";
-  if (k === "global.framework_explainer") return "The Framework";
+  if (k === "global.summary_dashboard") return "What this report includes";
+  if (k === "global.how_to_use") return "How to use this report";
+  if (k === "global.framework_explainer") return "How OperatingFrame works";
   if (k === "global.conclusion") return "Conclusion";
-  if (k === "global.cta_next_steps") return "Next Steps";
+  if (k === "global.cta_next_steps") return "Next steps";
 
-  if (k === "profile.identity") return topProfileName || "Profile Identity";
+  if (k === "profile.identity") return topProfileName || "Profile identity";
   if (k === "profile.strengths") return "Strengths";
-  if (k === "profile.development_areas") return "Development Areas";
-  if (k === "profile.communication_style") return "Communication Style";
-  if (k === "profile.reflection_questions") return "Reflection Questions";
+  if (k === "profile.development_areas") return "Development areas";
+  if (k === "profile.communication_style") return "Communication style";
+  if (k === "profile.reflection_questions") return "Reflection questions";
   if (k === "profile.collaboration") return "Collaboration";
 
   if (k === "segmentation-responses") return "Your responses";
@@ -155,53 +157,108 @@ function fallbackTitleFromId(id: string, topProfileName: string) {
   return "Section";
 }
 
-// ---------- Visual primitives ----------
+// ---------------- image helpers ----------------
 
-function Badge({ children }: { children: React.ReactNode }) {
+// You said you're using this path:
+const OF_ASSET_ROOT = "/images/operatingframe-full-test";
+
+function slugifyName(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[’'"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+// Profile images live here:
+// /public/images/operatingframe-full-test/profile-cards/*.png
+function profileImageSrc(profileName?: string) {
+  const n = (profileName || "").trim();
+  if (!n) return "";
+  const file = `${slugifyName(n)}.png`;
+  return `${OF_ASSET_ROOT}/profile-cards/${file}`;
+}
+
+// Optional: if you have a single logo, put it here.
+// If you want org-specific, we can map by org_slug later.
+function orgLogoSrc(orgSlug?: string) {
+  const s = (orgSlug || "").toLowerCase();
+  // If you have a logo file, drop it into:
+  // /public/images/operatingframe-full-test/logo.png
+  if (s.includes("operatingframe")) return `${OF_ASSET_ROOT}/logo.png`;
+  // fallback: blank
+  return "";
+}
+
+// ---------------- premium primitives ----------------
+
+function GlassShell(props: { children: React.ReactNode; className?: string }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-white/90">
-      {children}
-    </span>
+    <div
+      className={[
+        "rounded-3xl border border-white/10 bg-white/5",
+        "backdrop-blur-sm shadow-[0_20px_60px_rgba(0,0,0,0.35)]",
+        props.className || "",
+      ].join(" ")}
+    >
+      {props.children}
+    </div>
   );
 }
 
 function WhiteCard(props: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
+    <div className={["rounded-3xl bg-white text-slate-900 shadow-sm", props.className || ""].join(" ")}>
       {props.children}
     </div>
   );
 }
 
-function GlassCard(props: { children: React.ReactNode; className?: string }) {
+function Pill(props: { children: React.ReactNode; tone?: "dark" | "light" }) {
+  const tone = props.tone || "dark";
+  const cls =
+    tone === "light"
+      ? "border-slate-200 bg-slate-50 text-slate-700"
+      : "border-white/15 bg-white/10 text-white/90";
   return (
-    <div className={`rounded-3xl border border-white/10 bg-white/[0.06] backdrop-blur p-6 md:p-7 ${props.className || ""}`}>
+    <span className={["inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold", cls].join(" ")}>
       {props.children}
-    </div>
-  );
-}
-
-function MiniDivider() {
-  return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
-}
-
-function subtleLabel(text: string) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/85">
-      {text}
     </span>
   );
 }
 
-function frequencyColor(code: AB) {
-  // A red, B yellow, C green, D blue
-  if (code === "A") return { dot: "bg-red-500", bar: "bg-red-500" };
-  if (code === "B") return { dot: "bg-amber-400", bar: "bg-amber-400" };
-  if (code === "C") return { dot: "bg-emerald-500", bar: "bg-emerald-500" };
-  return { dot: "bg-blue-500", bar: "bg-blue-500" };
+function MiniRule() {
+  return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/12 to-transparent" />;
 }
 
-function FrequencyBars(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number>; top: AB }) {
+function SoftRule() {
+  return <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />;
+}
+
+// ---------------- charts (frequency bars + profile bars) ----------------
+
+function freqColor(code: AB) {
+  // per your instruction: A red, B yellow, C green, D blue
+  if (code === "A") return "bg-red-500";
+  if (code === "B") return "bg-amber-400";
+  if (code === "C") return "bg-emerald-500";
+  return "bg-blue-600";
+}
+
+function freqDot(code: AB) {
+  if (code === "A") return "bg-red-500";
+  if (code === "B") return "bg-amber-400";
+  if (code === "C") return "bg-emerald-500";
+  return "bg-blue-600";
+}
+
+function FrequencyBars(props: {
+  labels: Array<{ code: AB; name: string }>;
+  pct: Record<AB, number>;
+  top: AB;
+}) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const max = Math.max(...items.map((i) => i.v), 0.01);
 
@@ -210,34 +267,34 @@ function FrequencyBars(props: { labels: Array<{ code: AB; name: string }>; pct: 
       {items.map((it) => {
         const w = Math.round((it.v / max) * 100);
         const isTop = it.code === props.top;
-        const c = frequencyColor(it.code);
-
         return (
           <div key={it.code} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white ${c.dot}`}>
+                <div className="flex items-center gap-3">
+                  <span className={["inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white", freqDot(it.code)].join(" ")}>
                     {it.code}
                   </span>
-
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="truncate text-sm font-semibold text-slate-900">{it.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="truncate text-sm font-semibold text-slate-900">
+                        {it.name} <span className="text-slate-500">({it.code})</span>
+                      </div>
                       {isTop ? (
                         <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
                           Dominant
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-2 h-2 w-full rounded-full bg-white">
-                      <div className={`h-2 rounded-full ${c.bar}`} style={{ width: `${w}%` }} />
-                    </div>
                   </div>
+                </div>
+
+                <div className="mt-3 h-2.5 w-full rounded-full bg-white">
+                  <div className={["h-2.5 rounded-full", freqColor(it.code)].join(" ")} style={{ width: `${w}%` }} />
                 </div>
               </div>
 
-              <div className="shrink-0 text-sm font-bold text-slate-800">{pctLabel(it.v)}</div>
+              <div className="shrink-0 text-sm font-semibold text-slate-800">{pctLabel(it.v)}</div>
             </div>
           </div>
         );
@@ -246,7 +303,11 @@ function FrequencyBars(props: { labels: Array<{ code: AB; name: string }>; pct: 
   );
 }
 
-function ProfileBars(props: { labels: Array<{ code: string; name: string }>; pct: Record<string, number>; topCode: string }) {
+function ProfileBars(props: {
+  labels: Array<{ code: string; name: string }>;
+  pct: Record<string, number>;
+  topCode: string;
+}) {
   const items = props.labels
     .map((p) => ({ ...p, v: clamp01(props.pct?.[p.code] ?? 0) }))
     .sort((a, b) => (b.v || 0) - (a.v || 0));
@@ -259,17 +320,16 @@ function ProfileBars(props: { labels: Array<{ code: string; name: string }>; pct
         const w = Math.round((it.v / max) * 100);
         const isTop = it.code === props.topCode;
         const rank = idx + 1;
-
         return (
           <div key={it.code} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
                     {rank}
                   </span>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <div className="truncate text-sm font-semibold text-slate-900">{it.name}</div>
                       {isTop ? (
                         <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -277,14 +337,16 @@ function ProfileBars(props: { labels: Array<{ code: string; name: string }>; pct
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-2 h-2 w-full rounded-full bg-white">
-                      <div className="h-2 rounded-full bg-slate-900" style={{ width: `${w}%` }} />
-                    </div>
+                    <div className="text-xs text-slate-500">{it.code}</div>
                   </div>
+                </div>
+
+                <div className="mt-3 h-2.5 w-full rounded-full bg-white">
+                  <div className="h-2.5 rounded-full bg-slate-900" style={{ width: `${w}%` }} />
                 </div>
               </div>
 
-              <div className="shrink-0 text-sm font-bold text-slate-800">{pctLabel(it.v)}</div>
+              <div className="shrink-0 text-sm font-semibold text-slate-800">{pctLabel(it.v)}</div>
             </div>
           </div>
         );
@@ -293,111 +355,95 @@ function ProfileBars(props: { labels: Array<{ code: string; name: string }>; pct
   );
 }
 
+// ---------------- triad cards (Primary / Secondary / Tertiary) ----------------
+
 function TriadCards(props: {
   primary?: { code: string; name: string; pct: number };
   secondary?: { code: string; name: string; pct: number };
   tertiary?: { code: string; name: string; pct: number };
 }) {
-  const items = [
-    { label: "Primary profile", rank: 1, x: props.primary },
-    { label: "Secondary", rank: 2, x: props.secondary },
-    { label: "Tertiary", rank: 3, x: props.tertiary },
-  ].filter((i) => !!i.x);
+  const rows = [
+    { label: "Primary profile", badge: "1", tone: "ring-slate-900/10", item: props.primary },
+    { label: "Secondary", badge: "2", tone: "ring-slate-900/10", item: props.secondary },
+    { label: "Tertiary", badge: "3", tone: "ring-slate-900/10", item: props.tertiary },
+  ].filter((x) => !!x.item);
 
-  if (!items.length) return null;
-
+  // compact + stylish
   return (
-    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
       <div className="grid gap-4 md:grid-cols-3">
-        {items.map((it) => {
-          const pct = Math.round(clamp01(it.x!.pct) * 100);
+        {rows.map((r) => {
+          const item = r.item!;
+          const img = profileImageSrc(item.name);
+          const pct = Math.round(clamp01(item.pct) * 100);
 
           return (
-            <div key={it.label} className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="flex items-start justify-between">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {it.label}
+            <div
+              key={r.badge}
+              className={[
+                "rounded-3xl bg-white p-5 shadow-sm",
+                "ring-1",
+                r.tone,
+              ].join(" ")}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {r.label}
+                  </div>
+                  <div className="mt-2 text-lg font-bold text-slate-900">
+                    {item.name}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">{item.code}</div>
                 </div>
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                  {it.rank}
+
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+                  {r.badge}
                 </div>
               </div>
 
-              <div className="mt-3 text-lg font-bold text-slate-900">
-                {it.x!.name}
-              </div>
-              <div className="mt-1 text-xs font-semibold text-slate-500">{it.x!.code}</div>
+              {img ? (
+                <div className="mt-4 flex justify-center">
+                  <img
+                    src={img}
+                    alt={item.name}
+                    className="h-20 w-20 rounded-2xl object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              ) : null}
 
-              <div className="mt-3 text-sm font-semibold text-slate-800">{pct}% match</div>
+              <div className="mt-4 flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-900">{pct}% match</span>
+                <span className="text-xs text-slate-500">Fit</span>
+              </div>
+
               <div className="mt-2 h-2 w-full rounded-full bg-slate-200">
                 <div className="h-2 rounded-full bg-slate-900" style={{ width: `${pct}%` }} />
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {["Strengths", "Motivators", "Watch-outs"].map((chip) => (
-                  <span
-                    key={chip}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700"
-                  >
-                    {chip}
-                  </span>
-                ))}
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Strengths
+                </span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Motivators
+                </span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Watch-outs
+                </span>
               </div>
             </div>
           );
         })}
       </div>
-
-      <div className="mt-4 text-center text-xs text-slate-500">
-        Primary profile: <span className="font-semibold text-slate-700">{props.primary?.name || "—"}</span>
-      </div>
     </div>
   );
 }
 
-// ---------- Smart image helpers (logo + profile image) ----------
-
-function useBestImage(candidates: string[]) {
-  const [src, setSrc] = useState<string | null>(candidates[0] || null);
-
-  const onError = () => {
-    if (!src) return;
-    const idx = candidates.indexOf(src);
-    const next = idx >= 0 ? candidates[idx + 1] : null;
-    setSrc(next || null);
-  };
-
-  return { src, onError };
-}
-
-function buildOrgLogoCandidates(orgSlug: string) {
-  const s = (orgSlug || "").trim().toLowerCase();
-  if (!s) return [];
-
-  // You can standardise these later; for now we try a few common conventions.
-  return [
-    `/org-graphics/${s}-logo.png`,
-    `/org-graphics/${s}.png`,
-    `/org-graphics/${s}/logo.png`,
-    `/org-graphics/${s}/logo@2x.png`,
-    `/org-graphics/${s}-logo@2x.png`,
-    `/org-graphics/operatingframe-logo.png`, // nice fallback if you want
-  ];
-}
-
-function buildProfileImageCandidates(orgSlug: string, profileCode: string) {
-  const s = (orgSlug || "").trim().toLowerCase();
-  const p = (profileCode || "").trim();
-
-  return [
-    `/profile-cards/${s}/${p}.png`,
-    `/profile-cards/${s}-${p}.png`,
-    `/profile-cards/${p}.png`,
-    `/profile-cards/${p.toLowerCase()}.png`,
-  ];
-}
-
-// ---------- Block rendering ----------
+// ---------------- Block renderer ----------------
 
 function BlockRenderer(props: {
   block: ReportSectionBlock;
@@ -405,13 +451,10 @@ function BlockRenderer(props: {
     data: ResultData;
     participant: string;
     orgName: string;
-    primaryName: string;
-    secondaryName: string;
-    tertiaryName: string;
+    primary: { code: string; name: string; pct: number } | null;
+    secondary: { code: string; name: string; pct: number } | null;
+    tertiary: { code: string; name: string; pct: number } | null;
     topFreqName: string;
-    primary?: { code: string; name: string; pct: number };
-    secondary?: { code: string; name: string; pct: number };
-    tertiary?: { code: string; name: string; pct: number };
   };
 }) {
   const { block, ctx } = props;
@@ -426,18 +469,12 @@ function BlockRenderer(props: {
   }
 
   if (type === "image") {
-    const raw = String((block as any)?.src || "").trim();
-    if (!raw) return null;
-
-    const src = raw
-      .replaceAll("{{PROFILE_IMAGE_PRIMARY}}", buildProfileImageCandidates(ctx.data.org_slug, ctx.data.top_profile_code)[0] || "")
-      .trim();
-
+    const src = String((block as any)?.src || "").trim();
     if (!src) return null;
 
     const align = (String((block as any)?.align || "center") as any).toLowerCase();
     const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
-    const maxH = typeof (block as any)?.max_h === "number" ? (block as any).max_h : 420;
+    const maxH = typeof (block as any)?.max_h === "number" ? (block as any).max_h : 360;
 
     return (
       <figure className="my-6">
@@ -460,15 +497,14 @@ function BlockRenderer(props: {
     );
   }
 
-  if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
-  if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
-  if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
+  if (type === "h1")
+    return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
+  if (type === "h2")
+    return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
+  if (type === "h3")
+    return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
   if (type === "h4")
-    return (
-      <h4 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {safeText((block as any).text)}
-      </h4>
-    );
+    return <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{safeText((block as any).text)}</h4>;
 
   if (type === "p") {
     const t = safeText((block as any).text);
@@ -516,12 +552,12 @@ function BlockRenderer(props: {
 
     const shell =
       tone === "insight"
-        ? "border-slate-900/15 bg-slate-900/5"
+        ? "border-slate-900/10 bg-slate-900/5"
         : tone === "success"
-          ? "border-emerald-800/15 bg-emerald-50"
-          : tone === "warning"
-            ? "border-amber-800/15 bg-amber-50"
-            : "border-slate-200 bg-slate-50";
+        ? "border-emerald-800/12 bg-emerald-50"
+        : tone === "warning"
+        ? "border-amber-800/12 bg-amber-50"
+        : "border-slate-200 bg-slate-50";
 
     return (
       <div className={`rounded-3xl border p-5 ${shell}`}>
@@ -544,10 +580,7 @@ function BlockRenderer(props: {
     return (
       <div className="flex flex-wrap gap-2">
         {items.map((it: any, i: number) => (
-          <span
-            key={i}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700"
-          >
+          <span key={i} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
             {safeText(it)}
           </span>
         ))}
@@ -571,8 +604,8 @@ function BlockRenderer(props: {
             tone === "glass"
               ? "border-white/10 bg-slate-900 text-white"
               : tone === "dark"
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-900";
+              ? "border-slate-900 bg-slate-900 text-white"
+              : "border-slate-200 bg-white text-slate-900";
 
           return (
             <div key={idx} className={`rounded-3xl border p-5 ${shell}`}>
@@ -611,15 +644,25 @@ function BlockRenderer(props: {
 
   if (type === "chart.frequency_bars") {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-900">FREQUENCY + PROFILE</div>
-          <div className="text-xs text-slate-500">Your energy distribution</div>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Frequency + profile</div>
+            <div className="mt-2 text-lg font-bold text-slate-900">{ctx.topFreqName}</div>
+            <p className="mt-2 text-sm text-slate-700">
+              Frequencies show how you naturally operate as a leader — where your energy goes under pressure.
+              Higher = more natural, lower = less preferred.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-center">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Dominant</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-900">
+              {pctLabel(ctx.data.frequency_percentages?.[ctx.data.top_freq])}
+            </div>
+          </div>
         </div>
-        <div className="mt-2 text-sm text-slate-700">
-          Frequencies show how you naturally operate as a leader — where your energy goes under pressure. Higher = more natural, lower = less preferred.
-        </div>
-        <div className="mt-4">
+
+        <div className="mt-5">
           <FrequencyBars labels={ctx.data.frequency_labels} pct={ctx.data.frequency_percentages} top={ctx.data.top_freq} />
         </div>
       </div>
@@ -628,28 +671,30 @@ function BlockRenderer(props: {
 
   if (type === "chart.profile_bars") {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-900">PROFILE MIX</div>
-          <div className="text-xs text-slate-500">Primary + supporting</div>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Profile mix</div>
+            <div className="mt-2 text-lg font-bold text-slate-900">Primary + supporting</div>
+            <p className="mt-2 text-sm text-slate-700">
+              Profiles describe your execution pattern — how your leadership behaviour shows up day to day.
+              Your mix shows primary and supporting styles.
+            </p>
+          </div>
+          <div className="text-xs text-slate-500">Higher = stronger pattern</div>
         </div>
-        <div className="mt-2 text-sm text-slate-700">
-          Profiles describe your execution pattern — how your leadership behaviour shows up day to day. Your mix shows primary and supporting styles.
-        </div>
-        <div className="mt-4">
+
+        <div className="mt-5">
           <ProfileBars labels={ctx.data.profile_labels} pct={ctx.data.profile_percentages} topCode={ctx.data.top_profile_code} />
         </div>
       </div>
     );
   }
 
-  if (type === "profile.triad_cards") {
+  // ✅ NEW: triad cards block (Primary/Secondary/Tertiary) for profile.identity
+  if (type === "profiles.triad_cards") {
     return (
-      <TriadCards
-        primary={ctx.primary}
-        secondary={ctx.secondary}
-        tertiary={ctx.tertiary}
-      />
+      <TriadCards primary={ctx.primary || undefined} secondary={ctx.secondary || undefined} tertiary={ctx.tertiary || undefined} />
     );
   }
 
@@ -658,7 +703,7 @@ function BlockRenderer(props: {
     const text =
       safeText((block as any)?.text).trim() ||
       "Turn insight into action: use this report in a coaching conversation, a 1:1, or a team workshop.";
-    const btn = safeText((block as any)?.button_text).trim() || "Go to next steps";
+    const btn = safeText((block as any)?.button_text).trim() || "Book a discussion";
     const url = (ctx.data?.link?.next_steps_url || "").trim();
 
     return (
@@ -669,7 +714,7 @@ function BlockRenderer(props: {
           {url ? (
             <button
               onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-              className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+              className="inline-flex items-center rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
             >
               {btn}
             </button>
@@ -681,8 +726,9 @@ function BlockRenderer(props: {
     );
   }
 
+  // Unknown fallback
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
       <p className="text-xs font-semibold text-amber-900">
         Unsupported block type: {String((block as any).type || "unknown")}
       </p>
@@ -690,55 +736,16 @@ function BlockRenderer(props: {
   );
 }
 
-// ---------- Default content injection (keeps sections usable even if empty) ----------
+// ---------------- component ----------------
 
-function defaultBlocksForSection(
-  sectionId: string,
-  ctx: {
-    participant: string;
-    orgName: string;
-    primaryName: string;
-    secondaryName: string;
-    tertiaryName: string;
-    topFreqName: string;
-  }
-): ReportSectionBlock[] {
-  const id = String(sectionId || "").toLowerCase();
-
-  if (id === "global.cover") {
-    return [
-      {
-        type: "callout",
-        tone: "insight",
-        title: "Your headline insight",
-        text: `Your natural energy is led by ${ctx.topFreqName}, and your most natural Profile pattern is ${ctx.primaryName}. Use this report as language for what already works — and as a guide for small shifts that create outsized results.`,
-      },
-    ];
-  }
-
-  if (id === "global.summary_dashboard") {
-    return [{ type: "chart.frequency_bars" }, { type: "spacer", size: "md" }, { type: "chart.profile_bars" }];
-  }
-
-  if (id === "profile.identity") {
-    return [
-      { type: "profile.triad_cards" },
-      { type: "spacer", size: "md" },
-      { type: "callout", tone: "insight", title: `You are a ${ctx.primaryName}`, text: "This section should describe the core identity of the profile in a way that feels specific, human, and usable." },
-    ];
-  }
-
-  if (id === "global.cta_next_steps") {
-    return [{ type: "cta", title: "Next steps", text: "Book your next step conversation below to walk through your results.", button_text: "Book a discussion" }];
-  }
-
-  return [{ type: "p", text: "This section has not been populated yet." }];
-}
-
-// ---------- Component ----------
-
-export default function NativeBlocksReportClient(props: { token: string; tid: string; src: string; data: ResultData }) {
+export default function NativeBlocksReportClient(props: {
+  token: string;
+  tid: string;
+  src: string;
+  data: ResultData;
+}) {
   const { data } = props;
+
   const reportRef = useRef<HTMLDivElement | null>(null);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
@@ -747,8 +754,8 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
   const topProfileName = data.top_profile_name || "Top profile";
 
   const topFreqCode = data.top_freq;
-  const topFreqPct = data.frequency_percentages?.[topFreqCode] ?? 0;
-  const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
+  const topFreqName =
+    data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
   const sortedProfiles = useMemo(() => {
     return [...data.profile_labels]
@@ -756,9 +763,15 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
       .sort((a, b) => (b.pct || 0) - (a.pct || 0));
   }, [data.profile_labels, data.profile_percentages]);
 
-  const primary = sortedProfiles[0];
-  const secondary = sortedProfiles[1];
-  const tertiary = sortedProfiles[2];
+  const primary = sortedProfiles[0]
+    ? { code: sortedProfiles[0].code, name: sortedProfiles[0].name, pct: sortedProfiles[0].pct || 0 }
+    : null;
+  const secondary = sortedProfiles[1]
+    ? { code: sortedProfiles[1].code, name: sortedProfiles[1].name, pct: sortedProfiles[1].pct || 0 }
+    : null;
+  const tertiary = sortedProfiles[2]
+    ? { code: sortedProfiles[2].code, name: sortedProfiles[2].name, pct: sortedProfiles[2].pct || 0 }
+    : null;
 
   const mergedSections = useMemo(() => {
     const common = (data.sections?.common || []) as ReportSection[];
@@ -769,10 +782,10 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
   const indexItems = useMemo(() => {
     return mergedSections.map((s, i) => {
       const id = getDomId(s, i);
-      const title = safeText(s.title).trim() || fallbackTitleFromId(String(s.id || ""), data.top_profile_name);
+      const title = safeText(s.title).trim() || fallbackTitleFromId(String(s.id || ""), topProfileName);
       return { id, title, rawId: String(s.id || "") };
     });
-  }, [mergedSections, data.top_profile_name]);
+  }, [mergedSections, topProfileName]);
 
   function scrollToSection(id: string) {
     const el = document.getElementById(id);
@@ -794,28 +807,18 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
     window.print();
   }
 
-  // ✅ Images for the header
-  const logoCandidates = useMemo(() => buildOrgLogoCandidates(data.org_slug), [data.org_slug]);
-  const profileCandidates = useMemo(
-    () => buildProfileImageCandidates(data.org_slug, data.top_profile_code),
-    [data.org_slug, data.top_profile_code]
-  );
-
-  const logoImg = useBestImage(logoCandidates);
-  const profileImg = useBestImage(profileCandidates);
+  const logo = orgLogoSrc(data.org_slug);
+  const topProfileImg = profileImageSrc(topProfileName);
 
   const ctx = useMemo(() => {
     return {
       data,
       participant,
       orgName,
-      primaryName: primary?.name || data.top_profile_name || "Primary profile",
-      secondaryName: secondary?.name || "",
-      tertiaryName: tertiary?.name || "",
+      primary,
+      secondary,
+      tertiary,
       topFreqName,
-      primary: primary ? { code: primary.code, name: primary.name, pct: primary.pct || 0 } : undefined,
-      secondary: secondary ? { code: secondary.code, name: secondary.name, pct: secondary.pct || 0 } : undefined,
-      tertiary: tertiary ? { code: tertiary.code, name: tertiary.name, pct: tertiary.pct || 0 } : undefined,
     };
   }, [data, participant, orgName, primary, secondary, tertiary, topFreqName]);
 
@@ -824,131 +827,133 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
       <AppBackground />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-6">
-        {/* HERO HEADER (new structure) */}
-        <GlassCard>
-          <div className="flex items-start gap-5">
-            {/* Left: Org logo */}
-            <div className="shrink-0">
-              {logoImg.src ? (
-                <img
-                  src={logoImg.src}
-                  onError={logoImg.onError}
-                  alt={orgName}
-                  className="h-14 w-14 rounded-2xl bg-white p-2 shadow-sm"
-                />
-              ) : (
-                <div className="h-14 w-14 rounded-2xl border border-white/10 bg-white/5" />
-              )}
-            </div>
-
-            {/* Middle: Titles */}
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {subtleLabel(orgName)}
-                {subtleLabel(testName)}
+        {/* HERO / HEADER (clean, not duplicated) */}
+        <GlassShell className="p-6 md:p-7">
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex items-start gap-4 min-w-0">
+              {/* Org logo */}
+              <div className="shrink-0">
+                <div className="h-12 w-12 rounded-2xl border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center">
+                  {logo ? (
+                    <img
+                      src={logo}
+                      alt={orgName}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : null}
+                </div>
               </div>
 
-              <div className="mt-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
+              <div className="min-w-0">
+                {/* Labels row */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Pill tone="dark">{orgName}</Pill>
+                  <Pill tone="dark">{testName}</Pill>
+                </div>
+
+                <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
                   Personalised report
                 </div>
-                <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">
-                  Your Operating Style in Depth: {topProfileName}
+
+                <h1 className="mt-2 text-3xl md:text-4xl font-extrabold tracking-tight">
+                  Your Operating Style in Depth:{" "}
+                  <span className="text-white">{primary?.name || topProfileName}</span>
                 </h1>
 
-                <div className="mt-2 text-sm text-white/75">
-                  For <span className="font-semibold text-white">{participant}</span>
+                <div className="mt-3 space-y-1 text-sm text-white/80">
+                  <div>
+                    For <span className="font-semibold text-white">{participant}</span>
+                  </div>
+                  <div>
+                    Top profile:{" "}
+                    <span className="font-semibold text-white">{primary?.name || topProfileName}</span>
+                  </div>
                 </div>
 
-                <div className="mt-1 text-sm text-white/75">
-                  Top profile: <span className="font-semibold text-white">{topProfileName}</span>
+                {/* Buttons */}
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    onClick={downloadPdfViaPrint}
+                    className="inline-flex items-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                  >
+                    Download PDF
+                  </button>
+                  <button
+                    onClick={openNextSteps}
+                    className="inline-flex items-center rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
+                  >
+                    Next steps
+                  </button>
                 </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Badge>
-                  Dominant Frequency: {topFreqName} ({topFreqCode}) · {pctLabel(topFreqPct)}
-                </Badge>
-                {primary?.name ? <Badge>Primary: {primary.name}</Badge> : null}
-                {secondary?.name ? <Badge>Secondary: {secondary.name}</Badge> : null}
-                {tertiary?.name ? <Badge>Tertiary: {tertiary.name}</Badge> : null}
-              </div>
-
-              <div className="mt-5 flex gap-3">
-                <button
-                  onClick={downloadPdfViaPrint}
-                  className="inline-flex items-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-                >
-                  Download PDF
-                </button>
-
-                <button
-                  onClick={openNextSteps}
-                  className="inline-flex items-center rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
-                >
-                  Next steps
-                </button>
               </div>
             </div>
 
-            {/* Right: Profile image */}
+            {/* Profile image on the right */}
             <div className="hidden md:block shrink-0">
-              {profileImg.src ? (
-                <img
-                  src={profileImg.src}
-                  onError={profileImg.onError}
-                  alt={topProfileName}
-                  className="h-24 w-24 rounded-3xl border border-white/10 bg-white p-3 shadow-sm"
-                />
-              ) : (
-                <div className="h-24 w-24 rounded-3xl border border-white/10 bg-white/5" />
-              )}
+              <div className="h-20 w-20 rounded-3xl border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center">
+                {topProfileImg ? (
+                  <img
+                    src={topProfileImg}
+                    alt={topProfileName}
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : null}
+              </div>
             </div>
           </div>
 
           <div className="mt-6">
-            <MiniDivider />
+            <MiniRule />
           </div>
 
-          {/* QUICK DASHBOARD (tighter, less clunky) */}
+          {/* Clean “WOW” hero panels (not huge, not duplicated) */}
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <WhiteCard className="p-5 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Quick frequency view</div>
-                <div className="text-xs text-slate-500">Your energy distribution</div>
+            <WhiteCard className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Quick frequency view</div>
+                  <div className="text-xs text-slate-500">Your energy distribution</div>
+                </div>
               </div>
               <div className="mt-4">
                 <FrequencyBars labels={data.frequency_labels} pct={data.frequency_percentages} top={data.top_freq} />
               </div>
             </WhiteCard>
 
-            <WhiteCard className="p-5 md:p-6">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Quick profile view</div>
-                <div className="text-xs text-slate-500">Primary + supporting</div>
-              </div>
-              <div className="mt-2 text-sm text-slate-700">
-                Profiles describe your execution pattern — how your leadership shows up day to day.
+            <WhiteCard className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Quick profile view</div>
+                  <div className="text-xs text-slate-500">Primary + supporting</div>
+                </div>
               </div>
               <div className="mt-4">
                 <ProfileBars labels={data.profile_labels} pct={data.profile_percentages} topCode={data.top_profile_code} />
               </div>
             </WhiteCard>
           </div>
-        </GlassCard>
+        </GlassShell>
 
-        {/* BODY */}
+        {/* BODY: Index + Sections */}
         <div className="mt-6 grid gap-4 md:grid-cols-[280px_1fr]">
           <aside className="rounded-3xl border border-white/10 bg-white/5 p-4 sticky top-6 self-start">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">Index</p>
-            <p className="mt-1 text-xs text-slate-300">Jump straight to what you need.</p>
+            <div className="px-1">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">Index</div>
+              <div className="mt-1 text-xs text-white/60">Jump straight to what you need.</div>
+            </div>
 
             <div className="mt-4 space-y-2">
               {indexItems.map((s, i) => (
                 <button
                   key={s.id}
                   onClick={() => scrollToSection(s.id)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10"
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10 transition"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
@@ -957,7 +962,7 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium text-white">{s.title}</div>
                     </div>
-                    <div className="text-xs text-slate-300">View</div>
+                    <div className="text-xs text-white/60">View</div>
                   </div>
                 </button>
               ))}
@@ -967,39 +972,29 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
           <main className="space-y-4">
             {mergedSections.map((section, idx) => {
               const domId = getDomId(section, idx);
-              const title = safeText(section.title).trim() || fallbackTitleFromId(String(section.id || ""), data.top_profile_name);
+              const title =
+                safeText(section.title).trim() ||
+                fallbackTitleFromId(String(section.id || ""), topProfileName);
 
               const rawId = String(section.id || "").trim();
               const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-              const hasRealBlocks = blocks.length > 0;
-
-              const finalBlocks = hasRealBlocks
-                ? blocks
-                : defaultBlocksForSection(rawId, {
-                    participant,
-                    orgName,
-                    primaryName: ctx.primaryName,
-                    secondaryName: ctx.secondaryName,
-                    tertiaryName: ctx.tertiaryName,
-                    topFreqName: ctx.topFreqName,
-                  });
 
               return (
                 <section key={domId} id={domId} className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                  <WhiteCard className="p-6 md:p-7">
+                  <WhiteCard className="p-6">
                     <div className="flex items-start justify-between gap-3">
-                      <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
-
-                      {/* ✅ Subtle section tag (not clunky) */}
-                      {rawId ? (
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-500">
-                          {rawId}
-                        </span>
-                      ) : null}
+                      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {rawId || "section"}
+                      </span>
                     </div>
 
-                    <div className="mt-4 space-y-3">
-                      {finalBlocks.map((b, i) => (
+                    <div className="mt-5">
+                      <SoftRule />
+                    </div>
+
+                    <div className="mt-5 space-y-4">
+                      {blocks.map((b, i) => (
                         <BlockRenderer key={i} block={b} ctx={ctx} />
                       ))}
                     </div>
@@ -1008,16 +1003,9 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
               );
             })}
 
-            <div className="pt-2">
-              <button
-                onClick={openNextSteps}
-                className="inline-flex items-center rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
-              >
-                Next steps
-              </button>
-            </div>
-
-            <footer className="pt-4 text-xs text-slate-400">© {new Date().getFullYear()} Powered by Profiletest.ai</footer>
+            <footer className="pt-4 text-xs text-slate-400">
+              © {new Date().getFullYear()} Powered by Profiletest.ai
+            </footer>
           </main>
         </div>
       </div>
