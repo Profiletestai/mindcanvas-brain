@@ -2,6 +2,7 @@
 import "server-only";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import CopyButton from "./CopyButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,7 +21,7 @@ function baseUrl() {
 type SearchParams = {
   status?: string;
   partner_key?: string;
-  q?: string; // search in application_id
+  q?: string;
 };
 
 export default async function Page(props: { searchParams: Promise<SearchParams> }) {
@@ -46,7 +47,7 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
   const { data, error } = await query;
   if (error) {
     return (
-      <div className="p-8 text-white">
+      <div className="min-h-screen bg-[#060e16] text-white p-8">
         <div className="font-semibold">MCAS Applications</div>
         <pre className="mt-4 text-sm text-red-300">{JSON.stringify(error, null, 2)}</pre>
       </div>
@@ -62,9 +63,7 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
           <div>
             <div className="text-sm text-white/60">Admin</div>
             <h1 className="text-2xl font-semibold mt-1">MCAS Applications</h1>
-            <div className="text-white/60 mt-1 text-sm">
-              Showing {rows.length} (latest 200)
-            </div>
+            <div className="text-white/60 mt-1 text-sm">Showing {rows.length} (latest 200)</div>
           </div>
 
           <Link
@@ -75,7 +74,6 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
           </Link>
         </div>
 
-        {/* Filters */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
           <form className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
@@ -97,7 +95,7 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
               <input
                 name="partner_key"
                 defaultValue={partner_key}
-                placeholder="e.g. manual / partner_demo"
+                placeholder="e.g. manual"
                 className="mt-1 w-full rounded-xl bg-[#0b1724] border border-white/10 px-3 py-2"
               />
             </div>
@@ -129,7 +127,6 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
           </form>
         </div>
 
-        {/* Table */}
         <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
           <table className="w-full text-sm">
             <thead className="bg-white/5 text-white/70">
@@ -179,17 +176,7 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
                         >
                           Open
                         </a>
-                        <button
-                          type="button"
-                          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(link);
-                            } catch {}
-                          }}
-                        >
-                          Copy
-                        </button>
+                        <CopyButton text={link} />
                       </div>
                       <div className="mt-1 text-xs text-white/50 break-all">{link}</div>
                     </td>
@@ -206,10 +193,6 @@ export default async function Page(props: { searchParams: Promise<SearchParams> 
               ) : null}
             </tbody>
           </table>
-        </div>
-
-        <div className="mt-6 text-xs text-white/50">
-          Tip: create a manual record in <span className="font-mono">mcas.partner_applications</span> to generate a token link quickly.
         </div>
       </div>
     </div>

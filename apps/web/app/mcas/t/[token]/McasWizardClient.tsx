@@ -1,7 +1,7 @@
 //apps/web/app/mcas/t/[token]/McasWizardClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Question = {
   code: string;
