@@ -482,7 +482,7 @@ export default function PublicTestClient({ token }: { token: string }) {
                 <div className="text-sm font-semibold text-white/90">Instructions</div>
                 <p className="mt-2 text-sm leading-6 text-white/75">
                   Please answer each question honestly and instinctively. There are no right or wrong answers.
-                  Your results are based on patterns across your responses.
+                  Your results are based on patterns across your responses.- PublicTestClient
                 </p>
                 <p className="mt-3 text-sm text-white/75">Enjoy this experience with {finalOrg}.</p>
               </div>
