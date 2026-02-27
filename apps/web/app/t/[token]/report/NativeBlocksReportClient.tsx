@@ -2,7 +2,6 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import type { ReactNode } from "react";
 import AppBackground from "@/components/ui/AppBackground";
 
 type AB = "A" | "B" | "C" | "D";
@@ -30,11 +29,8 @@ type ReportSectionBlock =
       caption?: string;
       align?: "left" | "center" | "right";
       max_h?: number;
-      // optional extra styling knobs
-      rounded?: "none" | "md" | "xl" | "full";
-      shadow?: boolean;
     }
-  // Premium blocks
+  // ✅ Premium blocks
   | {
       type: "callout";
       tone?: "insight" | "warning" | "success" | "neutral";
@@ -42,7 +38,10 @@ type ReportSectionBlock =
       text?: string;
       bullets?: string[];
     }
-  | { type: "chips"; items?: string[] }
+  | {
+      type: "chips";
+      items?: string[];
+    }
   | {
       type: "cards";
       columns?: 1 | 2 | 3;
@@ -52,19 +51,23 @@ type ReportSectionBlock =
       type: "scorecard_row";
       items?: Array<{ label: string; value: string; hint?: string }>;
     }
-  // charts (support both old/new names safely)
-  | { type: "chart.frequency_bars" | "chart.frequency_bars_v2" | "chart.frequency_bars_old" }
+  | { type: "chart.frequency_bars" }
   | { type: "chart.profile_bars" }
-  | { type: "chart.profile_radar" }
-  // OperatingFrame specific
-  | { type: "profiles.triad_cards" }
+
+  // ✅ NEW (DB-driven) block types
   | {
       type: "images.pair";
-      left_src?: string;
-      right_src?: string;
-      left_caption?: string;
-      right_caption?: string;
+      left?: { title?: string; src?: string; alt?: string; caption?: string; max_h?: number };
+      right?: { title?: string; src?: string; alt?: string; caption?: string; max_h?: number };
     }
+  | {
+      type: "profiles.triad_cards";
+      // optional override text snippets (otherwise we use defaults)
+      primary_summary?: string;
+      secondary_summary?: string;
+      tertiary_summary?: string;
+    }
+
   | { type: "cta"; title?: string; text?: string; button_text?: string }
   | { type: string; [k: string]: any };
 
@@ -107,8 +110,6 @@ type ResultData = {
   sections?: SectionsPayload | null;
 };
 
-// -------------------- helpers --------------------
-
 function safeText(x: any): string {
   if (typeof x === "string") return x;
   if (Array.isArray(x)) return x.map(String).join(" ");
@@ -119,18 +120,6 @@ function safeText(x: any): string {
 function clamp01(n: number) {
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(1, n));
-}
-
-function pctLabel(v: number | undefined) {
-  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
-  return `${Math.round(n * 100)}%`;
-}
-
-function fullName(first?: string | null, last?: string | null) {
-  const f = (first || "").trim();
-  const l = (last || "").trim();
-  const out = `${f} ${l}`.trim();
-  return out || "Participant";
 }
 
 function normaliseId(s: string) {
@@ -149,20 +138,22 @@ function getDomId(section: ReportSection, idx: number) {
   return `section-${idx}`;
 }
 
-function stripDoublePrefix(name: string) {
-  // fixes: "P1: P1: Activator" or "P1: Activator" repeated
-  let s = (name || "").trim();
-  // collapse "P#: P#: "
-  s = s.replace(/^P(\d)\s*:\s*P\1\s*:\s*/i, "P$1: ");
-  // collapse "P#: P#: " (alternate punctuation)
-  s = s.replace(/^P(\d)\s*-\s*P\1\s*-\s*/i, "P$1: ");
-  return s;
+function pctLabel(v: number | undefined) {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  return `${Math.round(n * 100)}%`;
+}
+
+function fullName(first?: string | null, last?: string | null) {
+  const f = (first || "").trim();
+  const l = (last || "").trim();
+  const out = `${f} ${l}`.trim();
+  return out || "Participant";
 }
 
 function fallbackTitleFromId(id: string, topProfileName: string) {
   const k = String(id || "").toLowerCase();
 
-  if (k === "global.cover") return "Your personalised report";
+  if (k === "global.cover") return "Your OperatingFrame™ report";
   if (k === "global.welcome_letter") return "Welcome";
   if (k === "global.summary_dashboard") return "What this report includes";
   if (k === "global.how_to_use") return "How to use this report";
@@ -170,11 +161,11 @@ function fallbackTitleFromId(id: string, topProfileName: string) {
   if (k === "global.conclusion") return "Conclusion";
   if (k === "global.cta_next_steps") return "Next steps";
 
-  if (k === "profile.identity") return stripDoublePrefix(topProfileName) || "Your Primary Profile";
+  if (k === "profile.identity") return topProfileName || "Profile identity";
   if (k === "profile.strengths") return "Strengths";
-  if (k === "profile.development_areas") return "Development Areas";
-  if (k === "profile.communication_style") return "Communication Style";
-  if (k === "profile.reflection_questions") return "Reflection Questions";
+  if (k === "profile.development_areas") return "Development areas";
+  if (k === "profile.communication_style") return "Communication style";
+  if (k === "profile.reflection_questions") return "Reflection questions";
   if (k === "profile.collaboration") return "Collaboration";
 
   if (k === "segmentation-responses") return "Your responses";
@@ -184,65 +175,50 @@ function fallbackTitleFromId(id: string, topProfileName: string) {
   return "Section";
 }
 
-// -------------------- image resolution --------------------
-
-const OF_BASE = "/images/operatingframe-full-test";
-const PROFILE_CARD_BASE = `${OF_BASE}/profile-cards`;
-
-const profileCodeToSlug: Record<string, string> = {
-  PROFILE_1: "activator",
-  PROFILE_2: "messenger",
-  PROFILE_3: "relator",
-  PROFILE_4: "integrator",
-  PROFILE_5: "operator",
-  PROFILE_6: "planner",
-  PROFILE_7: "evaluator",
-  PROFILE_8: "vision-engineer",
-};
-
-function profileImageFromCode(code: string | undefined | null) {
-  const key = String(code || "").trim().toUpperCase();
-  const slug = profileCodeToSlug[key];
-  if (!slug) return "";
-  return `${PROFILE_CARD_BASE}/${slug}.png`;
-}
-
-function resolveImageSrc(raw: string, ctx: {
-  orgSlug: string;
-  primaryCode: string;
-  secondaryCode?: string;
-  tertiaryCode?: string;
+/**
+ * ✅ Image/macros resolver.
+ * This fixes your “images not coming through” problem when content_json uses placeholders.
+ *
+ * Supported macros:
+ *  - {{FREQUENCY_GRID}} -> /images/operatingframe-full-test/frequency-grid.png
+ *  - {{PROFILE_GRID}}   -> /images/operatingframe-full-test/profile-grid.png
+ *  - {{BIO_IMAGE}}      -> /images/operatingframe-full-test/bio-image.png
+ *  - {{PROFILE_IMAGE_PRIMARY}} / SECONDARY / TERTIARY -> profile card images
+ */
+function resolveImageSrc(rawSrc: string, ctx: {
+  primarySlug: string;
+  secondarySlug: string;
+  tertiarySlug: string;
 }) {
-  const src = (raw || "").trim();
-  if (!src) return "";
+  const s = String(rawSrc || "").trim();
+  if (!s) return "";
 
-  // already absolute / public path
-  if (src.startsWith("/") || src.startsWith("http://") || src.startsWith("https://")) return src;
-
-  // macro replacements
   const map: Record<string, string> = {
-    "{{FREQUENCY_GRID}}": `${OF_BASE}/frequency-grid.png`,
-    "{{PROFILE_GRID}}": `${OF_BASE}/profile-grid.png`,
-    "{{BIO_IMAGE}}": `${OF_BASE}/bio-image.png`,
-    "{{ORG_LOGO}}": `${OF_BASE}/logo.png`, // keep this file in public
-    "{{PROFILE_IMAGE_PRIMARY}}": profileImageFromCode(ctx.primaryCode),
-    "{{PROFILE_IMAGE_SECONDARY}}": profileImageFromCode(ctx.secondaryCode || ""),
-    "{{PROFILE_IMAGE_TERTIARY}}": profileImageFromCode(ctx.tertiaryCode || ""),
+    "{{FREQUENCY_GRID}}": "/images/operatingframe-full-test/frequency-grid.png",
+    "{{PROFILE_GRID}}": "/images/operatingframe-full-test/profile-grid.png",
+    "{{BIO_IMAGE}}": "/images/operatingframe-full-test/bio-image.png",
+    "{{PROFILE_IMAGE_PRIMARY}}": `/images/operatingframe-full-test/profile-cards/${ctx.primarySlug}.png`,
+    "{{PROFILE_IMAGE_SECONDARY}}": `/images/operatingframe-full-test/profile-cards/${ctx.secondarySlug}.png`,
+    "{{PROFILE_IMAGE_TERTIARY}}": `/images/operatingframe-full-test/profile-cards/${ctx.tertiarySlug}.png`,
   };
 
-  if (map[src]) return map[src];
+  if (map[s]) return map[s];
 
-  // allow simple filenames to resolve into OperatingFrame folder
-  if (src.endsWith(".png") || src.endsWith(".jpg") || src.endsWith(".jpeg") || src.endsWith(".webp")) {
-    return `${OF_BASE}/${src}`;
-  }
-
-  return src;
+  // Allow either absolute URL, or public/ relative paths
+  return s;
 }
 
-// -------------------- premium primitives --------------------
+function profileSlugFromName(name: string) {
+  return String(name || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w]+/g, "-")
+    .replace(/\-+/g, "-");
+}
 
-function Badge({ children }: { children: ReactNode }) {
+// ---------- Premium visual primitives ----------
+
+function Badge({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
       {children}
@@ -250,17 +226,17 @@ function Badge({ children }: { children: ReactNode }) {
   );
 }
 
-function GlassCard(props: { children: ReactNode; className?: string }) {
+function WhiteCard(props: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-3xl border border-white/10 bg-white/5 p-6 md:p-7 ${props.className || ""}`}>
+    <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
       {props.children}
     </div>
   );
 }
 
-function WhiteCard(props: { children: ReactNode; className?: string }) {
+function GlassCard(props: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-3xl bg-white p-6 md:p-7 text-slate-900 shadow-sm ${props.className || ""}`}>
+    <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>
       {props.children}
     </div>
   );
@@ -270,24 +246,7 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-function Pill({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/85">
-      {children}
-    </span>
-  );
-}
-
-// -------------------- charts & visuals --------------------
-
-const freqColor: Record<AB, string> = {
-  A: "#EF4444", // red
-  B: "#F59E0B", // yellow/amber
-  C: "#22C55E", // green
-  D: "#3B82F6", // blue
-};
-
-function FrequencyBarsColored(props: {
+function FrequencyBars(props: {
   labels: Array<{ code: AB; name: string }>;
   pct: Record<AB, number>;
   top: AB;
@@ -295,29 +254,27 @@ function FrequencyBarsColored(props: {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const max = Math.max(...items.map((i) => i.v), 0.01);
 
+  // Brand-ish per your A/B/C/D color instruction
+  const colorByCode: Record<AB, string> = {
+    A: "bg-red-500",
+    B: "bg-amber-400",
+    C: "bg-emerald-500",
+    D: "bg-blue-500",
+  };
+
   return (
     <div className="space-y-3">
       {items.map((it) => {
         const w = Math.round((it.v / max) * 100);
         const isTop = it.code === props.top;
-        const color = freqColor[it.code];
-
         return (
-          <div key={it.code} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-4">
+          <div key={it.code} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-                    style={{ backgroundColor: color }}
-                  >
-                    {it.code}
-                  </span>
-
                   <span className="text-sm font-semibold text-slate-900">
                     {it.name} <span className="text-slate-500">({it.code})</span>
                   </span>
-
                   {isTop ? (
                     <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
                       Dominant
@@ -325,8 +282,8 @@ function FrequencyBarsColored(props: {
                   ) : null}
                 </div>
 
-                <div className="mt-3 h-2.5 w-full rounded-full bg-white">
-                  <div className="h-2.5 rounded-full" style={{ width: `${w}%`, backgroundColor: color }} />
+                <div className="mt-2 h-2 w-full rounded-full bg-white">
+                  <div className={`h-2 rounded-full ${colorByCode[it.code]}`} style={{ width: `${w}%` }} />
                 </div>
               </div>
 
@@ -339,230 +296,25 @@ function FrequencyBarsColored(props: {
   );
 }
 
-function ProfileBars(props: {
-  labels: Array<{ code: string; name: string }>;
-  pct: Record<string, number>;
-  topCode: string;
-}) {
-  const items = props.labels
-    .map((p) => ({ ...p, v: clamp01(props.pct?.[p.code] ?? 0) }))
-    .sort((a, b) => (b.v || 0) - (a.v || 0));
-
-  const max = Math.max(...items.map((i) => i.v), 0.01);
-
+function ProfileRadarStub(props: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      {items.map((it, idx) => {
-        const w = Math.round((it.v / max) * 100);
-        const isTop = it.code === props.topCode;
-        const rank = idx + 1;
-
-        return (
-          <div key={it.code} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                    {rank}
-                  </span>
-
-                  <span className="truncate text-sm font-semibold text-slate-900">{stripDoublePrefix(it.name)}</span>
-
-                  {isTop ? (
-                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      Primary
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="mt-3 h-2.5 w-full rounded-full bg-white">
-                  <div className="h-2.5 rounded-full bg-slate-900" style={{ width: `${w}%` }} />
-                </div>
-              </div>
-
-              <div className="shrink-0 text-sm font-semibold text-slate-700">{pctLabel(it.v)}</div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ProfileRadar(props: {
-  values: Array<{ code: string; label: string; value: number }>;
-  title?: string;
-  subtitle?: string;
-}) {
-  const size = 300;
-  const cx = size / 2;
-  const cy = size / 2;
-  const R = 115;
-
-  const pts = props.values.map((v, i) => {
-    const a = (Math.PI * 2 * i) / props.values.length - Math.PI / 2;
-    const r = R * clamp01(v.value);
-    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), a };
-  });
-
-  const polygon = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-7">
-      <div className="flex items-start justify-between gap-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Profile mix</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{props.title || "Profile map"}</div>
-          {props.subtitle ? <p className="mt-2 text-sm text-slate-600 max-w-md">{props.subtitle}</p> : null}
+          <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Profile mix</div>
+          <div className="mt-2 text-xl font-semibold text-slate-900">{props.title}</div>
+          <p className="mt-2 text-sm text-slate-600">{props.description}</p>
         </div>
         <div className="text-xs text-slate-500">Profiles-only map</div>
       </div>
 
-      <div className="mt-6 flex justify-center">
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          {/* rings */}
-          {[0.25, 0.5, 0.75, 1].map((t) => (
-            <circle key={t} cx={cx} cy={cy} r={R * t} fill="none" stroke="#E5E7EB" />
-          ))}
-
-          {/* axes + labels */}
-          {props.values.map((v, i) => {
-            const a = (Math.PI * 2 * i) / props.values.length - Math.PI / 2;
-            const x2 = cx + R * Math.cos(a);
-            const y2 = cy + R * Math.sin(a);
-
-            const lx = cx + (R + 18) * Math.cos(a);
-            const ly = cy + (R + 18) * Math.sin(a);
-
-            return (
-              <g key={v.code}>
-                <line x1={cx} y1={cy} x2={x2} y2={y2} stroke="#E5E7EB" />
-                <text
-                  x={lx}
-                  y={ly}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="12"
-                  fill="#111827"
-                  fontWeight="600"
-                >
-                  {v.label}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* polygon */}
-          <polygon points={polygon} fill="rgba(37, 99, 235, 0.18)" stroke="#2563EB" strokeWidth="2" />
-          {pts.map((p, idx) => (
-            <circle key={idx} cx={p.x} cy={p.y} r={4.5} fill="#2563EB" />
-          ))}
-        </svg>
-      </div>
-
-      <div className="mt-2 text-xs text-slate-500 text-center">Higher = stronger pattern.</div>
+      <div className="mt-4 flex items-center justify-center">{props.children}</div>
+      <div className="mt-3 text-center text-xs text-slate-500">Higher = stronger pattern.</div>
     </div>
   );
 }
 
-// -------------------- triad cards --------------------
-
-const profileSummary: Record<string, string> = {
-  PROFILE_1: "Decisive, action-oriented initiator who drives momentum and breaks inertia.",
-  PROFILE_2: "Influential communicator who aligns people through clarity, presence, and energy.",
-  PROFILE_3: "Relationship-first stabiliser who builds trust and keeps teams connected under pressure.",
-  PROFILE_4: "Connector of people and process who creates cohesion, rhythm, and alignment.",
-  PROFILE_5: "Practical executor who builds reliability, delivers outcomes, and improves follow-through.",
-  PROFILE_6: "Structured organiser who plans, creates order, and enables predictable execution.",
-  PROFILE_7: "Critical thinker who improves decisions through insight, quality control, and precision.",
-  PROFILE_8: "Strategic architect who designs systems and long-term direction with clarity and depth.",
-};
-
-function RolePill({ children, tone }: { children: ReactNode; tone: "primary" | "support"; }) {
-  const cls =
-    tone === "primary"
-      ? "bg-slate-900 text-white border-slate-900"
-      : "bg-white text-slate-900 border-slate-200";
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${cls}`}>
-      {children}
-    </span>
-  );
-}
-
-function TriadCards(props: {
-  ctx: {
-    primary: { code: string; name: string; pct: number };
-    secondary?: { code: string; name: string; pct: number };
-    tertiary?: { code: string; name: string; pct: number };
-  };
-}) {
-  const items = [
-    { slot: "Primary profile", rank: 1, tone: "primary" as const, data: props.ctx.primary },
-    props.ctx.secondary ? { slot: "Secondary", rank: 2, tone: "support" as const, data: props.ctx.secondary } : null,
-    props.ctx.tertiary ? { slot: "Tertiary", rank: 3, tone: "support" as const, data: props.ctx.tertiary } : null,
-  ].filter(Boolean) as Array<{ slot: string; rank: number; tone: "primary" | "support"; data: { code: string; name: string; pct: number } }>;
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
-      <div className="grid gap-3 md:grid-cols-3">
-        {items.map((it) => {
-          const img = profileImageFromCode(it.data.code);
-          const name = stripDoublePrefix(it.data.name);
-          const pct = clamp01(it.data.pct);
-          const summary = profileSummary[it.data.code] || "A distinct pattern of contribution in the OperatingFrame model.";
-
-          // subtle colour accents
-          const accent =
-            it.rank === 1 ? "border-slate-900/15 bg-white" : it.rank === 2 ? "border-sky-200 bg-sky-50/40" : "border-emerald-200 bg-emerald-50/40";
-
-          return (
-            <div key={it.slot} className={`rounded-3xl border p-4 md:p-5 ${accent}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {it.slot}
-                </div>
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                  {it.rank}
-                </span>
-              </div>
-
-              <div className="mt-3 flex items-start gap-3">
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                  {img ? (
-                    <img src={img} alt={name} className="h-full w-full object-cover" />
-                  ) : null}
-                </div>
-
-                <div className="min-w-0">
-                  <div className="text-lg font-bold text-slate-900 leading-snug">{name}</div>
-                  <div className="mt-0.5 text-xs font-semibold text-slate-500">{it.data.code}</div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">{pctLabel(pct)} match</div>
-                <RolePill tone={it.tone}>{it.tone === "primary" ? "Primary" : "Supporting"}</RolePill>
-              </div>
-
-              <div className="mt-2 h-2 w-full rounded-full bg-white">
-                <div className="h-2 rounded-full bg-slate-900" style={{ width: `${Math.round(pct * 100)}%` }} />
-              </div>
-
-              <p className="mt-3 text-sm text-slate-700 leading-relaxed">{summary}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-4 text-center text-xs text-slate-500">
-        Primary profile: <span className="font-semibold text-slate-700">{stripDoublePrefix(props.ctx.primary.name)}</span>
-      </div>
-    </div>
-  );
-}
-
-// -------------------- BlockRenderer --------------------
+// ---------- Block rendering ----------
 
 function BlockRenderer(props: {
   block: ReportSectionBlock;
@@ -570,15 +322,23 @@ function BlockRenderer(props: {
     data: ResultData;
     participant: string;
     orgName: string;
-    testName: string;
-
-    topFreqName: string;
-    topFreqCode: AB;
-    topFreqPct: number;
+    reportTitle: string;
 
     primary: { code: string; name: string; pct: number };
     secondary?: { code: string; name: string; pct: number };
     tertiary?: { code: string; name: string; pct: number };
+
+    topFreq: { code: AB; name: string; pct: number };
+
+    // for macro image resolving
+    img: {
+      primarySlug: string;
+      secondarySlug: string;
+      tertiarySlug: string;
+      primaryImg: string;
+      secondaryImg: string;
+      tertiaryImg: string;
+    };
   };
 }) {
   const { block, ctx } = props;
@@ -592,16 +352,48 @@ function BlockRenderer(props: {
     return <div className={h} />;
   }
 
+  if (type === "image") {
+    const raw = String((block as any)?.src || "").trim();
+    if (!raw) return null;
+
+    const src = resolveImageSrc(raw, {
+      primarySlug: ctx.img.primarySlug,
+      secondarySlug: ctx.img.secondarySlug,
+      tertiarySlug: ctx.img.tertiarySlug,
+    });
+
+    const align = (String((block as any)?.align || "center") as any).toLowerCase();
+    const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
+    const maxH = typeof (block as any)?.max_h === "number" ? (block as any).max_h : 420;
+
+    return (
+      <figure className="my-6">
+        <div className={`flex ${justify}`}>
+          <img
+            src={src}
+            alt={safeText((block as any)?.alt)}
+            crossOrigin="anonymous"
+            className="h-auto max-w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+            style={{ maxHeight: maxH }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
+        {(block as any)?.caption ? (
+          <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText((block as any)?.caption)}</figcaption>
+        ) : null}
+      </figure>
+    );
+  }
+
   if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
   if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
   if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
-  if (type === "h4") {
+  if (type === "h4")
     return (
-      <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        {safeText((block as any).text)}
-      </h4>
+      <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{safeText((block as any).text)}</h4>
     );
-  }
 
   if (type === "p") {
     const t = safeText((block as any).text);
@@ -634,56 +426,14 @@ function BlockRenderer(props: {
     const t = safeText((block as any).text);
     const cite = safeText((block as any).cite);
     return (
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
         <p className="text-sm italic text-slate-700">“{t}”</p>
         {cite ? <p className="mt-2 text-xs text-slate-500">— {cite}</p> : null}
       </div>
     );
   }
 
-  if (type === "image") {
-    const rawSrc = String((block as any)?.src || "").trim();
-    if (!rawSrc) return null;
-
-    const align = (String((block as any)?.align || "center") as any).toLowerCase();
-    const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
-    const maxH = typeof (block as any)?.max_h === "number" ? (block as any).max_h : 520;
-    const rounded = String((block as any)?.rounded || "xl").toLowerCase();
-    const shadow = Boolean((block as any)?.shadow ?? true);
-
-    const rcls =
-      rounded === "full" ? "rounded-full" : rounded === "md" ? "rounded-xl" : rounded === "none" ? "rounded-none" : "rounded-3xl";
-
-    const src = resolveImageSrc(rawSrc, {
-      orgSlug: ctx.data.org_slug,
-      primaryCode: ctx.primary.code,
-      secondaryCode: ctx.secondary?.code,
-      tertiaryCode: ctx.tertiary?.code,
-    });
-
-    return (
-      <figure className="my-6">
-        <div className={`flex ${justify}`}>
-          <img
-            src={src}
-            alt={safeText((block as any)?.alt)}
-            crossOrigin="anonymous"
-            className={`h-auto max-w-full ${rcls} border border-slate-200 bg-white ${shadow ? "shadow-sm" : ""}`}
-            style={{ maxHeight: maxH }}
-            onError={(e) => {
-              // hide broken image
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        </div>
-        {(block as any)?.caption ? (
-          <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText((block as any)?.caption)}</figcaption>
-        ) : null}
-      </figure>
-    );
-  }
-
-  // callout
+  // ✅ Premium: callout
   if (type === "callout") {
     const tone = String((block as any)?.tone || "neutral").toLowerCase();
     const title = safeText((block as any)?.title).trim();
@@ -700,7 +450,7 @@ function BlockRenderer(props: {
             : "border-slate-200 bg-slate-50";
 
     return (
-      <div className={`rounded-3xl border p-6 ${shell}`}>
+      <div className={`rounded-2xl border p-5 ${shell}`}>
         {title ? <div className="text-sm font-semibold text-slate-900">{title}</div> : null}
         {text ? <p className="mt-2 text-sm text-slate-700 whitespace-pre-line">{text}</p> : null}
         {bullets.length ? (
@@ -714,7 +464,7 @@ function BlockRenderer(props: {
     );
   }
 
-  // chips
+  // ✅ Premium: chips
   if (type === "chips") {
     const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
     if (!items.length) return null;
@@ -732,11 +482,12 @@ function BlockRenderer(props: {
     );
   }
 
-  // cards
+  // ✅ Premium: cards
   if (type === "cards") {
     const columnsRaw = Number((block as any)?.columns || 2);
     const columns = columnsRaw === 1 ? 1 : columnsRaw === 3 ? 3 : 2;
     const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
+
     const grid =
       columns === 1 ? "grid-cols-1" : columns === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2";
 
@@ -752,7 +503,7 @@ function BlockRenderer(props: {
                 : "border-slate-200 bg-white text-slate-900";
 
           return (
-            <div key={idx} className={`rounded-3xl border p-6 ${shell}`}>
+            <div key={idx} className={`rounded-2xl border p-5 ${shell}`}>
               {it?.title ? (
                 <div className={`text-sm font-semibold ${tone === "light" ? "text-slate-900" : "text-white"}`}>
                   {safeText(it.title)}
@@ -770,14 +521,14 @@ function BlockRenderer(props: {
     );
   }
 
-  // scorecard row
+  // ✅ Premium: scorecard row
   if (type === "scorecard_row") {
     const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
     if (!items.length) return null;
     return (
       <div className="grid gap-3 md:grid-cols-3">
         {items.map((it: any, idx: number) => (
-          <div key={idx} className="rounded-3xl border border-slate-200 bg-white p-6">
+          <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{safeText(it?.label)}</div>
             <div className="mt-1 text-lg font-bold text-slate-900">{safeText(it?.value)}</div>
             {it?.hint ? <div className="mt-1 text-xs text-slate-500">{safeText(it.hint)}</div> : null}
@@ -787,136 +538,239 @@ function BlockRenderer(props: {
     );
   }
 
-  // OperatingFrame: triad cards inside profile.identity
-  if (type === "profiles.triad_cards") {
+  // ✅ Premium: charts driven by report data
+  if (type === "chart.frequency_bars") {
     return (
-      <TriadCards
-        ctx={{
-          primary: ctx.primary,
-          secondary: ctx.secondary,
-          tertiary: ctx.tertiary,
-        }}
-      />
-    );
-  }
-
-  // Images side-by-side block
-  if (type === "images.pair") {
-    const left = resolveImageSrc(String((block as any)?.left_src || ""), {
-      orgSlug: ctx.data.org_slug,
-      primaryCode: ctx.primary.code,
-      secondaryCode: ctx.secondary?.code,
-      tertiaryCode: ctx.tertiary?.code,
-    });
-    const right = resolveImageSrc(String((block as any)?.right_src || ""), {
-      orgSlug: ctx.data.org_slug,
-      primaryCode: ctx.primary.code,
-      secondaryCode: ctx.secondary?.code,
-      tertiaryCode: ctx.tertiary?.code,
-    });
-
-    if (!left && !right) return null;
-
-    return (
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          {left ? (
-            <img src={left} alt={safeText((block as any)?.left_caption)} className="w-full rounded-2xl border border-slate-200" />
-          ) : null}
-          {(block as any)?.left_caption ? (
-            <div className="mt-2 text-xs text-slate-500 text-center">{safeText((block as any).left_caption)}</div>
-          ) : null}
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5">
-          {right ? (
-            <img
-              src={right}
-              alt={safeText((block as any)?.right_caption)}
-              className="w-full rounded-2xl border border-slate-200"
-            />
-          ) : null}
-          {(block as any)?.right_caption ? (
-            <div className="mt-2 text-xs text-slate-500 text-center">{safeText((block as any).right_caption)}</div>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  // charts
-  if (type === "chart.frequency_bars" || type === "chart.frequency_bars_v2" || type === "chart.frequency_bars_old") {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6">
-        <div className="flex items-center justify-between gap-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-900">Frequency</div>
           <div className="text-xs text-slate-500">Higher = more natural energy</div>
         </div>
         <div className="mt-4">
-          <FrequencyBarsColored labels={ctx.data.frequency_labels} pct={ctx.data.frequency_percentages} top={ctx.data.top_freq} />
+          <FrequencyBars labels={ctx.data.frequency_labels} pct={ctx.data.frequency_percentages} top={ctx.data.top_freq} />
         </div>
       </div>
     );
   }
 
   if (type === "chart.profile_bars") {
+    // Intentionally removed from “What this report includes” per your instruction.
+    // Keep supported in case another section uses it later.
+    return null;
+  }
+
+  // ✅ NEW: images.pair (two clean cards side-by-side)
+  if (type === "images.pair") {
+    const left = (block as any)?.left || {};
+    const right = (block as any)?.right || {};
+
+    const leftSrc = resolveImageSrc(String(left?.src || ""), {
+      primarySlug: ctx.img.primarySlug,
+      secondarySlug: ctx.img.secondarySlug,
+      tertiarySlug: ctx.img.tertiarySlug,
+    });
+    const rightSrc = resolveImageSrc(String(right?.src || ""), {
+      primarySlug: ctx.img.primarySlug,
+      secondarySlug: ctx.img.secondarySlug,
+      tertiarySlug: ctx.img.tertiarySlug,
+    });
+
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="text-sm font-semibold text-slate-900">Profiles</div>
-          <div className="text-xs text-slate-500">Primary + supporting</div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          {left?.title ? <div className="text-sm font-semibold text-slate-900">{safeText(left.title)}</div> : null}
+          {leftSrc ? (
+            <div className="mt-3 flex justify-center">
+              <img
+                src={leftSrc}
+                alt={safeText(left?.alt)}
+                className="max-w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+                style={{ maxHeight: typeof left?.max_h === "number" ? left.max_h : 360 }}
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
+            </div>
+          ) : null}
+          {left?.caption ? <div className="mt-2 text-center text-xs text-slate-500">{safeText(left.caption)}</div> : null}
         </div>
-        <div className="mt-4">
-          <ProfileBars labels={ctx.data.profile_labels} pct={ctx.data.profile_percentages} topCode={ctx.data.top_profile_code} />
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          {right?.title ? <div className="text-sm font-semibold text-slate-900">{safeText(right.title)}</div> : null}
+          {rightSrc ? (
+            <div className="mt-3 flex justify-center">
+              <img
+                src={rightSrc}
+                alt={safeText(right?.alt)}
+                className="max-w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+                style={{ maxHeight: typeof right?.max_h === "number" ? right.max_h : 360 }}
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
+            </div>
+          ) : null}
+          {right?.caption ? <div className="mt-2 text-center text-xs text-slate-500">{safeText(right.caption)}</div> : null}
         </div>
       </div>
     );
   }
 
-  if (type === "chart.profile_radar") {
-    const values = ctx.data.profile_labels
-      .map((p) => ({ code: p.code, label: p.code.replace("PROFILE_", "P"), value: clamp01(ctx.data.profile_percentages?.[p.code] ?? 0) }))
-      .sort((a, b) => {
-        // keep P1..P8 order if possible
-        const ai = Number(a.label.replace("P", "")) || 999;
-        const bi = Number(b.label.replace("P", "")) || 999;
-        return ai - bi;
-      });
+  // ✅ NEW: profiles.triad_cards (Primary/Secondary/Tertiary) with images + richer summary
+  if (type === "profiles.triad_cards") {
+    const p = ctx.primary;
+    const s = ctx.secondary;
+    const t = ctx.tertiary;
+
+    const primarySummary =
+      safeText((block as any)?.primary_summary).trim() ||
+      "Your default under pressure — how you naturally initiate, decide, and drive outcomes.";
+    const secondarySummary =
+      safeText((block as any)?.secondary_summary).trim() ||
+      "A supporting pattern you lean on day-to-day — it balances and strengthens your primary style.";
+    const tertiarySummary =
+      safeText((block as any)?.tertiary_summary).trim() ||
+      "A backup style you can access when needed — especially when the situation demands a different approach.";
+
+    const cardShell = "rounded-2xl border p-5";
+    const pShell = "border-red-200 bg-red-50/40";
+    const sShell = "border-blue-200 bg-blue-50/40";
+    const tShell = "border-emerald-200 bg-emerald-50/40";
+
+    const Item = (args: {
+      label: "Primary profile" | "Secondary" | "Tertiary";
+      rank: 1 | 2 | 3;
+      name: string;
+      code: string;
+      pct: number;
+      img: string;
+      shell: string;
+      tag: "Primary" | "Supporting";
+      summary: string;
+    }) => (
+      <div className={`${cardShell} ${args.shell}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-600">{args.label}</div>
+            <div className="mt-2 text-lg font-semibold text-slate-900">
+              {args.code}: {args.name}
+            </div>
+            <div className="mt-1 text-xs font-semibold text-slate-500">{args.code.replace("P", "PROFILE_")}</div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+              {args.rank}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <img
+            src={args.img}
+            alt={args.name}
+            className="h-14 w-14 rounded-2xl border border-slate-200 bg-white object-contain"
+            onError={(e) => (e.currentTarget.style.display = "none")}
+          />
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-slate-900">{pctLabel(args.pct)}</div>
+              <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
+                {args.tag}
+              </span>
+            </div>
+            <div className="mt-2 h-2 w-full rounded-full bg-white">
+              <div className="h-2 rounded-full bg-slate-900" style={{ width: `${Math.round(clamp01(args.pct) * 100)}%` }} />
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-4 text-sm leading-relaxed text-slate-700">{args.summary}</p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+            Strengths
+          </span>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+            Motivators
+          </span>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+            Watch-outs
+          </span>
+        </div>
+      </div>
+    );
 
     return (
-      <ProfileRadar
-        values={values}
-        title={stripDoublePrefix(ctx.primary.name)}
-        subtitle="This visual map shows how your overall Operating Style is distributed across the model. Higher values show patterns you naturally use more often."
-      />
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <Item
+            label="Primary profile"
+            rank={1}
+            name={p.name}
+            code={p.code}
+            pct={p.pct}
+            img={ctx.img.primaryImg}
+            shell={pShell}
+            tag="Primary"
+            summary={primarySummary}
+          />
+          {s ? (
+            <Item
+              label="Secondary"
+              rank={2}
+              name={s.name}
+              code={s.code}
+              pct={s.pct}
+              img={ctx.img.secondaryImg}
+              shell={sShell}
+              tag="Supporting"
+              summary={secondarySummary}
+            />
+          ) : null}
+          {t ? (
+            <Item
+              label="Tertiary"
+              rank={3}
+              name={t.name}
+              code={t.code}
+              pct={t.pct}
+              img={ctx.img.tertiaryImg}
+              shell={tShell}
+              tag="Supporting"
+              summary={tertiarySummary}
+            />
+          ) : null}
+        </div>
+
+        <div className="mt-3 text-center text-xs text-slate-500">Primary profile: {p.name}</div>
+      </div>
     );
   }
 
-  // CTA
+  // ✅ Premium: CTA
   if (type === "cta") {
     const title = safeText((block as any)?.title).trim() || "Next steps";
     const text =
       safeText((block as any)?.text).trim() ||
-      "Turn insight into action: use this report in a coaching conversation, a 1:1, or a team workshop.";
-    const btn = safeText((block as any)?.button_text).trim() || "Next steps";
+      "Use this report in a coaching conversation. The real value is applying it to your role and team context.";
+    const btn = safeText((block as any)?.button_text).trim() || "Next step";
 
-    // ✅ Must use redirect_url first (per your requirement)
+    // ✅ This fixes your “Next Steps button not working” regression:
+    // Use redirect_url first (your generator link), then next_steps_url.
     const url = (ctx.data?.link?.redirect_url || ctx.data?.link?.next_steps_url || "").trim();
 
     return (
-      <div className="rounded-3xl border border-slate-200 bg-slate-900 p-7 text-white">
+      <div className="rounded-2xl border border-slate-200 bg-slate-900 p-6 text-white">
         <div className="text-lg font-semibold">{title}</div>
         <p className="mt-2 text-sm text-white/80">{text}</p>
         <div className="mt-5 flex flex-wrap gap-3">
           {url ? (
             <button
               onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-              className="inline-flex items-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+              className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
             >
               {btn}
             </button>
           ) : (
-            <span className="text-xs text-white/70">No redirect_url is configured for this link.</span>
+            <span className="text-xs text-white/70">No redirect/next step URL is configured for this link.</span>
           )}
         </div>
       </div>
@@ -925,7 +779,7 @@ function BlockRenderer(props: {
 
   // Unknown fallback
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
       <p className="text-xs font-semibold text-amber-900">
         Unsupported block type: {String((block as any).type || "unknown")}
       </p>
@@ -933,107 +787,7 @@ function BlockRenderer(props: {
   );
 }
 
-// -------------------- default blocks (only when DB blocks empty) --------------------
-
-function defaultBlocksForSection(sectionId: string): ReportSectionBlock[] {
-  const id = String(sectionId || "").toLowerCase();
-
-  if (id === "global.cover") {
-    return [
-      {
-        type: "callout",
-        tone: "insight",
-        title: "Your report at a glance",
-        text: "This report gives you a practical language for how you lead, decide, communicate, and execute. Use it to apply your strengths on purpose and spot the patterns that trip you up under pressure.",
-      },
-      {
-        type: "quote",
-        cite: "OperatingFrame™",
-        text: "The goal isn’t to put you in a box. It’s to give you leverage: clarity, self-awareness, and a repeatable way to improve how you work with others.",
-      },
-    ];
-  }
-
-  if (id === "global.summary_dashboard") {
-    return [
-      { type: "p", text: "Your results include two layers:" },
-      {
-        type: "ul",
-        items: [
-          "Frequencies (A–D): your broad operating energy—how you tend to think, decide, and move work forward under pressure.",
-          "Profiles (1–8): your more specific leadership pattern—how your Frequencies combine into a recognisable style.",
-        ],
-      },
-      {
-        type: "p",
-        text: "You’ll see a dominant Frequency, a Primary Profile, and supporting Secondary and Tertiary Profiles. Higher percentages indicate patterns you use more often and with less effort.",
-      },
-      {
-        type: "ul",
-        items: [
-          "Primary profile = your default under pressure.",
-          "Secondary profile = the pattern that supports you day-to-day.",
-          "Tertiary profile = a backup style you can access when needed.",
-        ],
-      },
-    ];
-  }
-
-  if (id === "global.framework_explainer") {
-    return [
-      {
-        type: "p",
-        text: "OperatingFrame™ is built on four behavioural Drivers (Frequencies) that show where you naturally place attention and energy.",
-      },
-      {
-        type: "ul",
-        items: [
-          "A: Direction — Vision, decisiveness, future-focus, creating momentum.",
-          "B: Connection — People, influence, communication, motivation and energy.",
-          "C: Structure — Process, rhythm, reliability, execution and follow-through.",
-          "D: Precision — Insight, analysis, accuracy, depth and quality.",
-        ],
-      },
-      {
-        type: "p",
-        text: "Those Drivers combine into eight Profiles—distinct patterns of contribution. Your profile mix explains how you typically lead, communicate, and execute.",
-      },
-      {
-        type: "ul",
-        items: [
-          "Activator (A+B): decisive, energetic initiator who gets things moving quickly.",
-          "Messenger (A+B): inspires and aligns people through communication and presence.",
-          "Relator (B+C): relationship-first stabiliser who builds trust and keeps teams connected.",
-          "Integrator (B+C): connector of people and process; creates alignment and cohesion.",
-          "Operator (C+D): practical executor who builds reliability and gets results delivered.",
-          "Planner (C+D): structured organiser who brings order, plans, and predictable execution.",
-          "Evaluator (D+A): critical thinker who improves decisions through insight and quality control.",
-          "Vision Engineer (D+A): strategic architect who designs systems and long-term direction.",
-        ],
-      },
-      {
-        type: "p",
-        text: "No profile is ‘better’. Each has strengths, blind spots, and conditions where it performs best. The goal is to use your pattern intentionally—and build compensating habits where needed.",
-      },
-      {
-        type: "images.pair",
-        left_src: "{{FREQUENCY_GRID}}",
-        right_src: "{{PROFILE_GRID}}",
-        left_caption: "The 4 Frequencies (A–D) — your operating drivers.",
-        right_caption: "The 8 Profiles — distinct patterns of contribution.",
-      },
-    ];
-  }
-
-  if (id === "global.cta_next_steps") {
-    return [{ type: "cta", title: "Next steps", text: "Book your follow-up conversation to walk through your results.", button_text: "Next steps" }];
-  }
-
-  // default generic
-  return [{ type: "p", text: "This section has not been populated yet." }];
-}
-
-// -------------------- component --------------------
+// ---------- Component ----------
 
 export default function NativeBlocksReportClient(props: {
   token: string;
@@ -1042,13 +796,12 @@ export default function NativeBlocksReportClient(props: {
   data: ResultData;
 }) {
   const { data } = props;
+
   const reportRef = useRef<HTMLDivElement | null>(null);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
-
-  // ✅ remove default “Organisation” wording — only show org if it exists
-  const orgName = (data.org_name || "").trim();
-  const testName = (data.test_name || "Personalised report").trim();
+  const orgName = data.org_name || data.test_name || "Organisation";
+  const reportTitle = data.test_name || "Personalised report";
 
   const topFreqCode = data.top_freq;
   const topFreqPct = data.frequency_percentages?.[topFreqCode] ?? 0;
@@ -1060,38 +813,9 @@ export default function NativeBlocksReportClient(props: {
       .sort((a, b) => (b.pct || 0) - (a.pct || 0));
   }, [data.profile_labels, data.profile_percentages]);
 
-  const primary = sortedProfiles[0];
+  const primary = sortedProfiles[0] || { code: data.top_profile_code, name: data.top_profile_name, pct: 0 };
   const secondary = sortedProfiles[1];
   const tertiary = sortedProfiles[2];
-
-  const ctx = useMemo(() => {
-    const primaryObj = {
-      code: primary?.code || data.top_profile_code,
-      name: stripDoublePrefix(primary?.name || data.top_profile_name || "Primary profile"),
-      pct: clamp01(primary?.pct ?? data.profile_percentages?.[data.top_profile_code] ?? 0),
-    };
-
-    const secondaryObj = secondary
-      ? { code: secondary.code, name: stripDoublePrefix(secondary.name), pct: clamp01(secondary.pct ?? 0) }
-      : undefined;
-
-    const tertiaryObj = tertiary
-      ? { code: tertiary.code, name: stripDoublePrefix(tertiary.name), pct: clamp01(tertiary.pct ?? 0) }
-      : undefined;
-
-    return {
-      data,
-      participant,
-      orgName,
-      testName,
-      topFreqName,
-      topFreqCode,
-      topFreqPct,
-      primary: primaryObj,
-      secondary: secondaryObj,
-      tertiary: tertiaryObj,
-    };
-  }, [data, participant, orgName, testName, topFreqName, topFreqCode, topFreqPct, primary, secondary, tertiary]);
 
   const mergedSections = useMemo(() => {
     const common = (data.sections?.common || []) as ReportSection[];
@@ -1102,10 +826,10 @@ export default function NativeBlocksReportClient(props: {
   const indexItems = useMemo(() => {
     return mergedSections.map((s, i) => {
       const id = getDomId(s, i);
-      const title = safeText(s.title).trim() || fallbackTitleFromId(String(s.id || ""), ctx.primary.name);
+      const title = safeText(s.title).trim() || fallbackTitleFromId(String(s.id || ""), data.top_profile_name);
       return { id, title, rawId: String(s.id || "") };
     });
-  }, [mergedSections, ctx.primary.name]);
+  }, [mergedSections, data.top_profile_name]);
 
   function scrollToSection(id: string) {
     const el = document.getElementById(id);
@@ -1114,44 +838,52 @@ export default function NativeBlocksReportClient(props: {
   }
 
   function openNextSteps() {
-    // ✅ Must use redirect link
     const url = (data?.link?.redirect_url || data?.link?.next_steps_url || "").trim();
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      return;
-    }
-    const hit = indexItems.find((x) => x.rawId === "global.cta_next_steps" || x.title.toLowerCase().includes("next steps"));
-    if (hit) scrollToSection(hit.id);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 
   function downloadPdfViaPrint() {
     window.print();
   }
 
-  // Header images
-  const orgLogo = resolveImageSrc("{{ORG_LOGO}}", {
-    orgSlug: data.org_slug,
-    primaryCode: ctx.primary.code,
-    secondaryCode: ctx.secondary?.code,
-    tertiaryCode: ctx.tertiary?.code,
-  });
+  const primarySlug = profileSlugFromName(primary?.name || "");
+  const secondarySlug = profileSlugFromName(secondary?.name || primary?.name || "");
+  const tertiarySlug = profileSlugFromName(tertiary?.name || primary?.name || "");
 
-  const profileImg = profileImageFromCode(ctx.primary.code);
-
-  // Profile radar data
-  const radarValues = useMemo(() => {
-    return data.profile_labels
-      .map((p) => ({
-        code: p.code,
-        label: p.code.replace("PROFILE_", "P"),
-        value: clamp01(data.profile_percentages?.[p.code] ?? 0),
-      }))
-      .sort((a, b) => {
-        const ai = Number(a.label.replace("P", "")) || 999;
-        const bi = Number(b.label.replace("P", "")) || 999;
-        return ai - bi;
-      });
-  }, [data.profile_labels, data.profile_percentages]);
+  const ctx = useMemo(() => {
+    return {
+      data,
+      participant,
+      orgName,
+      reportTitle,
+      primary: { code: primary?.code || data.top_profile_code, name: primary?.name || data.top_profile_name, pct: primary?.pct ?? 0 },
+      secondary: secondary ? { code: secondary.code, name: secondary.name, pct: secondary.pct ?? 0 } : undefined,
+      tertiary: tertiary ? { code: tertiary.code, name: tertiary.name, pct: tertiary.pct ?? 0 } : undefined,
+      topFreq: { code: topFreqCode, name: topFreqName, pct: topFreqPct },
+      img: {
+        primarySlug,
+        secondarySlug,
+        tertiarySlug,
+        primaryImg: `/images/operatingframe-full-test/profile-cards/${primarySlug}.png`,
+        secondaryImg: `/images/operatingframe-full-test/profile-cards/${secondarySlug}.png`,
+        tertiaryImg: `/images/operatingframe-full-test/profile-cards/${tertiarySlug}.png`,
+      },
+    };
+  }, [
+    data,
+    participant,
+    orgName,
+    reportTitle,
+    primary,
+    secondary,
+    tertiary,
+    topFreqCode,
+    topFreqName,
+    topFreqPct,
+    primarySlug,
+    secondarySlug,
+    tertiarySlug,
+  ]);
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
@@ -1159,64 +891,67 @@ export default function NativeBlocksReportClient(props: {
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-6">
         {/* HERO */}
-        <GlassCard>
+        <GlassCard className="p-7">
           <div className="flex items-start justify-between gap-6">
-            <div className="flex items-start gap-4 min-w-0">
-              {/* Left logo */}
-              <div className="h-14 w-14 md:h-16 md:w-16 shrink-0 rounded-2xl border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center">
-                {orgLogo ? <img src={orgLogo} alt={orgName || testName} className="h-full w-full object-cover" /> : null}
+            <div className="min-w-0">
+              {/* ✅ Remove “Organisation” label tag, keep clean pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{orgName}</Badge>
+                <Badge>{reportTitle}</Badge>
               </div>
 
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  {orgName ? <Pill>{orgName}</Pill> : null}
-                  <Pill>{testName}</Pill>
-                </div>
+              <div className="mt-3 text-xs font-semibold uppercase tracking-[0.22em] text-white/70">
+                Personalised report
+              </div>
 
-                <div className="mt-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">
-                    Personalised report
-                  </div>
-                  <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight leading-tight">
-                    Your Operating Style in Depth: {ctx.primary.name}
-                  </h1>
+              <h1 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight">
+                Your Operating Style in Depth: {ctx.primary.code}: {ctx.primary.name}
+              </h1>
 
-                  <p className="mt-2 text-sm text-white/80">
-                    For <span className="font-semibold text-white">{participant}</span>
-                  </p>
+              <p className="mt-2 text-sm text-white/80">
+                For <span className="font-semibold text-white">{participant}</span>
+              </p>
 
-                  <p className="mt-1 text-sm text-white/80">
-                    Top profile: <span className="font-semibold text-white">{ctx.primary.name}</span>
-                  </p>
+              {/* ✅ Move Dominant Frequency under Top Profile (as requested) */}
+              <div className="mt-1 text-sm text-white/80">
+                Top profile:{" "}
+                <span className="font-semibold text-white">
+                  {ctx.primary.code}: {ctx.primary.name}
+                </span>
+                <span className="mx-2 text-white/40">•</span>
+                Dominant frequency:{" "}
+                <span className="font-semibold text-white">
+                  {ctx.topFreq.name} ({ctx.topFreq.code})
+                </span>{" "}
+                · {pctLabel(ctx.topFreq.pct)}
+              </div>
 
-                  {/* ✅ Dominant frequency under Top Profile */}
-                  <p className="mt-1 text-sm text-white/80">
-                    Frequency: <span className="font-semibold text-white">{topFreqName}</span> · {pctLabel(topFreqPct)}
-                  </p>
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={downloadPdfViaPrint}
+                  className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                >
+                  Download PDF
+                </button>
 
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      onClick={downloadPdfViaPrint}
-                      className="inline-flex items-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-                    >
-                      Download PDF
-                    </button>
-
-                    <button
-                      onClick={openNextSteps}
-                      className="inline-flex items-center rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/15"
-                    >
-                      Next steps
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={openNextSteps}
+                  className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                >
+                  Next steps
+                </button>
               </div>
             </div>
 
-            {/* Right profile image (bigger) */}
-            <div className="hidden md:flex flex-col items-end gap-3 shrink-0">
-              <div className="h-28 w-28 rounded-3xl border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center">
-                {profileImg ? <img src={profileImg} alt={ctx.primary.name} className="h-24 w-24 object-contain" /> : null}
+            {/* ✅ Bigger profile image */}
+            <div className="shrink-0">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <img
+                  src={ctx.img.primaryImg}
+                  alt={ctx.primary.name}
+                  className="h-20 w-20 md:h-24 md:w-24 rounded-2xl bg-white object-contain"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
               </div>
             </div>
           </div>
@@ -1225,41 +960,33 @@ export default function NativeBlocksReportClient(props: {
             <MiniDivider />
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {/* Frequency card (kept compact + coloured bars) */}
+          {/* ✅ Keep the two top cards clean; profile card title now shows top profile name */}
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Frequency</div>
-                  <div className="mt-2 text-2xl font-bold text-slate-900">{topFreqName}</div>
-                  <p className="mt-2 text-sm text-slate-600 max-w-md">
-                    Frequencies show how you naturally operate as a leader — where your energy goes under pressure.
-                    Higher = more natural, lower = less preferred.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Dominant</div>
-                  <div className="mt-1 text-2xl font-bold text-slate-900">{pctLabel(topFreqPct)}</div>
-                </div>
+                <div className="text-sm font-semibold text-slate-900">Frequency</div>
+                <div className="text-xs text-slate-500">Your energy distribution</div>
               </div>
-
-              <div className="mt-5">
-                <FrequencyBarsColored labels={data.frequency_labels} pct={data.frequency_percentages} top={data.top_freq} />
+              <div className="mt-4">
+                <FrequencyBars labels={data.frequency_labels} pct={data.frequency_percentages} top={data.top_freq} />
               </div>
             </WhiteCard>
 
-            {/* Profile radar card (use top profile name; remove "Primary + supporting") */}
-            <ProfileRadar
-              values={radarValues}
-              title={ctx.primary.name}
-              subtitle="This visual map shows how your overall Operating Style is distributed across the model. Higher values show patterns you naturally use more often."
-            />
+            <ProfileRadarStub
+              title={`${ctx.primary.name}`}
+              description={`This visual map shows how your overall Profile / Operating Style is distributed across the model. Higher values show patterns you naturally use more often.`}
+            >
+              {/* Your existing radar chart component lives elsewhere in your codebase.
+                  This client currently receives the rendered chart from the API payload,
+                  so we simply preserve space for it and avoid adding another dependency here. */}
+              <div className="h-[260px] w-[260px] rounded-full border border-slate-200 bg-slate-50" />
+            </ProfileRadarStub>
           </div>
         </GlassCard>
 
         {/* BODY: Index + Sections */}
         <div className="mt-6 grid gap-4 md:grid-cols-[280px_1fr]">
-          <aside className="rounded-3xl border border-white/10 bg-white/5 p-4 sticky top-6 self-start">
+          <aside className="rounded-2xl border border-white/10 bg-white/5 p-4 sticky top-6 self-start">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Index</p>
             <p className="mt-1 text-xs text-slate-300">Jump straight to what you need.</p>
 
@@ -1268,7 +995,7 @@ export default function NativeBlocksReportClient(props: {
                 <button
                   key={s.id}
                   onClick={() => scrollToSection(s.id)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
@@ -1289,21 +1016,22 @@ export default function NativeBlocksReportClient(props: {
               const domId = getDomId(section, idx);
               const title =
                 safeText(section.title).trim() ||
-                fallbackTitleFromId(String(section.id || ""), ctx.primary.name);
+                fallbackTitleFromId(String(section.id || ""), data.top_profile_name);
 
-              const rawId = String(section.id || "").trim();
               const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-              const hasRealBlocks = blocks.length > 0;
-
-              const finalBlocks = hasRealBlocks ? blocks : defaultBlocksForSection(rawId);
 
               return (
-                <section key={domId} id={domId} className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                <section key={domId} id={domId} className="rounded-2xl border border-white/10 bg-white/5 p-5">
                   <WhiteCard>
-                    <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
 
-                    <div className="mt-5 space-y-4">
-                      {finalBlocks.map((b, i) => (
+                      {/* ✅ Remove rawId “bubble tag” like global.welcome_letter */}
+                      {/* (deliberately not rendered) */}
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {blocks.map((b, i) => (
                         <BlockRenderer key={i} block={b} ctx={ctx} />
                       ))}
                     </div>
@@ -1312,16 +1040,14 @@ export default function NativeBlocksReportClient(props: {
               );
             })}
 
-            {/* Bottom CTA (always present, uses redirect_url) */}
+            {/* Bottom CTA */}
             <div className="pt-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                <button
-                  onClick={openNextSteps}
-                  className="inline-flex items-center rounded-xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/15"
-                >
-                  Next steps
-                </button>
-              </div>
+              <button
+                onClick={openNextSteps}
+                className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Next steps
+              </button>
             </div>
 
             <footer className="pt-4 text-xs text-slate-400">
