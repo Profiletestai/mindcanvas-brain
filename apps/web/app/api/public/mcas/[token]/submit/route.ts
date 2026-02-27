@@ -13,6 +13,14 @@ function mcasSupa() {
 
 type IncomingAnswer = { question_code: string; option_code: string };
 
+type CandidatePayload = {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  consent?: boolean;
+};
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -28,15 +36,13 @@ type FrameworkOption = {
 };
 
 type FrameworkQuestion = {
-  code: string; // Q1..Q25
+  code: string;
   section: "operating_style" | "career_vertical";
   prompt: string;
   options: FrameworkOption[];
 };
 
 function verticalBandMidpoint(band: string): number | null {
-  // We use midpoints so we can average, then round to 1..6.
-  // 1-2 => 1.5, 3 => 3, 4 => 4, 5-6 => 5.5
   switch (band) {
     case "1-2":
       return 1.5;
@@ -62,10 +68,7 @@ function normalize(obj: Record<string, number>) {
   return out;
 }
 
-export async function POST(
-  req: Request,
-  ctx: { params: Promise<{ token: string }> }
-) {
+export async function POST(req: Request, ctx: { params: Promise<{ token: string }> }) {
   const sb = mcasSupa();
 
   try {
@@ -75,13 +78,31 @@ export async function POST(
 
     const body = await req.json().catch(() => ({}));
     const answers: IncomingAnswer[] = Array.isArray(body?.answers) ? body.answers : [];
+    const candidate: CandidatePayload = (body?.candidate && typeof body.candidate === "object")
+      ? body.candidate
+      : {};
+
     if (!answers.length) return NextResponse.json({ error: "answers[] required" }, { status: 400 });
 
-    // 1) Resolve partner application by token (even if you’re not using the partner API right now)
+    // Validate intro payload (required)
+    const first_name = String(candidate.first_name || "").trim();
+    const last_name = String(candidate.last_name || "").trim();
+    const email = String(candidate.email || "").trim();
+    const phone = String(candidate.phone || "").trim();
+    const consent = Boolean(candidate.consent);
+
+    if (!first_name || !last_name || !email || !phone || !consent) {
+      return NextResponse.json(
+        { error: "candidate fields required: first_name, last_name, email, phone, consent=true" },
+        { status: 400 }
+      );
+    }
+
+    // 1) Resolve application
     const { data: app, error: appErr } = await sb
       .from("partner_applications")
       .select(
-        "id, org_id, partner_key, application_id, status, framework_slug, framework_version, started_at, candidate_email, candidate_first_name, candidate_last_name"
+        "id, org_id, partner_key, application_id, status, framework_slug, framework_version, started_at"
       )
       .eq("public_token", public_token)
       .maybeSingle();
@@ -89,7 +110,7 @@ export async function POST(
     if (appErr) return NextResponse.json({ error: "db error" }, { status: 500 });
     if (!app) return NextResponse.json({ error: "invalid token" }, { status: 404 });
 
-    // 2) Load framework definition
+    // 2) Load framework
     const { data: fw, error: fwErr } = await sb
       .from("frameworks")
       .select("slug, version, definition")
@@ -110,7 +131,6 @@ export async function POST(
       );
     }
 
-    // Build lookup: Q -> option -> scoring meta
     const qLookup = new Map<string, FrameworkQuestion>();
     for (const q of questions) qLookup.set(q.code, q);
 
@@ -121,48 +141,50 @@ export async function POST(
       if (qc && oc) aMap.set(qc, oc);
     }
 
-    // Require all Q1..Q25
     for (let i = 1; i <= 25; i++) {
       const qc = `Q${i}`;
-      if (!aMap.has(qc)) {
-        return NextResponse.json({ error: `missing answer for ${qc}` }, { status: 400 });
-      }
+      if (!aMap.has(qc)) return NextResponse.json({ error: `missing answer for ${qc}` }, { status: 400 });
     }
 
-    // 3) Upsert individual (minimal longitudinal identity)
+    // 3) Update application with candidate details
+    const { error: upErr } = await sb
+      .from("partner_applications")
+      .update({
+        candidate_first_name: first_name,
+        candidate_last_name: last_name,
+        candidate_email: email,
+        candidate_phone: phone,
+        consent: true,
+      })
+      .eq("id", app.id);
+
+    if (upErr) return NextResponse.json({ error: "failed to save candidate info" }, { status: 500 });
+
+    // 4) Upsert individual (longitudinal identity per org)
     let individualId: string | null = null;
 
-    if (app.candidate_email) {
-      const { data: existingInd } = await sb
+    const { data: existingInd } = await sb
+      .from("individuals")
+      .select("id")
+      .eq("org_id", app.org_id)
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingInd?.id) {
+      individualId = existingInd.id;
+      // keep details current
+      await sb
         .from("individuals")
-        .select("id")
-        .eq("org_id", app.org_id)
-        .eq("email", app.candidate_email)
-        .maybeSingle();
-
-      if (existingInd?.id) {
-        individualId = existingInd.id;
-      } else {
-        const { data: createdInd, error: indErr } = await sb
-          .from("individuals")
-          .insert({
-            org_id: app.org_id,
-            email: app.candidate_email,
-            first_name: app.candidate_first_name,
-            last_name: app.candidate_last_name,
-            external_ref: `${app.partner_key}:${app.application_id}`,
-          })
-          .select("id")
-          .single();
-
-        if (indErr) return NextResponse.json({ error: "failed to create individual" }, { status: 500 });
-        individualId = createdInd.id;
-      }
+        .update({ first_name, last_name })
+        .eq("id", individualId);
     } else {
       const { data: createdInd, error: indErr } = await sb
         .from("individuals")
         .insert({
           org_id: app.org_id,
+          email,
+          first_name,
+          last_name,
           external_ref: `${app.partner_key}:${app.application_id}`,
         })
         .select("id")
@@ -172,7 +194,7 @@ export async function POST(
       individualId = createdInd.id;
     }
 
-    // 4) Create or reuse assessment (1 assessment per application for MVP)
+    // 5) Create or reuse assessment
     const { data: existingAssessment, error: asFindErr } = await sb
       .from("assessments")
       .select("id, status")
@@ -209,7 +231,7 @@ export async function POST(
       }
     }
 
-    // 5) Store answers (replace existing answers for this assessment)
+    // 6) Store answers
     await sb.from("assessment_answers").delete().eq("assessment_id", assessmentId);
 
     const answerRows = Array.from(aMap.entries()).map(([question_code, option_code]) => ({
@@ -222,9 +244,9 @@ export async function POST(
     const { error: ansErr } = await sb.from("assessment_answers").insert(answerRows);
     if (ansErr) return NextResponse.json({ error: "failed to save answers" }, { status: 500 });
 
-    // 6) Scoring
+    // 7) Scoring
     const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
-    const osTotals: Record<string, number> = {}; // OS1..OS8
+    const osTotals: Record<string, number> = {};
     const verticalValues: number[] = [];
     const flags: any[] = [];
 
@@ -252,14 +274,12 @@ export async function POST(
 
       if (q.section === "career_vertical") {
         if (qc === "Q25") {
-          // flags only
           if (opt.flag === "overreach_risk") overreachRisk = true;
           if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
           if (opt.flag === "vertical_confidence_matched") verticalConfidence = "matched";
           if (opt.flag === "vertical_readiness_signal") verticalReadiness = true;
         } else {
-          const band = opt.vertical_band;
-          const mid = band ? verticalBandMidpoint(band) : null;
+          const mid = opt.vertical_band ? verticalBandMidpoint(opt.vertical_band) : null;
           if (mid == null) {
             return NextResponse.json({ error: `missing vertical_band on ${qc}:${oc}` }, { status: 500 });
           }
@@ -282,13 +302,10 @@ export async function POST(
     const osSum = osDistArr.reduce((acc, x) => acc + x.pct, 0) || 1;
     const osDist = osDistArr.map((x) => ({ code: x.code, pct: Number((x.pct / osSum).toFixed(4)) }));
 
-    // Career Vertical score
     const vAvg = verticalValues.reduce((acc, v) => acc + v, 0) / (verticalValues.length || 1);
     const verticalLevel = clamp(Math.round(vAvg), 1, 6);
 
     const scoring_model = `mcas_${app.framework_version}_real_v1`;
-
-    // Confidence (simple v1)
     const confidence = {
       rating: "moderate",
       signals: {
@@ -301,7 +318,7 @@ export async function POST(
       },
     };
 
-    // 7) Persist result
+    // 8) Persist result
     await sb.from("results").delete().eq("assessment_id", assessmentId);
 
     const { error: resErr } = await sb.from("results").insert({
@@ -309,37 +326,25 @@ export async function POST(
       scoring_model,
       core_distribution: coreDist,
       os_distribution: osDist,
-      vertical_readiness: `V${verticalLevel}`, // keep simple; we can enrich later
+      vertical_readiness: `V${verticalLevel}`,
       confidence,
       flags,
     });
 
     if (resErr) return NextResponse.json({ error: "failed to save result" }, { status: 500 });
 
-    // 8) Mark completed
+    // 9) Mark completed
     const completedAt = nowIso();
 
-    await sb
-      .from("assessments")
-      .update({ status: "completed", completed_at: completedAt })
-      .eq("id", assessmentId);
-
-    await sb
-      .from("partner_applications")
-      .update({ status: "completed", completed_at: completedAt })
-      .eq("id", app.id);
+    await sb.from("assessments").update({ status: "completed", completed_at: completedAt }).eq("id", assessmentId);
+    await sb.from("partner_applications").update({ status: "completed", completed_at: completedAt }).eq("id", app.id);
 
     return NextResponse.json({
       ok: true,
       status: "completed",
       application_id: app.application_id,
-      framework: { slug: app.framework_slug, version: app.framework_version },
       scoring_model,
-      scores: {
-        core: coreDist,
-        operating_styles: osDist,
-        vertical_level: verticalLevel,
-      },
+      scores: { core: coreDist, operating_styles: osDist, vertical_level: verticalLevel },
       confidence,
       flags,
     });

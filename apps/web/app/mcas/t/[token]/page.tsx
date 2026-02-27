@@ -2,7 +2,7 @@
 import "server-only";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import McasTakerClient from "./McasTakerClient";
+import McasWizardClient from "./McasWizardClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,61 +15,73 @@ function mcasSupa() {
 }
 
 type FrameworkQuestion = {
-  code: string;          // "Q1"
-  prompt: string;        // question text
-  options: { code: string; label: string }[]; // A/B...
+  code: string; // Q1..Q25
+  prompt: string;
+  section?: string;
+  options: { code: string; label: string }[];
 };
 
-export default async function Page(
-  props: { params: Promise<{ token: string }> }
-) {
+export default async function Page(props: { params: Promise<{ token: string }> }) {
   const { token } = await props.params;
   const public_token = (token || "").trim();
   if (!public_token) notFound();
 
   const sb = mcasSupa();
 
-  // 1) Find the partner application by token
-  const { data: appRow, error: appErr } = await sb
+  // 1) Find the application
+  const { data: app, error: appErr } = await sb
     .from("partner_applications")
     .select(
-      "id, org_id, partner_key, application_id, status, framework_slug, framework_version, candidate_email, candidate_first_name, candidate_last_name"
+      "id, partner_key, application_id, org_id, status, framework_slug, framework_version, candidate_email, candidate_first_name, candidate_last_name"
     )
     .eq("public_token", public_token)
     .maybeSingle();
 
-  if (appErr || !appRow) notFound();
+  if (appErr || !app) notFound();
 
-  // 2) Load framework definition (questions live here for MVP)
-  const { data: fwRow, error: fwErr } = await sb
+  // 2) Load framework
+  const { data: fw, error: fwErr } = await sb
     .from("frameworks")
-    .select("slug, version, status, definition")
-    .eq("slug", appRow.framework_slug)
-    .eq("version", appRow.framework_version)
+    .select("slug, version, definition")
+    .eq("slug", app.framework_slug)
+    .eq("version", app.framework_version)
     .maybeSingle();
 
-  if (fwErr || !fwRow) notFound();
+  if (fwErr || !fw) notFound();
 
-  const def = (fwRow.definition || {}) as any;
-  const questions: FrameworkQuestion[] = Array.isArray(def.questions) ? def.questions : [];
+  const def = (fw.definition || {}) as any;
+  const rawQuestions = Array.isArray(def.questions) ? (def.questions as any[]) : [];
+
+  // 3) Normalize + enforce order Q1..Q25 (no randomization)
+  const questions: FrameworkQuestion[] = rawQuestions
+    .map((q) => ({
+      code: String(q.code || "").trim(),
+      prompt: String(q.prompt || "").trim(),
+      section: q.section ? String(q.section) : undefined,
+      options: Array.isArray(q.options)
+        ? q.options.map((o: any) => ({
+            code: String(o.code || "").trim(),
+            label: String(o.label || "").trim(),
+          }))
+        : [],
+    }))
+    .filter((q) => q.code && q.prompt && q.options.length > 0)
+    .sort((a, b) => {
+      const ai = Number(a.code.replace("Q", "")) || 0;
+      const bi = Number(b.code.replace("Q", "")) || 0;
+      return ai - bi;
+    });
 
   return (
-    <McasTakerClient
+    <McasWizardClient
       token={public_token}
       application={{
-        partner_key: appRow.partner_key,
-        application_id: appRow.application_id,
-        status: appRow.status,
-        candidate_email: appRow.candidate_email,
-        candidate_first_name: appRow.candidate_first_name,
-        candidate_last_name: appRow.candidate_last_name,
-        framework_slug: appRow.framework_slug,
-        framework_version: appRow.framework_version,
-      }}
-      framework={{
-        slug: fwRow.slug,
-        version: fwRow.version,
-        status: fwRow.status,
+        partner_key: app.partner_key,
+        application_id: app.application_id,
+        status: app.status,
+        candidate_first_name: app.candidate_first_name,
+        candidate_last_name: app.candidate_last_name,
+        candidate_email: app.candidate_email,
       }}
       questions={questions}
     />
