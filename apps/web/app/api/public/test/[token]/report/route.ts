@@ -1127,10 +1127,13 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       String(testRow?.slug || "").toLowerCase().includes("operatingframe") ||
       String(testRow?.name || "").toLowerCase().includes("operatingframe");
 
+    const isLead = String(testRow?.slug || "").toLowerCase().includes("lead") || String(testRow?.name || "").toLowerCase().includes("lead");
+    const allowRedirectInPortal = isOperatingFrame || isLead; // ✅ add LEAD here
+
     const linkMeta =
-      isPortalViewer && !isOperatingFrame
-        ? sanitizeLinkMetaForPortal(rawLinkMeta)
-        : rawLinkMeta;
+    isPortalViewer && !allowRedirectInPortal
+    ? sanitizeLinkMetaForPortal(rawLinkMeta)
+    : rawLinkMeta;;
 
     const answersCount = Array.isArray(sub.answers_json) ? sub.answers_json.length : 0;
     const computedSum = Object.values(profileTotals || {}).reduce((a, b) => a + (Number(b) || 0), 0);
