@@ -12,6 +12,15 @@ type LinkMeta = {
   redirect_url?: string | null;
   hidden_results_message?: string | null;
   email_report?: boolean | null;
+
+  // sometimes legacy links store redirect in meta
+  meta?: {
+    redirect_url?: string | null;
+    next_steps_url?: string | null;
+    [k: string]: any;
+  } | null;
+
+  [k: string]: any;
 };
 
 type ResultData = {
@@ -46,7 +55,15 @@ type ReportBlock =
   | { type: "divider" }
   | { type: "spacer"; size?: "sm" | "md" | "lg" }
   | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
-  | { type: "image"; src?: string; alt?: string; caption?: string; align?: "left" | "center" | "right"; max_h?: number }
+  | {
+      type: "image";
+      src?: string;
+      alt?: string;
+      caption?: string;
+      align?: "left" | "center" | "right";
+      max_h?: number;
+      rounded?: boolean;
+    }
   | { type: string; [k: string]: any };
 
 function safeText(x: any): string {
@@ -90,11 +107,19 @@ function profileNameToImageFile(profileName: string) {
 }
 
 function GlassCard(props: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>{props.children}</div>;
+  return (
+    <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>
+      {props.children}
+    </div>
+  );
 }
 
 function WhiteCard(props: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>{props.children}</div>;
+  return (
+    <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
+      {props.children}
+    </div>
+  );
 }
 
 function MiniDivider() {
@@ -151,7 +176,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   );
 }
 
-/** ✅ Profiles-only radar: P1..P8 */
+/** ✅ Profiles-only radar: P1..P8 with % rings + point labels */
 function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
@@ -171,6 +196,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   }
 
   const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+
   const pts = labels.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
 
@@ -183,6 +209,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
 
       <div className="mt-4 flex justify-center">
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {/* rings */}
           {rings.map((rv) => (
             <polygon
               key={rv}
@@ -192,13 +219,30 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             />
           ))}
 
+          {/* ring labels on top axis */}
+          {rings.map((rv) => (
+            <text
+              key={`lbl-${rv}`}
+              x={cx}
+              y={cy - r * rv}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="10"
+              fill="rgba(15,23,42,0.45)"
+            >
+              {Math.round(rv * 100)}%
+            </text>
+          ))}
+
+          {/* axes */}
           {labels.map((k, i) => {
             const p = pt(i, 1);
             return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
           })}
 
+          {/* axis labels */}
           {labels.map((k, i) => {
-            const p = pt(i, 1.10);
+            const p = pt(i, 1.12);
             return (
               <text
                 key={k}
@@ -215,8 +259,31 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             );
           })}
 
+          {/* polygon */}
           <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
           <circle cx={cx} cy={cy} r="2" fill="rgba(15,23,42,0.5)" />
+
+          {/* point labels */}
+          {labels.map((k, i) => {
+            const v = val(k);
+            const p = pt(i, v);
+            const labelPt = pt(i, Math.min(1, v + 0.10));
+            return (
+              <g key={`pt-${k}`}>
+                <circle cx={p.x} cy={p.y} r="3" fill="rgba(20,184,166,0.95)" />
+                <text
+                  x={labelPt.x}
+                  y={labelPt.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="10"
+                  fill="rgba(15,23,42,0.6)"
+                >
+                  {Math.round(v * 100)}%
+                </text>
+              </g>
+            );
+          })}
         </svg>
       </div>
     </div>
@@ -224,34 +291,29 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
 }
 
 /**
- * ✅ Normalize blocks so doc-style bullet sections don't become "all bold".
- * If we detect runs of h4 lines that look like list items under a subheading,
- * convert them into a single UL.
+ * ✅ Normalize blocks so doc-style "item lines" don't render as bold headings.
+ * Converts runs of h4 into a UL.
  */
 function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   const out: ReportBlock[] = [];
-  let pendingList: string[] = [];
+  let pending: string[] = [];
 
   const flush = () => {
-    if (pendingList.length) {
-      out.push({ type: "ul", items: pendingList });
-      pendingList = [];
+    if (pending.length) {
+      out.push({ type: "ul", items: pending });
+      pending = [];
     }
   };
 
   for (const b of blocks || []) {
     const t = String((b as any)?.type || "").toLowerCase();
 
-    // Treat h4 as potential "list item" (this is exactly what your screenshot shows)
     if (t === "h4") {
       const text = safeText((b as any)?.text).trim();
-      if (text) {
-        pendingList.push(text);
-        continue;
-      }
+      if (text) pending.push(text);
+      continue;
     }
 
-    // If we hit any other block type, flush accumulated list and keep block
     flush();
     out.push(b);
   }
@@ -260,11 +322,10 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   return out;
 }
 
-function resolveBlockImageSrc(src: string, topProfileName: string) {
-  const raw = String(src || "").trim();
+function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
+  const raw = String(rawSrc || "").trim();
   if (!raw) return "";
 
-  // Allow absolute/local URLs directly
   if (raw.startsWith("/") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
 
   if (raw === "{{TOP_PROFILE_IMAGE}}") {
@@ -285,10 +346,8 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
   if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText(b.text)}</h2>;
   if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText(b.text)}</h3>;
 
-  // ✅ IMPORTANT: h4 should NOT read as "big bold headings" in this report
-  // We'll still render it, but lighter weight; and our normaliser converts many h4 runs into ULs anyway.
-  if (type === "h4")
-    return <div className="text-sm font-semibold text-slate-900">{safeText(b.text)}</div>;
+  // keep h4 light (and most runs become UL via normaliser)
+  if (type === "h4") return <div className="text-sm font-medium text-slate-900">{safeText(b.text)}</div>;
 
   if (type === "p") return <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{safeText(b.text)}</p>;
 
@@ -300,6 +359,17 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
           <li key={i}>{safeText(it)}</li>
         ))}
       </ul>
+    );
+  }
+
+  if (type === "ol") {
+    const items = Array.isArray(b.items) ? b.items : [];
+    return (
+      <ol className="list-decimal pl-5 text-sm text-slate-700 space-y-1">
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
+      </ol>
     );
   }
 
@@ -351,7 +421,7 @@ export default function OperatingFrameReportClient(props: {
   tid: string;
   src: string;
   data: ResultData;
-  framework: any;
+  framework: any; // loaded from Supabase bucket in ReportGateClient
 }) {
   const { data, framework } = props;
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -360,6 +430,7 @@ export default function OperatingFrameReportClient(props: {
   const orgName = data.org_name || "Organisation";
   const testName = data.test_name || "OperatingFrame™";
 
+  // find profile by either PROFILE_# or P#
   const keys = profileKeyVariants(data.top_profile_code);
   const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
 
@@ -375,7 +446,14 @@ export default function OperatingFrameReportClient(props: {
     : "/images/operatingframe-full-test/profile-cards/bio-image.png";
 
   function openNextSteps() {
-    const url = (data?.link?.redirect_url || data?.link?.next_steps_url || "").trim();
+    const direct =
+      (data?.link as any)?.redirect_url ||
+      (data?.link as any)?.next_steps_url ||
+      (data?.link as any)?.meta?.redirect_url ||
+      (data?.link as any)?.meta?.next_steps_url ||
+      "";
+
+    const url = String(direct || "").trim();
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -387,26 +465,16 @@ export default function OperatingFrameReportClient(props: {
     const common = framework?.common || {};
     const p = profile?.sections || {};
 
-    // ✅ Ensure doc-like formatting in these sections
-    const s1 = normaliseDocBlocks(p?.section_1?.blocks || []);
-    const s2 = normaliseDocBlocks(p?.section_2?.blocks || []);
-    const s3 = normaliseDocBlocks(p?.section_3?.blocks || []);
-    const s4 = normaliseDocBlocks(p?.section_4?.blocks || []);
-    const s5 = normaliseDocBlocks(p?.section_5?.blocks || []);
-    const s6 = normaliseDocBlocks(p?.section_6?.blocks || []);
-    const s7 = normaliseDocBlocks(p?.section_7?.blocks || []);
-    const s8 = normaliseDocBlocks(p?.section_8?.blocks || []);
-
     return [
       { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || []) },
-      { title: "Section 1 – Executive Summary", blocks: s1 },
-      { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: s2 },
-      { title: "Section 3 – Your Operating Style", blocks: s3 },
-      { title: "Section 4 – Micro Pattern Expression", blocks: s4 },
-      { title: "Section 5 – Your Team Contribution", blocks: s5 },
-      { title: "Section 6 – Stress Operating Summary", blocks: s6 },
-      { title: "Section 7 – Decision Pattern", blocks: s7 },
-      { title: "Section 8 – Development Roadmap", blocks: s8 },
+      { title: "Section 1 – Executive Summary", blocks: normaliseDocBlocks(p?.section_1?.blocks || []) },
+      { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: normaliseDocBlocks(p?.section_2?.blocks || []) },
+      { title: "Section 3 – Your Operating Style", blocks: normaliseDocBlocks(p?.section_3?.blocks || []) },
+      { title: "Section 4 – Micro Pattern Expression", blocks: normaliseDocBlocks(p?.section_4?.blocks || []) },
+      { title: "Section 5 – Your Team Contribution", blocks: normaliseDocBlocks(p?.section_5?.blocks || []) },
+      { title: "Section 6 – Stress Operating Summary", blocks: normaliseDocBlocks(p?.section_6?.blocks || []) },
+      { title: "Section 7 – Decision Pattern", blocks: normaliseDocBlocks(p?.section_7?.blocks || []) },
+      { title: "Section 8 – Development Roadmap", blocks: normaliseDocBlocks(p?.section_8?.blocks || []) },
     ];
   }, [framework, profile]);
 

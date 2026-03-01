@@ -1,8 +1,9 @@
-//apps/web/app/admin/mcas/applications/[appId]/page.tsx
 import "server-only";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import CopyTextButton from "./CopyTextButton";
+import CopyJsonButton from "./CopyJsonButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,6 +24,19 @@ function pct(n: any) {
   return `${Math.round(x * 100)}%`;
 }
 
+function qNum(code: string) {
+  const n = Number(String(code || "").replace("Q", ""));
+  return Number.isFinite(n) ? n : 999;
+}
+
+type FrameworkDefinition = {
+  questions?: Array<{
+    code?: string;
+    prompt?: string;
+    options?: Array<{ code?: string; label?: string }>;
+  }>;
+};
+
 export default async function Page(props: { params: Promise<{ appId: string }> }) {
   const { appId } = await props.params;
   const id = decodeURIComponent(appId || "").trim();
@@ -40,6 +54,33 @@ export default async function Page(props: { params: Promise<{ appId: string }> }
     .maybeSingle();
 
   if (appErr || !app) notFound();
+
+  // Load framework definition for enrichment (prompts + option labels)
+  const { data: fw } = await sb
+    .from("frameworks")
+    .select("definition")
+    .eq("slug", app.framework_slug)
+    .eq("version", app.framework_version)
+    .maybeSingle();
+
+  const def = (fw?.definition || {}) as FrameworkDefinition;
+
+  const questionPromptByCode = new Map<string, string>();
+  const optionLabelByQAndOpt = new Map<string, string>(); // `${Q}|${OPT}` -> label
+
+  const rawQs = Array.isArray(def.questions) ? def.questions : [];
+  for (const q of rawQs) {
+    const qCode = String(q?.code || "").trim();
+    const prompt = String(q?.prompt || "").trim();
+    if (qCode) questionPromptByCode.set(qCode, prompt);
+
+    const opts = Array.isArray(q?.options) ? q!.options! : [];
+    for (const o of opts) {
+      const oCode = String(o?.code || "").trim();
+      const label = String(o?.label || "").trim();
+      if (qCode && oCode) optionLabelByQAndOpt.set(`${qCode}|${oCode}`, label);
+    }
+  }
 
   // Latest assessment for this application
   const { data: assessment } = await sb
@@ -73,6 +114,90 @@ export default async function Page(props: { params: Promise<{ appId: string }> }
   const flags = Array.isArray(result?.flags) ? result.flags : [];
   const confidence = result?.confidence ?? null;
 
+  // ---------------------------
+  // Enriched Answers (for UI + partner export)
+  // ---------------------------
+  const answersEnriched = (answers || [])
+    .slice()
+    .sort((a: any, b: any) => qNum(a.question_code) - qNum(b.question_code))
+    .map((a: any) => {
+      const qc = String(a.question_code || "").trim();
+      const oc = String(a.option_code || "").trim();
+      const prompt = questionPromptByCode.get(qc) || "";
+      const option_label = optionLabelByQAndOpt.get(`${qc}|${oc}`) || "";
+      return {
+        question_code: qc,
+        prompt: prompt || null,
+        option_code: oc,
+        option_label: option_label || null,
+        created_at: a.created_at || null,
+      };
+    });
+
+  // ---------------------------
+  // Partner Export Payload (v1)
+  // ---------------------------
+  const exportPayload = {
+    version: "mcas_partner_payload_v1",
+    generated_at: new Date().toISOString(),
+    partner: {
+      partner_key: app.partner_key,
+      application_id: app.application_id,
+    },
+    mindcanvas: {
+      org_id: app.org_id,
+      engine: "mcas",
+      framework: {
+        slug: app.framework_slug,
+        version: app.framework_version,
+      },
+      candidate_link: candidateLink,
+      status: {
+        application_status: app.status,
+        assessment_status: assessment?.status || null,
+        created_at: app.created_at || null,
+        started_at: app.started_at || null,
+        completed_at: app.completed_at || null,
+      },
+    },
+    candidate: {
+      first_name: app.candidate_first_name || null,
+      last_name: app.candidate_last_name || null,
+      email: app.candidate_email || null,
+      phone: app.candidate_phone || null,
+      consent: !!app.consent,
+    },
+    results: result
+      ? {
+          scoring_model: result.scoring_model || null,
+          core_distribution: result.core_distribution || null,
+          operating_style_distribution: result.os_distribution || null,
+          vertical_readiness: result.vertical_readiness || null,
+          confidence: result.confidence || null,
+          flags: result.flags || [],
+        }
+      : null,
+
+    // ✅ enriched answers for partner readability
+    answers: answersEnriched.map((a) => ({
+      question_code: a.question_code,
+      prompt: a.prompt,
+      option_code: a.option_code,
+      option_label: a.option_label,
+    })),
+
+    debug: {
+      application_id_internal: app.id,
+      assessment_id: assessmentId,
+      individual_id: assessment?.individual_id || null,
+
+      // useful to see if framework enrichment worked
+      framework_questions_loaded: rawQs.length,
+    },
+  };
+
+  const exportJson = JSON.stringify(exportPayload, null, 2);
+
   return (
     <div className="min-h-screen bg-[#060e16] text-white">
       <div className="max-w-6xl mx-auto px-6 py-10">
@@ -88,18 +213,21 @@ export default async function Page(props: { params: Promise<{ appId: string }> }
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             <a
               href={candidateLink}
               target="_blank"
               rel="noreferrer"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
             >
               Open Candidate Link
             </a>
+
+            <CopyTextButton text={candidateLink} label="Copy Candidate Link" />
+
             <Link
               href="/admin/mcas/applications"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
             >
               Back
             </Link>
@@ -230,34 +358,39 @@ export default async function Page(props: { params: Promise<{ appId: string }> }
           </div>
         </div>
 
-        {/* Answers */}
+        {/* Answers (Enriched) */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">Answers</div>
-          <div className="mt-1 text-lg font-semibold">Q1 → Q25</div>
+          <div className="mt-1 text-lg font-semibold">Q1 → Q25 (with prompts + labels)</div>
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-white/70">
                 <tr>
-                  <th className="text-left px-4 py-3">Question</th>
+                  <th className="text-left px-4 py-3">Q</th>
+                  <th className="text-left px-4 py-3">Prompt</th>
                   <th className="text-left px-4 py-3">Option</th>
-                  <th className="text-left px-4 py-3">Captured</th>
+                  <th className="text-left px-4 py-3">Answer</th>
                 </tr>
               </thead>
               <tbody>
-                {(answers || []).map((a: any) => (
-                  <tr key={`${a.question_code}-${a.option_code}-${a.created_at}`} className="border-t border-white/10">
-                    <td className="px-4 py-3 font-mono">{a.question_code}</td>
-                    <td className="px-4 py-3 font-mono">{a.option_code}</td>
-                    <td className="px-4 py-3 text-white/60">
-                      {a.created_at ? new Date(a.created_at).toLocaleString() : "-"}
+                {answersEnriched.map((a) => (
+                  <tr
+                    key={`${a.question_code}-${a.option_code}-${a.created_at}`}
+                    className="border-t border-white/10 align-top"
+                  >
+                    <td className="px-4 py-3 font-mono whitespace-nowrap">{a.question_code}</td>
+                    <td className="px-4 py-3 text-white/80">{a.prompt || <span className="text-white/40">—</span>}</td>
+                    <td className="px-4 py-3 font-mono whitespace-nowrap">{a.option_code}</td>
+                    <td className="px-4 py-3 text-white/80">
+                      {a.option_label || <span className="text-white/40">—</span>}
                     </td>
                   </tr>
                 ))}
 
-                {(!answers || answers.length === 0) ? (
+                {answersEnriched.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-10 text-white/60" colSpan={3}>
+                    <td className="px-4 py-10 text-white/60" colSpan={4}>
                       No answers captured yet.
                     </td>
                   </tr>
@@ -265,6 +398,25 @@ export default async function Page(props: { params: Promise<{ appId: string }> }
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Partner Export */}
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-sm text-white/60">Partner Export</div>
+              <div className="mt-1 text-lg font-semibold">Payload (v1)</div>
+              <div className="mt-1 text-sm text-white/60">
+                Copy this JSON and send to your integration partner. Later, the API will return this exact shape.
+              </div>
+            </div>
+
+            <CopyJsonButton json={exportJson} />
+          </div>
+
+          <pre className="mt-4 overflow-auto rounded-xl border border-white/10 bg-[#0b1724] p-4 text-xs text-white/80">
+{exportJson}
+          </pre>
         </div>
 
         {/* Raw result (debug) */}
@@ -279,9 +431,7 @@ export default async function Page(props: { params: Promise<{ appId: string }> }
           )}
         </div>
 
-        <div className="mt-6 text-xs text-white/50 break-all">
-          Candidate link: {candidateLink}
-        </div>
+        <div className="mt-6 text-xs text-white/50 break-all">Candidate link: {candidateLink}</div>
       </div>
     </div>
   );
