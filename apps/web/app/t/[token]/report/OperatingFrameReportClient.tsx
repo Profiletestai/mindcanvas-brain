@@ -1,4 +1,4 @@
-///apps/web/app/t/[token]/report/OperatingFrameReportClient.tsx
+// apps/web/app/t/[token]/report/OperatingFrameReportClient.tsx
 "use client";
 
 import AppBackground from "@/components/ui/AppBackground";
@@ -38,6 +38,17 @@ type ResultData = {
   top_profile_name: string;
 };
 
+type ReportBlock =
+  | { type: "p"; text?: string }
+  | { type: "ul"; items?: string[] }
+  | { type: "ol"; items?: string[] }
+  | { type: "quote"; text?: string; cite?: string }
+  | { type: "divider" }
+  | { type: "spacer"; size?: "sm" | "md" | "lg" }
+  | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
+  | { type: "image"; src?: string; alt?: string; caption?: string; align?: "left" | "center" | "right"; max_h?: number }
+  | { type: string; [k: string]: any };
+
 function safeText(x: any): string {
   if (typeof x === "string") return x;
   if (Array.isArray(x)) return x.map(String).join(" ");
@@ -67,7 +78,6 @@ function profileKeyVariants(code: string) {
 // ✅ Map profile name → actual filename in /public/images/operatingframe-full-test/profile-cards/
 function profileNameToImageFile(profileName: string) {
   const n = String(profileName || "").toLowerCase();
-
   if (n.includes("activator")) return "activator.png";
   if (n.includes("messenger")) return "messenger.png";
   if (n.includes("integrator")) return "integrator.png";
@@ -76,36 +86,15 @@ function profileNameToImageFile(profileName: string) {
   if (n.includes("planner")) return "planner.png";
   if (n.includes("evaluator")) return "evaluator.png";
   if (n.includes("vision")) return "vision-engineer.png";
-
-  return ""; // unknown
-}
-
-function resolveOrgLogo(src: string) {
-  const raw = String(src || "").trim();
-  if (!raw) return "";
-
-  if (raw.startsWith("/") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-
-  // fallback local logo
-  if (raw === "{{ORG_LOGO}}") return "/images/operatingframe-full-test/org-logo.png";
-
-  return raw;
+  return "";
 }
 
 function GlassCard(props: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>
-      {props.children}
-    </div>
-  );
+  return <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>{props.children}</div>;
 }
 
 function WhiteCard(props: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
-      {props.children}
-    </div>
-  );
+  return <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>{props.children}</div>;
 }
 
 function MiniDivider() {
@@ -115,10 +104,8 @@ function MiniDivider() {
 /** ✅ Vertical bar chart (A red / B yellow / C green / D blue) */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
-
   const barColor = (code: AB) =>
     code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
-
   const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
 
   return (
@@ -164,7 +151,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   );
 }
 
-/** ✅ Profile-only radar chart: P1..P8 ONLY (no Frequencies) */
+/** ✅ Profiles-only radar: P1..P8 */
 function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
@@ -184,9 +171,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   }
 
   const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
-
   const pts = labels.map((k, i) => pt(i, val(k)));
-
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
 
   return (
@@ -230,7 +215,6 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             );
           })}
 
-          {/* single profile polygon */}
           <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
           <circle cx={cx} cy={cy} r="2" fill="rgba(15,23,42,0.5)" />
         </svg>
@@ -239,14 +223,72 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   );
 }
 
-function BlockRenderer(props: { block: any }) {
+/**
+ * ✅ Normalize blocks so doc-style bullet sections don't become "all bold".
+ * If we detect runs of h4 lines that look like list items under a subheading,
+ * convert them into a single UL.
+ */
+function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
+  const out: ReportBlock[] = [];
+  let pendingList: string[] = [];
+
+  const flush = () => {
+    if (pendingList.length) {
+      out.push({ type: "ul", items: pendingList });
+      pendingList = [];
+    }
+  };
+
+  for (const b of blocks || []) {
+    const t = String((b as any)?.type || "").toLowerCase();
+
+    // Treat h4 as potential "list item" (this is exactly what your screenshot shows)
+    if (t === "h4") {
+      const text = safeText((b as any)?.text).trim();
+      if (text) {
+        pendingList.push(text);
+        continue;
+      }
+    }
+
+    // If we hit any other block type, flush accumulated list and keep block
+    flush();
+    out.push(b);
+  }
+
+  flush();
+  return out;
+}
+
+function resolveBlockImageSrc(src: string, topProfileName: string) {
+  const raw = String(src || "").trim();
+  if (!raw) return "";
+
+  // Allow absolute/local URLs directly
+  if (raw.startsWith("/") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+
+  if (raw === "{{TOP_PROFILE_IMAGE}}") {
+    const file = profileNameToImageFile(topProfileName);
+    return file
+      ? `/images/operatingframe-full-test/profile-cards/${file}`
+      : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+  }
+
+  return raw;
+}
+
+function BlockRenderer(props: { block: any; topProfileName: string }) {
   const b = props.block;
   const type = String(b?.type || "").toLowerCase();
 
   if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText(b.text)}</h1>;
   if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText(b.text)}</h2>;
   if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText(b.text)}</h3>;
-  if (type === "h4") return <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{safeText(b.text)}</h4>;
+
+  // ✅ IMPORTANT: h4 should NOT read as "big bold headings" in this report
+  // We'll still render it, but lighter weight; and our normaliser converts many h4 runs into ULs anyway.
+  if (type === "h4")
+    return <div className="text-sm font-semibold text-slate-900">{safeText(b.text)}</div>;
 
   if (type === "p") return <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{safeText(b.text)}</p>;
 
@@ -273,11 +315,12 @@ function BlockRenderer(props: { block: any }) {
   }
 
   if (type === "image") {
-    const src = String(b?.src || "").trim();
+    const src = resolveBlockImageSrc(String(b?.src || ""), props.topProfileName);
     if (!src) return null;
+
     const align = String(b?.align || "center").toLowerCase();
     const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
-    const maxH = typeof b?.max_h === "number" ? b.max_h : 320;
+    const maxH = typeof b?.max_h === "number" ? b.max_h : 360;
 
     return (
       <figure className="my-4">
@@ -317,7 +360,6 @@ export default function OperatingFrameReportClient(props: {
   const orgName = data.org_name || "Organisation";
   const testName = data.test_name || "OperatingFrame™";
 
-  // ✅ find profile by either PROFILE_# or P#
   const keys = profileKeyVariants(data.top_profile_code);
   const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
 
@@ -325,10 +367,8 @@ export default function OperatingFrameReportClient(props: {
   const topFreqCode = data.top_freq;
   const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
-  // ✅ Org logo (still local fallback unless you later wire org logo url into data)
-  const orgLogoSrc = resolveOrgLogo("{{ORG_LOGO}}");
+  const orgLogoSrc = "/images/operatingframe-full-test/org-logo.png";
 
-  // ✅ Profile hero image via fixed filename mapping
   const profileFile = profileNameToImageFile(topProfileName);
   const profileHeroSrc = profileFile
     ? `/images/operatingframe-full-test/profile-cards/${profileFile}`
@@ -347,16 +387,26 @@ export default function OperatingFrameReportClient(props: {
     const common = framework?.common || {};
     const p = profile?.sections || {};
 
+    // ✅ Ensure doc-like formatting in these sections
+    const s1 = normaliseDocBlocks(p?.section_1?.blocks || []);
+    const s2 = normaliseDocBlocks(p?.section_2?.blocks || []);
+    const s3 = normaliseDocBlocks(p?.section_3?.blocks || []);
+    const s4 = normaliseDocBlocks(p?.section_4?.blocks || []);
+    const s5 = normaliseDocBlocks(p?.section_5?.blocks || []);
+    const s6 = normaliseDocBlocks(p?.section_6?.blocks || []);
+    const s7 = normaliseDocBlocks(p?.section_7?.blocks || []);
+    const s8 = normaliseDocBlocks(p?.section_8?.blocks || []);
+
     return [
-      { title: common?.welcome?.title || "Welcome", blocks: common?.welcome?.blocks || [] },
-      { title: "Section 1 – Executive Summary", blocks: p?.section_1?.blocks || [] },
-      { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: p?.section_2?.blocks || [] },
-      { title: "Section 3 – Your Operating Style", blocks: p?.section_3?.blocks || [] },
-      { title: "Section 4 – Micro Pattern Expression", blocks: p?.section_4?.blocks || [] },
-      { title: "Section 5 – Your Team Contribution", blocks: p?.section_5?.blocks || [] },
-      { title: "Section 6 – Stress Operating Summary", blocks: p?.section_6?.blocks || [] },
-      { title: "Section 7 – Decision Pattern", blocks: p?.section_7?.blocks || [] },
-      { title: "Section 8 – Development Roadmap", blocks: p?.section_8?.blocks || [] },
+      { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || []) },
+      { title: "Section 1 – Executive Summary", blocks: s1 },
+      { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: s2 },
+      { title: "Section 3 – Your Operating Style", blocks: s3 },
+      { title: "Section 4 – Micro Pattern Expression", blocks: s4 },
+      { title: "Section 5 – Your Team Contribution", blocks: s5 },
+      { title: "Section 6 – Stress Operating Summary", blocks: s6 },
+      { title: "Section 7 – Decision Pattern", blocks: s7 },
+      { title: "Section 8 – Development Roadmap", blocks: s8 },
     ];
   }, [framework, profile]);
 
@@ -383,16 +433,14 @@ export default function OperatingFrameReportClient(props: {
             <div className="min-w-0">
               <div className="flex items-center gap-3">
                 <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden">
-                  {orgLogoSrc ? (
-                    <img
-                      src={orgLogoSrc}
-                      alt={orgName}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : null}
+                  <img
+                    src={orgLogoSrc}
+                    alt={orgName}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 </div>
 
                 <div className="min-w-0">
@@ -436,16 +484,14 @@ export default function OperatingFrameReportClient(props: {
 
             <div className="shrink-0 flex items-center gap-3">
               <div className="h-[92px] w-[92px] rounded-3xl bg-white/10 border border-white/15 overflow-hidden shadow-sm">
-                {profileHeroSrc ? (
-                  <img
-                    src={profileHeroSrc}
-                    alt={topProfileName}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                ) : null}
+                <img
+                  src={profileHeroSrc}
+                  alt={topProfileName}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -480,7 +526,7 @@ export default function OperatingFrameReportClient(props: {
                 <h2 className="text-xl font-semibold text-slate-900">{s.title}</h2>
                 <div className="mt-4 space-y-3">
                   {(s.blocks || []).map((b: any, i: number) => (
-                    <BlockRenderer key={i} block={b} />
+                    <BlockRenderer key={i} block={b} topProfileName={topProfileName} />
                   ))}
                 </div>
               </WhiteCard>
