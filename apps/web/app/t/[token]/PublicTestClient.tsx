@@ -50,7 +50,13 @@ function safeString(x: any): string {
   return String(x);
 }
 
-export default function PublicTestClient({ token }: { token: string }) {
+export default function PublicTestClient({
+  token,
+  embed = false,
+}: {
+  token: string;
+  embed?: boolean;
+}) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -82,12 +88,10 @@ export default function PublicTestClient({ token }: { token: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
 
-  // If show_results=false and there is no redirect, we show a “completion” panel.
   const [completedMessage, setCompletedMessage] = useState<string | null>(null);
 
   const key = (k: string) => `mc_${k}_${token}`;
 
-  // bootstrap: load link meta + questions
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -95,7 +99,6 @@ export default function PublicTestClient({ token }: { token: string }) {
         setLoading(true);
         setError("");
 
-        // 1) Link meta
         const metaRes: any = await fetchJson(`/api/public/test/${token}`);
         if (!alive) return;
 
@@ -118,37 +121,31 @@ export default function PublicTestClient({ token }: { token: string }) {
         setOrgName(orgNameFromMeta);
         setIntroText(introFromMeta);
 
-        // 🔔 Notify TestShell so it can update the hero title
-        if (typeof window !== "undefined") {
+        // notify TestShell only when not embedded
+        if (!embed && typeof window !== "undefined") {
           const detail = { orgName: orgNameFromMeta, testName: nameFromMeta };
           window.dispatchEvent(new CustomEvent("mc_test_meta", { detail }));
         }
 
-        // 2) Questions
         const qRes: any = await fetchJson(`/api/public/test/${token}/questions`);
         if (!alive) return;
 
         const list: Question[] = Array.isArray(qRes?.questions) ? qRes.questions : [];
         setQuestions(list);
 
-        // 3) Restore local state (answers, text answers, details, taker_id)
         if (typeof window !== "undefined") {
           const savedAns = window.localStorage.getItem(key("answers"));
           if (savedAns) {
             try {
               setAnswers(JSON.parse(savedAns));
-            } catch {
-              // ignore
-            }
+            } catch {}
           }
 
           const savedText = window.localStorage.getItem(key("text_answers"));
           if (savedText) {
             try {
               setTextAnswers(JSON.parse(savedText));
-            } catch {
-              // ignore
-            }
+            } catch {}
           }
 
           const d = window.localStorage.getItem(key("details"));
@@ -162,9 +159,7 @@ export default function PublicTestClient({ token }: { token: string }) {
               setCompany(o.company || "");
               setRoleTitle(o.roleTitle || "");
               setDataConsent(Boolean(o.dataConsent));
-            } catch {
-              // ignore
-            }
+            } catch {}
           }
 
           const tid = window.localStorage.getItem(key("taker_id"));
@@ -178,13 +173,13 @@ export default function PublicTestClient({ token }: { token: string }) {
         if (alive) setLoading(false);
       }
     })();
+
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, embed]);
 
-  // persist answers & details
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(key("answers"), JSON.stringify(answers));
@@ -333,15 +328,9 @@ export default function PublicTestClient({ token }: { token: string }) {
 
       const payloadAnswers = questions.map((qq) => {
         if (isTextQuestion(qq)) {
-          return {
-            question_id: qq.id,
-            text: (textAnswers[qq.id] || "").trim(),
-          };
+          return { question_id: qq.id, text: (textAnswers[qq.id] || "").trim() };
         }
-        return {
-          question_id: qq.id,
-          selected: Number(answers[qq.id] || 0) - 1,
-        };
+        return { question_id: qq.id, selected: Number(answers[qq.id] || 0) - 1 };
       });
 
       const res = await fetch(`/api/public/test/${token}/submit`, {
@@ -390,9 +379,12 @@ export default function PublicTestClient({ token }: { token: string }) {
 
   /* ---------------- UI ---------------- */
 
+  const finalOrg = orgName || "Profiletest.ai";
+  const finalTest = testName || "Profile Test";
+
   if (loading) {
     return (
-      <div className="p-6">
+      <div className={embed ? "p-0" : "p-6"}>
         <div className="text-lg font-semibold text-white">Loading…</div>
         <div className="mt-2 text-sm text-white/70">Preparing your assessment.</div>
       </div>
@@ -401,31 +393,16 @@ export default function PublicTestClient({ token }: { token: string }) {
 
   if (error) {
     return (
-      <div className="p-6 space-y-4">
+      <div className={embed ? "p-0" : "p-6"} style={embed ? { minHeight: 420 } : undefined}>
         <h1 className="text-xl font-semibold text-white">Couldn’t load test</h1>
-        <pre className="p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">{error}</pre>
-        <div className="text-white/70 text-sm">
-          Debug:
-          <ul className="list-disc ml-5 mt-2">
-            <li>
-              <a className="underline" href={`/api/public/test/${token}`} target="_blank" rel="noreferrer">
-                /api/public/test/{token}
-              </a>
-            </li>
-            <li>
-              <a className="underline" href={`/api/public/test/${token}/questions`} target="_blank" rel="noreferrer">
-                /api/public/test/{token}/questions
-              </a>
-            </li>
-          </ul>
-        </div>
+        <pre className="mt-3 p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">{error}</pre>
       </div>
     );
   }
 
   if (completedMessage) {
     return (
-      <div className="p-6 space-y-6">
+      <div className={embed ? "p-0" : "p-6"}>
         <div className="rounded-2xl bg-white/5 border border-white/10 p-5 max-w-2xl space-y-3">
           <div className="text-lg font-semibold text-white">All done</div>
           <p className="text-sm text-white/80">{completedMessage}</p>
@@ -446,28 +423,20 @@ export default function PublicTestClient({ token }: { token: string }) {
 
   const currentAnswered = q ? isAnswered(q) : false;
 
-  const finalOrg = orgName || "Profiletest.ai";
-  const finalTest = testName || "Profile Test";
-
   return (
-    <div className="p-6 space-y-6">
-      {/* Small status line */}
-      <div className="text-white/70 text-sm">
-        Token: <code className="text-white">{token}</code> • {started ? "started" : "not started"}
-      </div>
+    <div className={embed ? "p-0" : "p-6"}>
+      {/* ✅ Token line removed (request #1) */}
 
       {step === "details" ? (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Left: invitation + intro + instructions */}
+          {/* Left: invite/intro/instructions (request #2) */}
           <div className="lg:col-span-2">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-5">
               <div className="text-sm text-white/80 font-medium">
                 {finalOrg} invites you to complete this assessment
               </div>
 
-              <div>
-                <div className="text-2xl font-semibold text-white">{finalTest}</div>
-              </div>
+              <div className="text-2xl font-semibold text-white">{finalTest}</div>
 
               <div>
                 <div className="text-sm font-semibold text-white/90">Introduction To {finalTest}</div>
@@ -482,7 +451,7 @@ export default function PublicTestClient({ token }: { token: string }) {
                 <div className="text-sm font-semibold text-white/90">Instructions</div>
                 <p className="mt-2 text-sm leading-6 text-white/75">
                   Please answer each question honestly and instinctively. There are no right or wrong answers.
-                  Your results are based on patterns across your responses.- PublicTestClient
+                  Your results are based on patterns across your responses.
                 </p>
                 <p className="mt-3 text-sm text-white/75">Enjoy this experience with {finalOrg}.</p>
               </div>
@@ -533,7 +502,8 @@ export default function PublicTestClient({ token }: { token: string }) {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm text-white/80">Mobile *</span>
+                  {/* ✅ removed asterisk (request #3) */}
+                  <span className="text-sm text-white/80">Mobile</span>
                   <input
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={phone}
@@ -581,21 +551,11 @@ export default function PublicTestClient({ token }: { token: string }) {
 
                 <p className="text-xs text-white/70">
                   By submitting this assessment, you have read and agree to our{" "}
-                  <a
-                    href="/privacy"
-                    target="_blank"
-                    className="underline"
-                    rel="noopener noreferrer"
-                  >
+                  <a href="/privacy" target="_blank" className="underline" rel="noopener noreferrer">
                     Privacy Policy
                   </a>{" "}
                   and{" "}
-                  <a
-                    href="/terms"
-                    target="_blank"
-                    className="underline"
-                    rel="noopener noreferrer"
-                  >
+                  <a href="/terms" target="_blank" className="underline" rel="noopener noreferrer">
                     Terms &amp; Conditions
                   </a>
                   .
@@ -613,9 +573,11 @@ export default function PublicTestClient({ token }: { token: string }) {
                   {savingDetails ? "Saving…" : "Start This Assessment 👉"}
                 </button>
 
-                <div className="pt-3 text-center text-xs text-white/50">
-                  powered by <span className="text-white/65">profiletest.ai</span>
-                </div>
+                {!embed && (
+                  <div className="pt-3 text-center text-xs text-white/50">
+                    powered by <span className="text-white/65">profiletest.ai</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -652,9 +614,6 @@ export default function PublicTestClient({ token }: { token: string }) {
                   value={textAnswers[q.id] || ""}
                   onChange={(e) => setText(q.id, e.target.value)}
                 />
-                <div className="text-xs text-white/60">
-                  {(textAnswers[q.id] || "").trim().length === 0 ? "Please enter a response to continue." : null}
-                </div>
               </div>
             ) : Array.isArray(q.options) && q.options.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

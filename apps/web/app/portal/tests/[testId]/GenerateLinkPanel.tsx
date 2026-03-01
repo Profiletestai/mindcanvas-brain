@@ -24,7 +24,6 @@ export default function GenerateLinkPanel({ testId, testSlug, appOrigin }: Props
     setLastUrl(null);
     setLastToken(null);
     try {
-      // POST to the by-id route
       const res = await fetch(`/api/tests/by-id/${testId}/link`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -62,7 +61,6 @@ export default function GenerateLinkPanel({ testId, testSlug, appOrigin }: Props
         body: JSON.stringify({
           testKey: testId,
           recipient: email,
-          // optionally pass kind/maxUses; the server can default to 'full', 1
           kind: 'full',
           maxUses: 1,
         }),
@@ -81,16 +79,26 @@ export default function GenerateLinkPanel({ testId, testSlug, appOrigin }: Props
   }
 
   const origin = appOrigin && appOrigin.startsWith('http') ? appOrigin.replace(/\/+$/, '') : '';
-  const embedSrc = lastToken
-    ? `${origin}/t/${lastToken}`
-    : `${origin || ''}/t/<TOKEN_GOES_HERE>`;
 
-  const htmlSnippet = `<iframe src="${embedSrc}" width="100%" height="700" style="border:0;border-radius:12px;"></iframe>`;
-  const jsxSnippet = `<iframe src="${embedSrc}" width="100%" height="700" style={{ border: 0, borderRadius: 12 }} />`;
+  // ✅ Embed should render ONLY the "block" (no header/footer shell)
+  const embedSrc = lastToken
+    ? `${origin}/t/${lastToken}/embed`
+    : `${origin || ''}/t/<TOKEN_GOES_HERE>/embed`;
+
+  // Better defaults for the block-style embed
+  const htmlSnippet = `<iframe src="${embedSrc}" style="width:100%;border:0;height:900px;border-radius:16px;overflow:hidden;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+
+  const jsxSnippet = `<iframe
+  src="${embedSrc}"
+  style={{ width: '100%', border: 0, height: 900, borderRadius: 16, overflow: 'hidden' }}
+  loading="lazy"
+  referrerPolicy="no-referrer-when-downgrade"
+/>`;
 
   return (
     <section style={{ marginTop: 16, border: '1px solid #eee', borderRadius: 10, padding: 12 }}>
       <h2 style={{ fontSize: 18, fontWeight: 600 }}>Create & Share</h2>
+
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           type="button"
@@ -153,22 +161,29 @@ export default function GenerateLinkPanel({ testId, testSlug, appOrigin }: Props
           <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
             Copied to clipboard (if permitted).
           </div>
+
+          <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+            Embed URL:&nbsp;
+            <span style={{ fontFamily: 'monospace' }}>{embedSrc}</span>
+          </div>
         </div>
       )}
 
-      {/* Simple "modals" rendered inline */}
       {showEmbed && (
         <div style={{ marginTop: 16, padding: 12, border: '1px solid #ddd', borderRadius: 8, background: '#fafafa' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>Embed snippet (HTML)</strong>
-            <button onClick={() => setShowEmbed(false)} style={{ border: '1px solid #ccc', borderRadius: 6, padding: '4px 8px' }}>
+            <button
+              onClick={() => setShowEmbed(false)}
+              style={{ border: '1px solid #ccc', borderRadius: 6, padding: '4px 8px' }}
+            >
               Close
             </button>
           </div>
           <textarea
             readOnly
             value={htmlSnippet}
-            style={{ width: '100%', height: 120, marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
+            style={{ width: '100%', height: 140, marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
           />
         </div>
       )}
@@ -177,14 +192,17 @@ export default function GenerateLinkPanel({ testId, testSlug, appOrigin }: Props
         <div style={{ marginTop: 16, padding: 12, border: '1px solid #ddd', borderRadius: 8, background: '#fafafa' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>Code snippet (JSX)</strong>
-            <button onClick={() => setShowCode(false)} style={{ border: '1px solid #ccc', borderRadius: 6, padding: '4px 8px' }}>
+            <button
+              onClick={() => setShowCode(false)}
+              style={{ border: '1px solid #ccc', borderRadius: 6, padding: '4px 8px' }}
+            >
               Close
             </button>
           </div>
           <textarea
             readOnly
             value={jsxSnippet}
-            style={{ width: '100%', height: 120, marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
+            style={{ width: '100%', height: 160, marginTop: 8, fontFamily: 'monospace', fontSize: 12 }}
           />
         </div>
       )}
