@@ -62,7 +62,9 @@ type ReportBlock =
       caption?: string;
       align?: "left" | "center" | "right";
       max_h?: number;
-      rounded?: boolean;
+      rounded?: boolean; // if false -> keep square corners
+      border?: boolean; // if false -> no border/shadow
+      no_border?: boolean; // alias
     }
   | { type: string; [k: string]: any };
 
@@ -176,14 +178,23 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   );
 }
 
-/** ✅ Profiles-only radar: P1..P8 with % rings + point labels */
+/**
+ * ✅ Profiles-only radar: P1..P8
+ * Requested change: "zoom in to 60%" so it doesn't bunch up.
+ * Implementation: scale values relative to 60% (v / 0.6), clamp to 1.
+ * Also add ring labels and point % labels with better spacing.
+ */
 function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
-  const val = (p: string) => {
+  const rawVal = (p: string) => {
     const asPROFILE = p.replace(/^P/, "PROFILE_");
     return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
+
+  // "zoom to 60%" -> scale so 0.6 becomes outer ring (1.0)
+  const MAX = 0.6;
+  const val = (p: string) => clamp01(rawVal(p) / MAX);
 
   const size = 360;
   const cx = size / 2;
@@ -195,10 +206,13 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
     return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
   }
 
-  const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+  const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]; // display as 10..60
 
   const pts = labels.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
+
+  // ring label positions on top axis, but spread slightly so they don't stack too tightly
+  const ringLabelY = (rv: number) => cy - r * (rv / MAX);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -213,18 +227,18 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
           {rings.map((rv) => (
             <polygon
               key={rv}
-              points={labels.map((_, i) => pt(i, rv)).map((p) => `${p.x},${p.y}`).join(" ")}
+              points={labels.map((_, i) => pt(i, clamp01(rv / MAX))).map((p) => `${p.x},${p.y}`).join(" ")}
               fill="none"
               stroke="rgba(15,23,42,0.12)"
             />
           ))}
 
-          {/* ring labels on top axis */}
+          {/* ring labels (10–60%) */}
           {rings.map((rv) => (
             <text
               key={`lbl-${rv}`}
               x={cx}
-              y={cy - r * rv}
+              y={ringLabelY(rv)}
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="10"
@@ -263,24 +277,31 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
           <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
           <circle cx={cx} cy={cy} r="2" fill="rgba(15,23,42,0.5)" />
 
-          {/* point labels */}
+          {/* point dots + % labels (use raw % text, but position using scaled geometry) */}
           {labels.map((k, i) => {
-            const v = val(k);
-            const p = pt(i, v);
-            const labelPt = pt(i, Math.min(1, v + 0.10));
+            const vScaled = val(k);
+            const vRaw = rawVal(k);
+            const p = pt(i, vScaled);
+
+            // put label slightly further out; only show if >0 to reduce clutter
+            const show = vRaw > 0.001;
+            const labelPt = pt(i, Math.min(1, vScaled + 0.16));
+
             return (
               <g key={`pt-${k}`}>
                 <circle cx={p.x} cy={p.y} r="3" fill="rgba(20,184,166,0.95)" />
-                <text
-                  x={labelPt.x}
-                  y={labelPt.y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="10"
-                  fill="rgba(15,23,42,0.6)"
-                >
-                  {Math.round(v * 100)}%
-                </text>
+                {show ? (
+                  <text
+                    x={labelPt.x}
+                    y={labelPt.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="9"
+                    fill="rgba(15,23,42,0.55)"
+                  >
+                    {Math.round(vRaw * 100)}%
+                  </text>
+                ) : null}
               </g>
             );
           })}
@@ -292,33 +313,60 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
 
 /**
  * ✅ Normalize blocks so doc-style "item lines" don't render as bold headings.
- * Converts runs of h4 into a UL.
+ * - Converts runs of h4 into a UL
+ * - ALSO converts runs of h3 FOLLOWING an h3 heading (common in your doc export)
+ *   Example: "What You Naturally Do Well" (h3) then many h3 lines = should be bullets.
  */
 function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
+  const inBlocks = Array.isArray(blocks) ? blocks : [];
   const out: ReportBlock[] = [];
-  let pending: string[] = [];
 
-  const flush = () => {
-    if (pending.length) {
-      out.push({ type: "ul", items: pending });
-      pending = [];
-    }
-  };
+  const isH = (b: any, lvl: "h3" | "h4") => String(b?.type || "").toLowerCase() === lvl;
+  const getText = (b: any) => safeText(b?.text).trim();
 
-  for (const b of blocks || []) {
+  let i = 0;
+  while (i < inBlocks.length) {
+    const b = inBlocks[i];
     const t = String((b as any)?.type || "").toLowerCase();
 
+    // Convert runs of h4 into UL
     if (t === "h4") {
-      const text = safeText((b as any)?.text).trim();
-      if (text) pending.push(text);
+      const items: string[] = [];
+      while (i < inBlocks.length && isH(inBlocks[i], "h4")) {
+        const txt = getText(inBlocks[i]);
+        if (txt) items.push(txt);
+        i++;
+      }
+      if (items.length) out.push({ type: "ul", items });
       continue;
     }
 
-    flush();
+    // Convert "h3 heading + many h3 lines" into: h3 + ul(...)
+    if (t === "h3" && i + 1 < inBlocks.length && (isH(inBlocks[i + 1], "h3") || isH(inBlocks[i + 1], "h4"))) {
+      // Keep the first h3 as the heading
+      out.push(b);
+
+      const items: string[] = [];
+      i++;
+
+      // Collect consecutive h3/h4 blocks as bullet items
+      while (i < inBlocks.length) {
+        const tt = String((inBlocks[i] as any)?.type || "").toLowerCase();
+        if (tt !== "h3" && tt !== "h4") break;
+
+        const txt = getText(inBlocks[i]);
+        if (txt) items.push(txt);
+        i++;
+      }
+
+      if (items.length) out.push({ type: "ul", items });
+      continue;
+    }
+
     out.push(b);
+    i++;
   }
 
-  flush();
   return out;
 }
 
@@ -344,19 +392,23 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
 
   if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText(b.text)}</h1>;
   if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText(b.text)}</h2>;
+
+  // Subheadings: bold, but not huge
   if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText(b.text)}</h3>;
 
-  // keep h4 light (and most runs become UL via normaliser)
-  if (type === "h4") return <div className="text-sm font-medium text-slate-900">{safeText(b.text)}</div>;
+  // IMPORTANT: h4 should not look like "big bold headings"
+  if (type === "h4") return <div className="text-sm font-normal text-slate-700">{safeText(b.text)}</div>;
 
   if (type === "p") return <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{safeText(b.text)}</p>;
 
   if (type === "ul") {
     const items = Array.isArray(b.items) ? b.items : [];
     return (
-      <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
+      <ul className="list-disc pl-5 text-sm font-normal text-slate-700 space-y-1">
         {items.map((it: any, i: number) => (
-          <li key={i}>{safeText(it)}</li>
+          <li key={i} className="font-normal text-slate-700">
+            {safeText(it)}
+          </li>
         ))}
       </ul>
     );
@@ -365,9 +417,11 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
   if (type === "ol") {
     const items = Array.isArray(b.items) ? b.items : [];
     return (
-      <ol className="list-decimal pl-5 text-sm text-slate-700 space-y-1">
+      <ol className="list-decimal pl-5 text-sm font-normal text-slate-700 space-y-1">
         {items.map((it: any, i: number) => (
-          <li key={i}>{safeText(it)}</li>
+          <li key={i} className="font-normal text-slate-700">
+            {safeText(it)}
+          </li>
         ))}
       </ol>
     );
@@ -392,13 +446,21 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
     const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
     const maxH = typeof b?.max_h === "number" ? b.max_h : 360;
 
+    const wantsBorder =
+      b?.border === false || b?.no_border === true || String(src).toLowerCase().includes("nick-pye")
+        ? false
+        : true;
+
+    const rounded = b?.rounded === false ? "rounded-none" : "rounded-2xl";
+    const chrome = wantsBorder ? "border border-slate-200 bg-white shadow-sm" : "border-0 bg-transparent shadow-none";
+
     return (
       <figure className="my-4">
         <div className={`flex ${justify}`}>
           <img
             src={src}
             alt={safeText(b?.alt)}
-            className="max-w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+            className={`max-w-full ${rounded} ${chrome}`}
             style={{ maxHeight: maxH }}
             onError={(e) => {
               e.currentTarget.style.display = "none";
@@ -550,8 +612,9 @@ export default function OperatingFrameReportClient(props: {
               </div>
             </div>
 
+            {/* ✅ Bigger header image (your request) */}
             <div className="shrink-0 flex items-center gap-3">
-              <div className="h-[92px] w-[92px] rounded-3xl bg-white/10 border border-white/15 overflow-hidden shadow-sm">
+              <div className="h-[140px] w-[140px] md:h-[160px] md:w-[160px] rounded-[28px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                 <img
                   src={profileHeroSrc}
                   alt={topProfileName}
