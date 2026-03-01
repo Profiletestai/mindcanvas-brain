@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import NativeBlocksReportClient from "./NativeBlocksReportClient";
 import LegacyReportClient from "./LegacyReportClient";
+import OperatingFrameReportClient from "./OperatingFrameReportClient";
 
 type AB = "A" | "B" | "C" | "D";
 
@@ -63,7 +64,7 @@ type ResultData = {
   profile_totals?: Record<string, number>;
 
   top_freq: AB;
-  top_profile_code: string;
+  top_profile_code: string; // PROFILE_1..8
   top_profile_name: string;
 
   sections?: SectionsPayload | null;
@@ -81,12 +82,27 @@ function safeText(x: any): string {
   return String(x);
 }
 
+function supabasePublicFrameworkUrlForOperatingFrame() {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  if (!base) return "";
+  return `${base}/storage/v1/object/public/framework/operatingframe/operatingframe_report_content_v1.json`;
+}
+
+function isOperatingFrame(data: ResultData | null) {
+  const key = String(data?.debug?.storageFrameworkPath || "").trim();
+  return key === "operatingframe/operatingframe_report_content_v1.json";
+}
+
 export default function ReportGateClient(props: { token: string; tid: string; src?: string }) {
   const { token, tid, src } = props;
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<ResultData | null>(null);
+
+  // OperatingFrame framework JSON from public bucket
+  const [ofFramework, setOfFramework] = useState<any | null>(null);
+  const [ofErr, setOfErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +111,9 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
       try {
         setLoading(true);
         setErr(null);
+        setData(null);
+        setOfFramework(null);
+        setOfErr(null);
 
         if (!tid) {
           setErr("Missing tid");
@@ -122,6 +141,31 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
         if (cancelled) return;
         setData(json.data);
+
+        // ✅ Deterministic OperatingFrame framework fetch
+        if (isOperatingFrame(json.data)) {
+          const fwUrl = supabasePublicFrameworkUrlForOperatingFrame();
+          if (!fwUrl) {
+            setOfErr("Missing NEXT_PUBLIC_SUPABASE_URL (cannot load OperatingFrame framework JSON).");
+            setLoading(false);
+            return;
+          }
+
+          try {
+            const fwRes = await fetch(fwUrl, { cache: "no-store" });
+            if (!fwRes.ok) {
+              const t = await fwRes.text();
+              throw new Error(`Framework fetch failed (${fwRes.status}): ${t.slice(0, 200)}`);
+            }
+            const fwJson = await fwRes.json();
+            if (cancelled) return;
+            setOfFramework(fwJson);
+          } catch (e: any) {
+            if (cancelled) return;
+            setOfErr(String(e?.message || e));
+          }
+        }
+
         setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
@@ -140,6 +184,8 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     const flag = data?.debug?.useBlocksEngine;
     return flag === true;
   }, [data?.debug]);
+
+  const isOF = useMemo(() => isOperatingFrame(data), [data]);
 
   if (!tid) {
     return (
@@ -182,11 +228,41 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     );
   }
 
-  // ✅ Native v2 blocks renderer (your scalable path)
+  // ✅ OperatingFrame always wins (regardless of blocks engine)
+  if (isOF) {
+    if (ofErr || !ofFramework) {
+      return (
+        <div className="min-h-screen bg-[#050914] text-white">
+          <div className="mx-auto max-w-4xl p-6 space-y-4">
+            <h1 className="text-2xl font-semibold">Personalised report</h1>
+            <p className="text-sm text-red-400">Could not load OperatingFrame report content.</p>
+            <details className="rounded-lg border border-slate-700 bg-slate-950 p-4 text-xs text-slate-50">
+              <summary className="cursor-pointer font-medium">Debug information</summary>
+              <div className="mt-2 space-y-2">
+                <div>Framework error: {safeText(ofErr ?? "Unknown")}</div>
+                <div>Framework URL: {safeText(supabasePublicFrameworkUrlForOperatingFrame())}</div>
+                <div>storageFrameworkPath: {safeText(data?.debug?.storageFrameworkPath || "")}</div>
+              </div>
+            </details>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <OperatingFrameReportClient
+        token={token}
+        tid={tid}
+        src={src || ""}
+        data={data}
+        framework={ofFramework}
+      />
+    );
+  }
+
   if (useBlocksEngine) {
     return <NativeBlocksReportClient token={token} tid={tid} src={src || ""} data={data} />;
   }
 
-  // ✅ Legacy fallback for anything not using the blocks engine
   return <LegacyReportClient token={token} tid={tid} />;
 }
