@@ -14,32 +14,7 @@ type LinkMeta = {
   redirect_url?: string | null;
   hidden_results_message?: string | null;
   email_report?: boolean | null;
-};
-
-type ReportSectionBlock =
-  | { type: "p"; text?: string }
-  | { type: "ul"; items?: string[] }
-  | { type: "ol"; items?: string[] }
-  | { type: "quote"; text?: string; cite?: string }
-  | { type: "divider" }
-  | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
-  | { type: "image"; src?: string; alt?: string; caption?: string; align?: "left" | "center" | "right"; max_h?: number }
-  | { type: string; [k: string]: any };
-
-type ReportSection = {
-  id?: string;
-  title?: string;
-  blocks?: ReportSectionBlock[];
-};
-
-type SectionsPayload = {
-  common?: ReportSection[] | null;
-  profile?: ReportSection[] | null;
-  report_title?: string | null;
-  profile_missing?: boolean;
-  framework_version?: string | null;
-  framework_bucket?: string | null;
-  framework_path?: string | null;
+  meta?: any;
 };
 
 type ResultData = {
@@ -47,11 +22,7 @@ type ResultData = {
   org_name?: string | null;
   test_name: string;
 
-  taker: {
-    id: string;
-    first_name?: string | null;
-    last_name?: string | null;
-  };
+  taker: { id: string; first_name?: string | null; last_name?: string | null };
 
   link?: LinkMeta;
 
@@ -64,10 +35,10 @@ type ResultData = {
   profile_totals?: Record<string, number>;
 
   top_freq: AB;
-  top_profile_code: string; // PROFILE_1..8
+  top_profile_code: string;
   top_profile_name: string;
 
-  sections?: SectionsPayload | null;
+  sections?: any;
 
   debug?: any;
   version?: string;
@@ -93,6 +64,12 @@ function isOperatingFrame(data: ResultData | null) {
   return key === "operatingframe/operatingframe_report_content_v1.json";
 }
 
+// ✅ Absolute guards for orgs that must NEVER use native blocks engine in /t/ flow
+function isLegacyOrgForced(data: ResultData | null) {
+  const slug = String(data?.org_slug || "").toLowerCase().trim();
+  return slug === "team-puzzle" || slug === "competency-coach";
+}
+
 export default function ReportGateClient(props: { token: string; tid: string; src?: string }) {
   const { token, tid, src } = props;
 
@@ -100,7 +77,6 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<ResultData | null>(null);
 
-  // OperatingFrame framework JSON from public bucket
   const [ofFramework, setOfFramework] = useState<any | null>(null);
   const [ofErr, setOfErr] = useState<string | null>(null);
 
@@ -142,7 +118,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
         if (cancelled) return;
         setData(json.data);
 
-        // ✅ Deterministic OperatingFrame framework fetch
+        // OperatingFrame loads framework JSON from bucket
         if (isOperatingFrame(json.data)) {
           const fwUrl = supabasePublicFrameworkUrlForOperatingFrame();
           if (!fwUrl) {
@@ -185,6 +161,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     return flag === true;
   }, [data?.debug]);
 
+  const forcedLegacy = useMemo(() => isLegacyOrgForced(data), [data]);
   const isOF = useMemo(() => isOperatingFrame(data), [data]);
 
   if (!tid) {
@@ -228,7 +205,12 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     );
   }
 
-  // ✅ OperatingFrame always wins (regardless of blocks engine)
+  // ✅ HARD GUARD: Team Puzzle & Competency Coach always use legacy in /t/ flow
+  if (forcedLegacy) {
+    return <LegacyReportClient token={token} tid={tid} />;
+  }
+
+  // ✅ OperatingFrame always wins (special renderer)
   if (isOF) {
     if (ofErr || !ofFramework) {
       return (
@@ -249,19 +231,12 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
       );
     }
 
-    return (
-      <OperatingFrameReportClient
-        token={token}
-        tid={tid}
-        src={src || ""}
-        data={data}
-        framework={ofFramework}
-      />
-    );
+    return <OperatingFrameReportClient token={token} tid={tid} src={src || ""} data={data as any} framework={ofFramework} />;
   }
 
+  // ✅ Native blocks engine only for tests explicitly flagged (non-legacy orgs)
   if (useBlocksEngine) {
-    return <NativeBlocksReportClient token={token} tid={tid} src={src || ""} data={data} />;
+    return <NativeBlocksReportClient token={token} tid={tid} src={src || ""} data={data as any} />;
   }
 
   return <LegacyReportClient token={token} tid={tid} />;
