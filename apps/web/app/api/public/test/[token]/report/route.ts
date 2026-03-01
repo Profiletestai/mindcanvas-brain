@@ -51,11 +51,12 @@ type LinkMeta = {
   test_id: string;
   org_slug: string | null;
   test_name: string | null;
-  link_meta?: any | null;
 
-  // ✅ NEW: return org name/logo so report header can display properly
+  // ✅ org display fields for header
   org_name?: string | null;
   org_logo_url?: string | null;
+
+  link_meta?: any | null;
 };
 
 type ReportFrameworkMeta = {
@@ -119,8 +120,6 @@ type SectionsPayload = {
   common?: ReportSection[] | null;
   profile?: ReportSection[] | null;
 
-  // NOTE: We still keep common/profile for backward compatibility,
-  // but we now ensure Conclusion + Next Steps are AFTER profile by moving them.
   report_title?: string | null;
   profile_missing?: boolean;
   framework_version?: string | null;
@@ -373,9 +372,9 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
     test_id: q.data.test_id,
     org_slug: orgSlug,
     test_name: testName,
-    link_meta,
     org_name: orgName,
     org_logo_url: orgLogoUrl,
+    link_meta,
   };
 }
 
@@ -619,7 +618,6 @@ async function fetchBlocksForKeys(opts: {
 
 /**
  * Token replacement that preserves the input type.
- * This prevents TS from turning everything into `unknown`.
  */
 function replaceTokensDeep<T>(x: T, ctx: Record<string, string>): T {
   const walk = (v: any): any => {
@@ -631,15 +629,11 @@ function replaceTokensDeep<T>(x: T, ctx: Record<string, string>): T {
       return s;
     }
 
-    if (Array.isArray(v)) {
-      return v.map((it) => walk(it));
-    }
+    if (Array.isArray(v)) return v.map((it) => walk(it));
 
     if (v && typeof v === "object") {
       const out: Record<string, any> = {};
-      for (const [k, val] of Object.entries(v)) {
-        out[k] = walk(val);
-      }
+      for (const [k, val] of Object.entries(v)) out[k] = walk(val);
       return out;
     }
 
@@ -660,7 +654,7 @@ function contentJsonToSection(content_json: any, fallbackTitle?: string): { titl
     };
   }
 
-  // Support older “fields” shapes: { core_identity: "...", ... }
+  // Support older “fields” shapes
   const blocks: ReportSectionBlock[] = [];
   const core = safeText((cj as any).core_identity || "").trim();
   if (core) blocks.push({ type: "p", text: core });
@@ -741,13 +735,15 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const storageChoice = resolveStorageFramework(testMeta);
     const useStorageFramework = storageChoice.use;
 
-    const orgSlug = String(meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach").trim();
+    const orgSlug = String(
+      meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach",
+    ).trim();
 
     // Default: filesystem framework (by org)
     let fw: any = await loadFrameworkBySlug(orgSlug);
     let frameworkSource: "filesystem" | "storage" | "blocks" = "filesystem";
 
-    // If blocks engine: still download framework JSON for things like defaults/legacy lookups if needed
+    // If storage framework chosen, download it
     if (useStorageFramework && storageChoice.bucket && storageChoice.path) {
       const storageFw = await downloadFrameworkJSON(storageChoice.bucket, storageChoice.path);
       if (storageFw) {
@@ -790,7 +786,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     if (!sub) {
       return NextResponse.json(
-        { ok: false, error: "Submission not found for this taker/token.", debug: { takerId, token, test_id: meta.test_id } },
+        {
+          ok: false,
+          error: "Submission not found for this taker/token.",
+          debug: { takerId, token, test_id: meta.test_id },
+        },
         { status: 404 },
       );
     }
@@ -807,10 +807,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq =
-      (Object.entries(freqTotals) as [AB, number][]).sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq = (Object.entries(freqTotals) as [AB, number][])
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry = Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry =
+      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
       profile_labels.find((p) => p.code === top_profile_code)?.name ||
@@ -835,8 +836,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       PRIMARY_PROFILE_NAME: top_profile_name,
       SECONDARY_PROFILE_NAME: secondary,
       TERTIARY_PROFILE_NAME: tertiary,
-
-      // NOTE: these are legacy macros; your OperatingFrame report client is now mapping files explicitly
       PROFILE_IMAGE_PRIMARY: `/images/operatingframe-full-test/profile-cards/${String(top_profile_name).toLowerCase()}.png`,
       PROFILE_IMAGE_SECONDARY: secondary ? `/images/operatingframe-full-test/profile-cards/${String(secondary).toLowerCase()}.png` : "",
       PROFILE_IMAGE_TERTIARY: tertiary ? `/images/operatingframe-full-test/profile-cards/${String(tertiary).toLowerCase()}.png` : "",
@@ -854,7 +853,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
       // Blocks live under entity_code = 'GLOBAL' and entity_code = top_profile_code
       const globalBlocks = await fetchBlocksForKeys({ keys: globalKeys, entity_type: "global", entity_code: "GLOBAL" });
-      const profileBlocks = await fetchBlocksForKeys({ keys: profileKeys, entity_type: "profile", entity_code: top_profile_code });
+      const profileBlocks = await fetchBlocksForKeys({
+        keys: profileKeys,
+        entity_type: "profile",
+        entity_code: top_profile_code,
+      });
 
       const common: ReportSection[] = [];
       const profile: ReportSection[] = [];
@@ -876,7 +879,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
           };
 
-          // ✅ Push conclusion + next_steps AFTER profile sections, regardless of scope.
           if (GLOBAL_POST_PROFILE_KEYS.has(key)) postProfile.push(sectionObj);
           else common.push(sectionObj);
         } else {
@@ -911,7 +913,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         else common.push(segSection as any);
       }
 
-      // ✅ Append "post profile" global sections at the VERY end
+      // Append "post profile" global sections at the VERY end
       profile.push(...postProfile);
 
       sections = {
@@ -929,7 +931,14 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     // ✅ Link behavior comes from resolveLinkMeta() columns
     const rawLinkMeta = meta.link_meta || null;
-    const linkMeta = isPortalViewer ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
+
+    // ✅ Critical fix: portal viewer usually strips redirect URL,
+    // but OperatingFrame must keep it so Next Steps works in src=portal.
+    const isOperatingFrame = String(storageChoice.path || "").toLowerCase().includes("operatingframe/");
+    const linkMeta =
+      isPortalViewer && !isOperatingFrame
+        ? sanitizeLinkMetaForPortal(rawLinkMeta)
+        : rawLinkMeta;
 
     const answersCount = Array.isArray(sub.answers_json) ? sub.answers_json.length : 0;
     const computedSum = Object.values(profileTotals || {}).reduce((a, b) => a + (Number(b) || 0), 0);
@@ -947,10 +956,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       ok: true,
       data: {
         org_slug: orgSlug,
-
-        // ✅ NOW returned from orgs table (fixes header)
         org_name: meta.org_name || null,
-
         test_name: meta.test_name || testRow?.name || testMeta?.test || "Profile Test",
 
         taker: {
@@ -1023,6 +1029,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
           src,
           isPortalViewer,
+          isOperatingFrame,
         },
 
         version: useBlocksEngine ? "portal-native-v2-blocks+layout+labels+qual" : "portal-v1",
