@@ -1,20 +1,12 @@
 // apps/web/app/api/admin/org-rankings/route.ts
 import "server-only";
+
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
+import { getServerSupabase, getAdminClient } from "@/app/_lib/portal";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-
-// Must match portal.orgs.slug exactly
-const PROFILETEST_ORG_SLUG = "profiletest-ai";
 
 function defaultRange() {
   const to = new Date();
@@ -28,76 +20,66 @@ function parseISO(s: string | null) {
   return Number.isFinite(d.getTime()) ? d.toISOString() : null;
 }
 
-async function assertProfiletestAdmin() {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return { ok: false as const, status: 500, error: "Supabase env not configured" };
-  }
-
-  // ✅ Next typings: cookies() can be async
-  const cookieStore = await cookies();
-
-  // RLS-safe auth client (reads the logged-in user from cookies)
-  const authClient = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
-      },
-    },
-  });
-
-  // 1) Who is logged in?
-  const { data: auth, error: authErr } = await authClient.auth.getUser();
-  const user = auth?.user ?? null;
-  if (authErr || !user) {
-    return { ok: false as const, status: 401, error: "Unauthorised" };
-  }
-
-  // 2) Find profiletest org id
-  const { data: orgRow, error: orgErr } = await authClient
-    .schema("portal")
-    .from("orgs")
-    .select("id, slug")
-    .eq("slug", PROFILETEST_ORG_SLUG)
-    .maybeSingle();
-
-  if (orgErr || !orgRow?.id) {
-    return { ok: false as const, status: 403, error: "Forbidden" };
-  }
-
-  // 3) Must be a member of profiletest org
-  const { data: membership, error: memErr } = await authClient
-    .schema("portal")
-    .from("user_orgs")
-    .select("org_id, role")
-    .eq("org_id", orgRow.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (memErr || !membership) {
-    return { ok: false as const, status: 403, error: "Forbidden" };
-  }
-
-  // Optional: enforce role
-  // const allowed = ["owner", "admin", "super_admin"];
-  // if (!allowed.includes(String(membership.role || ""))) {
-  //   return { ok: false as const, status: 403, error: "Forbidden" };
-  // }
-
-  return { ok: true as const };
+function clamp01(n: number) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
 }
+
+type OrgRow = { id: string; slug: string; name: string | null };
+
+type OutRow = {
+  orgId: string;
+  slug: string;
+  name: string | null;
+
+  submissions: number;
+  uniqueTakers: number;
+  activeLinks: number;
+
+  last7: number;
+  prev7: number;
+  growth: number; // -1..+inf (1 means "New" in client if prev=0 and last>0)
+
+  lastUsedAt: string | null;
+
+  utilization: number; // submissions per active link
+  repeatRate: number; // 0..1
+  status: "hot" | "at_risk" | "active" | "dormant";
+};
+
+type Totals = {
+  submissions: number;
+  uniqueTakers: number;
+  activeLinks: number;
+  activeOrgs: number;
+  dormantOrgs: number;
+  atRiskOrgs: number;
+};
 
 export async function GET(req: Request) {
   try {
-    // ✅ Guard this admin endpoint
-    const guard = await assertProfiletestAdmin();
-    if (!guard.ok) {
-      return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+    // ✅ Auth gating: match /admin/layout.tsx (superadmin)
+    const sb = await getServerSupabase();
+    const { data: auth, error: authErr } = await sb.auth.getUser();
+    const user = auth?.user ?? null;
+    if (authErr || !user) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ ok: false, error: "Supabase env not configured" }, { status: 500 });
+    const admin = await getAdminClient();
+    const portal = admin.schema("portal");
+
+    const { data: adminRow } = await portal
+      .from("superadmin") // ✅ singular (matches your layout)
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!adminRow?.user_id) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
 
+    // Range
     const url = new URL(req.url);
     const fromQ = parseISO(url.searchParams.get("from"));
     const toQ = parseISO(url.searchParams.get("to"));
@@ -105,24 +87,25 @@ export async function GET(req: Request) {
     const from = fromQ ?? defFrom;
     const to = toQ ?? defTo;
 
-    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { db: { schema: "portal" } });
-    const portal = sb.schema("portal");
-
     // 1) Orgs
     const { data: orgs, error: orgErr } = await portal.from("orgs").select("id, slug, name");
-    if (orgErr) return NextResponse.json({ ok: false, error: orgErr.message }, { status: 500 });
+    if (orgErr) {
+      return NextResponse.json({ ok: false, error: orgErr.message }, { status: 500 });
+    }
 
-    const orgById = new Map<string, { id: string; slug: string; name: string | null }>();
-    (orgs ?? []).forEach((o: any) => orgById.set(o.id, o));
+    const orgById = new Map<string, OrgRow>();
+    (orgs ?? []).forEach((o: any) => orgById.set(o.id, { id: o.id, slug: o.slug, name: o.name ?? null }));
 
-    // 2) Submissions in range (use v_usage_submissions for org_id + created_at)
+    // 2) Submissions in range (org_id + created_at)
     const { data: subs, error: subsErr } = await portal
       .from("v_usage_submissions")
       .select("org_id, created_at")
       .gte("created_at", from)
       .lte("created_at", to);
 
-    if (subsErr) return NextResponse.json({ ok: false, error: subsErr.message }, { status: 500 });
+    if (subsErr) {
+      return NextResponse.json({ ok: false, error: subsErr.message }, { status: 500 });
+    }
 
     // 3) Unique takers in range (test_submissions -> tests to get org_id)
     const { data: takerRows, error: takerErr } = await portal
@@ -131,40 +114,72 @@ export async function GET(req: Request) {
       .gte("created_at", from)
       .lte("created_at", to);
 
-    if (takerErr) return NextResponse.json({ ok: false, error: takerErr.message }, { status: 500 });
+    if (takerErr) {
+      return NextResponse.json({ ok: false, error: takerErr.message }, { status: 500 });
+    }
 
-    // 4) Active links (current state)
+    // 4) Active links (current usable links, not date-range usage)
     const nowIso = new Date().toISOString();
     const { data: links, error: linksErr } = await portal.from("test_links").select("org_id, is_active, expires_at");
 
-    if (linksErr) return NextResponse.json({ ok: false, error: linksErr.message }, { status: 500 });
+    if (linksErr) {
+      return NextResponse.json({ ok: false, error: linksErr.message }, { status: 500 });
+    }
 
-    // 5) Growth: last 7 vs previous 7 within range window (based on submissions)
+    // Growth windows (based on end "to")
     const end = new Date(to);
     const last7Start = new Date(end.getTime() - 7 * 24 * 3600 * 1000);
     const prev7Start = new Date(end.getTime() - 14 * 24 * 3600 * 1000);
 
     const agg = new Map<
       string,
-      { submissions: number; uniqueTakers: Set<string>; activeLinks: number; last7: number; prev7: number }
+      {
+        submissions: number;
+        uniqueTakers: Set<string>;
+        activeLinks: number;
+        last7: number;
+        prev7: number;
+        lastUsedAt: string | null;
+      }
     >();
 
     function ensure(orgId: string) {
-      if (!agg.has(orgId)) agg.set(orgId, { submissions: 0, uniqueTakers: new Set(), activeLinks: 0, last7: 0, prev7: 0 });
+      if (!agg.has(orgId)) {
+        agg.set(orgId, {
+          submissions: 0,
+          uniqueTakers: new Set<string>(),
+          activeLinks: 0,
+          last7: 0,
+          prev7: 0,
+          lastUsedAt: null,
+        });
+      }
       return agg.get(orgId)!;
     }
 
+    // Submissions + growth + lastUsedAt
     for (const r of subs ?? []) {
       const orgId = (r as any).org_id as string;
+      const createdAt = (r as any).created_at as string | null;
+
       if (!orgId) continue;
       const a = ensure(orgId);
+
       a.submissions += 1;
 
-      const d = new Date((r as any).created_at);
-      if (d >= last7Start && d <= end) a.last7 += 1;
-      else if (d >= prev7Start && d < last7Start) a.prev7 += 1;
+      if (createdAt) {
+        // last used in range
+        if (!a.lastUsedAt || createdAt > a.lastUsedAt) a.lastUsedAt = createdAt;
+
+        const d = new Date(createdAt);
+        if (Number.isFinite(d.getTime())) {
+          if (d >= last7Start && d <= end) a.last7 += 1;
+          else if (d >= prev7Start && d < last7Start) a.prev7 += 1;
+        }
+      }
     }
 
+    // Unique takers
     for (const r of takerRows ?? []) {
       const orgId = (r as any)?.tests?.org_id as string | undefined;
       const takerId = (r as any)?.taker_id as string | undefined;
@@ -173,9 +188,11 @@ export async function GET(req: Request) {
       a.uniqueTakers.add(takerId);
     }
 
+    // Active links
     for (const l of links ?? []) {
       const orgId = (l as any).org_id as string;
       if (!orgId) continue;
+
       const isActive = (l as any).is_active !== false;
       const expiresAt = (l as any).expires_at as string | null;
       const notExpired = !expiresAt || expiresAt > nowIso;
@@ -186,30 +203,82 @@ export async function GET(req: Request) {
       }
     }
 
-    const rows = Array.from(orgById.values()).map((o) => {
-      const a = agg.get(o.id) ?? { submissions: 0, uniqueTakers: new Set<string>(), activeLinks: 0, last7: 0, prev7: 0 };
+    // Status rules (simple + useful)
+    // - at_risk: activeLinks > 0 but submissions == 0 (within range)
+    // - hot: submissions >= 10 AND (growth > 0 OR lastUsedAt within 48h)
+    // - active: submissions > 0
+    // - dormant: otherwise
+    const now = new Date();
+    const cutoff48h = new Date(now.getTime() - 48 * 3600 * 1000);
+
+    const rows: OutRow[] = Array.from(orgById.values()).map((o) => {
+      const a =
+        agg.get(o.id) ?? ({
+          submissions: 0,
+          uniqueTakers: new Set<string>(),
+          activeLinks: 0,
+          last7: 0,
+          prev7: 0,
+          lastUsedAt: null,
+        } as const);
+
       const prev = a.prev7;
       const last = a.last7;
       const growth = prev === 0 ? (last > 0 ? 1 : 0) : (last - prev) / prev;
 
+      const submissions = a.submissions;
+      const uniqueTakers = a.uniqueTakers.size;
+      const activeLinks = a.activeLinks;
+
+      const repeatRate = submissions > 0 ? clamp01(1 - uniqueTakers / submissions) : 0;
+      const utilization = activeLinks > 0 ? submissions / activeLinks : submissions > 0 ? submissions : 0;
+
+      const lastUsedAt = a.lastUsedAt;
+      const lastUsedDate = lastUsedAt ? new Date(lastUsedAt) : null;
+      const usedWithin48h = !!lastUsedDate && Number.isFinite(lastUsedDate.getTime()) && lastUsedDate >= cutoff48h;
+
+      let status: OutRow["status"] = "dormant";
+      if (activeLinks > 0 && submissions === 0) status = "at_risk";
+      else if (submissions > 0) status = "active";
+      if (submissions >= 10 && (growth > 0 || usedWithin48h)) status = "hot";
+
       return {
         orgId: o.id,
         slug: o.slug,
-        name: o.name,
-        submissions: a.submissions,
-        uniqueTakers: a.uniqueTakers.size,
-        activeLinks: a.activeLinks,
+        name: o.name ?? null,
+
+        submissions,
+        uniqueTakers,
+        activeLinks,
+
         last7: last,
         prev7: prev,
         growth,
+
+        lastUsedAt,
+
+        utilization,
+        repeatRate,
+        status,
       };
     });
 
     rows.sort((a, b) => b.submissions - a.submissions);
 
-    return NextResponse.json({ ok: true, filters: { from, to }, orgs: rows }, { status: 200 });
+    const totals: Totals = {
+      submissions: rows.reduce((s, r) => s + (r.submissions || 0), 0),
+      uniqueTakers: rows.reduce((s, r) => s + (r.uniqueTakers || 0), 0),
+      activeLinks: rows.reduce((s, r) => s + (r.activeLinks || 0), 0),
+      activeOrgs: rows.filter((r) => (r.submissions || 0) > 0).length,
+      dormantOrgs: rows.filter((r) => (r.submissions || 0) === 0 && (r.activeLinks || 0) === 0).length,
+      atRiskOrgs: rows.filter((r) => (r.submissions || 0) === 0 && (r.activeLinks || 0) > 0).length,
+    };
+
+    return NextResponse.json(
+      { ok: true, filters: { from, to }, totals, orgs: rows },
+      { status: 200 }
+    );
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? "Server error" }, { status: 500 });
   }
 }
-

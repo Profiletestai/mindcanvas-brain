@@ -1,183 +1,169 @@
 // apps/web/app/t/[token]/report/ReportGateClient.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import AppBackground from "@/components/ui/AppBackground";
+import { useEffect, useMemo, useState } from "react";
 
+// ✅ Existing engines
+import NativeBlocksReportClient from "./NativeBlocksReportClient";
 import LegacyReportClient from "./LegacyReportClient";
+
+// ✅ Org-specific legacy engine (Team Puzzle / Competency Coach style)
 import LegacyOrgReportClient from "./LegacyOrgReportClient";
 
-type GateMode = "loading" | "storage" | "legacy" | "error";
+// ✅ OperatingFrame special engine
+import OperatingFrameReportClient from "./OperatingFrameReportClient";
 
-type GateAPI = {
-  ok: boolean;
-  data?: {
-    sections?: any | null;
-    debug?: { useStorageFramework?: boolean };
-    version?: string;
-  };
-  error?: string;
+type AB = "A" | "B" | "C" | "D";
+
+type LinkMeta = {
+  next_steps_url?: string | null;
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  email_report?: boolean | null;
+  meta?: any;
 };
 
-type MetaAPI = {
-  ok?: boolean;
-  data?: any;
-  error?: string;
-  // sometimes endpoints return raw meta without {ok,data}
-  [k: string]: any;
+type ResultData = {
+  org_slug: string;
+  org_name?: string | null;
+  test_name: string;
+
+  taker: { id: string; first_name?: string | null; last_name?: string | null };
+
+  link?: LinkMeta;
+
+  frequency_labels: Array<{ code: AB; name: string }>;
+  frequency_percentages: Record<AB, number>;
+  frequency_totals?: Record<AB, number>;
+
+  profile_labels: Array<{ code: string; name: string }>;
+  profile_percentages: Record<string, number>;
+  profile_totals?: Record<string, number>;
+
+  top_freq: AB;
+  top_profile_code: string;
+  top_profile_name: string;
+
+  sections?: any;
+
+  debug?: any;
+  version?: string;
 };
 
-function norm(x: any) {
-  return String(x ?? "").trim().toLowerCase();
+type ApiResponse = { ok: boolean; data?: ResultData; error?: string };
+
+function safeText(x: any): string {
+  if (typeof x === "string") return x;
+  if (Array.isArray(x)) return x.map(String).join(" ");
+  if (x == null) return "";
+  return String(x);
 }
 
-function detectQsc(meta: any): { isQsc: boolean; variant: "entrepreneur" | "leader" } {
-  const frameworkType = norm(meta?.framework_type || meta?.test?.framework_type);
-  const resultType = norm(meta?.result_type || meta?.test?.result_type);
+/**
+ * OperatingFrame framework file lives in Supabase Storage public bucket.
+ * This function builds the public URL at runtime.
+ */
+function supabasePublicFrameworkUrlForOperatingFrame() {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+  if (!base) return "";
+  return `${base}/storage/v1/object/public/framework/operatingframe/operatingframe_report_content_v1.json`;
+}
 
-  const qscVariantRaw =
-    meta?.qsc_variant ||
-    meta?.test?.qsc_variant ||
-    meta?.meta?.qsc_variant ||
-    meta?.link?.meta?.qsc_variant ||
-    meta?.meta?.variant ||
-    meta?.variant;
+function isOperatingFrame(data: ResultData | null) {
+  // We detect OperatingFrame by the storage framework path returned by the API debug
+  const path = String(data?.debug?.storageFrameworkPath || "").trim().toLowerCase();
+  return path === "operatingframe/operatingframe_report_content_v1.json";
+}
 
-  const qscVariant = norm(qscVariantRaw);
-
-  const isQsc =
-    frameworkType === "qsc" ||
-    resultType === "qsc" ||
-    qscVariant === "entrepreneur" ||
-    qscVariant === "leader" ||
-    // extra safety: name/slug sometimes includes it
-    norm(meta?.test_name).includes("qsc") ||
-    norm(meta?.test?.name).includes("qsc") ||
-    norm(meta?.test_slug).includes("qsc") ||
-    norm(meta?.test?.slug).includes("qsc");
-
-  const variant: "entrepreneur" | "leader" = qscVariant === "leader" ? "leader" : "entrepreneur";
-  return { isQsc, variant };
+/**
+ * ✅ HARD ROUTES (non-negotiable)
+ * These orgs must NEVER use NativeBlocksReportClient from /t/ flow.
+ * They must use the org-specific legacy renderer.
+ */
+function isLegacyOrgForced(data: ResultData | null) {
+  const slug = String(data?.org_slug || "").toLowerCase().trim();
+  return slug === "team-puzzle" || slug === "competency-coach";
 }
 
 export default function ReportGateClient(props: { token: string; tid: string; src?: string }) {
-  const router = useRouter();
+  const { token, tid, src } = props;
 
-  const { token, tid } = props;
-  const src = typeof props.src === "string" ? props.src : "";
-
-  const [mode, setMode] = useState<GateMode>("loading");
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [data, setData] = useState<ResultData | null>(null);
 
-  const [decisionDebug, setDecisionDebug] = useState<{
-    url?: string;
-    version?: string;
-    useStorageFramework?: boolean;
-    decided?: "storage" | "legacy";
-    src?: string;
-    qscDetected?: boolean;
-    qscVariant?: string;
-  } | null>(null);
+  // OperatingFrame framework download state
+  const [ofFramework, setOfFramework] = useState<any | null>(null);
+  const [ofErr, setOfErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
       try {
-        setMode("loading");
+        setLoading(true);
         setErr(null);
-        setDecisionDebug(null);
+        setData(null);
+        setOfFramework(null);
+        setOfErr(null);
 
         if (!tid) {
-          setMode("error");
-          setErr("This page expects a ?tid= parameter.");
+          setErr("Missing tid");
+          setLoading(false);
           return;
         }
 
-        // --- existing report endpoint (keep exactly as your current approach) ---
         const qs = new URLSearchParams();
         qs.set("tid", tid);
-        if (src) qs.set("src", src); // forward src
+        if (src) qs.set("src", src);
 
         const url = `/api/public/test/${encodeURIComponent(token)}/report?${qs.toString()}`;
 
         const res = await fetch(url, { cache: "no-store" });
         const ct = res.headers.get("content-type") ?? "";
-
         if (!ct.includes("application/json")) {
           const text = await res.text();
           throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 200)}`);
         }
 
-        const json = (await res.json()) as GateAPI;
-
-        if (!res.ok || json.ok === false) {
+        const json = (await res.json()) as ApiResponse;
+        if (!res.ok || json.ok === false || !json.data) {
           throw new Error(json.error || `HTTP ${res.status}`);
         }
 
-        const explicitStorageFlag = Boolean(json.data?.debug?.useStorageFramework);
-        const version = String(json.data?.version || "");
-        const versionSuggestsStorage =
-          version.toLowerCase().includes("storage") || version.toLowerCase().includes("portal-v2");
-
-        const useStorage = explicitStorageFlag || versionSuggestsStorage;
-
-        // --- NEW: QSC detection (narrow + fail-soft) ---
-        // Only redirect when we can positively identify QSC.
-        let qscDetected = false;
-        let qscVariant: "entrepreneur" | "leader" = "entrepreneur";
-
-        try {
-          const metaRes = await fetch(`/api/public/test/${encodeURIComponent(token)}`, {
-            cache: "no-store",
-          });
-
-          const metaCt = metaRes.headers.get("content-type") ?? "";
-          if (metaCt.includes("application/json")) {
-            const metaJson = (await metaRes.json()) as MetaAPI;
-            const meta = (metaJson?.data ?? metaJson) as any;
-
-            const q = detectQsc(meta);
-            qscDetected = q.isQsc;
-            qscVariant = q.variant;
-          }
-        } catch {
-          // Fail-soft: if meta check fails, do nothing and continue with existing logic.
-          qscDetected = false;
-          qscVariant = "entrepreneur";
-        }
-
         if (cancelled) return;
+        setData(json.data);
 
-        setDecisionDebug({
-          url,
-          version: json.data?.version,
-          useStorageFramework: json.data?.debug?.useStorageFramework,
-          decided: useStorage ? "storage" : "legacy",
-          src,
-          qscDetected,
-          qscVariant,
-        });
+        // Only OperatingFrame needs the framework JSON from the bucket
+        if (isOperatingFrame(json.data)) {
+          const fwUrl = supabasePublicFrameworkUrlForOperatingFrame();
+          if (!fwUrl) {
+            setOfErr("Missing NEXT_PUBLIC_SUPABASE_URL (cannot load OperatingFrame framework JSON).");
+            setLoading(false);
+            return;
+          }
 
-        // If QSC → redirect to the QSC report route and stop.
-        if (qscDetected) {
-          const qsp = new URLSearchParams();
-          qsp.set("tid", tid);
-          if (src) qsp.set("src", src);
-
-          router.replace(
-            `/qsc/${encodeURIComponent(token)}/${encodeURIComponent(qscVariant)}?${qsp.toString()}`
-          );
-          return;
+          try {
+            const fwRes = await fetch(fwUrl, { cache: "no-store" });
+            if (!fwRes.ok) {
+              const t = await fwRes.text();
+              throw new Error(`Framework fetch failed (${fwRes.status}): ${t.slice(0, 200)}`);
+            }
+            const fwJson = await fwRes.json();
+            if (cancelled) return;
+            setOfFramework(fwJson);
+          } catch (e: any) {
+            if (cancelled) return;
+            setOfErr(String(e?.message || e));
+          }
         }
 
-        // Otherwise: preserve existing behavior.
-        setMode(useStorage ? "storage" : "legacy");
+        setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
-        setMode("error");
         setErr(String(e?.message || e));
+        setLoading(false);
       }
     }
 
@@ -185,52 +171,97 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     return () => {
       cancelled = true;
     };
-  }, [token, tid, src, router]);
+  }, [token, tid, src]);
 
-  if (mode === "loading") {
+  const useBlocksEngine = useMemo(() => {
+    // only trust the API flag
+    return data?.debug?.useBlocksEngine === true;
+  }, [data?.debug]);
+
+  const forcedLegacy = useMemo(() => isLegacyOrgForced(data), [data]);
+  const isOF = useMemo(() => isOperatingFrame(data), [data]);
+
+  if (!tid) {
     return (
       <div className="min-h-screen bg-[#050914] text-white">
-        <AppBackground />
-        <main className="relative z-10 mx-auto max-w-4xl p-6">
+        <div className="mx-auto max-w-4xl p-6">
           <h1 className="text-2xl font-semibold">Personalised report</h1>
-          <p className="mt-4 text-sm text-slate-300">Loading your report…</p>
-        </main>
+          <p className="mt-4 text-sm text-slate-300">
+            This page expects a <code>?tid=</code> parameter.
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (mode === "error") {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#050914] text-white">
-        <AppBackground />
-        <main className="relative z-10 mx-auto max-w-4xl p-6 space-y-4">
+        <div className="mx-auto max-w-4xl p-6">
+          <h1 className="text-2xl font-semibold">Personalised report</h1>
+          <p className="mt-4 text-sm text-slate-300">Loading your report…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (err || !data) {
+    return (
+      <div className="min-h-screen bg-[#050914] text-white">
+        <div className="mx-auto max-w-4xl p-6 space-y-4">
           <h1 className="text-2xl font-semibold">Personalised report</h1>
           <p className="text-sm text-red-400">Could not load your report.</p>
           <details className="rounded-lg border border-slate-700 bg-slate-950 p-4 text-xs text-slate-50">
             <summary className="cursor-pointer font-medium">Debug information</summary>
             <div className="mt-2 space-y-2">
-              <div>Error: {err ?? "Unknown"}</div>
-              {decisionDebug?.url ? <div>URL: {decisionDebug.url}</div> : null}
-              {decisionDebug?.src ? <div>src: {decisionDebug.src}</div> : <div>src: —</div>}
-              {decisionDebug?.qscDetected ? (
-                <div>QSC detected: yes ({decisionDebug.qscVariant})</div>
-              ) : (
-                <div>QSC detected: no</div>
-              )}
+              <div>Error: {safeText(err ?? "Unknown")}</div>
+              <div>org_slug: {safeText(data?.org_slug || "")}</div>
+              <div>useBlocksEngine: {safeText(String(data?.debug?.useBlocksEngine ?? ""))}</div>
             </div>
           </details>
-        </main>
+        </div>
       </div>
     );
   }
 
-  // NOTE: keep your original mapping exactly:
-  // "storage" → LegacyReportClient
-  // "legacy"  → LegacyOrgReportClient
-  if (mode === "storage") {
-    return <LegacyReportClient token={token} tid={tid} />;
+  /**
+   * ✅ ROUTING PRIORITY (this is the fix)
+   * 1) Team Puzzle / Competency Coach ALWAYS use LegacyOrgReportClient
+   * 2) OperatingFrame uses OperatingFrameReportClient
+   * 3) Only then do we consider NativeBlocksReportClient
+   * 4) Otherwise, fallback to LegacyReportClient
+   */
+
+  if (forcedLegacy) {
+    return <LegacyOrgReportClient token={token} tid={tid} />;
   }
 
-  return <LegacyOrgReportClient token={token} tid={tid} />;
-}
+  if (isOF) {
+    if (ofErr || !ofFramework) {
+      return (
+        <div className="min-h-screen bg-[#050914] text-white">
+          <div className="mx-auto max-w-4xl p-6 space-y-4">
+            <h1 className="text-2xl font-semibold">Personalised report</h1>
+            <p className="text-sm text-red-400">Could not load OperatingFrame report content.</p>
+            <details className="rounded-lg border border-slate-700 bg-slate-950 p-4 text-xs text-slate-50">
+              <summary className="cursor-pointer font-medium">Debug information</summary>
+              <div className="mt-2 space-y-2">
+                <div>Framework error: {safeText(ofErr ?? "Unknown")}</div>
+                <div>Framework URL: {safeText(supabasePublicFrameworkUrlForOperatingFrame())}</div>
+                <div>storageFrameworkPath: {safeText(data?.debug?.storageFrameworkPath || "")}</div>
+              </div>
+            </details>
+          </div>
+        </div>
+      );
+    }
 
+    return <OperatingFrameReportClient token={token} tid={tid} src={src || ""} data={data as any} framework={ofFramework} />;
+  }
+
+  if (useBlocksEngine) {
+    return <NativeBlocksReportClient token={token} tid={tid} src={src || ""} data={data as any} />;
+  }
+
+  return <LegacyReportClient token={token} tid={tid} />;
+}

@@ -155,28 +155,6 @@ async function loadLinkBehavior(
   };
 }
 
-/**
- * Add a query param to a URL that may already have ?... (and may have #hash),
- * without duplicating the param.
- */
-function addQueryParam(rawUrl: string, key: string, value: string): string {
-  const urlStr = String(rawUrl || "").trim();
-  if (!urlStr || !key || !value) return urlStr;
-
-  const [beforeHash, hash] = urlStr.split("#", 2);
-
-  // do not duplicate if already present
-  const hasParam = new RegExp(`([?&])${key}=`, "i").test(beforeHash);
-  if (hasParam) return urlStr;
-
-  const sep = beforeHash.includes("?") ? "&" : "?";
-  const updated = `${beforeHash}${sep}${encodeURIComponent(
-    key
-  )}=${encodeURIComponent(value)}`;
-
-  return hash ? `${updated}#${hash}` : updated;
-}
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -194,7 +172,8 @@ export async function POST(
     }
 
     const body = (await req.json().catch(() => ({}))) as any;
-    const takerId: string | undefined = body.taker_id || body.takerId || body.tid;
+    const takerId: string | undefined =
+      body.taker_id || body.takerId || body.tid;
 
     if (!takerId) {
       return NextResponse.json(
@@ -366,7 +345,12 @@ export async function POST(
 
     // Persist submission snapshot (keep wrapper test_id for org reporting)
     const totals = {
-      frequencies: { A: freqTotals.A, B: freqTotals.B, C: freqTotals.C, D: freqTotals.D },
+      frequencies: {
+        A: freqTotals.A,
+        B: freqTotals.B,
+        C: freqTotals.C,
+        D: freqTotals.D,
+      },
       profiles: profileTotals,
       meta: {
         wrapper_test_id: taker.test_id,
@@ -423,12 +407,16 @@ export async function POST(
           })
           .filter((a: any) => a.question_id && a.choice >= 0);
 
-        const scoring = calculateQscScores(questionsForScoring, answersForScoring);
+        const scoring = calculateQscScores(
+          questionsForScoring,
+          answersForScoring
+        );
 
         let qscProfileId: string | null = null;
 
         if (scoring.combinedProfileCode) {
-          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
+          const [personalityKey, mindsetKey] =
+            scoring.combinedProfileCode.split("_");
 
           const personalityMap: Record<string, string> = {
             FIRE: "A",
@@ -455,7 +443,8 @@ export async function POST(
               .eq("mindset_level", mindset_level)
               .maybeSingle();
 
-            if (!qscProfileError) qscProfileId = (qscProfileRow as any)?.id ?? null;
+            if (!qscProfileError)
+              qscProfileId = (qscProfileRow as any)?.id ?? null;
           }
         }
 
@@ -482,7 +471,10 @@ export async function POST(
           );
 
         if (qscUpsertError) {
-          console.error("QSC scoring: failed to upsert qsc_results", qscUpsertError);
+          console.error(
+            "QSC scoring: failed to upsert qsc_results",
+            qscUpsertError
+          );
         }
       } catch (e) {
         console.error("QSC scoring: unexpected error", e);
@@ -490,53 +482,50 @@ export async function POST(
     }
     // ---------------- END QSC SCORING ----------------
 
-    // Mark completed
-    await sb
-      .from("test_takers")
-      .update({ status: "completed" })
-      .eq("id", taker.id)
-      .eq("link_token", token);
-
     // ✅ Canonical base for ALL absolute links
     const origin = getBaseUrl();
 
     // These are useful for both redirect + email/debugging
-    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-      taker.id
-    )}`;
-    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
-      taker.id
-    )}`;
+    const reportPath = `/t/${encodeURIComponent(
+      token
+    )}/report?tid=${encodeURIComponent(taker.id)}`;
+    const resultPath = `/t/${encodeURIComponent(
+      token
+    )}/result?tid=${encodeURIComponent(taker.id)}`;
 
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
-    // QSC report (public-facing)
-    const qscReportPath = `/qsc/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-      taker.id
-    )}`;
-    let qscReportUrl = `${origin}${qscReportPath}`;
+    // ✅ QSC PUBLIC report destination
+    // Test takers must ONLY get the Growth report (entrepreneur) or leader page.
+    const qscGrowthPath = `/qsc/${encodeURIComponent(
+      token
+    )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
+    const qscLeaderPath = `/qsc/${encodeURIComponent(
+      token
+    )}/leader?tid=${encodeURIComponent(taker.id)}`;
 
-    // ✅ Choose QSC report view deterministically for EMAIL + LINKS
-    // Default: entrepreneur -> growth (prevents Buyer Snapshot fallback)
-    // You can later move this to tests.meta (e.g. meta.qsc_report_view) if you want per-test control.
-    const metaReportView =
-      String(meta?.qsc_report_view || meta?.default_report_view || "").trim();
-    const qscReportView =
-      metaReportView || (isQscEntrepreneur ? "growth" : "");
+    const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
+    const qscPublicUrl = `${origin}${qscPublicPath}`;
 
-    if (qscReportView) {
-      qscReportUrl = addQueryParam(qscReportUrl, "view", qscReportView);
-    }
+    // Mark completed + persist correct last_result_url (prevents old /report links being reused)
+    await sb
+      .from("test_takers")
+      .update({
+        status: "completed",
+        last_result_url: isQscTest ? qscPublicPath : reportPath,
+      })
+      .eq("id", taker.id)
+      .eq("link_token", token);
 
-    // Email the report page (not /result)
-    const reportUrlForEmail = isQscEntrepreneur ? qscReportUrl : baseReportUrl;
+    // Email the correct report page
+    const reportUrlForEmail = isQscTest ? qscPublicUrl : baseReportUrl;
 
     // ✅ Decide redirect deterministically using show_results
     const redirectUrl: string =
       linkBehavior.show_results === true
-        ? isQscEntrepreneur
-          ? addQueryParam(qscReportPath, "view", qscReportView || "growth") // keep redirects aligned
+        ? isQscTest
+          ? qscPublicPath
           : reportPath
         : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
         ? linkBehavior.redirect_url.trim()
@@ -568,10 +557,6 @@ export async function POST(
             first_name: taker.first_name || "there",
             test_name: (test.name as string) || slug || "your assessment",
             report_link: reportUrlForEmail,
-            // ✅ also pass report_view so emailTemplates.ts can enforce it too
-            ...(isQscEntrepreneur && qscReportView
-              ? { report_view: qscReportView }
-              : {}),
             org_name: orgName,
             support_email: supportEmail,
           },
@@ -624,7 +609,10 @@ export async function POST(
         });
 
         if (!ownerNotification?.ok) {
-          console.error("[submit] test_owner_notification failed", ownerNotification);
+          console.error(
+            "[submit] test_owner_notification failed",
+            ownerNotification
+          );
         }
       }
     } catch (e) {
@@ -648,6 +636,10 @@ export async function POST(
       result_url: baseResultUrl,
       report_url: baseReportUrl,
 
+      // Debug helpers
+      qsc_public_path: isQscTest ? qscPublicPath : null,
+      qsc_public_url: isQscTest ? qscPublicUrl : null,
+
       owner_notification: ownerNotification,
       taker_email: takerEmailResult,
     });
@@ -658,3 +650,5 @@ export async function POST(
     );
   }
 }
+
+

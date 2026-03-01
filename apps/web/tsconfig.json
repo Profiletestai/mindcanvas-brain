@@ -20,19 +20,9 @@
     },
     "allowSyntheticDefaultImports": true,
     "strictNullChecks": true,
-
-    /* ✅ Add React and ReactDOM typings here */
     "types": ["node", "next", "react", "react-dom"],
-
-    "typeRoots": ["./types", "./node_modules/@types"],
-
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    "plugins": [{ "name": "next" }]
   },
-
   "include": [
     "**/*.ts",
     "**/*.tsx",
@@ -44,6 +34,6 @@
     "types",
     ".next/types/**/*.ts"
   ],
-
   "exclude": ["node_modules", ".next", "dist", "out"]
 }
+

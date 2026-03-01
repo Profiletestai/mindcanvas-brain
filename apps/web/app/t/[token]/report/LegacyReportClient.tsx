@@ -116,40 +116,24 @@ function getSectionDomId(section: ReportSection, idx: number) {
   return `section-${idx}`;
 }
 
-function findWelcomeIndex(sections: ReportSection[]) {
-  const idx = sections.findIndex((s) => {
-    const id = (s.id || "").toLowerCase();
-    const title = (s.title || "").toLowerCase();
-    return (
-      id.includes("welcome") ||
-      title.includes("welcome from daniel") ||
-      title.includes("welcome from daniel acutt")
-    );
-  });
-  return idx;
-}
-
 function isNextStepsSection(s: ReportSection) {
   const id = (s.id || "").toLowerCase();
   const title = (s.title || "").toLowerCase();
   return id === "next-steps" || title === "next steps" || title.includes("next steps");
 }
 
-/** ----------------- NEW: profile image helpers (fail-soft) ----------------- */
+/** ----------------- profile image helpers (fail-soft) ----------------- */
 
 function inferProfileCardsBase(data?: ResultData | null): string {
   const fp = String(data?.sections?.framework_path || "").toLowerCase();
   const tn = String(data?.test_name || "").toLowerCase();
 
-  // Prefer framework_path when available
   if (fp.includes("operatingframe")) return "/images/operatingframe-full-test/profile-cards";
   if (fp.includes("lead")) return "/images/mindCanvas-LEAD-system/profile-cards";
 
-  // Fallback to test name
   if (tn.includes("operating")) return "/images/operatingframe-full-test/profile-cards";
   if (tn.includes("lead")) return "/images/mindCanvas-LEAD-system/profile-cards";
 
-  // Unknown framework
   return "";
 }
 
@@ -186,17 +170,11 @@ function buildProfileImageCandidates(base: string, profileName: string) {
   const n = String(profileName || "").trim();
   if (!n) return [];
 
-  const a = spacedLower(n);     // "vision engineer"
-  const b = dashed(n);          // "vision-engineer"
-  const c = underscored(n);     // "vision_engineer"
+  const a = spacedLower(n);
+  const b = dashed(n);
+  const c = underscored(n);
 
-  // IMPORTANT: keep spaces un-encoded in the string; browser will request with %20 automatically
-  const candidates = [
-    `${base}/${a}.png`,
-    `${base}/${b}.png`,
-    `${base}/${c}.png`,
-  ];
-
+  const candidates = [`${base}/${a}.png`, `${base}/${b}.png`, `${base}/${c}.png`];
   return Array.from(new Set(candidates));
 }
 
@@ -213,12 +191,8 @@ function ProfileImage({ candidates, alt }: { candidates: string[]; alt: string }
       crossOrigin="anonymous"
       className="hidden sm:block h-16 w-auto rounded-xl border border-white/10 bg-white/5 p-1"
       onError={(e) => {
-        // Try next candidate; if none left, hide.
-        if (idx < candidates.length - 1) {
-          setIdx(idx + 1);
-        } else {
-          e.currentTarget.style.display = "none";
-        }
+        if (idx < candidates.length - 1) setIdx(idx + 1);
+        else e.currentTarget.style.display = "none";
       }}
     />
   );
@@ -327,9 +301,12 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   if (type === "divider") return <hr className="my-5 border-slate-200" />;
   if (type === "image") return <ImageRenderer block={block as ImageBlock} />;
 
-  if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
-  if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
-  if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
+  if (type === "h1")
+    return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
+  if (type === "h2")
+    return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
+  if (type === "h3")
+    return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
   if (type === "h4") {
     return (
       <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -347,7 +324,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
       <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
-        {items.map((it: any, i: number) => <li key={i}>{safeText(it)}</li>)}
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
       </ul>
     );
   }
@@ -356,7 +335,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
       <ol className="list-decimal pl-5 text-sm text-slate-700 space-y-1">
-        {items.map((it: any, i: number) => <li key={i}>{safeText(it)}</li>)}
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
       </ol>
     );
   }
@@ -374,9 +355,7 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <p className="text-xs font-semibold text-amber-900">
-        Unsupported block type: {String((block as any).type || "unknown")}
-      </p>
+      <p className="text-xs font-semibold text-amber-900">Unsupported block type: {String((block as any).type || "unknown")}</p>
     </div>
   );
 }
@@ -439,6 +418,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     const common = (data?.sections?.common || []) as ReportSection[];
     const profile = (data?.sections?.profile || []) as ReportSection[];
 
+    // IMPORTANT: preserve server order. No “Welcome-first” reshuffle.
     const combined = [...common, ...profile].filter(Boolean);
 
     const seen = new Set<string>();
@@ -449,13 +429,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(s);
-    }
-
-    const idx = findWelcomeIndex(deduped);
-    if (idx > 0) {
-      const welcome = deduped[idx];
-      deduped.splice(idx, 1);
-      deduped.unshift(welcome);
     }
 
     return deduped;
@@ -616,7 +589,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
         {/* Header */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="flex items-start gap-4">
-            {/* NEW: profile image (fail-soft) */}
             <ProfileImage candidates={profileImgCandidates} alt={data.top_profile_name} />
 
             <div className="min-w-0 flex-1">
@@ -707,7 +679,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
             <p className="mt-1 text-xs text-slate-300">Jump straight to the section you need.</p>
 
             <div className="mt-4 space-y-2">
-              {quickIndex.slice(0, 30).map((s, i) => (
+              {quickIndex.slice(0, 50).map((s, i) => (
                 <button
                   key={s.id + i}
                   onClick={() => scrollToSection(s.id)}
@@ -773,4 +745,3 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     </div>
   );
 }
-
