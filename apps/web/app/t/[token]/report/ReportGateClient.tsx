@@ -2,8 +2,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+
+// ✅ Existing engines
 import NativeBlocksReportClient from "./NativeBlocksReportClient";
 import LegacyReportClient from "./LegacyReportClient";
+
+// ✅ Org-specific legacy engine (Team Puzzle / Competency Coach style)
+import LegacyOrgReportClient from "./LegacyOrgReportClient";
+
+// ✅ OperatingFrame special engine
 import OperatingFrameReportClient from "./OperatingFrameReportClient";
 
 type AB = "A" | "B" | "C" | "D";
@@ -53,6 +60,10 @@ function safeText(x: any): string {
   return String(x);
 }
 
+/**
+ * OperatingFrame framework file lives in Supabase Storage public bucket.
+ * This function builds the public URL at runtime.
+ */
 function supabasePublicFrameworkUrlForOperatingFrame() {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
   if (!base) return "";
@@ -60,11 +71,16 @@ function supabasePublicFrameworkUrlForOperatingFrame() {
 }
 
 function isOperatingFrame(data: ResultData | null) {
-  const key = String(data?.debug?.storageFrameworkPath || "").trim();
-  return key === "operatingframe/operatingframe_report_content_v1.json";
+  // We detect OperatingFrame by the storage framework path returned by the API debug
+  const path = String(data?.debug?.storageFrameworkPath || "").trim().toLowerCase();
+  return path === "operatingframe/operatingframe_report_content_v1.json";
 }
 
-// ✅ Absolute guards for orgs that must NEVER use native blocks engine in /t/ flow
+/**
+ * ✅ HARD ROUTES (non-negotiable)
+ * These orgs must NEVER use NativeBlocksReportClient from /t/ flow.
+ * They must use the org-specific legacy renderer.
+ */
 function isLegacyOrgForced(data: ResultData | null) {
   const slug = String(data?.org_slug || "").toLowerCase().trim();
   return slug === "team-puzzle" || slug === "competency-coach";
@@ -77,6 +93,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<ResultData | null>(null);
 
+  // OperatingFrame framework download state
   const [ofFramework, setOfFramework] = useState<any | null>(null);
   const [ofErr, setOfErr] = useState<string | null>(null);
 
@@ -118,7 +135,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
         if (cancelled) return;
         setData(json.data);
 
-        // OperatingFrame loads framework JSON from bucket
+        // Only OperatingFrame needs the framework JSON from the bucket
         if (isOperatingFrame(json.data)) {
           const fwUrl = supabasePublicFrameworkUrlForOperatingFrame();
           if (!fwUrl) {
@@ -157,8 +174,8 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   }, [token, tid, src]);
 
   const useBlocksEngine = useMemo(() => {
-    const flag = data?.debug?.useBlocksEngine;
-    return flag === true;
+    // only trust the API flag
+    return data?.debug?.useBlocksEngine === true;
   }, [data?.debug]);
 
   const forcedLegacy = useMemo(() => isLegacyOrgForced(data), [data]);
@@ -198,6 +215,8 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
             <summary className="cursor-pointer font-medium">Debug information</summary>
             <div className="mt-2 space-y-2">
               <div>Error: {safeText(err ?? "Unknown")}</div>
+              <div>org_slug: {safeText(data?.org_slug || "")}</div>
+              <div>useBlocksEngine: {safeText(String(data?.debug?.useBlocksEngine ?? ""))}</div>
             </div>
           </details>
         </div>
@@ -205,12 +224,18 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     );
   }
 
-  // ✅ HARD GUARD: Team Puzzle & Competency Coach always use legacy in /t/ flow
+  /**
+   * ✅ ROUTING PRIORITY (this is the fix)
+   * 1) Team Puzzle / Competency Coach ALWAYS use LegacyOrgReportClient
+   * 2) OperatingFrame uses OperatingFrameReportClient
+   * 3) Only then do we consider NativeBlocksReportClient
+   * 4) Otherwise, fallback to LegacyReportClient
+   */
+
   if (forcedLegacy) {
-    return <LegacyReportClient token={token} tid={tid} />;
+    return <LegacyOrgReportClient token={token} tid={tid} />;
   }
 
-  // ✅ OperatingFrame always wins (special renderer)
   if (isOF) {
     if (ofErr || !ofFramework) {
       return (
@@ -234,7 +259,6 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     return <OperatingFrameReportClient token={token} tid={tid} src={src || ""} data={data as any} framework={ofFramework} />;
   }
 
-  // ✅ Native blocks engine only for tests explicitly flagged (non-legacy orgs)
   if (useBlocksEngine) {
     return <NativeBlocksReportClient token={token} tid={tid} src={src || ""} data={data as any} />;
   }
