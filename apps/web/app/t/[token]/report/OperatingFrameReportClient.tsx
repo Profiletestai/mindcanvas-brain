@@ -1,3 +1,4 @@
+///apps/web/app/t/[token]/report/OperatingFrameReportClient.tsx
 "use client";
 
 import AppBackground from "@/components/ui/AppBackground";
@@ -33,7 +34,7 @@ type ResultData = {
   profile_percentages: Record<string, number>;
 
   top_freq: AB;
-  top_profile_code: string; // P1..P8
+  top_profile_code: string; // PROFILE_1..PROFILE_8
   top_profile_name: string;
 };
 
@@ -49,11 +50,6 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-function pctLabel(v: number | undefined) {
-  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
-  return `${Math.round(n * 100)}%`;
-}
-
 function fullName(first?: string | null, last?: string | null) {
   const f = (first || "").trim();
   const l = (last || "").trim();
@@ -61,35 +57,37 @@ function fullName(first?: string | null, last?: string | null) {
   return out || "Participant";
 }
 
-function slugify(s: string) {
-  return String(s || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]+/g, "")
-    .replace(/\s+/g, "-");
+function profileKeyVariants(code: string) {
+  const c = String(code || "").toUpperCase().trim(); // PROFILE_1
+  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c; // P1
+  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c; // PROFILE_1
+  return Array.from(new Set([c, asP, asPROFILE]));
 }
 
-function resolveImageSrc(
-  src: string,
-  ctx: { primaryName: string },
-) {
+// ✅ Map profile name → actual filename in /public/images/operatingframe-full-test/profile-cards/
+function profileNameToImageFile(profileName: string) {
+  const n = String(profileName || "").toLowerCase();
+
+  if (n.includes("activator")) return "activator.png";
+  if (n.includes("messenger")) return "messenger.png";
+  if (n.includes("integrator")) return "integrator.png";
+  if (n.includes("relator")) return "relator.png";
+  if (n.includes("operator")) return "operator.png";
+  if (n.includes("planner")) return "planner.png";
+  if (n.includes("evaluator")) return "evaluator.png";
+  if (n.includes("vision")) return "vision-engineer.png";
+
+  return ""; // unknown
+}
+
+function resolveOrgLogo(src: string) {
   const raw = String(src || "").trim();
   if (!raw) return "";
 
   if (raw.startsWith("/") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
 
-  const map: Record<string, string> = {
-    "{{ORG_LOGO}}": "/images/operatingframe-full-test/org-logo.png",
-    "{{PROFILE_GRID}}": "/images/operatingframe-full-test/profile-grid.png",
-    "{{FREQUENCY_GRID}}": "/images/operatingframe-full-test/frequency-grid.png",
-  };
-
-  if (map[raw]) return map[raw];
-
-  if (raw === "{{PROFILE_IMAGE_PRIMARY}}") {
-    const nm = slugify(ctx.primaryName);
-    return nm ? `/images/operatingframe-full-test/profile-cards/${nm}.png` : "";
-  }
+  // fallback local logo
+  if (raw === "{{ORG_LOGO}}") return "/images/operatingframe-full-test/org-logo.png";
 
   return raw;
 }
@@ -115,20 +113,11 @@ function MiniDivider() {
 }
 
 /** ✅ Vertical bar chart (A red / B yellow / C green / D blue) */
-function VerticalDriversChart(props: {
-  labels: Array<{ code: AB; name: string }>;
-  pct: Record<AB, number>;
-}) {
+function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
 
   const barColor = (code: AB) =>
-    code === "A"
-      ? "bg-red-500"
-      : code === "B"
-        ? "bg-amber-500"
-        : code === "C"
-          ? "bg-emerald-500"
-          : "bg-blue-500";
+    code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
 
   const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
 
@@ -175,23 +164,13 @@ function VerticalDriversChart(props: {
   );
 }
 
-/**
- * ✅ Radar chart: 12 axes
- * A,B,C,D + P1..P8 (matches your screenshot style)
- */
-function ProfileMapRadar(props: {
-  frequencyPct: Record<AB, number>;
-  profilePct: Record<string, number>;
-}) {
-  const labels = ["A", "P1", "P2", "B", "P3", "P4", "C", "P5", "P6", "D", "P7", "P8"] as const;
+/** ✅ Profile-only radar chart: P1..P8 ONLY (no Frequencies) */
+function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
+  const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
-  const freqVal = (k: string) => {
-    if (k === "A" || k === "B" || k === "C" || k === "D") return clamp01(props.frequencyPct[k as AB] ?? 0);
-    return 0;
-  };
-  const profVal = (k: string) => {
-    if (k.startsWith("P")) return clamp01(props.profilePct[k] ?? 0);
-    return 0;
+  const val = (p: string) => {
+    const asPROFILE = p.replace(/^P/, "PROFILE_");
+    return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
 
   const size = 360;
@@ -206,16 +185,14 @@ function ProfileMapRadar(props: {
 
   const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
 
-  const freqPts = labels.map((k, i) => pt(i, freqVal(k)));
-  const profPts = labels.map((k, i) => pt(i, profVal(k)));
+  const pts = labels.map((k, i) => pt(i, val(k)));
 
-  const path = (pts: Array<{ x: number; y: number }>) =>
-    pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Frequencies + Profiles)</div>
+        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
         <div className="text-xs text-slate-500">Higher = stronger pattern</div>
       </div>
 
@@ -232,21 +209,11 @@ function ProfileMapRadar(props: {
 
           {labels.map((k, i) => {
             const p = pt(i, 1);
-            return (
-              <line
-                key={k}
-                x1={cx}
-                y1={cy}
-                x2={p.x}
-                y2={p.y}
-                stroke="rgba(15,23,42,0.12)"
-              />
-            );
+            return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
           })}
 
           {labels.map((k, i) => {
-            const p = pt(i, 1.08);
-            const isFreq = k === "A" || k === "B" || k === "C" || k === "D";
+            const p = pt(i, 1.10);
             return (
               <text
                 key={k}
@@ -255,30 +222,18 @@ function ProfileMapRadar(props: {
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize="11"
-                fontWeight={isFreq ? 700 : 500}
-                fill={isFreq ? "rgba(15,23,42,0.85)" : "rgba(15,23,42,0.55)"}
+                fontWeight={600}
+                fill="rgba(15,23,42,0.65)"
               >
                 {k}
               </text>
             );
           })}
 
-          <path d={path(freqPts)} fill="rgba(37,99,235,0.12)" stroke="rgba(37,99,235,0.9)" strokeWidth="2" />
-          <path d={path(profPts)} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
-
+          {/* single profile polygon */}
+          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
           <circle cx={cx} cy={cy} r="2" fill="rgba(15,23,42,0.5)" />
         </svg>
-      </div>
-
-      <div className="mt-3 flex items-center justify-center gap-4 text-xs text-slate-600">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "rgba(37,99,235,0.9)" }} />
-          Frequencies
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "rgba(20,184,166,0.9)" }} />
-          Profiles
-        </div>
       </div>
     </div>
   );
@@ -306,6 +261,42 @@ function BlockRenderer(props: { block: any }) {
     );
   }
 
+  if (type === "quote") {
+    const t = safeText(b.text).trim();
+    const cite = safeText(b.cite).trim();
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <p className="text-sm italic text-slate-700">“{t}”</p>
+        {cite ? <p className="mt-2 text-xs text-slate-500">— {cite}</p> : null}
+      </div>
+    );
+  }
+
+  if (type === "image") {
+    const src = String(b?.src || "").trim();
+    if (!src) return null;
+    const align = String(b?.align || "center").toLowerCase();
+    const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
+    const maxH = typeof b?.max_h === "number" ? b.max_h : 320;
+
+    return (
+      <figure className="my-4">
+        <div className={`flex ${justify}`}>
+          <img
+            src={src}
+            alt={safeText(b?.alt)}
+            className="max-w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
+            style={{ maxHeight: maxH }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
+        {b?.caption ? <figcaption className="mt-2 text-xs text-slate-500">{safeText(b.caption)}</figcaption> : null}
+      </figure>
+    );
+  }
+
   if (type === "divider") return <hr className="my-6 border-slate-200" />;
   if (type === "spacer") return <div className={b.size === "lg" ? "h-10" : b.size === "sm" ? "h-3" : "h-6"} />;
 
@@ -317,24 +308,31 @@ export default function OperatingFrameReportClient(props: {
   tid: string;
   src: string;
   data: ResultData;
-  framework: any; // ✅ loaded from Supabase bucket
+  framework: any;
 }) {
   const { data, framework } = props;
   const reportRef = useRef<HTMLDivElement | null>(null);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
   const orgName = data.org_name || "Organisation";
-  const testName = data.test_name || "OperatingFrame";
+  const testName = data.test_name || "OperatingFrame™";
 
-  const profileCode = String(data.top_profile_code || "").toUpperCase(); // P1..P8
-  const profile = framework?.profiles?.[profileCode];
+  // ✅ find profile by either PROFILE_# or P#
+  const keys = profileKeyVariants(data.top_profile_code);
+  const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
 
   const topProfileName = profile?.name || data.top_profile_name || "Top Profile";
   const topFreqCode = data.top_freq;
   const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
-  const orgLogoSrc = resolveImageSrc("{{ORG_LOGO}}", { primaryName: topProfileName });
-  const profileHeroSrc = resolveImageSrc("{{PROFILE_IMAGE_PRIMARY}}", { primaryName: topProfileName });
+  // ✅ Org logo (still local fallback unless you later wire org logo url into data)
+  const orgLogoSrc = resolveOrgLogo("{{ORG_LOGO}}");
+
+  // ✅ Profile hero image via fixed filename mapping
+  const profileFile = profileNameToImageFile(topProfileName);
+  const profileHeroSrc = profileFile
+    ? `/images/operatingframe-full-test/profile-cards/${profileFile}`
+    : "/images/operatingframe-full-test/profile-cards/bio-image.png";
 
   function openNextSteps() {
     const url = (data?.link?.redirect_url || data?.link?.next_steps_url || "").trim();
@@ -348,6 +346,7 @@ export default function OperatingFrameReportClient(props: {
   const sections = useMemo(() => {
     const common = framework?.common || {};
     const p = profile?.sections || {};
+
     return [
       { title: common?.welcome?.title || "Welcome", blocks: common?.welcome?.blocks || [] },
       { title: "Section 1 – Executive Summary", blocks: p?.section_1?.blocks || [] },
@@ -363,10 +362,11 @@ export default function OperatingFrameReportClient(props: {
 
   const driversIntro =
     safeText(framework?.common?.drivers_intro?.blocks?.[0]?.text) ||
-    "The four Drivers show the behavioural energy you use most often.";
+    "OperatingFrame helps you understand four core drivers behind your leadership: Direction, Connection, Structure, and Precision.";
+
   const mapIntro =
     safeText(framework?.common?.profile_map_intro?.blocks?.[0]?.text) ||
-    "This map shows your overall pattern across Drivers and Profiles.";
+    "This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
@@ -413,7 +413,7 @@ export default function OperatingFrameReportClient(props: {
                   <span className="font-semibold text-white">Top Profile:</span> {topProfileName}
                 </div>
                 <div className="text-sm text-white/80">
-                  <span className="font-semibold text-white">Driver:</span> {topFreqName}
+                  <span className="font-semibold text-white">Driver:</span> {topFreqName} ({topFreqCode})
                 </div>
               </div>
 
@@ -467,7 +467,7 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
-                <ProfileMapRadar frequencyPct={data.frequency_percentages} profilePct={data.profile_percentages} />
+                <ProfileOnlyRadar profilePct={data.profile_percentages} />
               </div>
             </WhiteCard>
           </div>

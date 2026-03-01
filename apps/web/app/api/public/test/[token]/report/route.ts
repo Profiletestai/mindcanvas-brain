@@ -52,6 +52,10 @@ type LinkMeta = {
   org_slug: string | null;
   test_name: string | null;
   link_meta?: any | null;
+
+  // ✅ NEW: return org name/logo so report header can display properly
+  org_name?: string | null;
+  org_logo_url?: string | null;
 };
 
 type ReportFrameworkMeta = {
@@ -321,7 +325,7 @@ function sbAdmin() {
   });
 }
 
-// ✅ Resolve org/test for a token
+// ✅ Resolve org/test for a token (now includes org name/logo)
 async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   const sb = sbAdmin();
 
@@ -340,7 +344,7 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
         id,
         name,
         org_id,
-        orgs:orgs ( slug )
+        orgs:orgs ( slug, name, logo_url )
       )
     `,
     )
@@ -351,7 +355,11 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   if (q.error || !q.data?.test_id) return null;
 
   const testName = (q.data as any)?.tests?.name ?? null;
-  const orgSlug = (q.data as any)?.tests?.orgs?.slug ?? null;
+  const org = (q.data as any)?.tests?.orgs ?? null;
+
+  const orgSlug = org?.slug ?? null;
+  const orgName = org?.name ?? null;
+  const orgLogoUrl = org?.logo_url ?? null;
 
   const link_meta = {
     show_results: (q.data as any)?.show_results ?? true,
@@ -366,6 +374,8 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
     org_slug: orgSlug,
     test_name: testName,
     link_meta,
+    org_name: orgName,
+    org_logo_url: orgLogoUrl,
   };
 }
 
@@ -652,13 +662,13 @@ function contentJsonToSection(content_json: any, fallbackTitle?: string): { titl
 
   // Support older “fields” shapes: { core_identity: "...", ... }
   const blocks: ReportSectionBlock[] = [];
-  const core = safeText(cj.core_identity || "").trim();
+  const core = safeText((cj as any).core_identity || "").trim();
   if (core) blocks.push({ type: "p", text: core });
 
-  const desc = safeText(cj.description || "").trim();
+  const desc = safeText((cj as any).description || "").trim();
   if (desc) blocks.push({ type: "p", text: desc });
 
-  return { title: safeText(cj.title) || fallbackTitle, blocks };
+  return { title: safeText((cj as any).title) || fallbackTitle, blocks };
 }
 
 function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShape[] | null | undefined) {
@@ -683,7 +693,7 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
     } else {
       const opts = Array.isArray(q.options) ? q.options : [];
       const sel = selectedIndex(a);
-      const picked = opts[sel];
+      const picked = (opts as any[])[sel];
       answerText = safeText(picked);
       if (!answerText && (a as any) != null) {
         answerText = safeText((a as any)?.value ?? (a as any)?.selected ?? "");
@@ -803,7 +813,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const top_profile_entry = Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
     const top_profile_name =
-      profile_labels.find((p) => p.code === top_profile_code)?.name || look.profileByCode.get(top_profile_code)?.name || top_profile_code;
+      profile_labels.find((p) => p.code === top_profile_code)?.name ||
+      look.profileByCode.get(top_profile_code)?.name ||
+      top_profile_code;
 
     // Secondary / Tertiary
     const sortedProfiles = [...profile_labels]
@@ -823,6 +835,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       PRIMARY_PROFILE_NAME: top_profile_name,
       SECONDARY_PROFILE_NAME: secondary,
       TERTIARY_PROFILE_NAME: tertiary,
+
+      // NOTE: these are legacy macros; your OperatingFrame report client is now mapping files explicitly
       PROFILE_IMAGE_PRIMARY: `/images/operatingframe-full-test/profile-cards/${String(top_profile_name).toLowerCase()}.png`,
       PROFILE_IMAGE_SECONDARY: secondary ? `/images/operatingframe-full-test/profile-cards/${String(secondary).toLowerCase()}.png` : "",
       PROFILE_IMAGE_TERTIARY: tertiary ? `/images/operatingframe-full-test/profile-cards/${String(tertiary).toLowerCase()}.png` : "",
@@ -862,8 +876,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
           };
 
-          // ✅ This is the actual fix:
-          // Push conclusion + next_steps AFTER profile sections, regardless of scope.
+          // ✅ Push conclusion + next_steps AFTER profile sections, regardless of scope.
           if (GLOBAL_POST_PROFILE_KEYS.has(key)) postProfile.push(sectionObj);
           else common.push(sectionObj);
         } else {
@@ -899,7 +912,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       }
 
       // ✅ Append "post profile" global sections at the VERY end
-      // This makes Conclusion + Next Steps appear AFTER the profile sections
       profile.push(...postProfile);
 
       sections = {
@@ -935,7 +947,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       ok: true,
       data: {
         org_slug: orgSlug,
-        org_name: null,
+
+        // ✅ NOW returned from orgs table (fixes header)
+        org_name: meta.org_name || null,
+
         test_name: meta.test_name || testRow?.name || testMeta?.test || "Profile Test",
 
         taker: {
@@ -1001,6 +1016,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
                 moved_global_post_profile_keys: Array.from(GLOBAL_POST_PROFILE_KEYS),
               }
             : null,
+
+          // helpful org debug
+          org_name: meta.org_name || null,
+          org_logo_url: meta.org_logo_url || null,
 
           src,
           isPortalViewer,
