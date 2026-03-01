@@ -65,10 +65,6 @@ type ReportSectionBlock =
       left?: { src?: string; alt?: string; caption?: string; max_h?: number };
       right?: { src?: string; alt?: string; caption?: string; max_h?: number };
     }
-  | {
-      type: "profiles.triad_cards";
-      show_pills?: boolean;
-    }
   | { type: string; [k: string]: any };
 
 type ReportSection = {
@@ -85,7 +81,7 @@ type SectionsPayload = {
 type ResultData = {
   org_slug: string;
   org_name?: string | null;
-  org_logo_url?: string | null; // optional (if API includes it)
+  org_logo_url?: string | null;
   test_name: string;
 
   taker: {
@@ -123,6 +119,18 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+function pctLabel(v: number | undefined) {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+  return `${Math.round(n * 100)}%`;
+}
+
+function fullName(first?: string | null, last?: string | null) {
+  const f = (first || "").trim();
+  const l = (last || "").trim();
+  const out = `${f} ${l}`.trim();
+  return out || "Participant";
+}
+
 function normaliseId(s: string) {
   return s
     .toLowerCase()
@@ -137,18 +145,6 @@ function getDomId(section: ReportSection, idx: number) {
   const title = safeText(section.title).trim();
   if (title) return normaliseId(title);
   return `section-${idx}`;
-}
-
-function pctLabel(v: number | undefined) {
-  const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
-  return `${Math.round(n * 100)}%`;
-}
-
-function fullName(first?: string | null, last?: string | null) {
-  const f = (first || "").trim();
-  const l = (last || "").trim();
-  const out = `${f} ${l}`.trim();
-  return out || "Participant";
 }
 
 function cleanProfileName(raw: string) {
@@ -247,6 +243,7 @@ function resolveImageSrc(
         "{{PROFILE_GRID}}": "/images/mindCanvas-LEAD-system/profile-grid.png",
         "{{BIO_IMAGE}}": "/images/mindCanvas-LEAD-system/profile-cards/bio-image.png",
         "{{ORG_LOGO}}": "/images/mindCanvas-LEAD-system/org-logo.png",
+        "{{DANIEL_IMAGE}}": "/images/mindCanvas-LEAD-system/daniel-acutt.png",
       }
     : {
         "{{FREQUENCY_GRID}}": "/images/operatingframe-full-test/frequency-grid.png",
@@ -292,6 +289,14 @@ function resolveImageSrc(
   return raw;
 }
 
+function GlassCard(props: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>{props.children}</div>;
+}
+
+function WhiteCard(props: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>{props.children}</div>;
+}
+
 function Badge({ children }: { children: React.ReactNode }) {
   return (
     <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90">
@@ -300,90 +305,178 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function WhiteCard(props: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>{props.children}</div>;
-}
-
-function GlassCard(props: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>{props.children}</div>;
-}
-
 function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-function FrequencyBars(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number>; top: AB }) {
+/** ✅ Vertical bar chart (OperatingFrame style) */
+function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
-  const max = Math.max(...items.map((i) => i.v), 0.01);
 
-  const color = (code: AB) =>
+  const barColor = (code: AB) =>
     code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
 
+  const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
+
   return (
-    <div className="space-y-3">
-      {items.map((it) => {
-        const w = Math.round((it.v / max) * 100);
-        const isTop = it.code === props.top;
-        return (
-          <div key={it.code} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">
-                    {it.name} <span className="text-slate-500">({it.code})</span>
-                  </span>
-                  {isTop ? (
-                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Dominant</span>
-                  ) : null}
-                </div>
-                <div className="mt-2 h-2 w-full rounded-full bg-white">
-                  <div className={`h-2 rounded-full ${color(it.code)}`} style={{ width: `${w}%` }} />
-                </div>
-              </div>
-              <div className="ml-3 shrink-0 text-sm font-semibold text-slate-700">{pctLabel(it.v)}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-end gap-4">
+        <div className="w-10 shrink-0">
+          {ticks.map((t) => (
+            <div key={t} className="relative h-7">
+              <div className="absolute right-0 top-[-2px] text-[10px] font-semibold text-slate-400">{t}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex-1">
+          <div className="relative h-[308px] rounded-xl border border-slate-200 bg-slate-50">
+            {ticks.map((t) => (
+              <div
+                key={t}
+                className="absolute left-0 right-0 border-t border-slate-200/60"
+                style={{ top: `${(1 - t / 100) * 100}%` }}
+              />
+            ))}
+
+            <div className="absolute inset-0 flex items-end justify-around px-6 pb-4">
+              {items.map((it) => {
+                const h = Math.round(it.v * 100);
+                return (
+                  <div key={it.code} className="flex w-16 flex-col items-center gap-2">
+                    <div className="text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}</div>
+                    <div className="relative h-[240px] w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
+                      <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900">{it.code}</div>
+                    <div className="text-[11px] text-slate-600 text-center leading-tight">{it.name}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        );
-      })}
+        </div>
+      </div>
     </div>
   );
 }
 
-function ProfileBars(props: { labels: Array<{ code: string; name: string }>; pct: Record<string, number>; topCode: string }) {
-  const items = props.labels
-    .map((p) => ({ ...p, v: clamp01(props.pct?.[p.code] ?? 0) }))
-    .sort((a, b) => (b.v || 0) - (a.v || 0));
+/**
+ * ✅ Profiles-only radar: P1..P8
+ * Uses 60% zoom so values don’t bunch near the center.
+ */
+function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
+  const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
-  const max = Math.max(...items.map((i) => i.v), 0.01);
+  const rawVal = (p: string) => {
+    const asPROFILE = p.replace(/^P/, "PROFILE_");
+    return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
+  };
+
+  const MAX = 0.6;
+  const val = (p: string) => clamp01(rawVal(p) / MAX);
+
+  const size = 360;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 140;
+
+  function pt(i: number, v: number) {
+    const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
+    return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
+  }
+
+  const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+  const pts = labels.map((k, i) => pt(i, val(k)));
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
+
+  const ringLabelY = (rv: number) => cy - r * (rv / MAX);
 
   return (
-    <div className="space-y-3">
-      {items.map((it, idx) => {
-        const w = Math.round((it.v / max) * 100);
-        const isTop = it.code === props.topCode;
-        const rank = idx + 1;
-        return (
-          <div key={it.code} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
-                    {rank}
-                  </span>
-                  <span className="truncate text-sm font-semibold text-slate-900">{it.name}</span>
-                  {isTop ? (
-                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Primary</span>
-                  ) : null}
-                </div>
-                <div className="mt-2 h-2 w-full rounded-full bg-white">
-                  <div className="h-2 rounded-full bg-slate-900" style={{ width: `${w}%` }} />
-                </div>
-              </div>
-              <div className="shrink-0 text-sm font-semibold text-slate-700">{pctLabel(it.v)}</div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
+        <div className="text-xs text-slate-500">Higher = stronger pattern</div>
+      </div>
+
+      <div className="mt-4 flex justify-center">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {rings.map((rv) => (
+            <polygon
+              key={rv}
+              points={labels.map((_, i) => pt(i, clamp01(rv / MAX))).map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke="rgba(15,23,42,0.12)"
+            />
+          ))}
+
+          {rings.map((rv) => (
+            <text
+              key={`lbl-${rv}`}
+              x={cx}
+              y={ringLabelY(rv)}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="10"
+              fill="rgba(15,23,42,0.45)"
+            >
+              {Math.round(rv * 100)}%
+            </text>
+          ))}
+
+          {labels.map((k, i) => {
+            const p = pt(i, 1);
+            return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
+          })}
+
+          {labels.map((k, i) => {
+            const p = pt(i, 1.12);
+            return (
+              <text
+                key={k}
+                x={p.x}
+                y={p.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="11"
+                fontWeight={600}
+                fill="rgba(15,23,42,0.65)"
+              >
+                {k}
+              </text>
+            );
+          })}
+
+          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
+          <circle cx={cx} cy={cy} r="2" fill="rgba(15,23,42,0.5)" />
+
+          {labels.map((k, i) => {
+            const vScaled = val(k);
+            const vRaw = rawVal(k);
+            const p = pt(i, vScaled);
+            const show = vRaw > 0.001;
+            const labelPt = pt(i, Math.min(1, vScaled + 0.16));
+
+            return (
+              <g key={`pt-${k}`}>
+                <circle cx={p.x} cy={p.y} r="3" fill="rgba(20,184,166,0.95)" />
+                {show ? (
+                  <text
+                    x={labelPt.x}
+                    y={labelPt.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="9"
+                    fill="rgba(15,23,42,0.55)"
+                  >
+                    {Math.round(vRaw * 100)}%
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }
@@ -402,9 +495,8 @@ function BlockRenderer(props: {
     topFreqCode: AB;
     topFreqPct: number;
   };
-  sortedProfiles: Array<{ code: string; name: string; pct: number }>;
 }) {
-  const { block, ctx, sortedProfiles } = props;
+  const { block, ctx } = props;
   const type = String((block as any)?.type || "").toLowerCase().trim();
 
   if (type === "divider") return <hr className="my-6 border-slate-200" />;
@@ -445,7 +537,9 @@ function BlockRenderer(props: {
             }}
           />
         </div>
-        {(block as any)?.caption ? <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText((block as any)?.caption)}</figcaption> : null}
+        {(block as any)?.caption ? (
+          <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText((block as any)?.caption)}</figcaption>
+        ) : null}
       </figure>
     );
   }
@@ -520,191 +614,7 @@ function BlockRenderer(props: {
     );
   }
 
-  if (type === "chips") {
-    const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
-    if (!items.length) return null;
-    return (
-      <div className="flex flex-wrap gap-2">
-        {items.map((it: any, i: number) => (
-          <span key={i} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-            {safeText(it)}
-          </span>
-        ))}
-      </div>
-    );
-  }
-
-  if (type === "cards") {
-    const columnsRaw = Number((block as any)?.columns || 2);
-    const columns = columnsRaw === 1 ? 1 : columnsRaw === 3 ? 3 : 2;
-    const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
-
-    const grid = columns === 1 ? "grid-cols-1" : columns === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2";
-
-    return (
-      <div className={`grid gap-3 ${grid}`}>
-        {items.map((it: any, idx: number) => {
-          const tone = String(it?.tone || "light").toLowerCase();
-          const shell =
-            tone === "glass"
-              ? "border-white/10 bg-slate-900 text-white"
-              : tone === "dark"
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-200 bg-white text-slate-900";
-
-          return (
-            <div key={idx} className={`rounded-2xl border p-5 ${shell}`}>
-              {it?.title ? <div className={`text-sm font-semibold ${tone === "light" ? "text-slate-900" : "text-white"}`}>{safeText(it.title)}</div> : null}
-              {it?.text ? <p className={`mt-2 text-sm leading-relaxed ${tone === "light" ? "text-slate-700" : "text-white/80"}`}>{safeText(it.text)}</p> : null}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (type === "scorecard_row") {
-    const items = Array.isArray((block as any)?.items) ? (block as any)?.items : [];
-    if (!items.length) return null;
-    return (
-      <div className="grid gap-3 md:grid-cols-3">
-        {items.map((it: any, idx: number) => (
-          <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{safeText(it?.label)}</div>
-            <div className="mt-1 text-lg font-bold text-slate-900">{safeText(it?.value)}</div>
-            {it?.hint ? <div className="mt-1 text-xs text-slate-500">{safeText(it?.hint)}</div> : null}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (type === "images.pair") {
-    const left = (block as any)?.left || {};
-    const right = (block as any)?.right || {};
-
-    const leftSrc = resolveImageSrc(String(left?.src || ""), {
-      data: ctx.data,
-      primaryName: ctx.primaryName,
-      secondaryName: ctx.secondaryName,
-      tertiaryName: ctx.tertiaryName,
-      primaryCode: ctx.primaryCode,
-    });
-
-    const rightSrc = resolveImageSrc(String(right?.src || ""), {
-      data: ctx.data,
-      primaryName: ctx.primaryName,
-      secondaryName: ctx.secondaryName,
-      tertiaryName: ctx.tertiaryName,
-      primaryCode: ctx.primaryCode,
-    });
-
-    const leftMax = typeof left?.max_h === "number" ? left.max_h : 340;
-    const rightMax = typeof right?.max_h === "number" ? right.max_h : 340;
-
-    return (
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          {leftSrc ? (
-            <img
-              src={leftSrc}
-              alt={safeText(left?.alt)}
-              className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
-              style={{ maxHeight: leftMax, objectFit: "contain" }}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          ) : null}
-          {left?.caption ? <div className="mt-2 text-xs text-slate-500">{safeText(left.caption)}</div> : null}
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          {rightSrc ? (
-            <img
-              src={rightSrc}
-              alt={safeText(right?.alt)}
-              className="w-full rounded-2xl border border-slate-200 bg-white shadow-sm"
-              style={{ maxHeight: rightMax, objectFit: "contain" }}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
-          ) : null}
-          {right?.caption ? <div className="mt-2 text-xs text-slate-500">{safeText(right.caption)}</div> : null}
-        </div>
-      </div>
-    );
-  }
-
-  if (type === "chart.frequency_bars") {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-900">Frequency</div>
-          <div className="text-xs text-slate-500">Your energy distribution</div>
-        </div>
-        <div className="mt-4">
-          <FrequencyBars labels={ctx.data.frequency_labels} pct={ctx.data.frequency_percentages} top={ctx.data.top_freq} />
-        </div>
-      </div>
-    );
-  }
-
-  if (type === "chart.profile_radar" || type === "chart.profile_bars") {
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-900">Profile mix</div>
-          <div className="text-xs text-slate-500">Primary + supporting</div>
-        </div>
-        <div className="mt-4">
-          <ProfileBars labels={ctx.data.profile_labels} pct={ctx.data.profile_percentages} topCode={ctx.data.top_profile_code} />
-        </div>
-      </div>
-    );
-  }
-
-  if (type === "cta") {
-    const title = safeText((block as any)?.title).trim() || "Next steps";
-    const text =
-      safeText((block as any)?.text).trim() ||
-      "Turn insight into action: use this report in a coaching conversation, a 1:1, or a team workshop.";
-    const btn = safeText((block as any)?.button_text).trim() || "Go to next steps";
-
-    const url = String(
-      ctx.data?.link?.redirect_url ||
-        ctx.data?.link?.next_steps_url ||
-        ctx.data?.link?.meta?.redirect_url ||
-        ctx.data?.link?.meta?.next_steps_url ||
-        "",
-    ).trim();
-
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-900 p-6 text-white">
-        <div className="text-lg font-semibold">{title}</div>
-        <p className="mt-2 text-sm text-white/80">{text}</p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          {url ? (
-            <button
-              onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-              className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-            >
-              {btn}
-            </button>
-          ) : (
-            <span className="text-xs text-white/70">No redirect_url is configured for this link.</span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <p className="text-xs font-semibold text-amber-900">Unsupported block type: {String((block as any).type || "unknown")}</p>
-    </div>
-  );
+  return null;
 }
 
 function defaultBlocksForSection(sectionId: string): ReportSectionBlock[] {
@@ -740,10 +650,8 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
   const primaryName = cleanProfileName(primary?.name || data.top_profile_name || "Top profile");
   const secondaryName = cleanProfileName(secondary?.name || "");
   const tertiaryName = cleanProfileName(tertiary?.name || "");
-
   const primaryCode = (primary?.code || data.top_profile_code || "").toUpperCase();
 
-  // logo: prefer DB logo_url if API includes it
   const orgLogoSrc =
     String(data.org_logo_url || "").trim() ||
     resolveImageSrc("{{ORG_LOGO}}", { data, primaryName, secondaryName, tertiaryName, primaryCode });
@@ -813,14 +721,11 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
     };
   }, [data, participant, orgName, primaryName, primaryCode, secondaryName, tertiaryName, topFreqName, topFreqCode, topFreqPct]);
 
-  const gridImg = resolveImageSrc("{{PROFILE_GRID}}", { data, primaryName, secondaryName, tertiaryName, primaryCode });
-
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-6">
-        {/* ✅ OperatingFrame-style HERO header */}
         <GlassCard className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none opacity-60">
             <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
@@ -881,7 +786,6 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
                 </button>
               </div>
 
-              {/* Optional pills */}
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge>{primaryCode}</Badge>
                 {secondaryName ? <Badge>Secondary: {secondaryName}</Badge> : null}
@@ -909,44 +813,27 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
             <MiniDivider />
           </div>
 
-          {/* Snapshot charts */}
+          {/* ✅ OperatingFrame-style snapshot cards */}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Drivers (Frequency)</div>
-                <div className="text-xs text-slate-500">Your energy distribution</div>
+              <div className="text-sm font-semibold text-slate-900">Drivers (Frequency)</div>
+              <div className="mt-2 text-sm text-slate-700">
+                The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally;
+                lower scores are patterns you may need to be more intentional about.
               </div>
               <div className="mt-4">
-                <FrequencyBars labels={data.frequency_labels} pct={data.frequency_percentages} top={data.top_freq} />
+                <VerticalDriversChart labels={data.frequency_labels} pct={data.frequency_percentages} />
               </div>
             </WhiteCard>
 
             <WhiteCard>
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-900">Profile Map</div>
-                <div className="text-xs text-slate-500">At a glance</div>
-              </div>
-
+              <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">
-                This view shows your profile distribution across the model (higher = stronger pattern).
+                This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may
+                require support or structure (risk).
               </div>
-
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                {gridImg ? (
-                  <img
-                    src={gridImg}
-                    alt="Profile grid"
-                    className="w-full rounded-2xl"
-                    style={{ objectFit: "contain", maxHeight: 240 }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                ) : null}
-
-                <div className="mt-4">
-                  <ProfileBars labels={data.profile_labels} pct={data.profile_percentages} topCode={data.top_profile_code} />
-                </div>
+              <div className="mt-4">
+                <ProfileOnlyRadar profilePct={data.profile_percentages} />
               </div>
             </WhiteCard>
           </div>
@@ -962,7 +849,10 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
               {indexItems.map((s, i) => (
                 <button
                   key={s.id}
-                  onClick={() => scrollToSection(s.id)}
+                  onClick={() => {
+                    const el = document.getElementById(s.id);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
                   className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-left hover:bg-white/10"
                 >
                   <div className="flex items-center gap-3">
@@ -982,8 +872,7 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
           <main className="space-y-4">
             {mergedSections.map((section, idx) => {
               const domId = getDomId(section, idx);
-              const title =
-                safeText(section.title).trim() || fallbackTitleFromId(String(section.id || ""), data.top_profile_name);
+              const title = safeText(section.title).trim() || fallbackTitleFromId(String(section.id || ""), data.top_profile_name);
 
               const rawId = String(section.id || "").trim();
               const blocks = Array.isArray(section.blocks) ? section.blocks : [];
@@ -995,7 +884,7 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
                     <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
                     <div className="mt-4 space-y-3">
                       {finalBlocks.map((b, i) => (
-                        <BlockRenderer key={i} block={b} ctx={ctx} sortedProfiles={sortedProfiles} />
+                        <BlockRenderer key={i} block={b} ctx={ctx} />
                       ))}
                     </div>
                   </WhiteCard>
