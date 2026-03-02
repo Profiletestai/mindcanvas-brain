@@ -103,9 +103,16 @@ export default function LinksClient(props: {
   };
   useEffect(refreshLinks, [orgId]);
 
+  // ✅ Public link (full page)
   const fullLink = (token: string) => `${baseUrl}/t/${token}`;
-  const embedCode = (url: string) =>
-    `<iframe src="${url}" width="100%" height="800" frameborder="0"></iframe>`;
+
+  // ✅ Embed link (block only)
+  const embedLink = (token: string) => `${baseUrl}/t/${token}/embed`;
+
+  // ✅ Embed code now uses /embed (and nicer iframe styling)
+  const embedCode = (token: string) =>
+    `<iframe src="${embedLink(token)}" style="width:100%;height:900px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+
   const htmlButton = (url: string) =>
     `<a href="${url}" style="background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;text-align:center;display:inline-block;">Start your test</a>`;
 
@@ -487,19 +494,11 @@ export default function LinksClient(props: {
                 <th className="px-3 py-2 text-left font-medium">
                   Test name / Test purpose
                 </th>
-
-                {/* ✅ NEW */}
                 <th className="px-3 py-2 text-left font-medium">Test</th>
-
-                {/* ✅ NEW */}
                 <th className="px-3 py-2 text-left font-medium">Uses</th>
-
                 <th className="px-3 py-2 text-left font-medium">Created</th>
                 <th className="px-3 py-2 text-left font-medium">Results</th>
-
-                {/* ✅ NEW */}
                 <th className="px-3 py-2 text-left font-medium">Redirect link</th>
-
                 <th className="px-3 py-2 text-left font-medium">Expiry</th>
                 <th className="px-3 py-2 text-left font-medium">Link</th>
                 <th className="px-3 py-2 text-left font-medium">Copy</th>
@@ -523,14 +522,11 @@ export default function LinksClient(props: {
                   : false;
                 const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
 
-                // Redirect link: if results are hidden use redirect_url,
-                // otherwise show next_steps_url (still useful to see in table)
                 const redirectOrNext =
                   (r.show_results ? r.next_steps_url : r.redirect_url) || "";
 
                 return (
                   <tr key={r.id} className={`${rowBg} border-t`}>
-                    {/* Purpose / label */}
                     <td className="px-3 py-2 align-top">
                       <div className="font-medium">
                         {r.link_name || "Untitled link"}
@@ -542,12 +538,10 @@ export default function LinksClient(props: {
                       )}
                     </td>
 
-                    {/* ✅ Test */}
                     <td className="px-3 py-2 align-top">
                       <div className="text-sm text-gray-900">{r.test_name || "—"}</div>
                     </td>
 
-                    {/* ✅ Uses */}
                     <td className="px-3 py-2 align-top">
                       <div className="text-sm text-gray-900 tabular-nums">
                         {typeof r.use_count === "number" ? r.use_count : 0}
@@ -555,14 +549,12 @@ export default function LinksClient(props: {
                       </div>
                     </td>
 
-                    {/* Created */}
                     <td className="px-3 py-2 align-top">
                       {r.created_at
                         ? new Date(r.created_at).toLocaleString()
                         : "—"}
                     </td>
 
-                    {/* Results */}
                     <td className="px-3 py-2 align-top">
                       {r.show_results ? "Shown" : "Hidden"}
                       {!r.email_report && (
@@ -572,7 +564,6 @@ export default function LinksClient(props: {
                       )}
                     </td>
 
-                    {/* ✅ Redirect link */}
                     <td className="px-3 py-2 align-top">
                       {redirectOrNext ? (
                         <button
@@ -593,7 +584,6 @@ export default function LinksClient(props: {
                       ) : null}
                     </td>
 
-                    {/* Expiry */}
                     <td className="px-3 py-2 align-top">
                       {r.expires_at
                         ? `${new Date(r.expires_at).toLocaleString()}${
@@ -602,7 +592,6 @@ export default function LinksClient(props: {
                         : "—"}
                     </td>
 
-                    {/* Link */}
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
@@ -613,7 +602,6 @@ export default function LinksClient(props: {
                       </button>
                     </td>
 
-                    {/* Copy */}
                     <td className="px-3 py-2 align-top">
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -627,7 +615,7 @@ export default function LinksClient(props: {
                           className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
                           onClick={() =>
                             downloadTxt(
-                              embedCode(url),
+                              embedCode(r.token),
                               `mindcanvas-embed-${r.token}.txt`
                             )
                           }
@@ -645,7 +633,6 @@ export default function LinksClient(props: {
                       </div>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
