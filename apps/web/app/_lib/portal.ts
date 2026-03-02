@@ -10,6 +10,13 @@ import { readActiveOrgIdFromCookie } from "./org-active";
 // Local alias that won't fight supabase-js generics across versions
 type AnyClient = ReturnType<typeof createClient<any>>;
 
+// ✅ Added: cookie-to-set type to satisfy TS noImplicitAny
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: Record<string, any>;
+};
+
 // ── Env + origin helpers ──────────────────────────────────────────────────────
 function getEnv(name: string) {
   return process.env[name] ?? "";
@@ -49,7 +56,8 @@ export async function getServerSupabase() {
         // Next cookies() already returns parsed cookie objects
         return jar.getAll().map((c) => ({ name: c.name, value: c.value }));
       },
-      setAll(cookiesToSet) {
+      // ✅ Fixed: explicitly type parameter (noImplicitAny)
+      setAll(cookiesToSet: CookieToSet[]) {
         // This is what persists auth sessions (critical)
         for (const { name, value, options } of cookiesToSet) {
           try {
