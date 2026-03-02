@@ -6,6 +6,12 @@ export const config = {
   matcher: ["/portal/:path*", "/admin/:path*"],
 };
 
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: any; // Next cookies options shape differs across versions
+};
+
 function getSupabase(req: NextRequest, res: NextResponse) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -13,7 +19,7 @@ function getSupabase(req: NextRequest, res: NextResponse) {
   return createServerClient(url, anon, {
     cookies: {
       getAll: () => req.cookies.getAll(),
-      setAll: (cookies) => {
+      setAll: (cookies: CookieToSet[]) => {
         cookies.forEach(({ name, value, options }) =>
           res.cookies.set(name, value, options)
         );
