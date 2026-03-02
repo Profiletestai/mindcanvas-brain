@@ -1,6 +1,7 @@
-'use client';
+// apps/web/app/portal/[slug]/tests/[testId]/TestDetailsClient.tsx
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type LinkRow = {
   id: string;
@@ -40,40 +41,40 @@ export default function TestDetailsClient({
 }) {
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [takers, setTakers] = useState<TakerRow[]>([]);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [loadingLinks, setLoadingLinks] = useState(true);
   const [loadingTakers, setLoadingTakers] = useState(true);
-  const [copied, setCopied] = useState<string>('');
+  const [copied, setCopied] = useState<string>("");
   const [showOnlyConsented, setShowOnlyConsented] = useState(false);
 
   // inline edit
   const [editing, setEditing] = useState<EditState | null>(null);
-  const [savingTaker, setSavingTaker] = useState<string>(''); // takerId being saved
+  const [savingTaker, setSavingTaker] = useState<string>(""); // takerId being saved
 
   const base = useMemo(() => {
-    const env = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+    const env = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
     if (env) return env;
-    if (typeof window !== 'undefined') return window.location.origin;
-    return '';
+    if (typeof window !== "undefined") return window.location.origin;
+    return "";
   }, []);
 
   const copy = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(label);
-      setTimeout(() => setCopied(''), 1200);
+      setTimeout(() => setCopied(""), 1200);
     } catch {
-      setCopied(''); // noop
+      setCopied(""); // noop
     }
   };
 
   const downloadTxt = (content: string, filename: string) => {
     try {
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
 
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       a.click();
@@ -87,19 +88,19 @@ export default function TestDetailsClient({
   const loadLinks = useCallback(async () => {
     try {
       setLoadingLinks(true);
-      setError('');
-      const r = await fetch(`/api/tests/${testId}/links`, { cache: 'no-store' });
+      setError("");
+      const r = await fetch(`/api/tests/${testId}/links`, { cache: "no-store" });
       if (!r.ok) {
-        const text = await r.text().catch(() => '');
+        const text = await r.text().catch(() => "");
         setError(
-          `Failed to load links (HTTP ${r.status})${text ? ` — ${text}` : ''}`
+          `Failed to load links (HTTP ${r.status})${text ? ` — ${text}` : ""}`
         );
         setLinks([]);
         return;
       }
       const j = await r.json().catch(() => ({}));
       if (!j?.ok) {
-        setError(j?.error || 'Unknown error');
+        setError(j?.error || "Unknown error");
         setLinks([]);
         return;
       }
@@ -115,20 +116,19 @@ export default function TestDetailsClient({
   const loadTakers = useCallback(async () => {
     try {
       setLoadingTakers(true);
-      // Do not overwrite link-related error here to avoid hiding it
       const r = await fetch(`/api/tests/${testId}/takers`, {
-        cache: 'no-store',
+        cache: "no-store",
       });
       if (!r.ok) {
-        const text = await r.text().catch(() => '');
+        const text = await r.text().catch(() => "");
         setError((prev) =>
           prev
             ? prev +
               `\nFailed to load takers (HTTP ${r.status})${
-                text ? ` — ${text}` : ''
+                text ? ` — ${text}` : ""
               }`
             : `Failed to load takers (HTTP ${r.status})${
-                text ? ` — ${text}` : ''
+                text ? ` — ${text}` : ""
               }`
         );
         setTakers([]);
@@ -137,7 +137,7 @@ export default function TestDetailsClient({
       const j = await r.json().catch(() => ({}));
       if (!j?.ok) {
         setError((prev) =>
-          prev ? prev + `\n${j?.error || 'Error loading takers'}` : j?.error
+          prev ? prev + `\n${j?.error || "Error loading takers"}` : j?.error
         );
         setTakers([]);
         return;
@@ -163,9 +163,9 @@ export default function TestDetailsClient({
   const createLink = async () => {
     try {
       setBusy(true);
-      setError('');
+      setError("");
       const r = await fetch(`/api/tests/${testId}/create-link`, {
-        method: 'POST',
+        method: "POST",
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j?.ok) {
@@ -180,12 +180,17 @@ export default function TestDetailsClient({
     }
   };
 
-  const sampleToken = links[0]?.token ?? 'TOKEN';
+  const sampleToken = links[0]?.token ?? "TOKEN";
+
   const publicUrl = base ? `${base}/t/${sampleToken}` : `/t/${sampleToken}`;
-  const embed = `<iframe src="${publicUrl}" width="100%" height="800" frameborder="0"></iframe>`;
-  const codeSnippet = `fetch('${
-    base || ''
-  }/api/public/test/${sampleToken}/questions').then(r=>r.json())`;
+  const embedUrl = base
+    ? `${base}/t/${sampleToken}/embed`
+    : `/t/${sampleToken}/embed`;
+
+  // ✅ updated to /embed + nicer style
+  const embed = `<iframe src="${embedUrl}" style="width:100%;height:900px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+
+  const codeSnippet = `fetch('${base || ""}/api/public/test/${sampleToken}/questions').then(r=>r.json())`;
 
   const filteredTakers = useMemo(() => {
     if (!showOnlyConsented) return takers;
@@ -193,7 +198,7 @@ export default function TestDetailsClient({
   }, [takers, showOnlyConsented]);
 
   const formatDateTime = (iso?: string | null) => {
-    if (!iso) return '';
+    if (!iso) return "";
     try {
       const d = new Date(iso);
       if (Number.isNaN(d.getTime())) return iso;
@@ -204,24 +209,23 @@ export default function TestDetailsClient({
   };
 
   const startEdit = (t: TakerRow) => {
-    setError(''); // keep clean
+    setError("");
     setEditing({
       takerId: t.id,
-      first_name: (t.first_name ?? '').toString(),
-      last_name: (t.last_name ?? '').toString(),
-      email: (t.email ?? '').toString(),
+      first_name: (t.first_name ?? "").toString(),
+      last_name: (t.last_name ?? "").toString(),
+      email: (t.email ?? "").toString(),
     });
   };
 
   const cancelEdit = () => {
     setEditing(null);
-    setSavingTaker('');
+    setSavingTaker("");
   };
 
   const validateEmail = (email: string) => {
     const e = email.trim();
-    if (!e) return true; // allow blank if you want; if not, enforce below
-    // basic sanity check (not overstrict)
+    if (!e) return true;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
   };
 
@@ -232,23 +236,22 @@ export default function TestDetailsClient({
     const last_name = editing.last_name.trim();
     const email = editing.email.trim().toLowerCase();
 
-    // required checks (name can be empty, but email must be valid if provided)
     if (email && !validateEmail(email)) {
-      setError('Please enter a valid email address.');
+      setError("Please enter a valid email address.");
       return;
     }
 
     try {
       setSavingTaker(editing.takerId);
-      setError('');
+      setError("");
 
       const r = await fetch(
         `/api/tests/${encodeURIComponent(testId)}/takers/${encodeURIComponent(
           editing.takerId
         )}`,
         {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ first_name, last_name, email }),
         }
       );
@@ -259,13 +262,12 @@ export default function TestDetailsClient({
         return;
       }
 
-      // refresh list (source of truth)
       await loadTakers();
       setEditing(null);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
-      setSavingTaker('');
+      setSavingTaker("");
     }
   };
 
@@ -278,7 +280,7 @@ export default function TestDetailsClient({
           disabled={busy}
           className="px-3 py-2 rounded border border-white/20 hover:bg-white/10 disabled:opacity-60"
         >
-          {busy ? 'Creating…' : 'Create Link'}
+          {busy ? "Creating…" : "Create Link"}
         </button>
       </div>
 
@@ -307,7 +309,7 @@ export default function TestDetailsClient({
                     {url}
                   </a>
                   <button
-                    onClick={() => copy(url, 'url')}
+                    onClick={() => copy(url, "url")}
                     className="px-2 py-1 rounded border border-white/20 hover:bg-white/10 text-xs"
                     title="Copy URL"
                   >
@@ -315,7 +317,7 @@ export default function TestDetailsClient({
                   </button>
                   <span className="text-white/60">
                     · uses {l.use_count ?? 0}
-                    {l.max_uses ? `/${l.max_uses}` : ''}
+                    {l.max_uses ? `/${l.max_uses}` : ""}
                   </span>
                 </li>
               );
@@ -339,10 +341,17 @@ export default function TestDetailsClient({
             Download embed
           </button>
           <button
-            onClick={() => window.open(publicUrl, '_blank')}
+            onClick={() => window.open(publicUrl, "_blank")}
             className="px-3 py-2 rounded border border-white/20 hover:bg-white/10 text-sm"
           >
             Open Public Link
+          </button>
+          <button
+            onClick={() => window.open(embedUrl, "_blank")}
+            className="px-3 py-2 rounded border border-white/20 hover:bg-white/10 text-sm"
+            title="Open embed-only page"
+          >
+            Open Embed Link
           </button>
         </div>
       </section>
@@ -354,7 +363,7 @@ export default function TestDetailsClient({
           {codeSnippet}
         </pre>
         <button
-          onClick={() => copy(codeSnippet, 'code')}
+          onClick={() => copy(codeSnippet, "code")}
           className="px-3 py-2 rounded border border-white/20 hover:bg-white/10 text-sm"
         >
           Copy Snippet
@@ -395,29 +404,28 @@ export default function TestDetailsClient({
               </thead>
               <tbody>
                 {filteredTakers.map((t) => {
-                  const fullName = `${t.first_name || ''} ${t.last_name || ''}`.trim();
+                  const fullName = `${t.first_name || ""} ${t.last_name || ""}`.trim();
 
                   const consentLabel =
-                    t.data_consent === true ? 'Yes' : t.data_consent === false ? 'No' : 'Unknown';
+                    t.data_consent === true ? "Yes" : t.data_consent === false ? "No" : "Unknown";
 
                   const consentClass =
                     t.data_consent === true
-                      ? 'text-emerald-300'
+                      ? "text-emerald-300"
                       : t.data_consent === false
-                      ? 'text-red-300'
-                      : 'text-white/60';
+                      ? "text-red-300"
+                      : "text-white/60";
 
                   const isEditing = editing?.takerId === t.id;
                   const isSaving = savingTaker === t.id;
 
                   return (
                     <tr key={t.id} className="border-t border-white/10 align-top">
-                      {/* Name */}
                       <td className="px-3 py-2">
                         {isEditing ? (
                           <div className="flex flex-col gap-2">
                             <input
-                              value={editing?.first_name ?? ''}
+                              value={editing?.first_name ?? ""}
                               onChange={(e) =>
                                 setEditing((prev) =>
                                   prev ? { ...prev, first_name: e.target.value } : prev
@@ -427,7 +435,7 @@ export default function TestDetailsClient({
                               className="w-full rounded border border-white/20 bg-white/10 px-2 py-1 text-white placeholder:text-white/40"
                             />
                             <input
-                              value={editing?.last_name ?? ''}
+                              value={editing?.last_name ?? ""}
                               onChange={(e) =>
                                 setEditing((prev) =>
                                   prev ? { ...prev, last_name: e.target.value } : prev
@@ -442,11 +450,10 @@ export default function TestDetailsClient({
                         )}
                       </td>
 
-                      {/* Email */}
                       <td className="px-3 py-2">
                         {isEditing ? (
                           <input
-                            value={editing?.email ?? ''}
+                            value={editing?.email ?? ""}
                             onChange={(e) =>
                               setEditing((prev) => (prev ? { ...prev, email: e.target.value } : prev))
                             }
@@ -458,15 +465,12 @@ export default function TestDetailsClient({
                         )}
                       </td>
 
-                      {/* Status */}
                       <td className="px-3 py-2">
                         {t.status || <span className="text-white/60">—</span>}
                       </td>
 
-                      {/* Consent */}
                       <td className={`px-3 py-2 ${consentClass}`}>{consentLabel}</td>
 
-                      {/* Consent at */}
                       <td className="px-3 py-2">
                         {t.data_consent_at ? (
                           <span>{formatDateTime(t.data_consent_at)}</span>
@@ -475,7 +479,6 @@ export default function TestDetailsClient({
                         )}
                       </td>
 
-                      {/* Actions */}
                       <td className="px-3 py-2 text-right">
                         {isEditing ? (
                           <div className="flex justify-end gap-2">
@@ -491,7 +494,7 @@ export default function TestDetailsClient({
                               disabled={isSaving}
                               className="px-2 py-1 rounded border border-emerald-300/40 hover:bg-emerald-500/10 text-xs disabled:opacity-60"
                             >
-                              {isSaving ? 'Saving…' : 'Save'}
+                              {isSaving ? "Saving…" : "Save"}
                             </button>
                           </div>
                         ) : (
@@ -513,7 +516,6 @@ export default function TestDetailsClient({
         )}
       </section>
 
-      {/* Tiny toast */}
       {!!copied && (
         <div className="fixed bottom-4 right-4 px-3 py-2 rounded bg-white/10 border border-white/20 text-xs">
           Copied {copied} to clipboard
