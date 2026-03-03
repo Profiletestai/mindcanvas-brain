@@ -109,7 +109,14 @@ type ReportSectionBlock =
   | { type: "quote"; text?: string; cite?: string }
   | { type: "divider" }
   | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
-  | { type: "image"; src?: string; alt?: string; caption?: string; align?: "left" | "center" | "right"; max_h?: number }
+  | {
+      type: "image";
+      src?: string;
+      alt?: string;
+      caption?: string;
+      align?: "left" | "center" | "right";
+      max_h?: number;
+    }
   | { type: string; [k: string]: any };
 
 type ReportSection = {
@@ -346,7 +353,8 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
       tests:tests (
         id,
         name,
-        org_id
+        org_id,
+        slug
       )
     `,
     )
@@ -446,9 +454,15 @@ async function fetchDbLabels(test_id: string): Promise<{
 }> {
   const sb = sbAdmin();
 
-  const freqsRes = await sb.from("test_frequency_labels").select("frequency_code, frequency_name").eq("test_id", test_id);
+  const freqsRes = await sb
+    .from("test_frequency_labels")
+    .select("frequency_code, frequency_name")
+    .eq("test_id", test_id);
 
-  const profRes = await sb.from("test_profile_labels").select("profile_code, profile_name, frequency_code").eq("test_id", test_id);
+  const profRes = await sb
+    .from("test_profile_labels")
+    .select("profile_code, profile_name, frequency_code")
+    .eq("test_id", test_id);
 
   const freqs =
     Array.isArray(freqsRes.data)
@@ -472,7 +486,12 @@ async function fetchDbLabels(test_id: string): Promise<{
 
 async function fetchTestRow(test_id: string): Promise<TestRow | null> {
   const sb = sbAdmin();
-  const q = await sb.from("tests").select("id, slug, name, meta, org_id, report_layout_template_id").eq("id", test_id).maybeSingle();
+  const q = await sb
+    .from("tests")
+    .select("id, slug, name, meta, org_id, report_layout_template_id")
+    .eq("id", test_id)
+    .maybeSingle();
+
   if (q.error || !q.data) return null;
   return q.data as TestRow;
 }
@@ -549,14 +568,21 @@ type BlockRow = {
 async function fetchLayoutSections(layoutId: string | null | undefined): Promise<LayoutSection[]> {
   if (!layoutId) return [];
   const sb = sbAdmin();
-  const q = await sb.from("report_layout_templates").select("id, sections_json").eq("id", layoutId).maybeSingle();
+  const q = await sb
+    .from("report_layout_templates")
+    .select("id, sections_json")
+    .eq("id", layoutId)
+    .maybeSingle();
+
   if (q.error || !q.data) return [];
   const sections = (q.data as any)?.sections_json;
   if (!Array.isArray(sections)) return [];
   return sections
     .map((s: any) => ({
       key: String(s?.key || "").trim(),
-      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as "global" | "profile",
+      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as
+        | "global"
+        | "profile",
     }))
     .filter((s) => !!s.key);
 }
@@ -610,7 +636,12 @@ type FrameworkBlockRow = {
 
 async function fetchFrameworkById(frameworkId: string): Promise<FrameworkRow | null> {
   const sb = sbAdmin();
-  const q = await sb.from("frameworks").select("id, slug, name, type, version, status, structure_json").eq("id", frameworkId).maybeSingle();
+  const q = await sb
+    .from("frameworks")
+    .select("id, slug, name, type, version, status, structure_json")
+    .eq("id", frameworkId)
+    .maybeSingle();
+
   if (q.error || !q.data) return null;
   return q.data as any;
 }
@@ -750,16 +781,30 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const testRow = await fetchTestRow(meta.test_id);
     const testMeta = (testRow?.meta || {}) as TestMeta;
 
-    const reportEngine = String((testMeta as any)?.report_engine || "").trim();
-    const useBlocksEngine = reportEngine === "native_v2_blocks";
-
+    // Framework pointer
     const frameworkId =
       (typeof (testMeta as any)?.framework_id === "string" && (testMeta as any).framework_id.trim()) ||
       (typeof (testMeta as any)?.frameworkId === "string" && (testMeta as any).frameworkId.trim()) ||
       "";
 
+    // Storage framework choice (OperatingFrame lives here)
     const storageChoice = resolveStorageFramework(testMeta);
     const useStorageFramework = storageChoice.use;
+
+    const slugLower = String(testRow?.slug || "").toLowerCase();
+    const nameLower = String(testRow?.name || "").toLowerCase();
+    const storagePathLower = String(storageChoice.path || "").toLowerCase();
+
+    // ✅ Robust OperatingFrame detection
+    const isOperatingFrame =
+      storagePathLower.startsWith("operatingframe/") ||
+      storagePathLower.includes("/operatingframe/") ||
+      slugLower.includes("operatingframe") ||
+      nameLower.includes("operatingframe");
+
+    // Decide engine (HARD OVERRIDE for OperatingFrame)
+    const reportEngine = String((testMeta as any)?.report_engine || "").trim();
+    const useBlocksEngine = !isOperatingFrame && reportEngine === "native_v2_blocks";
 
     const orgSlug = String(meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach").trim();
 
@@ -772,6 +817,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       if (storageFw) {
         fw = storageFw;
         frameworkSource = useBlocksEngine ? "blocks" : "storage";
+      } else {
+        console.log("Storage framework missing; falling back to filesystem", { bucket: storageChoice.bucket, path: storageChoice.path });
       }
     }
 
@@ -821,7 +868,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
 
     const top_profile_name =
-      profile_labels.find((p) => p.code === top_profile_code)?.name || look.profileByCode.get(top_profile_code)?.name || top_profile_code;
+      profile_labels.find((p) => p.code === top_profile_code)?.name ||
+      look.profileByCode.get(top_profile_code)?.name ||
+      top_profile_code;
 
     const sortedProfiles = [...profile_labels]
       .map((p) => ({ ...p, pct: profile_percentages?.[p.code] ?? 0 }))
@@ -831,7 +880,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const tertiary = sortedProfiles[2]?.name || "";
     const topFreqName = frequency_labels.find((f) => f.code === top_freq)?.name || top_freq;
 
-    // ✅ tokenCtx is good (PRIMARY_PROFILE_NAME exists)
     const tokenCtx: Record<string, string> = {
       TEST_NAME: meta.test_name || testRow?.name || "Profile Test",
       ORG_SLUG: orgSlug,
@@ -840,7 +888,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       SECONDARY_PROFILE_NAME: secondary,
       TERTIARY_PROFILE_NAME: tertiary,
 
-      // leave as generic defaults; your LEAD blocks use explicit paths anyway
       PROFILE_IMAGE_PRIMARY: "",
       PROFILE_IMAGE_SECONDARY: "",
       PROFILE_IMAGE_TERTIARY: "",
@@ -848,6 +895,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     let sections: SectionsPayload | null = null;
 
+    // IMPORTANT: OperatingFrame must not run blocks engine
     if (useBlocksEngine) {
       if (frameworkId) {
         const fwRow = await fetchFrameworkById(frameworkId);
@@ -857,21 +905,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         const globalKeys: string[] = Array.isArray(sec?.global) ? sec.global.map(String) : [];
         const profileKeys: string[] = Array.isArray(sec?.profile) ? sec.profile.map(String) : [];
 
-        const fallbackGlobal = [
-          "global.cover",
-          "global.welcome_letter",
-          "global.how_to_use",
-          "global.lead_introduction",
-          "global.cta_next_steps",
-        ];
-        const fallbackProfile = [
-          "profile.identity",
-          "profile.strengths",
-          "profile.development_areas",
-          "profile.communication_style",
-          "profile.reflection_questions",
-          "profile.collaboration",
-        ];
+        const fallbackGlobal = ["global.cover", "global.welcome_letter", "global.how_to_use", "global.lead_introduction", "global.cta_next_steps"];
+        const fallbackProfile = ["profile.identity", "profile.strengths", "profile.development_areas", "profile.communication_style", "profile.reflection_questions", "profile.collaboration"];
 
         const gKeys = globalKeys.length ? globalKeys : fallbackGlobal;
         const pKeys = profileKeys.length ? profileKeys : fallbackProfile;
@@ -897,7 +932,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         for (const key of gKeys) {
           const row = globalBlocks.get(key);
           const content = row?.content_json || null;
-
           const built = contentJsonToSection(content, undefined);
           const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
 
@@ -1030,20 +1064,14 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           framework_path: storageChoice.path || null,
         };
       }
+    } else {
+      // Non-blocks path: leave sections null (OperatingFrame uses its own JSON client)
+      sections = null;
     }
 
     const rawLinkMeta = meta.link_meta || null;
 
-    const slugLower = String(testRow?.slug || "").toLowerCase();
-    const nameLower = String(testRow?.name || "").toLowerCase();
-
-    const isOperatingFrame =
-      String(storageChoice.path || "").toLowerCase().includes("operatingframe/") ||
-      slugLower.includes("operatingframe") ||
-      nameLower.includes("operatingframe");
-
     const isLead = slugLower.includes("lead") || nameLower.includes("lead");
-
     const allowRedirectInPortal = isOperatingFrame || isLead;
 
     const linkMeta = isPortalViewer && !allowRedirectInPortal ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
@@ -1053,7 +1081,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       data: {
         org_slug: orgSlug,
         org_name: meta.org_name || null,
-        org_logo_url: meta.org_logo_url || null, // ✅ FIXED: now returned
+        org_logo_url: meta.org_logo_url || null,
         test_name: meta.test_name || testRow?.name || testMeta?.test || "Profile Test",
 
         taker: {
@@ -1083,6 +1111,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           useBlocksEngine,
           frameworkSource,
           framework_id: frameworkId || null,
+
+          // ✅ expose storage framework pointer so ReportGateClient can load OperatingFrame JSON reliably
+          storageFrameworkBucket: storageChoice.bucket || null,
+          storageFrameworkPath: storageChoice.path || null,
 
           src,
           isPortalViewer,

@@ -27,6 +27,7 @@ type LinkMeta = {
 type ResultData = {
   org_slug: string;
   org_name?: string | null;
+  org_logo_url?: string | null;
   test_name: string;
 
   taker: { id: string; first_name?: string | null; last_name?: string | null };
@@ -62,8 +63,6 @@ function safeText(x: any): string {
 
 /**
  * Build a public Supabase Storage URL (for public buckets).
- * We use this to fetch OperatingFrame JSON dynamically based on
- * whatever storageFrameworkPath the API returned.
  */
 function supabasePublicFrameworkUrl(bucket: string, path: string) {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
@@ -74,16 +73,35 @@ function supabasePublicFrameworkUrl(bucket: string, path: string) {
   return `${base}/storage/v1/object/public/${cleanBucket}/${cleanPath}`;
 }
 
+function getStorageFrameworkPath(data: ResultData | null) {
+  const p1 = String(data?.debug?.storageFrameworkPath || "").trim();
+  if (p1) return p1;
+
+  const p2 = String(data?.sections?.framework_path || "").trim();
+  if (p2) return p2;
+
+  return "";
+}
+
+function getStorageFrameworkBucket(data: ResultData | null) {
+  const b1 = String(data?.debug?.storageFrameworkBucket || "").trim();
+  if (b1) return b1;
+
+  const b2 = String(data?.sections?.framework_bucket || "").trim();
+  if (b2) return b2;
+
+  // default public bucket
+  return "framework";
+}
+
 function isOperatingFrame(data: ResultData | null) {
-  // ✅ Robust detection: any operatingframe/* file should route here
-  const path = String(data?.debug?.storageFrameworkPath || "").trim().toLowerCase();
+  const path = getStorageFrameworkPath(data).toLowerCase();
   return path.startsWith("operatingframe/");
 }
 
 /**
  * ✅ HARD ROUTES (non-negotiable)
  * These orgs must NEVER use NativeBlocksReportClient from /t/ flow.
- * They must use the org-specific legacy renderer.
  */
 function isLegacyOrgForced(data: ResultData | null) {
   const slug = String(data?.org_slug || "").toLowerCase().trim();
@@ -141,11 +159,12 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
         // Only OperatingFrame needs the framework JSON from the bucket
         if (isOperatingFrame(json.data)) {
-          const storagePath = String(json.data?.debug?.storageFrameworkPath || "").trim();
-          const fwUrl = supabasePublicFrameworkUrl("framework", storagePath);
+          const storagePath = getStorageFrameworkPath(json.data);
+          const bucket = getStorageFrameworkBucket(json.data);
+          const fwUrl = supabasePublicFrameworkUrl(bucket, storagePath);
 
           if (!fwUrl) {
-            setOfErr("Missing NEXT_PUBLIC_SUPABASE_URL or storageFrameworkPath (cannot load OperatingFrame framework JSON).");
+            setOfErr("Missing NEXT_PUBLIC_SUPABASE_URL or storage framework path (cannot load OperatingFrame framework JSON).");
             setLoading(false);
             return;
           }
@@ -223,6 +242,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
               <div>Error: {safeText(err ?? "Unknown")}</div>
               <div>org_slug: {safeText(data?.org_slug || "")}</div>
               <div>useBlocksEngine: {safeText(String(data?.debug?.useBlocksEngine ?? ""))}</div>
+              <div>storageFrameworkPath: {safeText(getStorageFrameworkPath(data))}</div>
             </div>
           </details>
         </div>
@@ -233,7 +253,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   /**
    * ✅ ROUTING PRIORITY (non-negotiable)
    * 1) Team Puzzle / Competency Coach ALWAYS use LegacyOrgReportClient
-   * 2) OperatingFrame uses OperatingFrameReportClient
+   * 2) OperatingFrame uses OperatingFrameReportClient (bucket JSON)
    * 3) Only then do we consider NativeBlocksReportClient
    * 4) Otherwise, fallback to LegacyReportClient
    */
@@ -244,6 +264,8 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
   if (isOF) {
     if (ofErr || !ofFramework) {
+      const bucket = getStorageFrameworkBucket(data);
+      const path = getStorageFrameworkPath(data);
       return (
         <div className="min-h-screen bg-[#050914] text-white">
           <div className="mx-auto max-w-4xl p-6 space-y-4">
@@ -253,8 +275,9 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
               <summary className="cursor-pointer font-medium">Debug information</summary>
               <div className="mt-2 space-y-2">
                 <div>Framework error: {safeText(ofErr ?? "Unknown")}</div>
-                <div>Framework URL: {safeText(supabasePublicFrameworkUrl("framework", String(data?.debug?.storageFrameworkPath || "")))}</div>
-                <div>storageFrameworkPath: {safeText(data?.debug?.storageFrameworkPath || "")}</div>
+                <div>Framework bucket: {safeText(bucket)}</div>
+                <div>Framework path: {safeText(path)}</div>
+                <div>Framework URL: {safeText(supabasePublicFrameworkUrl(bucket, path))}</div>
               </div>
             </details>
           </div>
