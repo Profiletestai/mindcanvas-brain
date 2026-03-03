@@ -161,7 +161,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
                 const h = Math.round(it.v * 100);
                 return (
                   <div key={it.code} className="flex w-16 flex-col items-center gap-2">
-                    <div className="text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}</div>
+                    <div className="text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
                     <div className="relative h-[240px] w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
                       <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
                     </div>
@@ -206,7 +206,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
     return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
   }
 
-  const rings = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]; // display as 10..60
+  const rings = [0.1, 0.2, 0.3, 0.4, 0.5]; // display as 10..50
 
   const pts = labels.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
@@ -633,7 +633,7 @@ export default function OperatingFrameReportClient(props: {
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
-              <div className="text-sm font-semibold text-slate-900">Drivers (Frequency)</div>
+              <div className="text-sm font-semibold text-slate-900">Drivers</div>
               <div className="mt-2 text-sm text-slate-700">{driversIntro}</div>
               <div className="mt-4">
                 <VerticalDriversChart labels={data.frequency_labels} pct={data.frequency_percentages} />

@@ -816,7 +816,7 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
           {/* ✅ OperatingFrame-style snapshot cards */}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
-              <div className="text-sm font-semibold text-slate-900">Drivers (Frequency)</div>
+              <div className="text-sm font-semibold text-slate-900">Drivers</div>
               <div className="mt-2 text-sm text-slate-700">
                 The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally;
                 lower scores are patterns you may need to be more intentional about.
