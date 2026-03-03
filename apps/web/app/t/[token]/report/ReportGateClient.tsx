@@ -61,19 +61,23 @@ function safeText(x: any): string {
 }
 
 /**
- * OperatingFrame framework file lives in Supabase Storage public bucket.
- * This function builds the public URL at runtime.
+ * Build a public Supabase Storage URL (for public buckets).
+ * We use this to fetch OperatingFrame JSON dynamically based on
+ * whatever storageFrameworkPath the API returned.
  */
-function supabasePublicFrameworkUrlForOperatingFrame() {
+function supabasePublicFrameworkUrl(bucket: string, path: string) {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
   if (!base) return "";
-  return `${base}/storage/v1/object/public/framework/operatingframe/operatingframe_report_content_v1.json`;
+  const cleanBucket = String(bucket || "framework").trim();
+  const cleanPath = String(path || "").replace(/^\/+/, "");
+  if (!cleanPath) return "";
+  return `${base}/storage/v1/object/public/${cleanBucket}/${cleanPath}`;
 }
 
 function isOperatingFrame(data: ResultData | null) {
-  // We detect OperatingFrame by the storage framework path returned by the API debug
+  // ✅ Robust detection: any operatingframe/* file should route here
   const path = String(data?.debug?.storageFrameworkPath || "").trim().toLowerCase();
-  return path === "operatingframe/operatingframe_report_content_v1.json";
+  return path.startsWith("operatingframe/");
 }
 
 /**
@@ -137,9 +141,11 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
         // Only OperatingFrame needs the framework JSON from the bucket
         if (isOperatingFrame(json.data)) {
-          const fwUrl = supabasePublicFrameworkUrlForOperatingFrame();
+          const storagePath = String(json.data?.debug?.storageFrameworkPath || "").trim();
+          const fwUrl = supabasePublicFrameworkUrl("framework", storagePath);
+
           if (!fwUrl) {
-            setOfErr("Missing NEXT_PUBLIC_SUPABASE_URL (cannot load OperatingFrame framework JSON).");
+            setOfErr("Missing NEXT_PUBLIC_SUPABASE_URL or storageFrameworkPath (cannot load OperatingFrame framework JSON).");
             setLoading(false);
             return;
           }
@@ -225,7 +231,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   }
 
   /**
-   * ✅ ROUTING PRIORITY (this is the fix)
+   * ✅ ROUTING PRIORITY (non-negotiable)
    * 1) Team Puzzle / Competency Coach ALWAYS use LegacyOrgReportClient
    * 2) OperatingFrame uses OperatingFrameReportClient
    * 3) Only then do we consider NativeBlocksReportClient
@@ -247,7 +253,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
               <summary className="cursor-pointer font-medium">Debug information</summary>
               <div className="mt-2 space-y-2">
                 <div>Framework error: {safeText(ofErr ?? "Unknown")}</div>
-                <div>Framework URL: {safeText(supabasePublicFrameworkUrlForOperatingFrame())}</div>
+                <div>Framework URL: {safeText(supabasePublicFrameworkUrl("framework", String(data?.debug?.storageFrameworkPath || "")))}</div>
                 <div>storageFrameworkPath: {safeText(data?.debug?.storageFrameworkPath || "")}</div>
               </div>
             </details>
