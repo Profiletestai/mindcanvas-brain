@@ -13,7 +13,6 @@ type LinkMeta = {
   hidden_results_message?: string | null;
   email_report?: boolean | null;
 
-  // sometimes legacy links store redirect in meta
   meta?: {
     redirect_url?: string | null;
     next_steps_url?: string | null;
@@ -62,9 +61,9 @@ type ReportBlock =
       caption?: string;
       align?: "left" | "center" | "right";
       max_h?: number;
-      rounded?: boolean; // if false -> keep square corners
-      border?: boolean; // if false -> no border/shadow
-      no_border?: boolean; // alias
+      rounded?: boolean;
+      border?: boolean;
+      no_border?: boolean;
     }
   | { type: string; [k: string]: any };
 
@@ -94,7 +93,6 @@ function profileKeyVariants(code: string) {
   return Array.from(new Set([c, asP, asPROFILE]));
 }
 
-// ✅ Map profile name → actual filename in /public/images/operatingframe-full-test/profile-cards/
 function profileNameToImageFile(profileName: string) {
   const n = String(profileName || "").toLowerCase();
   if (n.includes("activator")) return "activator.png";
@@ -110,7 +108,7 @@ function profileNameToImageFile(profileName: string) {
 
 function GlassCard(props: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 ${props.className || ""}`}>
+    <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6 ${props.className || ""}`}>
       {props.children}
     </div>
   );
@@ -118,7 +116,7 @@ function GlassCard(props: { children: React.ReactNode; className?: string }) {
 
 function WhiteCard(props: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
+    <div className={`rounded-2xl bg-white p-4 md:p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
       {props.children}
     </div>
   );
@@ -128,17 +126,18 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-/** ✅ Vertical bar chart (A red / B yellow / C green / D blue) */
+/** ✅ Vertical bar chart */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const barColor = (code: AB) =>
     code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
-  const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
+  const ticks = [100, 80, 60, 40, 20, 0];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-end gap-4">
-        <div className="w-10 shrink-0">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+      <div className="flex items-end gap-3 md:gap-4">
+        {/* ticks: hidden on very small screens */}
+        <div className="hidden sm:block w-8 md:w-10 shrink-0">
           {ticks.map((t) => (
             <div key={t} className="relative h-7">
               <div className="absolute right-0 top-[-2px] text-[10px] font-semibold text-slate-400">{t}</div>
@@ -147,7 +146,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
         </div>
 
         <div className="flex-1">
-          <div className="relative h-[308px] rounded-xl border border-slate-200 bg-slate-50">
+          <div className="relative h-[260px] sm:h-[300px] md:h-[308px] rounded-xl border border-slate-200 bg-slate-50">
             {ticks.map((t) => (
               <div
                 key={t}
@@ -156,22 +155,28 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
               />
             ))}
 
-            <div className="absolute inset-0 flex items-end justify-around px-6 pb-4">
+            <div className="absolute inset-0 flex items-end justify-around px-3 sm:px-4 md:px-6 pb-3 sm:pb-4">
               {items.map((it) => {
                 const h = Math.round(it.v * 100);
                 return (
-                  <div key={it.code} className="flex w-16 flex-col items-center gap-2">
-                    {/* ✅ % labels added */}
-                    <div className="text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
-                    <div className="relative h-[240px] w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
+                  <div key={it.code} className="flex w-14 sm:w-16 flex-col items-center gap-2">
+                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">
+                      {Math.round(it.v * 100)}%
+                    </div>
+                    <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
                       <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
                     </div>
                     <div className="text-xs font-bold text-slate-900">{it.code}</div>
-                    <div className="text-[11px] text-slate-600 text-center leading-tight">{it.name}</div>
+                    <div className="text-[10px] sm:text-[11px] text-slate-600 text-center leading-tight">{it.name}</div>
                   </div>
                 );
               })}
             </div>
+          </div>
+
+          {/* mobile helper: ticks summary */}
+          <div className="mt-2 sm:hidden text-[11px] text-slate-500">
+            Scale: 0–100 (top labels show %)
           </div>
         </div>
       </div>
@@ -180,10 +185,9 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
 }
 
 /**
- * ✅ Profiles-only radar: P1..P8
- * Requested change: "zoom in to 50%" so it fills the card more.
- * Implementation: scale values relative to 50% (v / 0.5), clamp to 1.
- * Also enlarge SVG canvas + radius so the chart looks bigger (not tiny).
+ * ✅ Profiles-only radar: zoom to 50% + mobile-optimized sizing
+ * - Smaller canvas on mobile (so it doesn’t overflow)
+ * - Still large on desktop
  */
 function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
@@ -193,40 +197,38 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
     return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
 
-  // ✅ "zoom to 50%" -> scale so 0.5 becomes outer ring (1.0)
   const MAX = 0.5;
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  // ✅ make the radar visually larger
-  const size = 460;
+  // ViewBox stays constant; actual render size is responsive via CSS.
+  const size = 520;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 185;
+  const r = 205;
 
   function pt(i: number, v: number) {
     const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
     return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
   }
 
-  // display as 10..50
   const rings = [0.1, 0.2, 0.3, 0.4, 0.5];
-
   const pts = labels.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
-
   const ringLabelY = (rv: number) => cy - r * (rv / MAX);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center justify-between">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+      <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
-        <div className="text-xs text-slate-500">Higher = stronger pattern</div>
+        <div className="hidden sm:block text-xs text-slate-500">Higher = stronger pattern</div>
       </div>
 
-      <div className="mt-4 flex justify-center">
-        {/* ✅ responsive svg that fills the card */}
-        <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[520px] h-auto">
-          {/* rings */}
+      <div className="mt-3 flex justify-center">
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          className="w-full h-auto max-w-[420px] sm:max-w-[520px]"
+          aria-label="Profile radar chart"
+        >
           {rings.map((rv) => (
             <polygon
               key={rv}
@@ -236,7 +238,6 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             />
           ))}
 
-          {/* ring labels (10–50%) */}
           {rings.map((rv) => (
             <text
               key={`lbl-${rv}`}
@@ -244,20 +245,18 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
               y={ringLabelY(rv)}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="11"
-              fill="rgba(15,23,42,0.45)"
+              fontSize="12"
+              fill="rgba(15,23,42,0.42)"
             >
               {Math.round(rv * 100)}%
             </text>
           ))}
 
-          {/* axes */}
           {labels.map((k, i) => {
             const p = pt(i, 1);
             return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
           })}
 
-          {/* axis labels */}
           {labels.map((k, i) => {
             const p = pt(i, 1.12);
             return (
@@ -267,7 +266,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
                 y={p.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize="12"
+                fontSize="13"
                 fontWeight={600}
                 fill="rgba(15,23,42,0.65)"
               >
@@ -276,11 +275,9 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             );
           })}
 
-          {/* polygon */}
-          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2.5" />
-          <circle cx={cx} cy={cy} r="2.5" fill="rgba(15,23,42,0.5)" />
+          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.92)" strokeWidth="2.75" />
+          <circle cx={cx} cy={cy} r="2.75" fill="rgba(15,23,42,0.5)" />
 
-          {/* point dots + % labels */}
           {labels.map((k, i) => {
             const vScaled = val(k);
             const vRaw = rawVal(k);
@@ -291,14 +288,14 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
 
             return (
               <g key={`pt-${k}`}>
-                <circle cx={p.x} cy={p.y} r="3.5" fill="rgba(20,184,166,0.95)" />
+                <circle cx={p.x} cy={p.y} r="4" fill="rgba(20,184,166,0.95)" />
                 {show ? (
                   <text
                     x={labelPt.x}
                     y={labelPt.y}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize="10"
+                    fontSize="11"
                     fill="rgba(15,23,42,0.55)"
                   >
                     {Math.round(vRaw * 100)}%
@@ -309,15 +306,14 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
           })}
         </svg>
       </div>
+
+      <div className="mt-2 sm:hidden text-xs text-slate-500 text-center">Higher = stronger pattern</div>
     </div>
   );
 }
 
 /**
- * ✅ Normalize blocks so doc-style "item lines" don't render as bold headings.
- * - Converts runs of h4 into a UL
- * - ALSO converts runs of h3 FOLLOWING an h3 heading (common in your doc export)
- *   Example: "What You Naturally Do Well" (h3) then many h3 lines = should be bullets.
+ * Normalize blocks so doc-style "item lines" don't render as bold headings.
  */
 function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   const inBlocks = Array.isArray(blocks) ? blocks : [];
@@ -331,7 +327,6 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
     const b = inBlocks[i];
     const t = String((b as any)?.type || "").toLowerCase();
 
-    // Convert runs of h4 into UL
     if (t === "h4") {
       const items: string[] = [];
       while (i < inBlocks.length && isH(inBlocks[i], "h4")) {
@@ -343,10 +338,8 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
       continue;
     }
 
-    // Convert "h3 heading + many h3 lines" into: h3 + ul(...)
     if (t === "h3" && i + 1 < inBlocks.length && (isH(inBlocks[i + 1], "h3") || isH(inBlocks[i + 1], "h4"))) {
       out.push(b);
-
       const items: string[] = [];
       i++;
 
@@ -475,7 +468,7 @@ export default function OperatingFrameReportClient(props: {
   tid: string;
   src: string;
   data: ResultData;
-  framework: any; // loaded from Supabase bucket in ReportGateClient
+  framework: any;
 }) {
   const { data, framework } = props;
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -484,7 +477,6 @@ export default function OperatingFrameReportClient(props: {
   const orgName = data.org_name || "Organisation";
   const testName = data.test_name || "OperatingFrame™";
 
-  // find profile by either PROFILE_# or P#
   const keys = profileKeyVariants(data.top_profile_code);
   const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
 
@@ -518,7 +510,6 @@ export default function OperatingFrameReportClient(props: {
   const sections = useMemo(() => {
     const common = framework?.common || {};
     const p = profile?.sections || {};
-
     return [
       { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || []) },
       { title: "Section 1 – Executive Summary", blocks: normaliseDocBlocks(p?.section_1?.blocks || []) },
@@ -544,17 +535,19 @@ export default function OperatingFrameReportClient(props: {
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 md:px-6">
+      {/* ✅ tighter padding on mobile */}
+      <div className="relative z-10 mx-auto max-w-6xl px-3 sm:px-4 py-6 md:px-6 md:py-8">
         <GlassCard className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none opacity-60">
             <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
             <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
           </div>
 
-          <div className="relative flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          {/* ✅ mobile-first header layout */}
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden">
+              <div className="flex items-start gap-3">
+                <div className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
                   <img
                     src={orgLogoSrc}
                     alt={orgName}
@@ -574,7 +567,7 @@ export default function OperatingFrameReportClient(props: {
                 </div>
               </div>
 
-              <h1 className="mt-5 text-2xl md:text-3xl font-bold tracking-tight">
+              <h1 className="mt-4 text-[22px] sm:text-2xl md:text-3xl font-bold tracking-tight leading-tight">
                 Personalised Report for <span className="text-white/90">{participant}</span>
               </h1>
 
@@ -587,25 +580,27 @@ export default function OperatingFrameReportClient(props: {
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap gap-3">
+              {/* ✅ buttons stack on mobile */}
+              <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
                 <button
                   onClick={downloadPdfViaPrint}
-                  className="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                  className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
                 >
                   Download PDF
                 </button>
 
                 <button
                   onClick={openNextSteps}
-                  className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                  className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
                 >
                   Next Steps
                 </button>
               </div>
             </div>
 
-            <div className="shrink-0 flex items-center gap-3">
-              <div className="h-[140px] w-[140px] md:h-[160px] md:w-[160px] rounded-[28px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
+            {/* ✅ hero image smaller on mobile, stays big on desktop */}
+            <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
+              <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                 <img
                   src={profileHeroSrc}
                   alt={topProfileName}
@@ -622,9 +617,9 @@ export default function OperatingFrameReportClient(props: {
             <MiniDivider />
           </div>
 
+          {/* ✅ stack cards on mobile, 2-col on md+ */}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
-              {/* ✅ (Frequency) removed */}
               <div className="text-sm font-semibold text-slate-900">Drivers</div>
               <div className="mt-2 text-sm text-slate-700">{driversIntro}</div>
               <div className="mt-4">
@@ -636,7 +631,6 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
-                {/* ✅ radar is now bigger + zoomed to 50% */}
                 <ProfileOnlyRadar profilePct={data.profile_percentages} />
               </div>
             </WhiteCard>
@@ -645,9 +639,9 @@ export default function OperatingFrameReportClient(props: {
 
         <div className="mt-6 space-y-4">
           {sections.map((s, idx) => (
-            <section key={idx} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <section key={idx} className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
               <WhiteCard>
-                <h2 className="text-xl font-semibold text-slate-900">{s.title}</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-900">{s.title}</h2>
                 <div className="mt-4 space-y-3">
                   {(s.blocks || []).map((b: any, i: number) => (
                     <BlockRenderer key={i} block={b} topProfileName={topProfileName} />
@@ -657,10 +651,11 @@ export default function OperatingFrameReportClient(props: {
             </section>
           ))}
 
+          {/* ✅ bottom CTA button full width on mobile */}
           <div className="pt-2">
             <button
               onClick={openNextSteps}
-              className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+              className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
             >
               Next Steps
             </button>
