@@ -161,6 +161,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
                 const h = Math.round(it.v * 100);
                 return (
                   <div key={it.code} className="flex w-16 flex-col items-center gap-2">
+                    {/* ✅ % labels added */}
                     <div className="text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
                     <div className="relative h-[240px] w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
                       <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
@@ -180,9 +181,9 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
 
 /**
  * ✅ Profiles-only radar: P1..P8
- * Requested change: "zoom in to 60%" so it doesn't bunch up.
- * Implementation: scale values relative to 60% (v / 0.6), clamp to 1.
- * Also add ring labels and point % labels with better spacing.
+ * Requested change: "zoom in to 50%" so it fills the card more.
+ * Implementation: scale values relative to 50% (v / 0.5), clamp to 1.
+ * Also enlarge SVG canvas + radius so the chart looks bigger (not tiny).
  */
 function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
@@ -192,26 +193,27 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
     return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
 
-  // "zoom to 60%" -> scale so 0.6 becomes outer ring (1.0)
-  const MAX = 0.6;
+  // ✅ "zoom to 50%" -> scale so 0.5 becomes outer ring (1.0)
+  const MAX = 0.5;
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  const size = 360;
+  // ✅ make the radar visually larger
+  const size = 460;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 140;
+  const r = 185;
 
   function pt(i: number, v: number) {
     const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
     return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
   }
 
-  const rings = [0.1, 0.2, 0.3, 0.4, 0.5]; // display as 10..50
+  // display as 10..50
+  const rings = [0.1, 0.2, 0.3, 0.4, 0.5];
 
   const pts = labels.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
 
-  // ring label positions on top axis, but spread slightly so they don't stack too tightly
   const ringLabelY = (rv: number) => cy - r * (rv / MAX);
 
   return (
@@ -222,7 +224,8 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
       </div>
 
       <div className="mt-4 flex justify-center">
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* ✅ responsive svg that fills the card */}
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[520px] h-auto">
           {/* rings */}
           {rings.map((rv) => (
             <polygon
@@ -233,7 +236,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             />
           ))}
 
-          {/* ring labels (10–60%) */}
+          {/* ring labels (10–50%) */}
           {rings.map((rv) => (
             <text
               key={`lbl-${rv}`}
@@ -241,7 +244,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
               y={ringLabelY(rv)}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="10"
+              fontSize="11"
               fill="rgba(15,23,42,0.45)"
             >
               {Math.round(rv * 100)}%
@@ -264,7 +267,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
                 y={p.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize="11"
+                fontSize="12"
                 fontWeight={600}
                 fill="rgba(15,23,42,0.65)"
               >
@@ -274,29 +277,28 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
           })}
 
           {/* polygon */}
-          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2" />
-          <circle cx={cx} cy={cy} r="2" fill="rgba(15,23,42,0.5)" />
+          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.9)" strokeWidth="2.5" />
+          <circle cx={cx} cy={cy} r="2.5" fill="rgba(15,23,42,0.5)" />
 
-          {/* point dots + % labels (use raw % text, but position using scaled geometry) */}
+          {/* point dots + % labels */}
           {labels.map((k, i) => {
             const vScaled = val(k);
             const vRaw = rawVal(k);
             const p = pt(i, vScaled);
 
-            // put label slightly further out; only show if >0 to reduce clutter
             const show = vRaw > 0.001;
             const labelPt = pt(i, Math.min(1, vScaled + 0.16));
 
             return (
               <g key={`pt-${k}`}>
-                <circle cx={p.x} cy={p.y} r="3" fill="rgba(20,184,166,0.95)" />
+                <circle cx={p.x} cy={p.y} r="3.5" fill="rgba(20,184,166,0.95)" />
                 {show ? (
                   <text
                     x={labelPt.x}
                     y={labelPt.y}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize="9"
+                    fontSize="10"
                     fill="rgba(15,23,42,0.55)"
                   >
                     {Math.round(vRaw * 100)}%
@@ -343,13 +345,11 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
 
     // Convert "h3 heading + many h3 lines" into: h3 + ul(...)
     if (t === "h3" && i + 1 < inBlocks.length && (isH(inBlocks[i + 1], "h3") || isH(inBlocks[i + 1], "h4"))) {
-      // Keep the first h3 as the heading
       out.push(b);
 
       const items: string[] = [];
       i++;
 
-      // Collect consecutive h3/h4 blocks as bullet items
       while (i < inBlocks.length) {
         const tt = String((inBlocks[i] as any)?.type || "").toLowerCase();
         if (tt !== "h3" && tt !== "h4") break;
@@ -378,9 +378,7 @@ function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
 
   if (raw === "{{TOP_PROFILE_IMAGE}}") {
     const file = profileNameToImageFile(topProfileName);
-    return file
-      ? `/images/operatingframe-full-test/profile-cards/${file}`
-      : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+    return file ? `/images/operatingframe-full-test/profile-cards/${file}` : "/images/operatingframe-full-test/profile-cards/bio-image.png";
   }
 
   return raw;
@@ -392,11 +390,7 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
 
   if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText(b.text)}</h1>;
   if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText(b.text)}</h2>;
-
-  // Subheadings: bold, but not huge
   if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText(b.text)}</h3>;
-
-  // IMPORTANT: h4 should not look like "big bold headings"
   if (type === "h4") return <div className="text-sm font-normal text-slate-700">{safeText(b.text)}</div>;
 
   if (type === "p") return <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{safeText(b.text)}</p>;
@@ -447,9 +441,7 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
     const maxH = typeof b?.max_h === "number" ? b.max_h : 360;
 
     const wantsBorder =
-      b?.border === false || b?.no_border === true || String(src).toLowerCase().includes("nick-pye")
-        ? false
-        : true;
+      b?.border === false || b?.no_border === true || String(src).toLowerCase().includes("nick-pye") ? false : true;
 
     const rounded = b?.rounded === false ? "rounded-none" : "rounded-2xl";
     const chrome = wantsBorder ? "border border-slate-200 bg-white shadow-sm" : "border-0 bg-transparent shadow-none";
@@ -612,7 +604,6 @@ export default function OperatingFrameReportClient(props: {
               </div>
             </div>
 
-            {/* ✅ Bigger header image (your request) */}
             <div className="shrink-0 flex items-center gap-3">
               <div className="h-[140px] w-[140px] md:h-[160px] md:w-[160px] rounded-[28px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                 <img
@@ -633,6 +624,7 @@ export default function OperatingFrameReportClient(props: {
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
+              {/* ✅ (Frequency) removed */}
               <div className="text-sm font-semibold text-slate-900">Drivers</div>
               <div className="mt-2 text-sm text-slate-700">{driversIntro}</div>
               <div className="mt-4">
@@ -644,6 +636,7 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
+                {/* ✅ radar is now bigger + zoomed to 50% */}
                 <ProfileOnlyRadar profilePct={data.profile_percentages} />
               </div>
             </WhiteCard>
