@@ -522,7 +522,8 @@ export default function OperatingFrameReportClient(props: {
       makeSection("Section 5 – Team Contribution", p?.section_5),
       makeSection("Section 6 – Stress Operating Summary", p?.section_6),
       makeSection("Section 7 – Decision Pattern", p?.section_7),
-      makeSection("Section 8 – Development Roadmap", p?.section_8),
+      makeSection("Section 8 – Decision Pattern", p?.section_8),
+      makeSection("Section 9 – Development Roadmap", p?.section_9),
     ];
   }, [framework, profile]);
 
