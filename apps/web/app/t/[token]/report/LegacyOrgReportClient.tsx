@@ -696,7 +696,32 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
 
   // Header hero image (use TP top profile card if available, otherwise org logo)
   const heroSrc = topProfileImage || "";
+function getTeamPuzzleProfileImage(profileName?: string): string | null {
+  if (!profileName) return null;
 
+  // normalise: lowercase, trim, collapse spaces, remove non-letters
+  const cleaned = profileName
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z\s]/g, "");
+
+  // match by "contains" so we don't depend on exact wording
+  if (cleaned.includes("visionary")) return "/profile-cards/tp-visionary.png";
+  if (cleaned.includes("catalyst")) return "/profile-cards/tp-catalyst.png";
+  if (cleaned.includes("motivator")) return "/profile-cards/tp-motivator.png";
+  if (cleaned.includes("connector")) return "/profile-cards/tp-connector.png";
+  if (cleaned.includes("facilitator")) return "/profile-cards/tp-facilitator.png";
+  if (cleaned.includes("coordinator")) return "/profile-cards/tp-coordinator.png";
+  if (cleaned.includes("controller")) return "/profile-cards/tp-controller.png";
+
+  // handle optimiser / optimizer spelling + "optimiser" variations
+  if (cleaned.includes("optimiser") || cleaned.includes("optimizer") || cleaned.includes("optimiser")) {
+    return "/profile-cards/tp-optimiser.png";
+  }
+
+  return null;
+}
   const topFreqName =
     data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq;
 
@@ -845,7 +870,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                       }}
                     />
                     {orgAssets.founderCaption ? (
-                      <p className="text-xs text-slate-500 text-center">{orgAssets.founderCaption}</p>
+                      <p className="text-xs text-slate-500 text-left">{orgAssets.founderCaption}</p>
                     ) : null}
                   </div>
                 ) : null}
