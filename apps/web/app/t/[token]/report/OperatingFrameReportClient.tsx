@@ -12,13 +12,11 @@ type LinkMeta = {
   redirect_url?: string | null;
   hidden_results_message?: string | null;
   email_report?: boolean | null;
-
   meta?: {
     redirect_url?: string | null;
     next_steps_url?: string | null;
     [k: string]: any;
   } | null;
-
   [k: string]: any;
 };
 
@@ -26,23 +24,18 @@ type ResultData = {
   org_slug: string;
   org_name?: string | null;
   test_name: string;
-
   taker: {
     id: string;
     first_name?: string | null;
     last_name?: string | null;
   };
-
   link?: LinkMeta;
-
   frequency_labels: Array<{ code: AB; name: string }>;
   frequency_percentages: Record<AB, number>;
-
   profile_labels: Array<{ code: string; name: string }>;
   profile_percentages: Record<string, number>;
-
   top_freq: AB;
-  top_profile_code: string; // PROFILE_1..PROFILE_8
+  top_profile_code: string;
   top_profile_name: string;
 };
 
@@ -87,9 +80,9 @@ function fullName(first?: string | null, last?: string | null) {
 }
 
 function profileKeyVariants(code: string) {
-  const c = String(code || "").toUpperCase().trim(); // PROFILE_1
-  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c; // P1
-  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c; // PROFILE_1
+  const c = String(code || "").toUpperCase().trim();
+  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c;
+  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c;
   return Array.from(new Set([c, asP, asPROFILE]));
 }
 
@@ -126,7 +119,6 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-/** ✅ Vertical bar chart */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const barColor = (code: AB) =>
@@ -136,7 +128,6 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-end gap-3 md:gap-4">
-        {/* ticks: hidden on very small screens */}
         <div className="hidden sm:block w-8 md:w-10 shrink-0">
           {ticks.map((t) => (
             <div key={t} className="relative h-7">
@@ -173,23 +164,16 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
               })}
             </div>
           </div>
-
-          {/* mobile helper: ticks summary */}
-          <div className="mt-2 sm:hidden text-[11px] text-slate-500">
-            Scale: 0–100 (top labels show %)
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/**
- * ✅ Profiles-only radar: zoom to 50% + mobile-optimized sizing
- * - Smaller canvas on mobile (so it doesn’t overflow)
- * - Still large on desktop
- */
-function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
+function ProfileOnlyRadar(props: {
+  profilePct: Record<string, number>;
+  profileLabels: Array<{ code: string; name: string }>;
+}) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
   const rawVal = (p: string) => {
@@ -197,10 +181,14 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
     return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
 
+  const getProfileName = (p: string) => {
+    const asPROFILE = p.replace(/^P/, "PROFILE_");
+    return props.profileLabels.find((x) => x.code === asPROFILE)?.name || p;
+  };
+
   const MAX = 0.5;
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  // ViewBox stays constant; actual render size is responsive via CSS.
   const size = 520;
   const cx = size / 2;
   const cy = size / 2;
@@ -258,7 +246,8 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
           })}
 
           {labels.map((k, i) => {
-            const p = pt(i, 1.12);
+            const p = pt(i, 1.16);
+            const name = getProfileName(k);
             return (
               <text
                 key={k}
@@ -266,11 +255,11 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
                 y={p.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize="13"
+                fontSize="12"
                 fontWeight={600}
                 fill="rgba(15,23,42,0.65)"
               >
-                {k}
+                {`${k}: ${name}`}
               </text>
             );
           })}
@@ -282,7 +271,6 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             const vScaled = val(k);
             const vRaw = rawVal(k);
             const p = pt(i, vScaled);
-
             const show = vRaw > 0.001;
             const labelPt = pt(i, Math.min(1, vScaled + 0.16));
 
@@ -312,9 +300,6 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   );
 }
 
-/**
- * Normalize blocks so doc-style "item lines" don't render as bold headings.
- */
 function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   const inBlocks = Array.isArray(blocks) ? blocks : [];
   const out: ReportBlock[] = [];
@@ -361,6 +346,18 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   }
 
   return out;
+}
+
+function stripLeadingTitleBlock(blocks: ReportBlock[]): ReportBlock[] {
+  if (!Array.isArray(blocks) || blocks.length === 0) return [];
+  const first = blocks[0];
+  const type = String((first as any)?.type || "").toLowerCase();
+
+  if (type === "h1" || type === "h2") {
+    return blocks.slice(1);
+  }
+
+  return blocks;
 }
 
 function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
@@ -510,16 +507,23 @@ export default function OperatingFrameReportClient(props: {
   const sections = useMemo(() => {
     const common = framework?.common || {};
     const p = profile?.sections || {};
+
+    const makeSection = (fallbackTitle: string, raw: any) => {
+      const title = safeText(raw?.title).trim() || fallbackTitle;
+      const blocks = stripLeadingTitleBlock(normaliseDocBlocks(raw?.blocks || []));
+      return { title, blocks };
+    };
+
     return [
-      { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || []) },
-      { title: "Section 1 – Executive Summary", blocks: normaliseDocBlocks(p?.section_1?.blocks || []) },
-      { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: normaliseDocBlocks(p?.section_2?.blocks || []) },
-      { title: "Section 3 – Your Operating Style", blocks: normaliseDocBlocks(p?.section_3?.blocks || []) },
-      { title: "Section 4 – Micro Pattern Expression", blocks: normaliseDocBlocks(p?.section_4?.blocks || []) },
-      { title: "Section 5 – Your Team Contribution", blocks: normaliseDocBlocks(p?.section_5?.blocks || []) },
-      { title: "Section 6 – Stress Operating Summary", blocks: normaliseDocBlocks(p?.section_6?.blocks || []) },
-      { title: "Section 7 – Decision Pattern", blocks: normaliseDocBlocks(p?.section_7?.blocks || []) },
-      { title: "Section 8 – Development Roadmap", blocks: normaliseDocBlocks(p?.section_8?.blocks || []) },
+      makeSection("Welcome", common?.welcome),
+      makeSection("Section 1 – Executive Summary", p?.section_1),
+      makeSection("Section 2 – Your Leadership Drivers", p?.section_2),
+      makeSection("Section 3 – Your Operating Style", p?.section_3),
+      makeSection("Section 4 – How Your Drivers Combine", p?.section_4),
+      makeSection("Section 5 – Team Contribution", p?.section_5),
+      makeSection("Section 6 – Stress Operating Summary", p?.section_6),
+      makeSection("Section 7 – Decision Pattern", p?.section_7),
+      makeSection("Section 8 – Development Roadmap", p?.section_8),
     ];
   }, [framework, profile]);
 
@@ -535,7 +539,6 @@ export default function OperatingFrameReportClient(props: {
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
 
-      {/* ✅ tighter padding on mobile */}
       <div className="relative z-10 mx-auto max-w-6xl px-3 sm:px-4 py-6 md:px-6 md:py-8">
         <GlassCard className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none opacity-60">
@@ -543,7 +546,6 @@ export default function OperatingFrameReportClient(props: {
             <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
           </div>
 
-          {/* ✅ mobile-first header layout */}
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <div className="flex items-start gap-3">
@@ -580,7 +582,6 @@ export default function OperatingFrameReportClient(props: {
                 </div>
               </div>
 
-              {/* ✅ buttons stack on mobile */}
               <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
                 <button
                   onClick={downloadPdfViaPrint}
@@ -598,7 +599,6 @@ export default function OperatingFrameReportClient(props: {
               </div>
             </div>
 
-            {/* ✅ hero image smaller on mobile, stays big on desktop */}
             <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
               <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                 <img
@@ -617,7 +617,6 @@ export default function OperatingFrameReportClient(props: {
             <MiniDivider />
           </div>
 
-          {/* ✅ stack cards on mobile, 2-col on md+ */}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
               <div className="text-sm font-semibold text-slate-900">Drivers</div>
@@ -631,7 +630,10 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
-                <ProfileOnlyRadar profilePct={data.profile_percentages} />
+                <ProfileOnlyRadar
+                  profilePct={data.profile_percentages}
+                  profileLabels={data.profile_labels}
+                />
               </div>
             </WhiteCard>
           </div>
@@ -651,7 +653,6 @@ export default function OperatingFrameReportClient(props: {
             </section>
           ))}
 
-          {/* ✅ bottom CTA button full width on mobile */}
           <div className="pt-2">
             <button
               onClick={openNextSteps}
