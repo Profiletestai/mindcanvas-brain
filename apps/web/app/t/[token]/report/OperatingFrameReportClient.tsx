@@ -106,6 +106,17 @@ function profileNameToImageFile(profileName: string) {
   return "";
 }
 
+function cleanProfileLabel(name: string, code: string) {
+  const raw = String(name || "").trim();
+  if (!raw) return code;
+
+  // remove prefixes like "P1:", "P1 -", "PROFILE_1:"
+  return raw
+    .replace(/^P\d+\s*[:\-]\s*/i, "")
+    .replace(/^PROFILE[_\s-]?\d+\s*[:\-]\s*/i, "")
+    .trim();
+}
+
 function GlassCard(props: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6 ${props.className || ""}`}>
@@ -126,7 +137,7 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-/** ✅ Vertical bar chart */
+/** Vertical bar chart */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const barColor = (code: AB) =>
@@ -136,7 +147,6 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-end gap-3 md:gap-4">
-        {/* ticks: hidden on very small screens */}
         <div className="hidden sm:block w-8 md:w-10 shrink-0">
           {ticks.map((t) => (
             <div key={t} className="relative h-7">
@@ -174,7 +184,6 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
             </div>
           </div>
 
-          {/* mobile helper: ticks summary */}
           <div className="mt-2 sm:hidden text-[11px] text-slate-500">
             Scale: 0–100 (top labels show %)
           </div>
@@ -185,33 +194,47 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
 }
 
 /**
- * ✅ Profiles-only radar: zoom to 50% + mobile-optimized sizing
- * - Smaller canvas on mobile (so it doesn’t overflow)
- * - Still large on desktop
+ * Profiles-only radar
+ * - adds profile names to labels
+ * - zooms in a bit more
+ * - keeps mobile sizing clean
  */
-function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
+function ProfileOnlyRadar(props: {
+  profilePct: Record<string, number>;
+  profileLabels: Array<{ code: string; name: string }>;
+}) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
+
+  const profileNameByCode = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const p of props.profileLabels || []) {
+      const rawCode = String(p.code || "").toUpperCase();
+      const pCode = rawCode.startsWith("PROFILE_") ? rawCode.replace("PROFILE_", "P") : rawCode;
+      out[pCode] = cleanProfileLabel(String(p.name || ""), pCode);
+    }
+    return out;
+  }, [props.profileLabels]);
 
   const rawVal = (p: string) => {
     const asPROFILE = p.replace(/^P/, "PROFILE_");
     return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
 
-  const MAX = 0.5;
+  // Zoom in a little more than before
+  const MAX = 0.45;
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  // ViewBox stays constant; actual render size is responsive via CSS.
-  const size = 520;
+  const size = 560;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 205;
+  const r = 220;
 
   function pt(i: number, v: number) {
     const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
     return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
   }
 
-  const rings = [0.1, 0.2, 0.3, 0.4, 0.5];
+  const rings = [0.1, 0.2, 0.3, 0.4];
   const pts = labels.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
   const ringLabelY = (rv: number) => cy - r * (rv / MAX);
@@ -219,14 +242,14 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
+        <div className="text-sm font-semibold text-slate-900">Your Personality Map</div>
         <div className="hidden sm:block text-xs text-slate-500">Higher = stronger pattern</div>
       </div>
 
-      <div className="mt-3 flex justify-center">
+      <div className="mt-3 flex justify-center overflow-x-auto">
         <svg
           viewBox={`0 0 ${size} ${size}`}
-          className="w-full h-auto max-w-[420px] sm:max-w-[520px]"
+          className="w-full h-auto min-w-[340px] max-w-[460px] sm:max-w-[560px]"
           aria-label="Profile radar chart"
         >
           {rings.map((rv) => (
@@ -258,20 +281,33 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
           })}
 
           {labels.map((k, i) => {
-            const p = pt(i, 1.12);
+            const p = pt(i, 1.14);
+            const name = profileNameByCode[k] || k;
+
             return (
-              <text
-                key={k}
-                x={p.x}
-                y={p.y}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="13"
-                fontWeight={600}
-                fill="rgba(15,23,42,0.65)"
-              >
-                {k}
-              </text>
+              <g key={k}>
+                <text
+                  x={p.x}
+                  y={p.y - 7}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="13"
+                  fontWeight={700}
+                  fill="rgba(15,23,42,0.72)"
+                >
+                  {k}
+                </text>
+                <text
+                  x={p.x}
+                  y={p.y + 10}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="10.5"
+                  fill="rgba(15,23,42,0.56)"
+                >
+                  {name}
+                </text>
+              </g>
             );
           })}
 
@@ -282,9 +318,8 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number> }) {
             const vScaled = val(k);
             const vRaw = rawVal(k);
             const p = pt(i, vScaled);
-
             const show = vRaw > 0.001;
-            const labelPt = pt(i, Math.min(1, vScaled + 0.16));
+            const labelPt = pt(i, Math.min(1, vScaled + 0.14));
 
             return (
               <g key={`pt-${k}`}>
@@ -529,13 +564,12 @@ export default function OperatingFrameReportClient(props: {
 
   const mapIntro =
     safeText(framework?.common?.profile_map_intro?.blocks?.[0]?.text) ||
-    "This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
+    "This map shows your overall pattern across Profiles. It helps you see what you naturally lean on and what may require more intention.";
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
 
-      {/* ✅ tighter padding on mobile */}
       <div className="relative z-10 mx-auto max-w-6xl px-3 sm:px-4 py-6 md:px-6 md:py-8">
         <GlassCard className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none opacity-60">
@@ -543,7 +577,6 @@ export default function OperatingFrameReportClient(props: {
             <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
           </div>
 
-          {/* ✅ mobile-first header layout */}
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <div className="flex items-start gap-3">
@@ -580,7 +613,6 @@ export default function OperatingFrameReportClient(props: {
                 </div>
               </div>
 
-              {/* ✅ buttons stack on mobile */}
               <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
                 <button
                   onClick={downloadPdfViaPrint}
@@ -598,7 +630,6 @@ export default function OperatingFrameReportClient(props: {
               </div>
             </div>
 
-            {/* ✅ hero image smaller on mobile, stays big on desktop */}
             <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
               <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                 <img
@@ -617,7 +648,6 @@ export default function OperatingFrameReportClient(props: {
             <MiniDivider />
           </div>
 
-          {/* ✅ stack cards on mobile, 2-col on md+ */}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
               <div className="text-sm font-semibold text-slate-900">Drivers</div>
@@ -631,7 +661,10 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
-                <ProfileOnlyRadar profilePct={data.profile_percentages} />
+                <ProfileOnlyRadar
+                  profilePct={data.profile_percentages}
+                  profileLabels={data.profile_labels}
+                />
               </div>
             </WhiteCard>
           </div>
@@ -651,7 +684,6 @@ export default function OperatingFrameReportClient(props: {
             </section>
           ))}
 
-          {/* ✅ bottom CTA button full width on mobile */}
           <div className="pt-2">
             <button
               onClick={openNextSteps}
