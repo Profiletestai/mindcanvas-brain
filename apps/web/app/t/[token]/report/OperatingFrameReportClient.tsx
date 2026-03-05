@@ -3,7 +3,6 @@
 
 import AppBackground from "@/components/ui/AppBackground";
 import { useMemo, useRef } from "react";
-import type { ReactNode, SyntheticEvent } from "react";
 
 type AB = "A" | "B" | "C" | "D";
 
@@ -31,12 +30,15 @@ type ResultData = {
     last_name?: string | null;
   };
   link?: LinkMeta;
+
   frequency_labels: Array<{ code: AB; name: string }>;
   frequency_percentages: Record<AB, number>;
+
   profile_labels: Array<{ code: string; name: string }>;
   profile_percentages: Record<string, number>;
+
   top_freq: AB;
-  top_profile_code: string;
+  top_profile_code: string; // PROFILE_1..PROFILE_8
   top_profile_name: string;
 };
 
@@ -81,12 +83,13 @@ function fullName(first?: string | null, last?: string | null) {
 }
 
 function profileKeyVariants(code: string) {
-  const c = String(code || "").toUpperCase().trim();
-  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c;
-  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c;
+  const c = String(code || "").toUpperCase().trim(); // PROFILE_1
+  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c; // P1
+  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c; // PROFILE_1
   return Array.from(new Set([c, asP, asPROFILE]));
 }
 
+// Map profile name -> image in /public/images/operatingframe-full-test/profile-cards/
 function profileNameToImageFile(profileName: string) {
   const n = String(profileName || "").toLowerCase();
   if (n.includes("activator")) return "activator.png";
@@ -100,7 +103,7 @@ function profileNameToImageFile(profileName: string) {
   return "";
 }
 
-function GlassCard(props: { children: ReactNode; className?: string }) {
+function GlassCard(props: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6 ${props.className || ""}`}>
       {props.children}
@@ -108,7 +111,7 @@ function GlassCard(props: { children: ReactNode; className?: string }) {
   );
 }
 
-function WhiteCard(props: { children: ReactNode; className?: string }) {
+function WhiteCard(props: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl bg-white p-4 md:p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
       {props.children}
@@ -120,7 +123,7 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-/** ✅ Vertical Drivers chart (percent labels on bars already). */
+/** Vertical driver bars */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const barColor = (code: AB) =>
@@ -164,19 +167,13 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
               })}
             </div>
           </div>
-
-          {/* intentionally removed the extra mobile “Scale…” helper line */}
         </div>
       </div>
     </div>
   );
 }
 
-/**
- * ✅ Profiles-only radar
- * - includes profile names in the axis labels: "P1: Activator"
- * - slightly zoomed in (bigger radius + outer label spacing)
- */
+/** Profile radar + names */
 function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLabels: Array<{ code: string; name: string }> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
@@ -190,16 +187,14 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
     return props.profileLabels.find((x) => x.code === asPROFILE)?.name || p;
   };
 
-  // “zoom” target: 50% outer ring
+  // zoom (0.5 = zoom in to 50% max)
   const MAX = 0.5;
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
   const size = 520;
   const cx = size / 2;
   const cy = size / 2;
-
-  // slightly larger radius than before = reads less “small”
-  const r = 225;
+  const r = 205;
 
   function pt(i: number, v: number) {
     const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
@@ -219,7 +214,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
       </div>
 
       <div className="mt-3 flex justify-center">
-        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto max-w-[420px] sm:max-w-[560px]" aria-label="Profile radar chart">
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto max-w-[420px] sm:max-w-[520px]">
           {rings.map((rv) => (
             <polygon
               key={rv}
@@ -230,7 +225,15 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
           ))}
 
           {rings.map((rv) => (
-            <text key={`lbl-${rv}`} x={cx} y={ringLabelY(rv)} textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="rgba(15,23,42,0.42)">
+            <text
+              key={`lbl-${rv}`}
+              x={cx}
+              y={ringLabelY(rv)}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="12"
+              fill="rgba(15,23,42,0.42)"
+            >
               {Math.round(rv * 100)}%
             </text>
           ))}
@@ -240,9 +243,8 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
             return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
           })}
 
-          {/* axis labels incl. names */}
           {labels.map((k, i) => {
-            const p = pt(i, 1.18);
+            const p = pt(i, 1.16);
             const name = getProfileName(k);
             return (
               <text
@@ -267,7 +269,6 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
             const vScaled = val(k);
             const vRaw = rawVal(k);
             const p = pt(i, vScaled);
-
             const show = vRaw > 0.001;
             const labelPt = pt(i, Math.min(1, vScaled + 0.16));
 
@@ -275,7 +276,14 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
               <g key={`pt-${k}`}>
                 <circle cx={p.x} cy={p.y} r="4" fill="rgba(20,184,166,0.95)" />
                 {show ? (
-                  <text x={labelPt.x} y={labelPt.y} textAnchor="middle" dominantBaseline="middle" fontSize="11" fill="rgba(15,23,42,0.55)">
+                  <text
+                    x={labelPt.x}
+                    y={labelPt.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="11"
+                    fill="rgba(15,23,42,0.55)"
+                  >
                     {Math.round(vRaw * 100)}%
                   </text>
                 ) : null}
@@ -290,9 +298,7 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
   );
 }
 
-/**
- * Normalize blocks so doc-style "item lines" don't render as bold headings.
- */
+/** Normalize doc blocks */
 function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   const inBlocks = Array.isArray(blocks) ? blocks : [];
   const out: ReportBlock[] = [];
@@ -341,6 +347,7 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   return out;
 }
 
+/** Remove duplicated H1/H2 at start of a section */
 function stripLeadingTitleBlock(blocks: ReportBlock[]): ReportBlock[] {
   if (!Array.isArray(blocks) || blocks.length === 0) return [];
   const first = blocks[0];
@@ -365,9 +372,26 @@ function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
   return raw;
 }
 
-function hideImg(e: SyntheticEvent<HTMLImageElement>) {
-  const img = e.currentTarget as HTMLImageElement;
-  img.style.display = "none";
+/** Replace simple tokens in block text/src/caption */
+function replaceTokensInBlocks(blocks: ReportBlock[], ctx: Record<string, string>): ReportBlock[] {
+  const walk = (v: any): any => {
+    if (typeof v === "string") {
+      let s = v;
+      for (const [k, val] of Object.entries(ctx)) {
+        s = s.split(`{{${k}}}`).join(val);
+      }
+      return s;
+    }
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === "object") {
+      const out: Record<string, any> = {};
+      for (const [k, val] of Object.entries(v)) out[k] = walk(val);
+      return out;
+    }
+    return v;
+  };
+
+  return walk(blocks) as ReportBlock[];
 }
 
 function BlockRenderer(props: { block: any; topProfileName: string }) {
@@ -426,7 +450,8 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
     const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
     const maxH = typeof b?.max_h === "number" ? b.max_h : 360;
 
-    const wantsBorder = b?.border === false || b?.no_border === true || String(src).toLowerCase().includes("nick-pye") ? false : true;
+    const wantsBorder =
+      b?.border === false || b?.no_border === true || String(src).toLowerCase().includes("nick-pye") ? false : true;
 
     const rounded = b?.rounded === false ? "rounded-none" : "rounded-2xl";
     const chrome = wantsBorder ? "border border-slate-200 bg-white shadow-sm" : "border-0 bg-transparent shadow-none";
@@ -434,7 +459,15 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
     return (
       <figure className="my-4">
         <div className={`flex ${justify}`}>
-          <img src={src} alt={safeText(b?.alt)} className={`max-w-full ${rounded} ${chrome}`} style={{ maxHeight: maxH }} onError={hideImg} />
+          <img
+            src={src}
+            alt={safeText(b?.alt)}
+            className={`max-w-full ${rounded} ${chrome}`}
+            style={{ maxHeight: maxH }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
         </div>
         {b?.caption ? <figcaption className="mt-2 text-xs text-slate-500">{safeText(b.caption)}</figcaption> : null}
       </figure>
@@ -452,7 +485,7 @@ export default function OperatingFrameReportClient(props: {
   tid: string;
   src: string;
   data: ResultData;
-  framework: any; // from Supabase bucket
+  framework: any;
 }) {
   const { data, framework } = props;
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -465,6 +498,8 @@ export default function OperatingFrameReportClient(props: {
   const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
 
   const topProfileName = profile?.name || data.top_profile_name || "Top Profile";
+  const topProfileCode = data.top_profile_code || "PROFILE_1";
+
   const topFreqCode = data.top_freq;
   const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
@@ -474,6 +509,17 @@ export default function OperatingFrameReportClient(props: {
   const profileHeroSrc = profileFile
     ? `/images/operatingframe-full-test/profile-cards/${profileFile}`
     : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+
+  const tokenCtx: Record<string, string> = {
+    TOP_PROFILE_NAME: topProfileName,
+    TOP_PROFILE_CODE: topProfileCode,
+    TOP_PROFILE_IMAGE: "{{TOP_PROFILE_IMAGE}}", // resolved later in resolveBlockImageSrc
+    TOP_DRIVER_NAME: topFreqName,
+    TOP_DRIVER_CODE: topFreqCode,
+    PARTICIPANT_NAME: participant,
+    ORG_NAME: orgName,
+    TEST_NAME: testName,
+  };
 
   function openNextSteps() {
     const direct =
@@ -491,40 +537,34 @@ export default function OperatingFrameReportClient(props: {
     window.print();
   }
 
-  /**
-   * ✅ Section routing per your spec:
-   * - Standard sections (2/3/4) must come from framework.common
-   * - Profile-specific sections (1,5,6,7,8,9) come from profile.sections
-   */
   const sections = useMemo(() => {
     const common = framework?.common || {};
     const p = profile?.sections || {};
 
-    const make = (fallbackTitle: string, raw: any) => {
+    const build = (fallbackTitle: string, raw: any) => {
       const title = safeText(raw?.title).trim() || fallbackTitle;
-      const blocks = stripLeadingTitleBlock(normaliseDocBlocks(raw?.blocks || []));
+      const rawBlocks = Array.isArray(raw?.blocks) ? (raw.blocks as ReportBlock[]) : [];
+      const blocks = stripLeadingTitleBlock(normaliseDocBlocks(replaceTokensInBlocks(rawBlocks, tokenCtx)));
       return { title, blocks };
     };
 
-    // NOTE:
-    // v3_RESECTIONED.json stores standard sections under common.section_2/3/4
-    // and profile-specific ones under profile.sections.section_1/5/6/7/8/9
+    // ✅ IMPORTANT: Section 2–5 come from COMMON (standard on all reports)
+    // Section 6–9 come from PROFILE (specific)
     return [
-      make("Welcome", common?.welcome),
+      build("Welcome", common?.welcome),
+      build("Section 1 – Executive Summary", p?.section_1),
 
-      make("Section 1 – Executive Summary", p?.section_1),
+      build("Section 2 – The Four Leadership Drivers", common?.section_2),
+      build("Section 3 – The Eight Operating Styles", common?.section_3),
+      build("Section 4 – Your Operating Style", common?.section_4),
+      build("Section 5 – How Your Drivers Combine", common?.section_5),
 
-      make("Section 2 – The Four Leadership Drivers", common?.section_2),
-      make("Section 3 – The Eight Operating Styles", common?.section_3),
-      make("Section 4 – Your Operating Style", common?.section_4),
-
-      make("Section 5 – Your Team Contribution", p?.section_5),
-      make("Section 6 – Your Stress Operating Summary", p?.section_6),
-      make("Section 7 – Your Decision Patterns", p?.section_7),
-      make("Section 8 – Your Development Roadmap", p?.section_8),
-      make("Section 9 – Your Development Roadmap", p?.section_9 ?? p?.section_8),
+      build("Section 6 – Your Team Contribution", p?.section_6),
+      build("Section 7 – Your Stress Operating Summary", p?.section_7),
+      build("Section 8 – Your Decision Patterns", p?.section_8),
+      build("Section 9 – Your Development Roadmap", p?.section_9),
     ];
-  }, [framework, profile]);
+  }, [framework, profile, topProfileName, topProfileCode, topFreqName, topFreqCode, participant, orgName, testName]);
 
   const driversIntro =
     safeText(framework?.common?.drivers_intro?.blocks?.[0]?.text) ||
@@ -549,7 +589,14 @@ export default function OperatingFrameReportClient(props: {
             <div className="min-w-0">
               <div className="flex items-start gap-3">
                 <div className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
-                  <img src={orgLogoSrc} alt={orgName} className="h-full w-full object-cover" onError={hideImg} />
+                  <img
+                    src={orgLogoSrc}
+                    alt={orgName}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 </div>
 
                 <div className="min-w-0">
@@ -593,7 +640,14 @@ export default function OperatingFrameReportClient(props: {
 
             <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
               <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
-                <img src={profileHeroSrc} alt={topProfileName} className="h-full w-full object-cover" onError={hideImg} />
+                <img
+                  src={profileHeroSrc}
+                  alt={topProfileName}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             </div>
           </div>

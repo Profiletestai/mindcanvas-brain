@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -183,7 +183,12 @@ const DEFAULT_FREQUENCY_DESCRIPTIONS: Record<FrequencyCode, string> = {
   D: "Observation, reflection, analysis and deeper understanding.",
 };
 
-// ---------- OperatingFrame-style header helpers ----------------------------
+// ---------- OperatingFrame-style header UI helpers -------------------------
+
+function clamp01(n: number) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
 
 function GlassCard(props: { children: ReactNode; className?: string }) {
   return (
@@ -193,8 +198,201 @@ function GlassCard(props: { children: ReactNode; className?: string }) {
   );
 }
 
+function WhiteCard(props: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl bg-white p-4 md:p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
+      {props.children}
+    </div>
+  );
+}
+
 function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
+}
+
+/** ✅ Vertical Drivers chart (percent labels on bars already). */
+function VerticalDriversChart(props: {
+  labels: Array<{ code: FrequencyCode; name: string }>;
+  pct: Record<FrequencyCode, number>;
+}) {
+  const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
+  const barColor = (code: FrequencyCode) =>
+    code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
+  const ticks = [100, 80, 60, 40, 20, 0];
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+      <div className="flex items-end gap-3 md:gap-4">
+        <div className="hidden sm:block w-8 md:w-10 shrink-0">
+          {ticks.map((t) => (
+            <div key={t} className="relative h-7">
+              <div className="absolute right-0 top-[-2px] text-[10px] font-semibold text-slate-400">{t}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex-1">
+          <div className="relative h-[260px] sm:h-[300px] md:h-[308px] rounded-xl border border-slate-200 bg-slate-50">
+            {ticks.map((t) => (
+              <div
+                key={t}
+                className="absolute left-0 right-0 border-t border-slate-200/60"
+                style={{ top: `${(1 - t / 100) * 100}%` }}
+              />
+            ))}
+
+            <div className="absolute inset-0 flex items-end justify-around px-3 sm:px-4 md:px-6 pb-3 sm:pb-4">
+              {items.map((it) => {
+                const h = Math.round(it.v * 100);
+                return (
+                  <div key={it.code} className="flex w-14 sm:w-16 flex-col items-center gap-2">
+                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
+                    <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
+                      <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
+                    </div>
+                    <div className="text-xs font-bold text-slate-900">{it.code}</div>
+                    <div className="text-[10px] sm:text-[11px] text-slate-600 text-center leading-tight">{it.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ✅ Profiles-only radar
+ * - includes profile names in the axis labels: "P1: Activator"
+ * - slightly zoomed in
+ */
+function ProfileOnlyRadar(props: {
+  profilePct: Record<string, number>;
+  profileLabels: Array<{ code: string; name: string }>;
+}) {
+  const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
+
+  const rawVal = (p: string) => {
+    const asPROFILE = p.replace(/^P/, "PROFILE_");
+    return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
+  };
+
+  const getProfileName = (p: string) => {
+    const asPROFILE = p.replace(/^P/, "PROFILE_");
+    return props.profileLabels.find((x) => x.code === asPROFILE)?.name || p;
+  };
+
+  const MAX = 0.5;
+  const val = (p: string) => clamp01(rawVal(p) / MAX);
+
+  const size = 520;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 225;
+
+  function pt(i: number, v: number) {
+    const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
+    return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
+  }
+
+  const rings = [0.1, 0.2, 0.3, 0.4, 0.5];
+  const pts = labels.map((k, i) => pt(i, val(k)));
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
+  const ringLabelY = (rv: number) => cy - r * (rv / MAX);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
+        <div className="hidden sm:block text-xs text-slate-500">Higher = stronger pattern</div>
+      </div>
+
+      <div className="mt-3 flex justify-center">
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto max-w-[420px] sm:max-w-[560px]" aria-label="Profile radar chart">
+          {rings.map((rv) => (
+            <polygon
+              key={rv}
+              points={labels.map((_, i) => pt(i, clamp01(rv / MAX))).map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke="rgba(15,23,42,0.12)"
+            />
+          ))}
+
+          {rings.map((rv) => (
+            <text
+              key={`lbl-${rv}`}
+              x={cx}
+              y={ringLabelY(rv)}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="12"
+              fill="rgba(15,23,42,0.42)"
+            >
+              {Math.round(rv * 100)}%
+            </text>
+          ))}
+
+          {labels.map((k, i) => {
+            const p = pt(i, 1);
+            return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
+          })}
+
+          {labels.map((k, i) => {
+            const p = pt(i, 1.18);
+            const name = getProfileName(k);
+            return (
+              <text
+                key={k}
+                x={p.x}
+                y={p.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="12"
+                fontWeight={600}
+                fill="rgba(15,23,42,0.65)"
+              >
+                {`${k}: ${name}`}
+              </text>
+            );
+          })}
+
+          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.92)" strokeWidth="2.75" />
+          <circle cx={cx} cy={cy} r="2.75" fill="rgba(15,23,42,0.5)" />
+
+          {labels.map((k, i) => {
+            const vScaled = val(k);
+            const vRaw = rawVal(k);
+            const p = pt(i, vScaled);
+
+            const show = vRaw > 0.001;
+            const labelPt = pt(i, Math.min(1, vScaled + 0.16));
+
+            return (
+              <g key={`pt-${k}`}>
+                <circle cx={p.x} cy={p.y} r="4" fill="rgba(20,184,166,0.95)" />
+                {show ? (
+                  <text
+                    x={labelPt.x}
+                    y={labelPt.y}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="11"
+                    fill="rgba(15,23,42,0.55)"
+                  >
+                    {Math.round(vRaw * 100)}%
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div className="mt-2 sm:hidden text-xs text-slate-500 text-center">Higher = stronger pattern</div>
+    </div>
+  );
 }
 
 // -------------------------------------------------------------------------
@@ -204,7 +402,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
   const token = props.token;
   const tid = props.tid;
 
-  // ✅ NEW: detect portal viewer mode from page URL (?src=portal)
+  // ✅ portal viewer mode from URL (?src=portal)
   const isPortalViewer = useMemo(() => {
     if (typeof window === "undefined") return false;
     const src = new URLSearchParams(window.location.search).get("src");
@@ -312,7 +510,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
   useEffect(() => {
     if (!resultData) return;
 
-    // ✅ portal viewers should NEVER be redirected away from the report
+    // portal viewers should NEVER be redirected away from the report
     if (isPortalViewer) return;
 
     const showResults = resultData.link?.show_results ?? true;
@@ -325,7 +523,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     window.location.assign(redirectUrl);
   }, [resultData, isPortalViewer]);
 
-  // QSC redirect if needed – client-side using the error (relative URLs)
+  // QSC redirect if needed
   useEffect(() => {
     async function maybeRedirectQSC() {
       if (!loadError) return;
@@ -333,9 +531,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
 
       let variant = "entrepreneur";
       try {
-        const metaRes = await fetch(`/api/public/test/${encodeURIComponent(token)}`, {
-          cache: "no-store",
-        });
+        const metaRes = await fetch(`/api/public/test/${encodeURIComponent(token)}`, { cache: "no-store" });
         const metaJson = (await metaRes.json().catch(() => null as any)) as any;
         const link = (metaJson?.data ?? metaJson ?? {}) as any;
 
@@ -407,7 +603,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     );
   }
 
-  // ✅ Portal viewers ALWAYS show the report (even if show_results=false on the link)
+  // ✅ Portal viewers ALWAYS show the report
   const linkShowResults = isPortalViewer ? true : (resultData.link?.show_results ?? true);
 
   const linkRedirectUrl = (resultData.link?.redirect_url || "").trim();
@@ -473,9 +669,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
 
   const frameworkTitle: string = reportCopy?.framework_title || `The ${orgName} framework`;
   const frameworkIntro: string[] =
-    reportCopy?.framework_intro && Array.isArray(reportCopy.framework_intro)
-      ? reportCopy.framework_intro
-      : getDefaultFrameworkIntro(orgName);
+    reportCopy?.framework_intro && Array.isArray(reportCopy.framework_intro) ? reportCopy.framework_intro : getDefaultFrameworkIntro(orgName);
 
   const howToUse = reportCopy?.how_to_use || defaultHowToUse();
   const howToRead = reportCopy?.how_to_read_scores || defaultHowToReadScores();
@@ -497,105 +691,133 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     profileCopy?.[primary?.code || ""]?.example ||
     "For example, you’re likely to be the person who brings energy to the room, helps others stay engaged, and keeps people moving toward a shared goal.";
 
-  // ✅ Header hero image (Team Puzzle: top profile card; otherwise: optional/no hero)
-  const topProfileImage = isTeamPuzzle && primary?.name ? getTeamPuzzleProfileImage(primary.name) : null;
+  const topProfileImage =
+    isTeamPuzzle && primary?.name ? getTeamPuzzleProfileImage(primary.name) : null;
 
-  const topFreqName = data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq;
+  // Header hero image (use TP top profile card if available, otherwise org logo)
+  const heroSrc = topProfileImage || orgAssets?.logoSrc || "";
+
+  const topFreqName =
+    data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq;
+
+  const driversIntroHeader =
+    "The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about.";
+
+  const mapIntroHeader =
+    "This map shows your overall pattern across Drivers and Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
 
-      <div className="relative z-10">
-        <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 pb-12 pt-8 md:px-6">
-          {/* ✅ NEW HEADER (OperatingFrame-style) */}
-          <GlassCard className="relative overflow-hidden">
-            <div className="absolute inset-0 pointer-events-none opacity-60">
-              <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
-            </div>
+      <div className="relative z-10 mx-auto max-w-6xl px-3 sm:px-4 py-6 md:px-6 md:py-8">
+        {/* ✅ OperatingFrame-style header for Team Puzzle (and other legacy orgs) */}
+        <GlassCard className="relative overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none opacity-60">
+            <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+            <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
+          </div>
 
-            <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-start gap-3">
-                  <div className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
-                    {orgAssets?.logoSrc ? (
-                      <img
-                        src={orgAssets.logoSrc}
-                        alt={orgName}
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ) : null}
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">Organisation</div>
-                    <div className="mt-1 text-sm font-semibold text-white truncate">{orgName}</div>
-
-                    <div className="mt-3 text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">Test Name</div>
-                    <div className="mt-1 text-sm font-semibold text-white truncate">{data.test_name || reportTitle}</div>
-                  </div>
-                </div>
-
-                <h1 className="mt-4 text-[22px] sm:text-2xl md:text-3xl font-bold tracking-tight leading-tight">
-                  Personalised Report for <span className="text-white/90">{participantName}</span>
-                </h1>
-
-                <div className="mt-3 grid gap-2">
-                  <div className="text-sm text-white/80">
-                    <span className="font-semibold text-white">Top Profile:</span> {data.top_profile_name}
-                    {primary?.code ? <span className="text-white/60"> ({primary.code})</span> : null}
-                  </div>
-                  <div className="text-sm text-white/80">
-                    <span className="font-semibold text-white">Frequency:</span> {topFreqName} ({data.top_freq})
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
-                  <button
-                    onClick={handleDownloadPdf}
-                    className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-                  >
-                    Download PDF
-                  </button>
-
-                  {hasNextSteps && (
-                    <button
-                      onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")}
-                      className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
-                      title="Open next steps"
-                    >
-                      Next Steps
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* ✅ hero image: Team Puzzle top profile card */}
-              {topProfileImage ? (
-                <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
-                  <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-start gap-3">
+                <div className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
+                  {orgAssets?.logoSrc ? (
                     <img
-                      src={topProfileImage}
-                      alt={primary?.name || "Top profile"}
+                      src={orgAssets.logoSrc}
+                      alt={orgName}
                       className="h-full w-full object-cover"
-                      onError={(e) => {
+                      onError={(e: any) => {
                         e.currentTarget.style.display = "none";
                       }}
                     />
-                  </div>
+                  ) : null}
                 </div>
-              ) : null}
+
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">Organisation</div>
+                  <div className="mt-1 text-sm font-semibold text-white truncate">{orgName}</div>
+
+                  <div className="mt-3 text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">Test Name</div>
+                  <div className="mt-1 text-sm font-semibold text-white truncate">{data.test_name}</div>
+                </div>
+              </div>
+
+              <h1 className="mt-4 text-[22px] sm:text-2xl md:text-3xl font-bold tracking-tight leading-tight">
+                Personalised Report for <span className="text-white/90">{participantName}</span>
+              </h1>
+
+              <div className="mt-3 grid gap-2">
+                <div className="text-sm text-white/80">
+                  <span className="font-semibold text-white">Top Profile:</span> {data.top_profile_name}
+                </div>
+                <div className="text-sm text-white/80">
+                  <span className="font-semibold text-white">Driver:</span> {topFreqName} ({data.top_freq})
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
+                {hasNextSteps ? (
+                  <button
+                    onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")}
+                    className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                    title="Open next steps"
+                  >
+                    Next Steps
+                  </button>
+                ) : null}
+
+                <button
+                  onClick={handleDownloadPdf}
+                  className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                >
+                  Download PDF
+                </button>
+              </div>
             </div>
 
-            <div className="mt-6">
-              <MiniDivider />
-            </div>
-          </GlassCard>
+            {/* Hero (top profile image if TP) */}
+            {heroSrc ? (
+              <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
+                <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
+                  <img
+                    src={heroSrc}
+                    alt={data.top_profile_name}
+                    className="h-full w-full object-cover"
+                    onError={(e: any) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
 
+          <div className="mt-6">
+            <MiniDivider />
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <WhiteCard>
+              <div className="text-sm font-semibold text-slate-900">Drivers</div>
+              <div className="mt-2 text-sm text-slate-700">{driversIntroHeader}</div>
+              <div className="mt-4">
+                <VerticalDriversChart labels={data.frequency_labels} pct={data.frequency_percentages} />
+              </div>
+            </WhiteCard>
+
+            <WhiteCard>
+              <div className="text-sm font-semibold text-slate-900">Profile Map</div>
+              <div className="mt-2 text-sm text-slate-700">{mapIntroHeader}</div>
+              <div className="mt-4">
+                <ProfileOnlyRadar profilePct={data.profile_percentages} profileLabels={data.profile_labels} />
+              </div>
+            </WhiteCard>
+          </div>
+        </GlassCard>
+
+        {/* Existing report content continues below (kept intact) */}
+        <div className="mt-8 mx-auto max-w-5xl">
           {/* PART 1 ---------------------------------------------------------- */}
           <section className="space-y-6">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Part 1 · About this assessment</p>
@@ -607,23 +829,26 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
 
               <div className="mt-4 flex flex-col gap-6">
                 <div className="space-y-3 text-sm leading-relaxed text-slate-700">
-                  {welcomeBody.map((p, idx) => (
+                  {welcomeBody.map((p: string, idx: number) => (
                     <p key={idx}>{p}</p>
                   ))}
                 </div>
 
-                {orgAssets?.founderPhotoSrc && (
+                {orgAssets?.founderPhotoSrc ? (
                   <div className="flex flex-col items-center gap-3">
                     <img
                       src={orgAssets.founderPhotoSrc}
                       alt={orgAssets.founderCaption || "Founder"}
                       className="h-28 w-28 rounded-full object-cover border border-slate-200"
+                      onError={(e: any) => {
+                        e.currentTarget.style.display = "none";
+                      }}
                     />
-                    {orgAssets.founderCaption && (
+                    {orgAssets.founderCaption ? (
                       <p className="text-xs text-slate-500 text-center">{orgAssets.founderCaption}</p>
-                    )}
+                    ) : null}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -638,15 +863,15 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                   ))}
                 </ul>
                 <p className="mt-3 text-xs text-slate-500">
-                  Use this as a starting point, not a verdict. The most useful insights come from reflecting, asking
-                  questions, and applying what feels true in your day-to-day work.
+                  Use this as a starting point, not a verdict. The most useful insights come from reflecting, asking questions,
+                  and applying what feels true in your day-to-day work.
                 </p>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-7 text-slate-900">
                 <h3 className="text-base font-semibold text-slate-900">{frameworkTitle}</h3>
                 <div className="mt-3 space-y-3 text-sm leading-relaxed text-slate-700">
-                  {frameworkIntro.map((p, idx) => (
+                  {frameworkIntro.map((p: string, idx: number) => (
                     <p key={idx}>{p}</p>
                   ))}
                 </div>
@@ -660,18 +885,24 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
               </h3>
               <p className="mt-2 text-sm text-slate-700">{frequenciesCopy?.intro || DEFAULT_FREQUENCIES_INTRO}</p>
 
-              {frequencyDiagramSrc && (
+              {frequencyDiagramSrc ? (
                 <div className="mt-4 flex justify-center">
-                  <img src={frequencyDiagramSrc} alt="Frequencies" className="max-h-64 w-auto rounded-xl" />
+                  <img
+                    src={frequencyDiagramSrc}
+                    alt="Frequencies"
+                    className="max-h-64 w-auto rounded-xl"
+                    onError={(e: any) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 </div>
-              )}
+              ) : null}
 
               <dl className="mt-4 space-y-2 text-sm text-slate-800">
                 {data.frequency_labels.map((f) => {
                   const freqMeta = frequenciesCopy?.items?.[f.code as FrequencyCode] ?? null;
                   const name = freqMeta?.name || f.name;
-                  const description =
-                    freqMeta?.description || DEFAULT_FREQUENCY_DESCRIPTIONS[f.code as FrequencyCode];
+                  const description = freqMeta?.description || DEFAULT_FREQUENCY_DESCRIPTIONS[f.code as FrequencyCode];
 
                   return (
                     <div key={f.code}>
@@ -695,11 +926,18 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                   "Profiles blend the Frequencies into distinct patterns of contribution. Your profile mix shows how you naturally create value in sessions, relationships and results."}
               </p>
 
-              {profilesDiagramSrc && (
+              {profilesDiagramSrc ? (
                 <div className="mt-4 flex justify-center">
-                  <img src={profilesDiagramSrc} alt="Profiles" className="max-h-72 w-auto rounded-xl" />
+                  <img
+                    src={profilesDiagramSrc}
+                    alt="Profiles"
+                    className="max-h-72 w-auto rounded-xl"
+                    onError={(e: any) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 </div>
-              )}
+              ) : null}
 
               <dl className="mt-4 grid gap-2 text-sm text-slate-800 md:grid-cols-2">
                 {data.profile_labels.map((p) => {
@@ -717,23 +955,26 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
             </div>
           </section>
 
-          {/* Personality Map */}
-          <section className="space-y-4">
+          {/* Personality Map (kept) */}
+          <section className="space-y-4 mt-10">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Your personality map</p>
             <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-7 text-slate-900">
               <h2 className="text-lg font-semibold text-slate-900">Your Personality Map</h2>
               <p className="mt-2 text-sm text-slate-700">
-                This visual map shows how your overall energy (Frequencies) and your more detailed style (Profiles) are distributed across the
-                model. Higher values show patterns you use more often.
+                This visual map shows how your overall energy (Frequencies) and your more detailed style (Profiles) are distributed
+                across the model. Higher values show patterns you use more often.
               </p>
               <div className="mt-6">
-                <PersonalityMapSection frequencyPercentages={data.frequency_percentages} profilePercentages={data.profile_percentages} />
+                <PersonalityMapSection
+                  frequencyPercentages={data.frequency_percentages}
+                  profilePercentages={data.profile_percentages}
+                />
               </div>
             </div>
           </section>
 
           {/* PART 2 – personal profile --------------------------------------- */}
-          <section className="space-y-6">
+          <section className="space-y-6 mt-10">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Part 2 · Your personal profile</p>
 
             {/* Frequency summary */}
@@ -749,8 +990,8 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                       {data.top_freq}
                       {")"}
                     </span>
-                    , which shapes how you approach problems and make decisions. Higher percentages indicate where you naturally spend more energy;
-                    lower percentages highlight areas that may feel less comfortable or more draining.
+                    , which shapes how you approach problems and make decisions. Higher percentages indicate where you naturally
+                    spend more energy; lower percentages highlight areas that may feel less comfortable or more draining.
                   </p>
                 </div>
                 <div className="rounded-xl bg-sky-50 px-4 py-3 text-xs text-sky-900">
@@ -789,14 +1030,16 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                 </p>
                 <ul className="mt-2 list-disc space-y-1 pl-4">
                   <li>
-                    <span className="font-semibold">Key traits:</span> The energy you rely on most when you need to move things forward.
+                    <span className="font-semibold">Key traits:</span> The energy you rely on most when you need to move things
+                    forward.
                   </li>
                   <li>
-                    <span className="font-semibold">Motivators:</span> Conditions that help this way of working feel energising and sustainable.
+                    <span className="font-semibold">Motivators:</span> Conditions that help this way of working feel energising and
+                    sustainable.
                   </li>
                   <li>
-                    <span className="font-semibold">Watch outs:</span> Things to notice when this frequency is over-used, such as ignoring other
-                    perspectives or pushing your preferred style too hard.
+                    <span className="font-semibold">Watch outs:</span> Things to notice when this frequency is over-used, such as
+                    ignoring other perspectives or pushing your preferred style too hard.
                   </li>
                 </ul>
               </div>
@@ -807,8 +1050,8 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
               <div className="flex flex-col gap-1">
                 <h2 className="text-lg font-semibold text-slate-900">Profile mix</h2>
                 <p className="text-sm text-slate-700">
-                  Your profile mix shows how strongly you match each of the eight Profiles. Higher percentages show patterns you use often; lower
-                  ones are backup styles you can lean on when needed.
+                  Your profile mix shows how strongly you match each of the eight Profiles. Higher percentages show patterns you
+                  use often; lower ones are backup styles you can lean on when needed.
                 </p>
               </div>
 
@@ -863,11 +1106,18 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                   <div key={p.code} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 text-slate-900">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
 
-                    {profileImg && (
+                    {profileImg ? (
                       <div className="mt-2 mb-3 flex justify-center">
-                        <img src={profileImg} alt={p.name} className="h-24 w-auto rounded-xl" />
+                        <img
+                          src={profileImg}
+                          alt={p.name}
+                          className="h-24 w-auto rounded-xl"
+                          onError={(e: any) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
                       </div>
-                    )}
+                    ) : null}
 
                     <h3 className="text-lg font-semibold text-slate-900">{p.name}</h3>
                     <p className="text-xs text-slate-500">{p.code}</p>
@@ -876,15 +1126,18 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                     <ul className="mt-3 flex-1 list-disc space-y-1 pl-4 text-xs text-slate-700">
                       <li>
                         <span className="font-semibold">Key traits:</span>{" "}
-                        {asText(copy?.traits) || "How this profile most naturally contributes when things are going well."}
+                        {asText(copy?.traits) ||
+                          "How this profile most naturally contributes when things are going well."}
                       </li>
                       <li>
                         <span className="font-semibold">Motivators:</span>{" "}
-                        {asText(copy?.motivators) || "Conditions that help this style feel energising and sustainable."}
+                        {asText(copy?.motivators) ||
+                          "Conditions that help this style feel energising and sustainable."}
                       </li>
                       <li>
                         <span className="font-semibold">Watch outs:</span>{" "}
-                        {asText(copy?.blind_spots) || "Things to watch out for when this style is over-used or under pressure."}
+                        {asText(copy?.blind_spots) ||
+                          "Things to watch out for when this style is over-used or under pressure."}
                       </li>
                     </ul>
                   </div>
@@ -897,9 +1150,10 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
               <h2 className="text-lg font-semibold text-slate-900">Energy mix – how your profiles work together</h2>
               <p className="mt-2 text-sm text-slate-700">
                 Your top three profiles form an energy mix that shapes how you show up day to day. Your primary profile,{" "}
-                <span className="font-semibold">{primary?.name}</span>, is the style you’re most likely to default to under pressure. Your secondary
-                profile, <span className="font-semibold">{secondary?.name}</span>, adds a supporting pattern you can lean on. Your tertiary profile,{" "}
-                <span className="font-semibold">{tertiary?.name}</span>, is a backup style you can draw on when needed.
+                <span className="font-semibold">{primary?.name}</span>, is the style you’re most likely to default to under pressure.
+                Your secondary profile, <span className="font-semibold">{secondary?.name}</span>, adds a supporting pattern you can
+                lean on. Your tertiary profile, <span className="font-semibold">{tertiary?.name}</span>, is a backup style you can
+                draw on when needed.
               </p>
               <p className="mt-3 text-sm text-slate-700">{primaryExample}</p>
             </div>
@@ -913,12 +1167,12 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                 </p>
                 <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-slate-700">
                   <li>
-                    Leaning into your <span className="font-semibold">{data.top_freq}</span> energy when decisions need to be made or momentum is
-                    required.
+                    Leaning into your <span className="font-semibold">{data.top_freq}</span> energy when decisions need to be made or
+                    momentum is required.
                   </li>
                   <li>
-                    Using your <span className="font-semibold">{primary?.name}</span> profile to bring something that others may not – whether that’s
-                    ideas, people focus, structure, or depth.
+                    Using your <span className="font-semibold">{primary?.name}</span> profile to bring something that others may not –
+                    whether that’s ideas, people focus, structure, or depth.
                   </li>
                   <li>Combining your top three profiles to adapt to different people and contexts without losing your authenticity.</li>
                 </ul>
@@ -927,7 +1181,8 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
               <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900">
                 <h2 className="text-lg font-semibold text-slate-900">Development areas</h2>
                 <p className="mt-2 text-sm text-slate-700">
-                  Development areas are not weaknesses. They’re places where a small shift in awareness or behaviour can unlock more ease and impact.
+                  Development areas are not weaknesses. They’re places where a small shift in awareness or behaviour can unlock more
+                  ease and impact.
                 </p>
                 <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-slate-700">
                   <li>Noticing when your dominant frequency is over-used and crowding out other perspectives.</li>
@@ -944,15 +1199,9 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                 Your profile doesn’t exist in isolation – it plays out in relationship with other people and profiles on your team.
               </p>
               <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-slate-700">
-                <li>
-                  Look for partners whose strengths sit in lower-frequency areas for you. They can help you see risks and opportunities you might
-                  otherwise miss.
-                </li>
+                <li>Look for partners whose strengths sit in lower-frequency areas for you. They can help you see risks and opportunities you might otherwise miss.</li>
                 <li>Share this report with your manager or coach and talk about how your role can make the most of your natural energy.</li>
-                <li>
-                  When conflict shows up, ask: “Is this about style rather than intent?” Often, different profiles are reaching for the same outcome
-                  in different ways.
-                </li>
+                <li>When conflict shows up, ask: “Is this about style rather than intent?” Often, different profiles are reaching for the same outcome in different ways.</li>
               </ul>
             </div>
 
@@ -960,16 +1209,17 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-900">
               <h2 className="text-lg font-semibold text-slate-900">Overall summary</h2>
               <p className="mt-2 text-sm text-slate-700">
-                In summary, your strongest contribution comes from your <span className="font-semibold">{primary?.name}</span> profile, supported by{" "}
-                <span className="font-semibold">{secondary?.name}</span> and <span className="font-semibold">{tertiary?.name}</span>. Your{" "}
+                In summary, your strongest contribution comes from your <span className="font-semibold">{primary?.name}</span> profile,
+                supported by <span className="font-semibold">{secondary?.name}</span> and{" "}
+                <span className="font-semibold">{tertiary?.name}</span>. Your{" "}
                 <span className="font-semibold">
                   {data.frequency_labels.find((f) => f.code === data.top_freq)?.name} ({data.top_freq})
                 </span>{" "}
                 frequency shapes how you naturally approach decisions, problems, and collaboration.
               </p>
               <p className="mt-3 text-sm text-slate-700">
-                No profile is better than another. The aim is not to change who you are, but to understand how you work best, and how to create
-                environments where you and your team can do your best thinking and contribution.
+                No profile is better than another. The aim is not to change who you are, but to understand how you work best, and how
+                to create environments where you and your team can do your best thinking and contribution.
               </p>
             </div>
 
@@ -977,8 +1227,8 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
             <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-7 text-slate-900">
               <h2 className="text-lg font-semibold text-slate-900">Next steps</h2>
               <p className="mt-2 text-sm text-slate-700">
-                A profile report is most powerful when it turns into conversation and action. Use these suggestions to decide what you want to do
-                with your insights:
+                A profile report is most powerful when it turns into conversation and action. Use these suggestions to decide what you
+                want to do with your insights:
               </p>
 
               <ul className="mt-3 list-disc space-y-1 pl-4 text-sm text-slate-700">
@@ -989,7 +1239,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                 <li>If you are working with a coach, choose one strength and one development area to explore in your next session.</li>
               </ul>
 
-              {hasNextSteps && (
+              {hasNextSteps ? (
                 <div className="mt-5">
                   <button
                     onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")}
@@ -998,11 +1248,11 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                     Go to next steps
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
 
-          <footer className="mt-4 border-t border-slate-800 pt-4 text-xs text-slate-400">
+          <footer className="mt-10 border-t border-slate-800 pt-4 text-xs text-slate-400">
             © {new Date().getFullYear()} Powered by Profiletest.ai
           </footer>
         </div>
@@ -1010,5 +1260,3 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     </div>
   );
 }
-
-
