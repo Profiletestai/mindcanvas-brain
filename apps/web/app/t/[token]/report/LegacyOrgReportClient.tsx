@@ -695,7 +695,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
     isTeamPuzzle && primary?.name ? getTeamPuzzleProfileImage(primary.name) : null;
 
   // Header hero image (use TP top profile card if available, otherwise org logo)
-  const heroSrc = topProfileImage || orgAssets?.logoSrc || "";
+  const heroSrc = topProfileImage || "";
 
   const topFreqName =
     data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq;
