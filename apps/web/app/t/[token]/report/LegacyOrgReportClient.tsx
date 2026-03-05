@@ -210,19 +210,22 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-/** ✅ Vertical Drivers chart (percent labels on bars already). */
+/** ✅ Vertical Drivers chart — clean % labels anchored above each bar */
 function VerticalDriversChart(props: {
   labels: Array<{ code: FrequencyCode; name: string }>;
   pct: Record<FrequencyCode, number>;
 }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
+
   const barColor = (code: FrequencyCode) =>
-    code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
+  code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
+
   const ticks = [100, 80, 60, 40, 20, 0];
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-end gap-3 md:gap-4">
+        {/* ticks */}
         <div className="hidden sm:block w-8 md:w-10 shrink-0">
           {ticks.map((t) => (
             <div key={t} className="relative h-7">
@@ -241,15 +244,35 @@ function VerticalDriversChart(props: {
               />
             ))}
 
+            {/* bars */}
             <div className="absolute inset-0 flex items-end justify-around px-3 sm:px-4 md:px-6 pb-3 sm:pb-4">
               {items.map((it) => {
-                const h = Math.round(it.v * 100);
+                const pct = Math.round(it.v * 100);
+                const h = pct; // since we clamp 0..1 and use % height
+
                 return (
                   <div key={it.code} className="flex w-14 sm:w-16 flex-col items-center gap-2">
-                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
-                    <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
-                      <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
+                    {/* ✅ label is anchored to the bar container, not floating in the chart */}
+                    <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10">
+                      {pct > 0 ? (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[11px] sm:text-xs font-semibold text-slate-700">
+                          {pct}%
+                        </div>
+                      ) : (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[11px] sm:text-xs font-semibold text-slate-300">
+                          {/* hide 0% text if you prefer: just return null */}
+                          0%
+                        </div>
+                      )}
+
+                      <div className="relative h-full w-full rounded-lg bg-white border border-slate-200 overflow-hidden">
+                        <div
+                          className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`}
+                          style={{ height: `${h}%` }}
+                        />
+                      </div>
                     </div>
+
                     <div className="text-xs font-bold text-slate-900">{it.code}</div>
                     <div className="text-[10px] sm:text-[11px] text-slate-600 text-center leading-tight">{it.name}</div>
                   </div>
@@ -257,6 +280,8 @@ function VerticalDriversChart(props: {
               })}
             </div>
           </div>
+
+          {/* no extra scale helper line */}
         </div>
       </div>
     </div>
@@ -726,10 +751,10 @@ function getTeamPuzzleProfileImage(profileName?: string): string | null {
     data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq;
 
   const driversIntroHeader =
-    "The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about.";
+    "The four frequencies show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about.";
 
   const mapIntroHeader =
-    "This map shows your overall pattern across Drivers and Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
+    "This map shows your overall pattern across the Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
@@ -804,7 +829,7 @@ function getTeamPuzzleProfileImage(profileName?: string): string | null {
             {/* Hero (top profile image if TP) */}
             {heroSrc ? (
               <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
-                <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
+                <div className="h-[150px] w-[150px] sm:h-[180px] sm:w-[180px] md:h-[220px] md:w-[220px] rounded-[32px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                   <img
                     src={heroSrc}
                     alt={data.top_profile_name}
@@ -824,7 +849,7 @@ function getTeamPuzzleProfileImage(profileName?: string): string | null {
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
-              <div className="text-sm font-semibold text-slate-900">Drivers</div>
+              <div className="text-sm font-semibold text-slate-900">Frequencies</div>
               <div className="mt-2 text-sm text-slate-700">{driversIntroHeader}</div>
               <div className="mt-4">
                 <VerticalDriversChart labels={data.frequency_labels} pct={data.frequency_percentages} />
