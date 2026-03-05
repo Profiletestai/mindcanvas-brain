@@ -554,10 +554,10 @@ export default function OperatingFrameReportClient(props: {
       build("Welcome", common?.welcome),
       build("Section 1 – Executive Summary", p?.section_1),
 
-      build("Section 2 – The Four Leadership Drivers", common?.section_2),
-      build("Section 3 – The Eight Operating Styles", common?.section_3),
-      build("Section 4 – Your Operating Style", common?.section_4),
-      build("Section 5 – How Your Drivers Combine", common?.section_5),
+      build("Section 2 – The Four Leadership Drivers", p?.section_2),
+      build("Section 3 – The Eight Operating Styles", p?.section_3),
+      build("Section 4 – Your Operating Style", p?.section_4),
+      build("Section 5 – How Your Drivers Combine", p?.section_5),
 
       build("Section 6 – Your Team Contribution", p?.section_6),
       build("Section 7 – Your Stress Operating Summary", p?.section_7),
