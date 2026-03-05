@@ -835,7 +835,7 @@ export default function LegacyOrgReportClient(props: { token: string; tid: strin
                 </div>
 
                 {orgAssets?.founderPhotoSrc ? (
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex flex-col items-left gap-3">
                     <img
                       src={orgAssets.founderPhotoSrc}
                       alt={orgAssets.founderCaption || "Founder"}
