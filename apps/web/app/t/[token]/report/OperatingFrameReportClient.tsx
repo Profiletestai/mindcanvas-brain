@@ -563,9 +563,9 @@ export default function OperatingFrameReportClient(props: {
       { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || [], { dropQuotes: true }) },
 
       { title: "Section 1 – Executive Summary", blocks: normaliseDocBlocks(p?.section_1?.blocks || []) },
-      { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: normaliseDocBlocks(p?.section_2?.blocks || []) },
+      { title: "Section 2 – Your Leadership Drivers", blocks: normaliseDocBlocks(p?.section_2?.blocks || []) },
       { title: "Section 3 – Your Operating Style", blocks: normaliseDocBlocks(p?.section_3?.blocks || []) },
-      { title: "Section 4 – Micro Pattern Expression", blocks: normaliseDocBlocks(p?.section_4?.blocks || []) },
+      { title: "Section 4 – How Your Drivers Combine", blocks: normaliseDocBlocks(p?.section_4?.blocks || []) },
       { title: "Section 5 – Your Team Contribution", blocks: normaliseDocBlocks(p?.section_5?.blocks || []) },
       { title: "Section 6 – Stress Operating Summary", blocks: normaliseDocBlocks(p?.section_6?.blocks || []) },
       { title: "Section 7 – Decision Pattern", blocks: normaliseDocBlocks(p?.section_7?.blocks || []) },
