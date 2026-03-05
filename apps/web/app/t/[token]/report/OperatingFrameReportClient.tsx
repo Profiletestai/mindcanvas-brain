@@ -30,12 +30,15 @@ type ResultData = {
     last_name?: string | null;
   };
   link?: LinkMeta;
+
   frequency_labels: Array<{ code: AB; name: string }>;
   frequency_percentages: Record<AB, number>;
+
   profile_labels: Array<{ code: string; name: string }>;
   profile_percentages: Record<string, number>;
+
   top_freq: AB;
-  top_profile_code: string;
+  top_profile_code: string; // PROFILE_1..PROFILE_8
   top_profile_name: string;
 };
 
@@ -80,12 +83,13 @@ function fullName(first?: string | null, last?: string | null) {
 }
 
 function profileKeyVariants(code: string) {
-  const c = String(code || "").toUpperCase().trim();
-  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c;
-  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c;
+  const c = String(code || "").toUpperCase().trim(); // PROFILE_1
+  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c; // P1
+  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c; // PROFILE_1
   return Array.from(new Set([c, asP, asPROFILE]));
 }
 
+// Map profile name -> image in /public/images/operatingframe-full-test/profile-cards/
 function profileNameToImageFile(profileName: string) {
   const n = String(profileName || "").toLowerCase();
   if (n.includes("activator")) return "activator.png";
@@ -119,6 +123,7 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
+/** Vertical driver bars */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const barColor = (code: AB) =>
@@ -151,9 +156,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
                 const h = Math.round(it.v * 100);
                 return (
                   <div key={it.code} className="flex w-14 sm:w-16 flex-col items-center gap-2">
-                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">
-                      {Math.round(it.v * 100)}%
-                    </div>
+                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
                     <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
                       <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
                     </div>
@@ -170,10 +173,8 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   );
 }
 
-function ProfileOnlyRadar(props: {
-  profilePct: Record<string, number>;
-  profileLabels: Array<{ code: string; name: string }>;
-}) {
+/** Profile radar + names */
+function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLabels: Array<{ code: string; name: string }> }) {
   const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
   const rawVal = (p: string) => {
@@ -186,6 +187,7 @@ function ProfileOnlyRadar(props: {
     return props.profileLabels.find((x) => x.code === asPROFILE)?.name || p;
   };
 
+  // zoom (0.5 = zoom in to 50% max)
   const MAX = 0.5;
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
@@ -212,11 +214,7 @@ function ProfileOnlyRadar(props: {
       </div>
 
       <div className="mt-3 flex justify-center">
-        <svg
-          viewBox={`0 0 ${size} ${size}`}
-          className="w-full h-auto max-w-[420px] sm:max-w-[520px]"
-          aria-label="Profile radar chart"
-        >
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto max-w-[420px] sm:max-w-[520px]">
           {rings.map((rv) => (
             <polygon
               key={rv}
@@ -300,6 +298,7 @@ function ProfileOnlyRadar(props: {
   );
 }
 
+/** Normalize doc blocks */
 function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   const inBlocks = Array.isArray(blocks) ? blocks : [];
   const out: ReportBlock[] = [];
@@ -348,15 +347,12 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   return out;
 }
 
+/** Remove duplicated H1/H2 at start of a section */
 function stripLeadingTitleBlock(blocks: ReportBlock[]): ReportBlock[] {
   if (!Array.isArray(blocks) || blocks.length === 0) return [];
   const first = blocks[0];
   const type = String((first as any)?.type || "").toLowerCase();
-
-  if (type === "h1" || type === "h2") {
-    return blocks.slice(1);
-  }
-
+  if (type === "h1" || type === "h2") return blocks.slice(1);
   return blocks;
 }
 
@@ -368,10 +364,34 @@ function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
 
   if (raw === "{{TOP_PROFILE_IMAGE}}") {
     const file = profileNameToImageFile(topProfileName);
-    return file ? `/images/operatingframe-full-test/profile-cards/${file}` : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+    return file
+      ? `/images/operatingframe-full-test/profile-cards/${file}`
+      : "/images/operatingframe-full-test/profile-cards/bio-image.png";
   }
 
   return raw;
+}
+
+/** Replace simple tokens in block text/src/caption */
+function replaceTokensInBlocks(blocks: ReportBlock[], ctx: Record<string, string>): ReportBlock[] {
+  const walk = (v: any): any => {
+    if (typeof v === "string") {
+      let s = v;
+      for (const [k, val] of Object.entries(ctx)) {
+        s = s.split(`{{${k}}}`).join(val);
+      }
+      return s;
+    }
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === "object") {
+      const out: Record<string, any> = {};
+      for (const [k, val] of Object.entries(v)) out[k] = walk(val);
+      return out;
+    }
+    return v;
+  };
+
+  return walk(blocks) as ReportBlock[];
 }
 
 function BlockRenderer(props: { block: any; topProfileName: string }) {
@@ -478,6 +498,8 @@ export default function OperatingFrameReportClient(props: {
   const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
 
   const topProfileName = profile?.name || data.top_profile_name || "Top Profile";
+  const topProfileCode = data.top_profile_code || "PROFILE_1";
+
   const topFreqCode = data.top_freq;
   const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
@@ -487,6 +509,17 @@ export default function OperatingFrameReportClient(props: {
   const profileHeroSrc = profileFile
     ? `/images/operatingframe-full-test/profile-cards/${profileFile}`
     : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+
+  const tokenCtx: Record<string, string> = {
+    TOP_PROFILE_NAME: topProfileName,
+    TOP_PROFILE_CODE: topProfileCode,
+    TOP_PROFILE_IMAGE: "{{TOP_PROFILE_IMAGE}}", // resolved later in resolveBlockImageSrc
+    TOP_DRIVER_NAME: topFreqName,
+    TOP_DRIVER_CODE: topFreqCode,
+    PARTICIPANT_NAME: participant,
+    ORG_NAME: orgName,
+    TEST_NAME: testName,
+  };
 
   function openNextSteps() {
     const direct =
@@ -508,24 +541,30 @@ export default function OperatingFrameReportClient(props: {
     const common = framework?.common || {};
     const p = profile?.sections || {};
 
-    const makeSection = (fallbackTitle: string, raw: any) => {
+    const build = (fallbackTitle: string, raw: any) => {
       const title = safeText(raw?.title).trim() || fallbackTitle;
-      const blocks = stripLeadingTitleBlock(normaliseDocBlocks(raw?.blocks || []));
+      const rawBlocks = Array.isArray(raw?.blocks) ? (raw.blocks as ReportBlock[]) : [];
+      const blocks = stripLeadingTitleBlock(normaliseDocBlocks(replaceTokensInBlocks(rawBlocks, tokenCtx)));
       return { title, blocks };
     };
 
+    // ✅ IMPORTANT: Section 2–5 come from COMMON (standard on all reports)
+    // Section 6–9 come from PROFILE (specific)
     return [
-      makeSection("Welcome", common?.welcome),
-      makeSection("Section 1 – Executive Summary", p?.section_1),
-      makeSection("Section 2 – Your Leadership Drivers", p?.section_2),
-      makeSection("Section 3 – Your Operating Style", p?.section_3),
-      makeSection("Section 4 – How Your Drivers Combine", p?.section_4),
-      makeSection("Section 5 – Team Contribution", p?.section_5),
-      makeSection("Section 6 – Stress Operating Summary", p?.section_6),
-      makeSection("Section 7 – Decision Pattern", p?.section_7),
-      makeSection("Section 8 – Development Roadmap", p?.section_8),
+      build("Welcome", common?.welcome),
+      build("Section 1 – Executive Summary", p?.section_1),
+
+      build("Section 2 – The Four Leadership Drivers", p?.section_2),
+      build("Section 3 – The Eight Operating Styles", p?.section_3),
+      build("Section 4 – Your Operating Style", p?.section_4),
+      build("Section 5 – How Your Drivers Combine", p?.section_5),
+
+      build("Section 6 – Your Team Contribution", p?.section_6),
+      build("Section 7 – Your Stress Operating Summary", p?.section_7),
+      build("Section 8 – Your Decision Patterns", p?.section_8),
+      build("Section 9 – Your Development Roadmap", p?.section_9),
     ];
-  }, [framework, profile]);
+  }, [framework, profile, topProfileName, topProfileCode, topFreqName, topFreqCode, participant, orgName, testName]);
 
   const driversIntro =
     safeText(framework?.common?.drivers_intro?.blocks?.[0]?.text) ||
@@ -630,10 +669,7 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
-                <ProfileOnlyRadar
-                  profilePct={data.profile_percentages}
-                  profileLabels={data.profile_labels}
-                />
+                <ProfileOnlyRadar profilePct={data.profile_percentages} profileLabels={data.profile_labels} />
               </div>
             </WhiteCard>
           </div>
