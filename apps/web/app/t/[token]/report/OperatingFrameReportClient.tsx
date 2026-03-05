@@ -2,7 +2,7 @@
 "use client";
 
 import AppBackground from "@/components/ui/AppBackground";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode, type SyntheticEvent } from "react";
 
 type AB = "A" | "B" | "C" | "D";
 
@@ -93,6 +93,7 @@ function profileKeyVariants(code: string) {
   return Array.from(new Set([c, asP, asPROFILE]));
 }
 
+// Map profile name → actual filename in /public/images/operatingframe-full-test/profile-cards/
 function profileNameToImageFile(profileName: string) {
   const n = String(profileName || "").toLowerCase();
   if (n.includes("activator")) return "activator.png";
@@ -106,18 +107,7 @@ function profileNameToImageFile(profileName: string) {
   return "";
 }
 
-function cleanProfileLabel(name: string, code: string) {
-  const raw = String(name || "").trim();
-  if (!raw) return code;
-
-  // remove prefixes like "P1:", "P1 -", "PROFILE_1:"
-  return raw
-    .replace(/^P\d+\s*[:\-]\s*/i, "")
-    .replace(/^PROFILE[_\s-]?\d+\s*[:\-]\s*/i, "")
-    .trim();
-}
-
-function GlassCard(props: { children: React.ReactNode; className?: string }) {
+function GlassCard(props: { children: ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6 ${props.className || ""}`}>
       {props.children}
@@ -125,7 +115,7 @@ function GlassCard(props: { children: React.ReactNode; className?: string }) {
   );
 }
 
-function WhiteCard(props: { children: React.ReactNode; className?: string }) {
+function WhiteCard(props: { children: ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl bg-white p-4 md:p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
       {props.children}
@@ -137,7 +127,7 @@ function MiniDivider() {
   return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
 }
 
-/** Vertical bar chart */
+/** ✅ Vertical bar chart with % labels (mobile-friendly) */
 function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
   const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
   const barColor = (code: AB) =>
@@ -147,6 +137,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-end gap-3 md:gap-4">
+        {/* ticks hidden on very small screens */}
         <div className="hidden sm:block w-8 md:w-10 shrink-0">
           {ticks.map((t) => (
             <div key={t} className="relative h-7">
@@ -170,9 +161,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
                 const h = Math.round(it.v * 100);
                 return (
                   <div key={it.code} className="flex w-14 sm:w-16 flex-col items-center gap-2">
-                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">
-                      {Math.round(it.v * 100)}%
-                    </div>
+                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">{h}%</div>
                     <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
                       <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
                     </div>
@@ -184,9 +173,7 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
             </div>
           </div>
 
-          <div className="mt-2 sm:hidden text-[11px] text-slate-500">
-            Scale: 0–100 (top labels show %)
-          </div>
+          <div className="mt-2 sm:hidden text-[11px] text-slate-500">Scale: 0–100 (top labels show %)</div>
         </div>
       </div>
     </div>
@@ -194,73 +181,86 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
 }
 
 /**
- * Profiles-only radar
- * - adds profile names to labels
- * - zooms in a bit more
- * - keeps mobile sizing clean
+ * ✅ Profiles-only radar
+ * Updates:
+ * - Add profile names to axis labels (e.g., "P1 Activator")
+ * - Zoom in slightly (MAX reduced)
+ * - Mobile-optimized sizing (responsive SVG)
  */
 function ProfileOnlyRadar(props: {
   profilePct: Record<string, number>;
   profileLabels: Array<{ code: string; name: string }>;
 }) {
-  const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
+  const axes = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
 
-  const profileNameByCode = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (const p of props.profileLabels || []) {
-      const rawCode = String(p.code || "").toUpperCase();
-      const pCode = rawCode.startsWith("PROFILE_") ? rawCode.replace("PROFILE_", "P") : rawCode;
-      out[pCode] = cleanProfileLabel(String(p.name || ""), pCode);
-    }
-    return out;
-  }, [props.profileLabels]);
+  const nameForAxis = (p: string) => {
+    const asPROFILE = p.replace(/^P/, "PROFILE_");
+    const hit =
+      props.profileLabels.find((x) => String(x.code).toUpperCase() === asPROFILE) ||
+      props.profileLabels.find((x) => String(x.code).toUpperCase() === p);
+    const nm = safeText(hit?.name).trim();
+    // if stored as "P1: Activator" keep just "Activator" for the label portion
+    return nm.replace(/^P\d+\s*:\s*/i, "").trim();
+  };
 
   const rawVal = (p: string) => {
     const asPROFILE = p.replace(/^P/, "PROFILE_");
     return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
   };
 
-  // Zoom in a little more than before
-  const MAX = 0.45;
+  // Zoom: treat MAX as the “outer ring” (smaller MAX = bigger shape)
+  const MAX = 0.45; // was 0.50; "zoom in a little"
   const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  const size = 560;
+  // ViewBox constant; CSS controls render size
+  const size = 520;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 220;
+  const r = 205;
 
   function pt(i: number, v: number) {
-    const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
+    const angle = (Math.PI * 2 * i) / axes.length - Math.PI / 2;
     return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
   }
 
-  const rings = [0.1, 0.2, 0.3, 0.4];
-  const pts = labels.map((k, i) => pt(i, val(k)));
+  const rings = [0.1, 0.2, 0.3, 0.4, 0.45];
+  const pts = axes.map((k, i) => pt(i, val(k)));
   const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
   const ringLabelY = (rv: number) => cy - r * (rv / MAX);
+
+  const axisLabel = (p: string) => {
+    const nm = nameForAxis(p);
+    // keep short on mobile: show "P1" then name below
+    return { code: p, name: nm || "" };
+  };
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-slate-900">Your Personality Map</div>
+        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
         <div className="hidden sm:block text-xs text-slate-500">Higher = stronger pattern</div>
       </div>
 
-      <div className="mt-3 flex justify-center overflow-x-auto">
+      <div className="mt-3 flex justify-center">
         <svg
           viewBox={`0 0 ${size} ${size}`}
-          className="w-full h-auto min-w-[340px] max-w-[460px] sm:max-w-[560px]"
+          className="w-full h-auto max-w-[440px] sm:max-w-[560px]" // slightly larger visual
           aria-label="Profile radar chart"
         >
+          {/* rings */}
           {rings.map((rv) => (
             <polygon
               key={rv}
-              points={labels.map((_, i) => pt(i, clamp01(rv / MAX))).map((p) => `${p.x},${p.y}`).join(" ")}
+              points={axes
+                .map((_, i) => pt(i, clamp01(rv / MAX)))
+                .map((p) => `${p.x},${p.y}`)
+                .join(" ")}
               fill="none"
               stroke="rgba(15,23,42,0.12)"
             />
           ))}
 
+          {/* ring labels */}
           {rings.map((rv) => (
             <text
               key={`lbl-${rv}`}
@@ -275,51 +275,59 @@ function ProfileOnlyRadar(props: {
             </text>
           ))}
 
-          {labels.map((k, i) => {
+          {/* axes */}
+          {axes.map((k, i) => {
             const p = pt(i, 1);
             return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
           })}
 
-          {labels.map((k, i) => {
+          {/* axis labels: "P1" + profile name */}
+          {axes.map((k, i) => {
             const p = pt(i, 1.14);
-            const name = profileNameByCode[k] || k;
-
+            const lbl = axisLabel(k);
             return (
-              <g key={k}>
+              <g key={`lbl-${k}`}>
                 <text
                   x={p.x}
-                  y={p.y - 7}
+                  y={p.y}
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fontSize="13"
                   fontWeight={700}
-                  fill="rgba(15,23,42,0.72)"
+                  fill="rgba(15,23,42,0.70)"
                 >
-                  {k}
+                  {lbl.code}
                 </text>
-                <text
-                  x={p.x}
-                  y={p.y + 10}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="10.5"
-                  fill="rgba(15,23,42,0.56)"
-                >
-                  {name}
-                </text>
+
+                {lbl.name ? (
+                  <text
+                    x={p.x}
+                    y={p.y + 16}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="11"
+                    fontWeight={600}
+                    fill="rgba(15,23,42,0.55)"
+                  >
+                    {lbl.name}
+                  </text>
+                ) : null}
               </g>
             );
           })}
 
+          {/* polygon */}
           <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.92)" strokeWidth="2.75" />
           <circle cx={cx} cy={cy} r="2.75" fill="rgba(15,23,42,0.5)" />
 
-          {labels.map((k, i) => {
+          {/* point dots + % labels */}
+          {axes.map((k, i) => {
             const vScaled = val(k);
             const vRaw = rawVal(k);
             const p = pt(i, vScaled);
+
             const show = vRaw > 0.001;
-            const labelPt = pt(i, Math.min(1, vScaled + 0.14));
+            const labelPt = pt(i, Math.min(1, vScaled + 0.16));
 
             return (
               <g key={`pt-${k}`}>
@@ -349,23 +357,27 @@ function ProfileOnlyRadar(props: {
 
 /**
  * Normalize blocks so doc-style "item lines" don't render as bold headings.
+ * Also: remove quote blocks (client request) WHEN the section is "welcome".
  */
-function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
+function normaliseDocBlocks(blocks: ReportBlock[], opts?: { dropQuotes?: boolean }): ReportBlock[] {
   const inBlocks = Array.isArray(blocks) ? blocks : [];
+  const filtered = opts?.dropQuotes ? inBlocks.filter((b) => String((b as any)?.type || "").toLowerCase() !== "quote") : inBlocks;
+
   const out: ReportBlock[] = [];
 
   const isH = (b: any, lvl: "h3" | "h4") => String(b?.type || "").toLowerCase() === lvl;
   const getText = (b: any) => safeText(b?.text).trim();
 
   let i = 0;
-  while (i < inBlocks.length) {
-    const b = inBlocks[i];
+  while (i < filtered.length) {
+    const b = filtered[i];
     const t = String((b as any)?.type || "").toLowerCase();
 
+    // Convert runs of h4 into UL
     if (t === "h4") {
       const items: string[] = [];
-      while (i < inBlocks.length && isH(inBlocks[i], "h4")) {
-        const txt = getText(inBlocks[i]);
+      while (i < filtered.length && isH(filtered[i], "h4")) {
+        const txt = getText(filtered[i]);
         if (txt) items.push(txt);
         i++;
       }
@@ -373,16 +385,17 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
       continue;
     }
 
-    if (t === "h3" && i + 1 < inBlocks.length && (isH(inBlocks[i + 1], "h3") || isH(inBlocks[i + 1], "h4"))) {
+    // Convert "h3 heading + many h3/h4 lines" into: h3 + ul(...)
+    if (t === "h3" && i + 1 < filtered.length && (isH(filtered[i + 1], "h3") || isH(filtered[i + 1], "h4"))) {
       out.push(b);
       const items: string[] = [];
       i++;
 
-      while (i < inBlocks.length) {
-        const tt = String((inBlocks[i] as any)?.type || "").toLowerCase();
+      while (i < filtered.length) {
+        const tt = String((filtered[i] as any)?.type || "").toLowerCase();
         if (tt !== "h3" && tt !== "h4") break;
 
-        const txt = getText(inBlocks[i]);
+        const txt = getText(filtered[i]);
         if (txt) items.push(txt);
         i++;
       }
@@ -406,7 +419,9 @@ function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
 
   if (raw === "{{TOP_PROFILE_IMAGE}}") {
     const file = profileNameToImageFile(topProfileName);
-    return file ? `/images/operatingframe-full-test/profile-cards/${file}` : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+    return file
+      ? `/images/operatingframe-full-test/profile-cards/${file}`
+      : "/images/operatingframe-full-test/profile-cards/bio-image.png";
   }
 
   return raw;
@@ -450,6 +465,7 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
   }
 
   if (type === "quote") {
+    // Generally supported, but welcome section filters these out via normaliseDocBlocks({dropQuotes:true})
     const t = safeText(b.text).trim();
     const cite = safeText(b.cite).trim();
     return (
@@ -474,18 +490,14 @@ function BlockRenderer(props: { block: any; topProfileName: string }) {
     const rounded = b?.rounded === false ? "rounded-none" : "rounded-2xl";
     const chrome = wantsBorder ? "border border-slate-200 bg-white shadow-sm" : "border-0 bg-transparent shadow-none";
 
+    const onErr = (e: SyntheticEvent<HTMLImageElement>) => {
+      (e.currentTarget as HTMLImageElement).style.display = "none";
+    };
+
     return (
       <figure className="my-4">
         <div className={`flex ${justify}`}>
-          <img
-            src={src}
-            alt={safeText(b?.alt)}
-            className={`max-w-full ${rounded} ${chrome}`}
-            style={{ maxHeight: maxH }}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
+          <img src={src} alt={safeText(b?.alt)} className={`max-w-full ${rounded} ${chrome}`} style={{ maxHeight: maxH }} onError={onErr} />
         </div>
         {b?.caption ? <figcaption className="mt-2 text-xs text-slate-500">{safeText(b.caption)}</figcaption> : null}
       </figure>
@@ -503,7 +515,7 @@ export default function OperatingFrameReportClient(props: {
   tid: string;
   src: string;
   data: ResultData;
-  framework: any;
+  framework: any; // loaded from Supabase bucket in ReportGateClient
 }) {
   const { data, framework } = props;
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -542,11 +554,14 @@ export default function OperatingFrameReportClient(props: {
     window.print();
   }
 
+  // ✅ sections now include Section 9 if present in JSON
   const sections = useMemo(() => {
     const common = framework?.common || {};
     const p = profile?.sections || {};
-    return [
-      { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || []) },
+    const list = [
+      // ✅ Welcome: drop quotes per client instruction
+      { title: common?.welcome?.title || "Welcome", blocks: normaliseDocBlocks(common?.welcome?.blocks || [], { dropQuotes: true }) },
+
       { title: "Section 1 – Executive Summary", blocks: normaliseDocBlocks(p?.section_1?.blocks || []) },
       { title: "Section 2 – The Four Drivers: Your Operating Pattern", blocks: normaliseDocBlocks(p?.section_2?.blocks || []) },
       { title: "Section 3 – Your Operating Style", blocks: normaliseDocBlocks(p?.section_3?.blocks || []) },
@@ -556,6 +571,14 @@ export default function OperatingFrameReportClient(props: {
       { title: "Section 7 – Decision Pattern", blocks: normaliseDocBlocks(p?.section_7?.blocks || []) },
       { title: "Section 8 – Development Roadmap", blocks: normaliseDocBlocks(p?.section_8?.blocks || []) },
     ];
+
+    // Add Section 9 only if present (so older JSONs don’t break)
+    const s9 = p?.section_9?.blocks;
+    if (Array.isArray(s9) && s9.length) {
+      list.push({ title: "Section 9 – Next Steps", blocks: normaliseDocBlocks(s9) });
+    }
+
+    return list;
   }, [framework, profile]);
 
   const driversIntro =
@@ -564,12 +587,17 @@ export default function OperatingFrameReportClient(props: {
 
   const mapIntro =
     safeText(framework?.common?.profile_map_intro?.blocks?.[0]?.text) ||
-    "This map shows your overall pattern across Profiles. It helps you see what you naturally lean on and what may require more intention.";
+    "This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
+
+  const imgOnErr = (e: SyntheticEvent<HTMLImageElement>) => {
+    (e.currentTarget as HTMLImageElement).style.display = "none";
+  };
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
 
+      {/* tighter padding on mobile */}
       <div className="relative z-10 mx-auto max-w-6xl px-3 sm:px-4 py-6 md:px-6 md:py-8">
         <GlassCard className="relative overflow-hidden">
           <div className="absolute inset-0 pointer-events-none opacity-60">
@@ -577,18 +605,12 @@ export default function OperatingFrameReportClient(props: {
             <div className="absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
           </div>
 
+          {/* mobile-first header layout */}
           <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <div className="flex items-start gap-3">
                 <div className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
-                  <img
-                    src={orgLogoSrc}
-                    alt={orgName}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
+                  <img src={orgLogoSrc} alt={orgName} className="h-full w-full object-cover" onError={imgOnErr} />
                 </div>
 
                 <div className="min-w-0">
@@ -613,6 +635,7 @@ export default function OperatingFrameReportClient(props: {
                 </div>
               </div>
 
+              {/* buttons stack on mobile */}
               <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
                 <button
                   onClick={downloadPdfViaPrint}
@@ -630,16 +653,10 @@ export default function OperatingFrameReportClient(props: {
               </div>
             </div>
 
+            {/* hero image smaller on mobile, bigger on desktop */}
             <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
               <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
-                <img
-                  src={profileHeroSrc}
-                  alt={topProfileName}
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
+                <img src={profileHeroSrc} alt={topProfileName} className="h-full w-full object-cover" onError={imgOnErr} />
               </div>
             </div>
           </div>
@@ -648,6 +665,7 @@ export default function OperatingFrameReportClient(props: {
             <MiniDivider />
           </div>
 
+          {/* stack cards on mobile, 2-col on md+ */}
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
               <div className="text-sm font-semibold text-slate-900">Drivers</div>
@@ -661,10 +679,7 @@ export default function OperatingFrameReportClient(props: {
               <div className="text-sm font-semibold text-slate-900">Profile Map</div>
               <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
               <div className="mt-4">
-                <ProfileOnlyRadar
-                  profilePct={data.profile_percentages}
-                  profileLabels={data.profile_labels}
-                />
+                <ProfileOnlyRadar profilePct={data.profile_percentages} profileLabels={data.profile_labels || []} />
               </div>
             </WhiteCard>
           </div>
@@ -684,6 +699,7 @@ export default function OperatingFrameReportClient(props: {
             </section>
           ))}
 
+          {/* bottom CTA button full width on mobile */}
           <div className="pt-2">
             <button
               onClick={openNextSteps}
