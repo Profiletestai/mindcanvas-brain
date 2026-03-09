@@ -36,6 +36,11 @@ type SubmitResponse = {
   show_results?: boolean;
   next_steps_url?: string | null;
   hidden_results_message?: string | null;
+  // also accept legacy variants
+  redirect_url?: string | null;
+  redirectUrl?: string | null;
+  showResults?: boolean;
+  nextStepsUrl?: string | null;
   [k: string]: any;
 };
 
@@ -73,6 +78,9 @@ export default function PublicTestClient({
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [textAnswers, setTextAnswers] = useState<TextAnswersMap>({});
+
+  // ✅ NEW: remember whether this token is the visibility engine
+  const [isVisibilityEngine, setIsVisibilityEngine] = useState(false);
 
   // details
   const [firstName, setFirstName] = useState("");
@@ -132,6 +140,10 @@ export default function PublicTestClient({
 
         const list: Question[] = Array.isArray(qRes?.questions) ? qRes.questions : [];
         setQuestions(list);
+
+        // ✅ NEW: detect visibility engine from questions response debug
+        const engine = safeString(qRes?.__debug?.engine).toLowerCase();
+        setIsVisibilityEngine(engine.includes("visibility"));
 
         if (typeof window !== "undefined") {
           const savedAns = window.localStorage.getItem(key("answers"));
@@ -348,6 +360,12 @@ export default function PublicTestClient({
         window.localStorage.removeItem(key("details"));
       }
 
+      // ✅ NEW: visibility always goes to the bespoke report route
+      if (isVisibilityEngine) {
+        router.replace(`/t/${token}/visibility/report?tid=${encodeURIComponent(takerId)}`);
+        return;
+      }
+
       const { redirect, nextSteps, showResults } = resolveRedirectAndNextSteps(j);
 
       if (showResults !== false) {
@@ -425,11 +443,8 @@ export default function PublicTestClient({
 
   return (
     <div className={embed ? "p-0" : "p-6"}>
-      {/* ✅ Token line removed (request #1) */}
-
       {step === "details" ? (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Left: invite/intro/instructions (request #2) */}
           <div className="lg:col-span-2">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-5">
               <div className="text-sm text-white/80 font-medium">
@@ -458,7 +473,6 @@ export default function PublicTestClient({
             </div>
           </div>
 
-          {/* Right: form */}
           <div className="lg:col-span-3">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-4">
               <div className="text-lg font-semibold text-white">Before we start, tell us about you</div>
@@ -502,7 +516,6 @@ export default function PublicTestClient({
                 </label>
 
                 <label className="block">
-                  {/* ✅ removed asterisk (request #3) */}
                   <span className="text-sm text-white/80">Mobile</span>
                   <input
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"

@@ -17,6 +17,7 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
+  Cell,
 } from "recharts";
 
 type AB = "A" | "B" | "C" | "D";
@@ -39,7 +40,12 @@ type ApiVisibilityReportResponse = {
     org_name?: string | null;
     org_logo_url?: string | null;
     test_name?: string | null;
-    taker?: { id: string; first_name?: string | null; last_name?: string | null; email?: string | null };
+    taker?: {
+      id: string;
+      first_name?: string | null;
+      last_name?: string | null;
+      email?: string | null;
+    };
     totals?: VisibilityTotals;
     debug?: any;
   };
@@ -85,15 +91,195 @@ async function fetchJson(url: string) {
   return j;
 }
 
+/* ---------------- Brand-ish palette (no Tailwind tokens needed) ---------------- */
+
+const BRAND = {
+  navy0: "#050914",
+  textDim: "rgba(255,255,255,0.72)",
+  textFaint: "rgba(255,255,255,0.55)",
+  border: "rgba(255,255,255,0.12)",
+
+  teal: "#38E1C6",
+  blue: "#4FB3FF",
+  purple: "#7C3AED",
+
+  tier: {
+    Invisible: "#64748B", // slate
+    Emerging: "#4FB3FF", // blue
+    Established: "#38E1C6", // teal
+    Magnetic: "#7C3AED", // purple
+  } as Record<Tier, string>,
+
+  ab: {
+    A: "#38E1C6",
+    B: "#4FB3FF",
+    C: "#F59E0B",
+    D: "#EF4444",
+  } as Record<AB, string>,
+};
+
+/* ---------------- UI atoms ---------------- */
+
 const Shell = ({ children }: { children: ReactNode }) => (
-  <div className="min-h-screen bg-[#050914] text-white">
+  <div className="min-h-screen text-white" style={{ background: BRAND.navy0 }}>
     <div className="pointer-events-none fixed inset-0">
-      <div className="absolute inset-0 opacity-60 [background:radial-gradient(1200px_600px_at_20%_10%,rgba(56,189,248,0.18),transparent_60%),radial-gradient(900px_500px_at_85%_20%,rgba(99,102,241,0.18),transparent_55%),radial-gradient(800px_500px_at_50%_90%,rgba(20,184,166,0.14),transparent_55%)]" />
-      <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:48px_48px]" />
+      <div
+        className="absolute inset-0 opacity-70"
+        style={{
+          background:
+            "radial-gradient(1100px 520px at 16% 8%, rgba(56,225,198,0.18), transparent 60%)," +
+            "radial-gradient(900px 480px at 86% 20%, rgba(79,179,255,0.16), transparent 55%)," +
+            "radial-gradient(700px 520px at 50% 88%, rgba(124,58,237,0.14), transparent 60%)",
+        }}
+      />
+      <div
+        className="absolute inset-0 opacity-25"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)," +
+            "linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
+          backgroundSize: "52px 52px",
+        }}
+      />
     </div>
     <div className="relative">{children}</div>
   </div>
 );
+
+function GlassCard({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title?: string;
+  subtitle?: string;
+  right?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-[28px] p-[1px]"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(56,225,198,0.22), rgba(79,179,255,0.12), rgba(255,255,255,0.06))",
+        boxShadow: "0 18px 60px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div
+        className="rounded-[27px] p-6"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03))",
+          border: `1px solid ${BRAND.border}`,
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        {(title || subtitle || right) && (
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {title && <div className="text-lg font-semibold">{title}</div>}
+              {subtitle && (
+                <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
+                  {subtitle}
+                </div>
+              )}
+            </div>
+            {right}
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Visuals: Ladder + Pyramid ---------------- */
+
+function LadderGrid({ level }: { level: number }) {
+  const active = clamp(level, 1, 20);
+  const steps = Array.from({ length: 20 }, (_, i) => i + 1);
+
+  return (
+    <div className="mt-5 grid grid-cols-10 gap-2">
+      {steps.map((s) => {
+        const isActive = s === active;
+        const band = tierBand(s);
+        const bandColor = BRAND.tier[band];
+        return (
+          <div
+            key={s}
+            className="h-9 rounded-xl border text-[11px] flex items-center justify-center select-none"
+            style={{
+              borderColor: isActive ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.12)",
+              background: isActive
+                ? `linear-gradient(180deg, ${bandColor}33, rgba(255,255,255,0.10))`
+                : "rgba(255,255,255,0.04)",
+              boxShadow: isActive
+                ? `0 0 0 1px rgba(255,255,255,0.12), 0 0 18px ${bandColor}55`
+                : "none",
+              color: isActive ? "white" : "rgba(255,255,255,0.75)",
+            }}
+            title={`${band} • Level ${s}`}
+          >
+            {s}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
+  const tiers: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
+  const activeTier = tier;
+
+  return (
+    <div className="mt-6">
+      <div className="text-xs" style={{ color: BRAND.textFaint }}>
+        Pyramid view (tier emphasis)
+      </div>
+
+      <div className="mt-3 flex items-center justify-center">
+        <div className="w-full max-w-[520px] space-y-2">
+          {tiers.map((t, idx) => {
+            const isActive = t === activeTier;
+            const c = BRAND.tier[t];
+            const widthPct = 60 + idx * 12; // 60,72,84,96
+            return (
+              <div key={t} className="flex items-center justify-center">
+                <div
+                  className="h-12 rounded-2xl border flex items-center justify-between px-4"
+                  style={{
+                    width: `${widthPct}%`,
+                    borderColor: isActive ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.12)",
+                    background: isActive
+                      ? `linear-gradient(90deg, ${c}66, rgba(255,255,255,0.06))`
+                      : "rgba(255,255,255,0.04)",
+                    boxShadow: isActive ? `0 0 22px ${c}55` : "none",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
+                    />
+                    <div className="text-sm font-semibold">{t}</div>
+                  </div>
+                  <div className="text-xs" style={{ color: BRAND.textDim }}>
+                    {t === tier ? `Level ${level}` : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Main ---------------- */
 
 export default function VisibilityReportClient({
   token,
@@ -153,6 +339,7 @@ export default function VisibilityReportClient({
     return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
       name: t,
       value: Number(counts[t] ?? 0),
+      color: BRAND.tier[t],
     }));
   }, [vis]);
 
@@ -160,27 +347,11 @@ export default function VisibilityReportClient({
     if (!vis) return [];
     const pts = vis.personality_points || ({} as any);
     const order: AB[] = ["A", "B", "C", "D"];
-    return order.map((k) => ({ name: k, value: Number(pts[k] ?? 0) }));
+    return order.map((k) => ({ name: k, value: Number(pts[k] ?? 0), color: BRAND.ab[k] }));
   }, [vis]);
 
-  const ladderData = useMemo(() => {
-    const level = vis?.level ?? 0;
-    const active = clamp(level, 1, 20);
-    const steps = [];
-    for (let i = 1; i <= 20; i++) {
-      steps.push({
-        step: i,
-        active: i === active ? 1 : 0,
-        band: tierBand(i),
-      });
-    }
-    return steps;
-  }, [vis?.level]);
-
   const radarData = useMemo(() => {
-    // Proxy pillar view until pillar scoring is explicitly stored.
     if (!vis) return null;
-
     const tc = vis.tier_counts || ({} as any);
     const total = (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).reduce(
       (s, t) => s + Number(tc[t] ?? 0),
@@ -210,9 +381,11 @@ export default function VisibilityReportClient({
   if (loading) {
     return (
       <Shell>
-        <div className="mx-auto max-w-5xl p-6">
+        <div className="mx-auto max-w-6xl p-6">
           <div className="text-2xl font-semibold">Loading your report…</div>
-          <div className="mt-2 text-sm text-white/70">Preparing your Visibility Ladder report.</div>
+          <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+            Preparing your Visibility Ladder report.
+          </div>
         </div>
       </Shell>
     );
@@ -221,10 +394,15 @@ export default function VisibilityReportClient({
   if (err || !vis) {
     return (
       <Shell>
-        <div className="mx-auto max-w-5xl p-6 space-y-4">
+        <div className="mx-auto max-w-6xl p-6 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
-          <p className="text-sm text-red-300">{safeText(err || "Unknown error")}</p>
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4 text-xs text-white/70">
+          <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
+            {safeText(err || "Unknown error")}
+          </p>
+          <div
+            className="rounded-2xl p-4 text-xs"
+            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BRAND.border}` }}
+          >
             <div>token: {token}</div>
             <div>tid: {tid}</div>
           </div>
@@ -236,156 +414,174 @@ export default function VisibilityReportClient({
     );
   }
 
+  const tierColor = BRAND.tier[vis.tier];
+  const styleColor = BRAND.ab[vis.personality_type];
+
   return (
     <Shell>
       <div className="mx-auto max-w-6xl p-6 space-y-6">
-        <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="text-sm text-white/70">
-                {orgName} • {testName}
+        <GlassCard
+          title={`${takerName} Visibility Ladder`}
+          subtitle={`${orgName} • ${testName}`}
+          right={
+            <div
+              className="rounded-2xl border p-4 min-w-[240px]"
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
+            >
+              <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                At a glance
               </div>
-              <div className="mt-2 text-3xl font-semibold">{takerName} Visibility Ladder</div>
-              <div className="mt-2 text-white/80">
-                <span className="font-semibold">{vis.tier}</span> • Level{" "}
-                <span className="font-semibold">{vis.level}</span> •{" "}
-                <span className="font-semibold">{readinessLabel(vis.readiness)}</span>
-              </div>
-              <div className="mt-3 text-sm text-white/70">
-                Style: <span className="font-semibold">{vis.personality_type}</span>
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-black/20 border border-white/10 p-4 min-w-[240px]">
-              <div className="text-xs text-white/60">At a glance</div>
               <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <div className="text-white/60">Tier</div>
-                  <div className="font-semibold">{vis.tier}</div>
+                  <div style={{ color: BRAND.textFaint }}>Tier</div>
+                  <div className="font-semibold" style={{ color: tierColor }}>
+                    {vis.tier}
+                  </div>
                 </div>
                 <div>
-                  <div className="text-white/60">Level</div>
+                  <div style={{ color: BRAND.textFaint }}>Level</div>
                   <div className="font-semibold">{vis.level}</div>
                 </div>
                 <div>
-                  <div className="text-white/60">Readiness</div>
+                  <div style={{ color: BRAND.textFaint }}>Readiness</div>
                   <div className="font-semibold">{readinessLabel(vis.readiness)}</div>
                 </div>
                 <div>
-                  <div className="text-white/60">Style</div>
-                  <div className="font-semibold">{vis.personality_type}</div>
+                  <div style={{ color: BRAND.textFaint }}>Style</div>
+                  <div className="font-semibold" style={{ color: styleColor }}>
+                    {vis.personality_type}
+                  </div>
                 </div>
               </div>
             </div>
+          }
+        >
+          <div className="mt-2 text-white/85">
+            <span className="font-semibold" style={{ color: tierColor }}>
+              {vis.tier}
+            </span>{" "}
+            • Level <span className="font-semibold">{vis.level}</span> •{" "}
+            <span className="font-semibold">{readinessLabel(vis.readiness)}</span>
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Ladder + Tier distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
-            <div className="text-lg font-semibold">Your ladder position</div>
-            <div className="mt-1 text-sm text-white/70">20 levels across 4 tiers. You’re highlighted at your level.</div>
-
-            <div className="mt-5 grid grid-cols-10 gap-2">
-              {ladderData.map((s) => (
-                <div
-                  key={s.step}
-                  className={[
-                    "h-8 rounded-lg border text-[11px] flex items-center justify-center",
-                    s.active ? "bg-white text-black border-white" : "bg-white/5 border-white/15 text-white/70",
-                  ].join(" ")}
-                  title={`${s.band} • Level ${s.step}`}
-                >
-                  {s.step}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 text-xs text-white/60">
+          <GlassCard title="Your ladder position" subtitle="20 levels across 4 tiers. You’re highlighted at your level.">
+            <LadderGrid level={vis.level} />
+            <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
               Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20 Magnetic
             </div>
-          </div>
+            <TierPyramid tier={vis.tier} level={vis.level} />
+          </GlassCard>
 
-          <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
-            <div className="text-lg font-semibold">Signal distribution</div>
-            <div className="mt-1 text-sm text-white/70">How your answers across Q9–Q25 mapped into each tier.</div>
-
-            <div className="mt-4 h-[260px]">
+          <GlassCard title="Signal distribution" subtitle="How your answers across Q9–Q25 mapped into each tier.">
+            <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={tierCountsData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.75)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.75)" }} allowDecimals={false} />
+                <BarChart data={tierCountsData} barCategoryGap={22}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
+                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
-                    labelStyle={{ color: "white" }}
+                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                    contentStyle={{
+                      background: "rgba(7,18,38,0.92)",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                      borderRadius: 14,
+                      color: "white",
+                    }}
+                    labelStyle={{ color: "rgba(255,255,255,0.9)" }}
                   />
-                  <Bar dataKey="value" />
+                  <Bar dataKey="value" radius={[14, 14, 6, 6]}>
+                    {tierCountsData.map((d) => (
+                      <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </GlassCard>
         </div>
 
-        {/* Pillars + Personality */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
-            <div className="text-lg font-semibold">Pillars overview</div>
-            <div className="mt-1 text-sm text-white/70">A high-level picture of Discoverability, Trust, and Conversion.</div>
-
-            <div className="mt-4 h-[280px]">
+          <GlassCard title="Pillars overview" subtitle="A high-level picture of Discoverability, Trust, and Conversion.">
+            <div className="mt-4 h-[320px]">
               {radarData ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart data={radarData}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="pillar" tick={{ fill: "rgba(255,255,255,0.75)" }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.6)" }} />
-                    <Radar dataKey="score" />
+                    <PolarGrid stroke="rgba(255,255,255,0.14)" />
+                    <PolarAngleAxis dataKey="pillar" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                    <PolarRadiusAxis
+                      angle={30}
+                      domain={[0, 100]}
+                      tick={{ fill: "rgba(255,255,255,0.55)" }}
+                      stroke="rgba(255,255,255,0.12)"
+                    />
+                    <Radar dataKey="score" stroke={BRAND.teal} fill={BRAND.teal} fillOpacity={0.25} />
                     <Tooltip
-                      contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
-                      labelStyle={{ color: "white" }}
+                      contentStyle={{
+                        background: "rgba(7,18,38,0.92)",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        borderRadius: 14,
+                        color: "white",
+                      }}
+                      labelStyle={{ color: "rgba(255,255,255,0.9)" }}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full rounded-xl bg-black/20 border border-white/10 flex items-center justify-center text-sm text-white/70">
+                <div
+                  className="h-full rounded-2xl flex items-center justify-center text-sm"
+                  style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
+                >
                   Pillar data will appear here once enabled.
                 </div>
               )}
             </div>
-          </div>
+          </GlassCard>
 
-          <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
-            <div className="text-lg font-semibold">Your execution style</div>
-            <div className="mt-1 text-sm text-white/70">Based on Q1–Q8 weighting.</div>
-
-            <div className="mt-4 h-[280px]">
+          <GlassCard title="Your execution style" subtitle="Based on Q1–Q8 weighting.">
+            <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={personalityData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.75)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.75)" }} allowDecimals={false} />
+                <BarChart data={personalityData} barCategoryGap={24}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
+                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
-                    labelStyle={{ color: "white" }}
+                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                    contentStyle={{
+                      background: "rgba(7,18,38,0.92)",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                      borderRadius: 14,
+                      color: "white",
+                    }}
+                    labelStyle={{ color: "rgba(255,255,255,0.9)" }}
                   />
-                  <Bar dataKey="value" />
+                  <Bar dataKey="value" radius={[14, 14, 6, 6]}>
+                    {personalityData.map((d) => (
+                      <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="mt-2 text-xs text-white/60">
-              Primary style: <span className="text-white/80 font-semibold">{vis.personality_type}</span>
+            <div className="mt-3 text-sm" style={{ color: BRAND.textDim }}>
+              Primary style:{" "}
+              <span className="font-semibold" style={{ color: styleColor }}>
+                {vis.personality_type}
+              </span>
             </div>
-          </div>
+          </GlassCard>
         </div>
 
-        <div className="rounded-3xl bg-white/5 border border-white/10 p-6 space-y-4">
-          <div className="text-lg font-semibold">Your personalised guidance</div>
-          <p className="text-sm text-white/70">
-            Next, we’ll add AI-generated insights based on your tier, level, distribution, and style.
-          </p>
-        </div>
+        <GlassCard
+          title="Your personalised guidance"
+          subtitle="Next we’ll generate AI insights: what this level means, your strengths, your risks, and a 7-day + 30-day plan."
+        >
+          <div className="pt-2 text-xs" style={{ color: BRAND.textFaint }}>
+            powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
+          </div>
+        </GlassCard>
       </div>
     </Shell>
   );
