@@ -40,12 +40,12 @@ function normSlug(v: any) {
 }
 
 /**
- * Global wrapper->content resolver.
- * - If not wrapper: return self
- * - If wrapper:
- *   - Prefer source test by slug if available (qsc-leaders / qsc-core)
- *   - Else default_source_test
- *   - Else first source_tests entry
+ * Resolve the canonical test that actually owns the questions.
+ *
+ * Supported cases:
+ * 1) Normal direct tests -> use self
+ * 2) Shared-source cloned tests -> use meta.source_test_id / base_test_id / parent_test_id
+ * 3) QSC-style wrappers -> use source_tests / default_source_test logic
  */
 async function resolveEffectiveTestId(args: {
   sb: any;
@@ -54,6 +54,25 @@ async function resolveEffectiveTestId(args: {
   const { sb, wrapperTest } = args;
 
   const meta = wrapperTest?.meta ?? {};
+
+  // 1) Generic shared-source clone support
+  const genericSource =
+    typeof meta?.source_test_id === "string"
+      ? meta.source_test_id
+      : typeof meta?.base_test_id === "string"
+      ? meta.base_test_id
+      : typeof meta?.parent_test_id === "string"
+      ? meta.parent_test_id
+      : null;
+
+  if (genericSource && isUuidLike(genericSource)) {
+    return {
+      effectiveTestId: genericSource,
+      resolvedBy: "meta.source_test_id|base_test_id|parent_test_id",
+    };
+  }
+
+  // 2) Existing wrapper logic (used by QSC-style wrappers)
   const isWrapper = meta?.wrapper === true;
 
   if (!isWrapper) {
@@ -63,8 +82,11 @@ async function resolveEffectiveTestId(args: {
   const sourceTests: string[] = Array.isArray(meta?.source_tests)
     ? meta.source_tests
     : [];
+
   const defaultSource: string | null =
-    typeof meta?.default_source_test === "string" ? meta.default_source_test : null;
+    typeof meta?.default_source_test === "string"
+      ? meta.default_source_test
+      : null;
 
   // If we have multiple source tests, prefer specific known slugs when present
   if (sourceTests.length) {
@@ -77,7 +99,7 @@ async function resolveEffectiveTestId(args: {
 
       const list = (candidates ?? []) as TestRow[];
 
-      // Prefer qsc-leaders if it exists (leader question set is typically different)
+      // Prefer qsc-leaders if it exists
       const leaders = list.find((t) => normSlug(t.slug) === "qsc-leaders");
       if (leaders?.id) {
         return {
@@ -99,12 +121,18 @@ async function resolveEffectiveTestId(args: {
 
   // Fallback: default source
   if (defaultSource && isUuidLike(defaultSource)) {
-    return { effectiveTestId: defaultSource, resolvedBy: "meta.default_source_test" };
+    return {
+      effectiveTestId: defaultSource,
+      resolvedBy: "meta.default_source_test",
+    };
   }
 
   // Fallback: first source
   if (sourceTests.length && isUuidLike(sourceTests[0])) {
-    return { effectiveTestId: sourceTests[0], resolvedBy: "meta.source_tests[0]" };
+    return {
+      effectiveTestId: sourceTests[0],
+      resolvedBy: "meta.source_tests[0]",
+    };
   }
 
   return { effectiveTestId: wrapperTest.id, resolvedBy: "wrapper_no_sources" };
@@ -119,7 +147,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
 
     const sb = getPortalClient();
 
-    // 1) resolve link -> wrapper test_id
+    // 1) resolve link -> test_id
     const { data: linkRow, error: linkErr } = (await sb
       .from("test_links")
       .select("token, test_id")
@@ -130,7 +158,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       return NextResponse.json({ ok: false, error: "invalid link" }, { status: 404 });
     }
 
-    // 2) load wrapper test meta (and slug for better selection)
+    // 2) load test meta
     const { data: testRow, error: testErr } = (await sb
       .from("tests")
       .select("id, slug, meta")
@@ -149,8 +177,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       wrapperTest: testRow,
     });
 
-    // 3) load questions DIRECTLY from portal.test_questions
-    // IMPORTANT: no relationship joins, no question_id column references.
+    // 3) load questions directly from portal.test_questions
     const { data: rows, error: qErr } = (await sb
       .from("test_questions")
       .select("id, idx, order, type, text, options, category")
@@ -182,7 +209,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
     return NextResponse.json({
       ok: true,
       token: linkRow.token,
-      test_id: linkRow.test_id, // wrapper test id
+      test_id: linkRow.test_id, // linked/org-facing test id
       effective_test_id: effectiveTestId, // canonical content test id
       questions,
       __debug: {
