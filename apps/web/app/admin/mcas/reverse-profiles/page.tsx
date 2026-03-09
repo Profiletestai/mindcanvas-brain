@@ -50,7 +50,7 @@ export default async function Page(props: {
 
   if (partner_key) query = query.eq("partner_key", partner_key);
   if (status) query = query.eq("status", status);
-  if (q) query = query.or(`job_id.ilike.%${q}%,title.ilike.%${q}%`);
+  if (q) query = query.or(`job_id.ilike.%${q}%,title.ilike.%${q}%,run_number.ilike.%${q}%`);
 
   const { data: runs, error } = await query;
 
@@ -78,8 +78,7 @@ export default async function Page(props: {
             </h1>
             <p className="mt-2 text-white/70 max-w-3xl">
               Create, manage, and share reverse-profile sandbox tests for partner
-              validation. These runs let partners experience the question flow and
-              see the exact structured output MCAS returns.
+              validation. Each run is tracked as an AI flow record inside MCAS.
             </p>
           </div>
 
@@ -135,7 +134,7 @@ export default async function Page(props: {
 
             <div>
               <label className="block text-xs text-white/60 mb-2">
-                Search title / job ID
+                Search title / job ID / run number
               </label>
               <input
                 name="q"
@@ -175,19 +174,23 @@ export default async function Page(props: {
               {(runs || []).map((run: any) => {
                 const testPath = `/mcas/reverse/${run.id}`;
                 const resultPath = `/mcas/reverse/${run.id}/result`;
-
                 const testLink = `${origin}${testPath}`;
                 const resultLink = `${origin}${resultPath}`;
 
                 return (
                   <tr key={run.id} className="border-t border-white/10 align-top">
                     <td className="px-4 py-4">
-                      <div className="font-medium">{run.title || "Untitled run"}</div>
+                      <div className="font-medium">
+                        {run.run_number || "—"} • {run.title || "Untitled run"}
+                      </div>
                       <div className="mt-1 text-xs text-white/50">
                         Job ID: {run.job_id || "—"}
                       </div>
                       <div className="mt-1 text-xs text-white/50">
                         Campaign: {run.campaign_id || "—"}
+                      </div>
+                      <div className="mt-1 text-xs text-white/50">
+                        Source: {run.source || "manual"}
                       </div>
                       <div className="mt-2 text-[11px] text-white/35 font-mono break-all">
                         {run.id}
@@ -228,10 +231,7 @@ export default async function Page(props: {
                           Open Test
                         </a>
 
-                        <CopyTextButton
-                          text={testLink}
-                          label="Copy Test Link"
-                        />
+                        <CopyTextButton text={testLink} label="Copy Test Link" />
 
                         <a
                           href={resultPath}
@@ -242,10 +242,7 @@ export default async function Page(props: {
                           Open Result
                         </a>
 
-                        <CopyTextButton
-                          text={resultLink}
-                          label="Copy Result Link"
-                        />
+                        <CopyTextButton text={resultLink} label="Copy Result Link" />
                       </div>
 
                       <div className="mt-2 text-[11px] text-white/35 break-all">

@@ -302,6 +302,12 @@ export async function POST(req: Request) {
 
     const resultPayload = {
       type: "reverse_profile_result",
+      meta: {
+        run_id: run.id,
+        run_number: run.run_number,
+        run_type: run.run_type || "reverse_profile_ai",
+        source: run.source || "manual",
+      },
       partner: {
         partner_key: run.partner_key,
       },
@@ -339,6 +345,32 @@ export async function POST(req: Request) {
       },
     };
 
+    const exportPayload = {
+      ok: true,
+      type: "reverse_profile_export",
+      meta: {
+        run_id: run.id,
+        run_number: run.run_number,
+        run_type: run.run_type || "reverse_profile_ai",
+        source: run.source || "manual",
+        exported_at: new Date().toISOString(),
+      },
+      partner: {
+        partner_key: run.partner_key,
+      },
+      job: {
+        job_id: run.job_id,
+        campaign_id: run.campaign_id,
+        title: run.title,
+      },
+      framework: {
+        slug: frameworkSlug,
+        version: frameworkVersion,
+      },
+      scoring_model_version: "mcas-score-v1",
+      result: resultPayload,
+    };
+
     const now = new Date().toISOString();
 
     const { error: updateErr } = await sb
@@ -347,6 +379,7 @@ export async function POST(req: Request) {
         submitted_answers: answers,
         score_payload: resultPayload,
         word_mapping_payload: wording,
+        export_payload: exportPayload,
         scoring_model_version: "mcas-score-v1",
         status: "scored",
         submitted_at: now,
@@ -361,7 +394,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       run_id: runId,
+      run_number: run.run_number,
       payload: resultPayload,
+      export_payload: exportPayload,
     });
   } catch (error: any) {
     return NextResponse.json(

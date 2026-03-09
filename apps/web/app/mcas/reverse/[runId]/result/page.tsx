@@ -48,7 +48,7 @@ export default async function Page(
   const flags = Array.isArray(scoring?.flags) ? scoring.flags : [];
   const confidence = scoring?.confidence || null;
 
-  const jsonPreview = payload || null;
+  const jsonPreview = run?.export_payload || payload || null;
 
   return (
     <div className="min-h-screen bg-[#060e16] text-white">
@@ -60,15 +60,20 @@ export default async function Page(
               {run?.title || "Reverse Profile Result"}
             </h1>
             <div className="mt-2 text-sm text-white/60">
+              Run Number: <span className="text-white">{run?.run_number || "—"}</span>
+              {" • "}
               Partner: <span className="text-white">{run?.partner_key || "—"}</span>
               {" • "}
               Job ID: <span className="text-white">{run?.job_id || "—"}</span>
-              {" • "}
+            </div>
+            <div className="mt-1 text-sm text-white/60">
               Framework:{" "}
               <span className="text-white">
                 {payload?.framework?.slug || run?.framework_slug || "mcas-core-alignment"}{" "}
                 {payload?.framework?.version || run?.framework_version || "v1"}
               </span>
+              {" • "}
+              Source: <span className="text-white">{run?.source || "manual"}</span>
             </div>
           </div>
 
@@ -88,7 +93,6 @@ export default async function Page(
           </div>
         </div>
 
-        {/* Summary */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-xs text-white/60">Status</div>
@@ -118,7 +122,6 @@ export default async function Page(
           </div>
         </div>
 
-        {/* CORE */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">CORE Distribution</div>
           <div className="mt-1 text-lg font-semibold">Primary behavioural mix</div>
@@ -139,7 +142,6 @@ export default async function Page(
           </div>
         </div>
 
-        {/* Operating Style + Career Vertical */}
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="text-sm text-white/60">Top Operating Style</div>
@@ -199,7 +201,6 @@ export default async function Page(
           </div>
         </div>
 
-        {/* Wording */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">Word Mapping Output</div>
           <div className="mt-1 text-lg font-semibold">
@@ -273,7 +274,6 @@ export default async function Page(
           )}
         </div>
 
-        {/* Confidence + Flags */}
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="text-sm text-white/60">Confidence</div>
@@ -308,7 +308,6 @@ export default async function Page(
           </div>
         </div>
 
-        {/* JSON */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">API Payload Preview</div>
           <div className="mt-1 text-lg font-semibold">

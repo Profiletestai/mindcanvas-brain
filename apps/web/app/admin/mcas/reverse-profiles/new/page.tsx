@@ -22,8 +22,12 @@ async function createRun(formData: FormData) {
   const job_id = String(formData.get("job_id") || "").trim();
   const campaign_id = String(formData.get("campaign_id") || "").trim() || null;
   const title = String(formData.get("title") || "").trim();
-  const framework_slug = String(formData.get("framework_slug") || "").trim() || "mcas-core-alignment";
-  const framework_version = String(formData.get("framework_version") || "").trim() || "v1";
+  const framework_slug =
+    String(formData.get("framework_slug") || "").trim() || "mcas-core-alignment";
+  const framework_version =
+    String(formData.get("framework_version") || "").trim() || "v1";
+  const source = String(formData.get("source") || "").trim() || "manual";
+  const notes = String(formData.get("notes") || "").trim() || null;
 
   if (!partner_key || !job_id || !title) return;
 
@@ -39,6 +43,10 @@ async function createRun(formData: FormData) {
       framework_slug,
       framework_version,
       input_mode: "manual",
+      run_type: "reverse_profile_ai",
+      source,
+      notes,
+      job_title_snapshot: title,
       status: "draft",
     })
     .select("id")
@@ -65,8 +73,8 @@ export default async function Page() {
         <h1 className="mt-1 text-3xl font-semibold">Create Reverse Profile Sandbox</h1>
         <p className="mt-3 text-white/70 max-w-2xl">
           Create a sandbox run for a partner to answer the 25 MCAS questions as the
-          ideal candidate for a role. The result page will show the visual output and
-          the structured payload their platform will receive.
+          ideal candidate for a role. Every run is stored in MCAS as a tracked AI flow
+          record with its own run number, answers, score output, and wording payload.
         </p>
 
         <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -115,7 +123,7 @@ export default async function Page() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm text-white/70 mb-2">Framework Slug</label>
                 <input
@@ -133,11 +141,33 @@ export default async function Page() {
                   className="w-full rounded-xl border border-white/10 bg-[#0b1724] px-4 py-3 outline-none"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm text-white/70 mb-2">Source</label>
+                <select
+                  name="source"
+                  defaultValue="manual"
+                  className="w-full rounded-xl border border-white/10 bg-[#0b1724] px-4 py-3 outline-none"
+                >
+                  <option value="manual">manual</option>
+                  <option value="ai">ai</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-white/70 mb-2">Notes</label>
+              <textarea
+                name="notes"
+                rows={4}
+                placeholder="Optional notes for this AI/reverse profile run"
+                className="w-full rounded-xl border border-white/10 bg-[#0b1724] px-4 py-3 outline-none"
+              />
             </div>
 
             <div className="rounded-xl border border-white/10 bg-[#0b1724] p-4 text-sm text-white/60">
-              This creates a partner sandbox run. After creation you’ll be redirected to
-              the shareable question flow.
+              This creates a tracked reverse-profile run in MCAS. The run receives its own
+              ID and stores the questions answered, scoring output, wording output, and export payload.
             </div>
 
             <button className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-5 py-3 text-sm font-medium text-white shadow hover:brightness-110 transition">
