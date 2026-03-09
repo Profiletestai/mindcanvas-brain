@@ -358,12 +358,7 @@ export async function POST(
       }
 
       // Score
-      const personalityPoints: Record<AB, number> = {
-        A: 0,
-        B: 0,
-        C: 0,
-        D: 0,
-      };
+      const personalityPoints: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
       const tierCounts: Record<Tier, number> = {
         Invisible: 0,
         Emerging: 0,
@@ -516,7 +511,7 @@ export async function POST(
       // ✅ Canonical base for ALL absolute links
       const origin = getBaseUrl();
 
-      // ✅ NEW: Visibility uses its own bespoke report route (no ReportGate/template)
+      // ✅ NEW: bespoke Visibility report route
       const reportPath = `/t/${encodeURIComponent(
         token
       )}/visibility/report?tid=${encodeURIComponent(taker.id)}`;
@@ -571,14 +566,17 @@ export async function POST(
           });
 
           if (!takerEmailResult?.ok) {
-            console.error("[visibility submit] test_taker_report failed", takerEmailResult);
+            console.error(
+              "[visibility submit] test_taker_report failed",
+              takerEmailResult
+            );
           }
         }
       } catch (e) {
         console.error("[visibility submit] test_taker_report unexpected error", e);
       }
 
-      // ✅ Send internal notification (keeps ops parity with other tests)
+      // ✅ Internal notification (optional, but keeps parity)
       let ownerNotification: any = null;
       try {
         const sentTo =
@@ -613,24 +611,26 @@ export async function POST(
           });
 
           if (!ownerNotification?.ok) {
-            console.error("[visibility submit] test_owner_notification failed", ownerNotification);
+            console.error(
+              "[visibility submit] test_owner_notification failed",
+              ownerNotification
+            );
           }
         }
       } catch (e) {
         console.error("[visibility submit] owner notification unexpected error", e);
       }
 
-      // Decide redirect using existing rules
-      const redirectUrl: string =
-        linkBehavior.show_results === true
-          ? reportPath
-          : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
-          ? linkBehavior.redirect_url.trim()
-          : resultPath;
-
+      // ✅ IMPORTANT: force the public client to use redirect (not /result)
+      // PublicTestClient hard-routes to /result when show_results is true.
+      // Setting show_results: false triggers the existing redirect branch.
       return NextResponse.json({
         ok: true,
         totals,
+
+        show_results: false, // ✅ forces client to follow redirect
+        redirect: reportPath,
+
         link: {
           show_results: linkBehavior.show_results,
           redirect_url: linkBehavior.redirect_url,
@@ -638,9 +638,10 @@ export async function POST(
           next_steps_url: linkBehavior.next_steps_url,
           email_report: linkBehavior.email_report,
         },
-        redirect: redirectUrl,
+
         result_url: baseResultUrl,
         report_url: baseReportUrl,
+
         owner_notification: ownerNotification,
         taker_email: takerEmailResult,
       });
@@ -923,6 +924,7 @@ export async function POST(
     const baseResultUrl = `${origin}${resultPath}`;
 
     // ✅ QSC PUBLIC report destination
+    // Test takers must ONLY get the Growth report (entrepreneur) or leader page.
     const qscGrowthPath = `/qsc/${encodeURIComponent(
       token
     )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
@@ -933,7 +935,7 @@ export async function POST(
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
 
-    // Mark completed + persist correct last_result_url
+    // Mark completed + persist correct last_result_url (prevents old /report links being reused)
     await sb
       .from("test_takers")
       .update({
