@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -31,27 +32,15 @@ type VisibilityTotals = {
   tier_counts: Record<Tier, number>;
 };
 
-type ApiReportResponse = {
+type ApiVisibilityReportResponse = {
   ok: boolean;
   data?: {
     org_slug?: string | null;
     org_name?: string | null;
     org_logo_url?: string | null;
     test_name?: string | null;
-    taker?: {
-      id: string;
-      first_name?: string | null;
-      last_name?: string | null;
-      email?: string | null;
-    };
-    link?: {
-      next_steps_url?: string | null;
-      show_results?: boolean | null;
-      redirect_url?: string | null;
-      hidden_results_message?: string | null;
-      email_report?: boolean | null;
-    };
-    totals?: any;
+    taker?: { id: string; first_name?: string | null; last_name?: string | null; email?: string | null };
+    totals?: VisibilityTotals;
     debug?: any;
   };
   error?: string;
@@ -96,6 +85,16 @@ async function fetchJson(url: string) {
   return j;
 }
 
+const Shell = ({ children }: { children: ReactNode }) => (
+  <div className="min-h-screen bg-[#050914] text-white">
+    <div className="pointer-events-none fixed inset-0">
+      <div className="absolute inset-0 opacity-60 [background:radial-gradient(1200px_600px_at_20%_10%,rgba(56,189,248,0.18),transparent_60%),radial-gradient(900px_500px_at_85%_20%,rgba(99,102,241,0.18),transparent_55%),radial-gradient(800px_500px_at_50%_90%,rgba(20,184,166,0.14),transparent_55%)]" />
+      <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:48px_48px]" />
+    </div>
+    <div className="relative">{children}</div>
+  </div>
+);
+
 export default function VisibilityReportClient({
   token,
   tid,
@@ -107,8 +106,7 @@ export default function VisibilityReportClient({
 }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
-  const [meta, setMeta] = useState<ApiReportResponse["data"] | null>(null);
+  const [meta, setMeta] = useState<ApiVisibilityReportResponse["data"] | null>(null);
   const [vis, setVis] = useState<VisibilityTotals | null>(null);
 
   useEffect(() => {
@@ -123,27 +121,19 @@ export default function VisibilityReportClient({
 
         if (!tid) throw new Error("Missing tid");
 
-        // Reuse your existing report API (portal) because visibility totals are persisted into portal.test_results
-        const url = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+        const url = `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
           tid
         )}${src ? `&src=${encodeURIComponent(src)}` : ""}`;
 
-        const j: ApiReportResponse = await fetchJson(url);
+        const j: ApiVisibilityReportResponse = await fetchJson(url);
         if (cancelled) return;
 
-        const data = j.data || null;
-        setMeta(data);
+        setMeta(j.data || null);
 
-        const totals = (data as any)?.totals;
-        const v = totals?.visibility as VisibilityTotals | undefined;
+        const totals = j.data?.totals;
+        if (!totals) throw new Error("Visibility totals not found from visibility report endpoint.");
+        setVis(totals);
 
-        if (!v || !v.tier || !v.level) {
-          throw new Error(
-            "Visibility totals not found. Confirm submit route writes totals.visibility into portal.test_results."
-          );
-        }
-
-        setVis(v);
         setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
@@ -188,7 +178,7 @@ export default function VisibilityReportClient({
   }, [vis?.level]);
 
   const radarData = useMemo(() => {
-    // Proxy pillar view from tier distribution until we add a dedicated pillar endpoint.
+    // Proxy pillar view until pillar scoring is explicitly stored.
     if (!vis) return null;
 
     const tc = vis.tier_counts || ({} as any);
@@ -216,17 +206,6 @@ export default function VisibilityReportClient({
   const orgName = meta?.org_name || "MindCanvas";
   const testName = meta?.test_name || "Visibility Ladder";
   const takerName = fullName(meta?.taker);
-
-  const Shell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-[#050914] text-white">
-      {/* background flair */}
-      <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 opacity-60 [background:radial-gradient(1200px_600px_at_20%_10%,rgba(56,189,248,0.18),transparent_60%),radial-gradient(900px_500px_at_85%_20%,rgba(99,102,241,0.18),transparent_55%),radial-gradient(800px_500px_at_50%_90%,rgba(20,184,166,0.14),transparent_55%)]" />
-        <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:48px_48px]" />
-      </div>
-      <div className="relative">{children}</div>
-    </div>
-  );
 
   if (loading) {
     return (
@@ -260,7 +239,6 @@ export default function VisibilityReportClient({
   return (
     <Shell>
       <div className="mx-auto max-w-6xl p-6 space-y-6">
-        {/* Hero */}
         <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
@@ -304,12 +282,9 @@ export default function VisibilityReportClient({
 
         {/* Ladder + Tier distribution */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Ladder */}
           <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
             <div className="text-lg font-semibold">Your ladder position</div>
-            <div className="mt-1 text-sm text-white/70">
-              20 levels across 4 tiers. You’re highlighted at your current level.
-            </div>
+            <div className="mt-1 text-sm text-white/70">20 levels across 4 tiers. You’re highlighted at your level.</div>
 
             <div className="mt-5 grid grid-cols-10 gap-2">
               {ladderData.map((s) => (
@@ -317,9 +292,7 @@ export default function VisibilityReportClient({
                   key={s.step}
                   className={[
                     "h-8 rounded-lg border text-[11px] flex items-center justify-center",
-                    s.active
-                      ? "bg-white text-black border-white"
-                      : "bg-white/5 border-white/15 text-white/70",
+                    s.active ? "bg-white text-black border-white" : "bg-white/5 border-white/15 text-white/70",
                   ].join(" ")}
                   title={`${s.band} • Level ${s.step}`}
                 >
@@ -333,12 +306,9 @@ export default function VisibilityReportClient({
             </div>
           </div>
 
-          {/* Tier distribution */}
           <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
             <div className="text-lg font-semibold">Signal distribution</div>
-            <div className="mt-1 text-sm text-white/70">
-              How your answers across Q9–Q25 mapped into each tier.
-            </div>
+            <div className="mt-1 text-sm text-white/70">How your answers across Q9–Q25 mapped into each tier.</div>
 
             <div className="mt-4 h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -347,31 +317,21 @@ export default function VisibilityReportClient({
                   <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.75)" }} />
                   <YAxis tick={{ fill: "rgba(255,255,255,0.75)" }} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{
-                      background: "rgba(0,0,0,0.85)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                    }}
+                    contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
                     labelStyle={{ color: "white" }}
                   />
                   <Bar dataKey="value" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-
-            <div className="mt-2 text-xs text-white/60">
-              This chart is the “why” behind your tier and level.
-            </div>
           </div>
         </div>
 
         {/* Pillars + Personality */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Pillars radar */}
           <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
             <div className="text-lg font-semibold">Pillars overview</div>
-            <div className="mt-1 text-sm text-white/70">
-              A high-level picture of Discoverability, Trust, and Conversion.
-            </div>
+            <div className="mt-1 text-sm text-white/70">A high-level picture of Discoverability, Trust, and Conversion.</div>
 
             <div className="mt-4 h-[280px]">
               {radarData ? (
@@ -379,17 +339,10 @@ export default function VisibilityReportClient({
                   <RadarChart data={radarData}>
                     <PolarGrid />
                     <PolarAngleAxis dataKey="pillar" tick={{ fill: "rgba(255,255,255,0.75)" }} />
-                    <PolarRadiusAxis
-                      angle={30}
-                      domain={[0, 100]}
-                      tick={{ fill: "rgba(255,255,255,0.6)" }}
-                    />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.6)" }} />
                     <Radar dataKey="score" />
                     <Tooltip
-                      contentStyle={{
-                        background: "rgba(0,0,0,0.85)",
-                        border: "1px solid rgba(255,255,255,0.15)",
-                      }}
+                      contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
                       labelStyle={{ color: "white" }}
                     />
                   </RadarChart>
@@ -400,18 +353,11 @@ export default function VisibilityReportClient({
                 </div>
               )}
             </div>
-
-            <div className="mt-2 text-xs text-white/60">
-              (We’ll upgrade this to true pillar scoring once we add the dedicated endpoint.)
-            </div>
           </div>
 
-          {/* Personality */}
           <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
             <div className="text-lg font-semibold">Your execution style</div>
-            <div className="mt-1 text-sm text-white/70">
-              Based on Q1–Q8 weighting. This helps tailor the action plan to how you naturally operate.
-            </div>
+            <div className="mt-1 text-sm text-white/70">Based on Q1–Q8 weighting.</div>
 
             <div className="mt-4 h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -420,10 +366,7 @@ export default function VisibilityReportClient({
                   <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.75)" }} />
                   <YAxis tick={{ fill: "rgba(255,255,255,0.75)" }} allowDecimals={false} />
                   <Tooltip
-                    contentStyle={{
-                      background: "rgba(0,0,0,0.85)",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                    }}
+                    contentStyle={{ background: "rgba(0,0,0,0.85)", border: "1px solid rgba(255,255,255,0.15)" }}
                     labelStyle={{ color: "white" }}
                   />
                   <Bar dataKey="value" />
@@ -432,38 +375,16 @@ export default function VisibilityReportClient({
             </div>
 
             <div className="mt-2 text-xs text-white/60">
-              Primary style:{" "}
-              <span className="text-white/80 font-semibold">{vis.personality_type}</span>
+              Primary style: <span className="text-white/80 font-semibold">{vis.personality_type}</span>
             </div>
           </div>
         </div>
 
-        {/* AI Narrative (placeholder for now) */}
         <div className="rounded-3xl bg-white/5 border border-white/10 p-6 space-y-4">
           <div className="text-lg font-semibold">Your personalised guidance</div>
           <p className="text-sm text-white/70">
-            Next, we’ll add AI-generated insights based on your tier, level, signal distribution, and style — including a
-            7-day plan and a 30-day plan.
+            Next, we’ll add AI-generated insights based on your tier, level, distribution, and style.
           </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-2xl bg-black/20 border border-white/10 p-4">
-              <div className="text-sm font-semibold">What this level means</div>
-              <p className="mt-2 text-sm text-white/70">(AI narrative section placeholder)</p>
-            </div>
-            <div className="rounded-2xl bg-black/20 border border-white/10 p-4">
-              <div className="text-sm font-semibold">Your next 7 days</div>
-              <p className="mt-2 text-sm text-white/70">(AI action plan placeholder)</p>
-            </div>
-            <div className="rounded-2xl bg-black/20 border border-white/10 p-4">
-              <div className="text-sm font-semibold">Your next 30 days</div>
-              <p className="mt-2 text-sm text-white/70">(AI roadmap placeholder)</p>
-            </div>
-          </div>
-
-          <div className="pt-2 text-xs text-white/50">
-            powered by <span className="text-white/70">profiletest.ai</span>
-          </div>
         </div>
       </div>
     </Shell>
