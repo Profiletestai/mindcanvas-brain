@@ -8,6 +8,7 @@ import { getBaseUrl } from "@/lib/baseUrl";
 type AB = "A" | "B" | "C" | "D";
 type Tier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type Readiness = "stabilise" | "ready_to_progress";
+
 type PMEntry = { points?: number; profile?: string };
 type QuestionRow = {
   id: string;
@@ -108,10 +109,17 @@ type LinkBehavior = {
   email_report: boolean; // ✅ real DB column
 };
 
+/**
+ * Load link behavior flags.
+ *
+ * Your DB column is `email_report`.
+ * Some older code referenced `email_results`, so we fall back to that if needed.
+ */
 async function loadLinkBehavior(
   sb: ReturnType<typeof supa>,
   token: string
 ): Promise<LinkBehavior> {
+  // ✅ attempt using current schema (email_report)
   const a1 = await sb
     .from("test_links")
     .select(
@@ -131,6 +139,7 @@ async function loadLinkBehavior(
     };
   }
 
+  // ⚠️ fallback: older schema might have email_results
   const a2 = await sb
     .from("test_links")
     .select(
@@ -169,7 +178,10 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function computeTierAndLevel(tierCounts: Record<Tier, number>, totalSignals: number) {
+function computeTierAndLevel(
+  tierCounts: Record<Tier, number>,
+  totalSignals: number
+) {
   const tierRank: Record<Tier, number> = {
     Invisible: 1,
     Emerging: 2,
@@ -346,8 +358,18 @@ export async function POST(
       }
 
       // Score
-      const personalityPoints: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
-      const tierCounts: Record<Tier, number> = { Invisible: 0, Emerging: 0, Established: 0, Magnetic: 0 };
+      const personalityPoints: Record<AB, number> = {
+        A: 0,
+        B: 0,
+        C: 0,
+        D: 0,
+      };
+      const tierCounts: Record<Tier, number> = {
+        Invisible: 0,
+        Emerging: 0,
+        Established: 0,
+        Magnetic: 0,
+      };
       let ladderSignals = 0;
 
       // Store answers as QCODE -> AB (for visibility.submissions.answers)
@@ -394,6 +416,11 @@ export async function POST(
       const readiness = computeReadiness(tierLevel, below);
 
       // Persist into visibility schema
+      const fullName = [taker.first_name, taker.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
       const { data: sub, error: subErr } = await vis
         .from("submissions")
         .insert({
@@ -401,7 +428,7 @@ export async function POST(
           test_id: vTest.id,
           test_link_id: null,
           token,
-          taker_name: [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || null,
+          taker_name: fullName || null,
           taker_email: taker.email ?? null,
           answers: storedAnswers,
           metadata: { taker_id: taker.id, portal_test_id: taker.test_id },
@@ -486,19 +513,112 @@ export async function POST(
         );
       }
 
-      // Mark completed
+      // ✅ Canonical base for ALL absolute links
       const origin = getBaseUrl();
-      const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
-      const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(taker.id)}`;
 
+      // ✅ NEW: Visibility uses its own bespoke report route (no ReportGate/template)
+      const reportPath = `/t/${encodeURIComponent(
+        token
+      )}/visibility/report?tid=${encodeURIComponent(taker.id)}`;
+
+      const resultPath = `/t/${encodeURIComponent(
+        token
+      )}/result?tid=${encodeURIComponent(taker.id)}`;
+
+      const baseReportUrl = `${origin}${reportPath}`;
+      const baseResultUrl = `${origin}${resultPath}`;
+
+      // Mark completed + persist last_result_url
       await sb
         .from("test_takers")
         .update({
           status: "completed",
-          last_result_url: reportPath, // keep consistent with other tests
+          last_result_url: reportPath,
         })
         .eq("id", taker.id)
         .eq("link_token", token);
+
+      // Load org (needed for email template placeholders)
+      const { data: orgRow } = await sb
+        .from("orgs")
+        .select("id, slug, name, support_email, notification_email, website_url")
+        .eq("id", taker.org_id)
+        .maybeSingle();
+
+      const orgName =
+        String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() ||
+        "MindCanvas";
+
+      const supportEmail =
+        normalizeEmail((orgRow as any)?.support_email) ||
+        getDefaultSupportEmail();
+
+      // ✅ Email report link to test taker (if enabled)
+      let takerEmailResult: any = null;
+      try {
+        if (linkBehavior.email_report && normalizeEmail(taker.email)) {
+          takerEmailResult = await sendTemplatedEmail({
+            orgId: taker.org_id,
+            type: "test_taker_report",
+            to: String(taker.email),
+            context: {
+              first_name: taker.first_name || "there",
+              test_name: (test.name as string) || "your assessment",
+              report_link: baseReportUrl, // ✅ new visibility report link
+              org_name: orgName,
+              support_email: supportEmail,
+            },
+          });
+
+          if (!takerEmailResult?.ok) {
+            console.error("[visibility submit] test_taker_report failed", takerEmailResult);
+          }
+        }
+      } catch (e) {
+        console.error("[visibility submit] test_taker_report unexpected error", e);
+      }
+
+      // ✅ Send internal notification (keeps ops parity with other tests)
+      let ownerNotification: any = null;
+      try {
+        const sentTo =
+          normalizeEmail((orgRow as any)?.notification_email) ||
+          getDefaultInternalEmail();
+
+        if (normalizeEmail(sentTo)) {
+          const internalReportLink = `${origin}/portal/${(orgRow as any)?.slug}/database/${taker.id}`;
+          const internalResultsDashboardLink = `${origin}/portal/${(orgRow as any)?.slug}/dashboard?testId=${taker.test_id}`;
+
+          ownerNotification = await sendTemplatedEmail({
+            orgId: (orgRow as any)?.id || taker.org_id,
+            type: "test_owner_notification",
+            to: sentTo,
+            context: {
+              owner_first_name: "",
+              owner_full_name: "",
+
+              test_taker_full_name: fullName || (taker as any).email || "",
+              test_taker_email: (taker as any).email || "",
+              test_taker_mobile: (taker as any).phone || "",
+              test_taker_org: (taker as any).company || "",
+
+              test_name: (test.name as string) || "your assessment",
+
+              internal_report_link: internalReportLink,
+              internal_results_dashboard_link: internalResultsDashboardLink,
+
+              org_name: orgName,
+              owner_website: (orgRow as any)?.website_url || "",
+            },
+          });
+
+          if (!ownerNotification?.ok) {
+            console.error("[visibility submit] test_owner_notification failed", ownerNotification);
+          }
+        }
+      } catch (e) {
+        console.error("[visibility submit] owner notification unexpected error", e);
+      }
 
       // Decide redirect using existing rules
       const redirectUrl: string =
@@ -519,8 +639,10 @@ export async function POST(
           email_report: linkBehavior.email_report,
         },
         redirect: redirectUrl,
-        result_url: `${origin}${resultPath}`,
-        report_url: `${origin}${reportPath}`,
+        result_url: baseResultUrl,
+        report_url: baseReportUrl,
+        owner_notification: ownerNotification,
+        taker_email: takerEmailResult,
       });
     }
 
@@ -800,6 +922,7 @@ export async function POST(
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
+    // ✅ QSC PUBLIC report destination
     const qscGrowthPath = `/qsc/${encodeURIComponent(
       token
     )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
@@ -810,6 +933,7 @@ export async function POST(
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
 
+    // Mark completed + persist correct last_result_url
     await sb
       .from("test_takers")
       .update({
@@ -819,8 +943,10 @@ export async function POST(
       .eq("id", taker.id)
       .eq("link_token", token);
 
+    // Email the correct report page
     const reportUrlForEmail = isQscTest ? qscPublicUrl : baseReportUrl;
 
+    // ✅ Decide redirect deterministically using show_results
     const redirectUrl: string =
       linkBehavior.show_results === true
         ? isQscTest
@@ -830,6 +956,7 @@ export async function POST(
         ? linkBehavior.redirect_url.trim()
         : resultPath;
 
+    // Load org (needed for email template placeholders)
     const { data: orgRow } = await sb
       .from("orgs")
       .select("id, slug, name, support_email, notification_email, website_url")
@@ -843,6 +970,7 @@ export async function POST(
     const supportEmail =
       normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
 
+    // ✅ Email report link to test taker (if enabled)
     let takerEmailResult: any = null;
     try {
       if (linkBehavior.email_report && normalizeEmail(taker.email)) {
@@ -867,6 +995,7 @@ export async function POST(
       console.error("[submit] test_taker_report unexpected error", e);
     }
 
+    // ✅ Send internal notification
     let ownerNotification: any = null;
     try {
       const sentTo =
