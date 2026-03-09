@@ -32,22 +32,23 @@ export default async function Page(
     .eq("id", runId)
     .maybeSingle();
 
-  const score = run?.score_payload || null;
-  const wordMapping = run?.word_mapping_payload || null;
+  const payload = run?.score_payload || null;
+  const scoring = payload?.scoring || null;
+  const wording = payload?.wording || null;
 
-  const core = score?.core_distribution || {};
-  const topOs = score?.operating_style || null;
-  const osRanking = Array.isArray(score?.operating_style_ranking)
-    ? score.operating_style_ranking
+  const core = scoring?.core_distribution || {};
+  const osRanking = Array.isArray(scoring?.operating_style_ranking)
+    ? scoring.operating_style_ranking
     : [];
-  const careerVertical = score?.career_vertical || null;
-  const flags = Array.isArray(score?.flags) ? score.flags : [];
-  const confidence = score?.confidence || null;
+  const topOs =
+    scoring?.primary_operating_style ||
+    (osRanking.length > 0 ? osRanking[0] : null);
 
-  const jsonPreview = {
-    score_payload: score,
-    word_mapping_payload: wordMapping,
-  };
+  const careerVertical = scoring?.career_vertical || null;
+  const flags = Array.isArray(scoring?.flags) ? scoring.flags : [];
+  const confidence = scoring?.confidence || null;
+
+  const jsonPreview = run?.export_payload || payload || null;
 
   return (
     <div className="min-h-screen bg-[#060e16] text-white">
@@ -59,14 +60,20 @@ export default async function Page(
               {run?.title || "Reverse Profile Result"}
             </h1>
             <div className="mt-2 text-sm text-white/60">
+              Run Number: <span className="text-white">{run?.run_number || "—"}</span>
+              {" • "}
               Partner: <span className="text-white">{run?.partner_key || "—"}</span>
               {" • "}
               Job ID: <span className="text-white">{run?.job_id || "—"}</span>
-              {" • "}
+            </div>
+            <div className="mt-1 text-sm text-white/60">
               Framework:{" "}
               <span className="text-white">
-                {run?.framework_slug || "mcas-core-alignment"} {run?.framework_version || "v1"}
+                {payload?.framework?.slug || run?.framework_slug || "mcas-core-alignment"}{" "}
+                {payload?.framework?.version || run?.framework_version || "v1"}
               </span>
+              {" • "}
+              Source: <span className="text-white">{run?.source || "manual"}</span>
             </div>
           </div>
 
@@ -78,15 +85,14 @@ export default async function Page(
               Retake Test
             </Link>
             <Link
-              href="/admin/mcas/reverse-profiles/new"
+              href="/admin/mcas/reverse-profiles"
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10 transition"
             >
-              Create New Link
+              Back to Runs
             </Link>
           </div>
         </div>
 
-        {/* Top state */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-xs text-white/60">Status</div>
@@ -102,7 +108,7 @@ export default async function Page(
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-xs text-white/60">Scoring Model</div>
-            <div className="mt-2 font-medium">{run?.scoring_model_version || "—"}</div>
+            <div className="mt-2 font-medium">{scoring?.model_version || run?.scoring_model_version || "—"}</div>
             <div className="mt-3 text-xs text-white/50">
               Input mode: {run?.input_mode || "—"}
             </div>
@@ -111,13 +117,11 @@ export default async function Page(
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-xs text-white/60">Purpose</div>
             <div className="mt-2 text-sm text-white/80">
-              This page shows the visual result and the exact structured data that partner
-              platforms will receive.
+              This page shows the visual result and the exact structured data that partner platforms will receive.
             </div>
           </div>
         </div>
 
-        {/* CORE */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">CORE Distribution</div>
           <div className="mt-1 text-lg font-semibold">Primary behavioural mix</div>
@@ -138,7 +142,6 @@ export default async function Page(
           </div>
         </div>
 
-        {/* Operating Style + Career Vertical */}
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="text-sm text-white/60">Top Operating Style</div>
@@ -198,26 +201,25 @@ export default async function Page(
           </div>
         </div>
 
-        {/* Word Mapping */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">Word Mapping Output</div>
           <div className="mt-1 text-lg font-semibold">
             Recruitment wording signals for job-description generation
           </div>
 
-          {wordMapping ? (
+          {wording ? (
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/50">Primary CORE</div>
                 <div className="mt-1 font-medium">
-                  {wordMapping.primary_core?.label || wordMapping.primary_core?.code || "—"}
+                  {wording.primary_core?.label || wording.primary_core?.code || "—"}
                 </div>
                 <div className="mt-1 text-xs text-white/40 font-mono">
-                  {wordMapping.primary_core?.code || ""}
+                  {wording.primary_core?.code || ""}
                 </div>
                 <div className="mt-3 text-sm text-white/70">
-                  {wordMapping.primary_core?.pct != null
-                    ? `Weight: ${pct(wordMapping.primary_core.pct)}`
+                  {wording.primary_core?.pct != null
+                    ? `Weight: ${pct(wording.primary_core.pct)}`
                     : "—"}
                 </div>
               </div>
@@ -225,14 +227,14 @@ export default async function Page(
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/50">Secondary CORE</div>
                 <div className="mt-1 font-medium">
-                  {wordMapping.secondary_core?.label || wordMapping.secondary_core?.code || "—"}
+                  {wording.secondary_core?.label || wording.secondary_core?.code || "—"}
                 </div>
                 <div className="mt-1 text-xs text-white/40 font-mono">
-                  {wordMapping.secondary_core?.code || ""}
+                  {wording.secondary_core?.code || ""}
                 </div>
                 <div className="mt-3 text-sm text-white/70">
-                  {wordMapping.secondary_core?.pct != null
-                    ? `Weight: ${pct(wordMapping.secondary_core.pct)}`
+                  {wording.secondary_core?.pct != null
+                    ? `Weight: ${pct(wording.secondary_core.pct)}`
                     : "—"}
                 </div>
               </div>
@@ -240,13 +242,13 @@ export default async function Page(
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/50">Operating Style Language</div>
                 <div className="mt-1 font-medium">
-                  {wordMapping.operating_style?.label || wordMapping.operating_style?.code || "—"}
+                  {wording.operating_style?.label || wording.operating_style?.code || "—"}
                 </div>
                 <div className="mt-1 text-xs text-white/40 font-mono">
-                  {wordMapping.operating_style?.code || ""}
+                  {wording.operating_style?.code || ""}
                 </div>
                 <ul className="mt-3 space-y-1 text-sm text-white/75">
-                  {(wordMapping.operating_style?.words || []).map((w: string, idx: number) => (
+                  {(wording.operating_style?.words || []).map((w: string, idx: number) => (
                     <li key={idx}>• {w}</li>
                   ))}
                 </ul>
@@ -255,24 +257,23 @@ export default async function Page(
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/50">Career Vertical Language</div>
                 <div className="mt-1 font-medium">
-                  {wordMapping.career_vertical?.label || wordMapping.career_vertical?.code || "—"}
+                  {wording.career_vertical?.label || wording.career_vertical?.code || "—"}
                 </div>
                 <div className="mt-1 text-xs text-white/40 font-mono">
-                  {wordMapping.career_vertical?.code || ""}
+                  {wording.career_vertical?.code || ""}
                 </div>
                 <ul className="mt-3 space-y-1 text-sm text-white/75">
-                  {(wordMapping.career_vertical?.words || []).map((w: string, idx: number) => (
+                  {(wording.career_vertical?.words || []).map((w: string, idx: number) => (
                     <li key={idx}>• {w}</li>
                   ))}
                 </ul>
               </div>
             </div>
           ) : (
-            <div className="mt-4 text-white/60">No word mapping output yet.</div>
+            <div className="mt-4 text-white/60">No wording output yet.</div>
           )}
         </div>
 
-        {/* Flags + confidence */}
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="text-sm text-white/60">Confidence</div>
@@ -307,11 +308,10 @@ export default async function Page(
           </div>
         </div>
 
-        {/* JSON Preview */}
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm text-white/60">API Payload Preview</div>
           <div className="mt-1 text-lg font-semibold">
-            This is the structured data a partner platform will receive
+            This is the structured result a partner platform would receive
           </div>
 
           <pre className="mt-4 overflow-auto rounded-xl border border-white/10 bg-[#0b1724] p-4 text-xs text-white/80">
