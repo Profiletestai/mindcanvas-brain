@@ -45,19 +45,28 @@ export default async function Page(props: {
   let query = sb
     .from("reverse_profile_runs")
     .select("*")
+    .eq("run_type", "reverse_profile_ai")
     .order("created_at", { ascending: false })
     .limit(200);
 
   if (partner_key) query = query.eq("partner_key", partner_key);
   if (status) query = query.eq("status", status);
-  if (q) query = query.or(`job_id.ilike.%${q}%,title.ilike.%${q}%,run_number.ilike.%${q}%`);
+  if (q) {
+    query = query.or(
+      [
+        `job_id.ilike.%${q}%`,
+        `title.ilike.%${q}%`,
+        `run_number.ilike.%${q}%`,
+      ].join(",")
+    );
+  }
 
   const { data: runs, error } = await query;
 
   if (error) {
     return (
       <div className="min-h-screen bg-[#060e16] text-white p-8">
-        <div className="font-semibold">Reverse Profiles</div>
+        <div className="font-semibold">AI Reverse Profile Runs</div>
         <pre className="mt-4 text-sm text-red-300">
           {JSON.stringify(error, null, 2)}
         </pre>
@@ -73,12 +82,11 @@ export default async function Page(props: {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="text-sm text-white/60">Admin • MCAS</div>
-            <h1 className="mt-1 text-3xl font-semibold">
-              Reverse Profile Sandbox Runs
-            </h1>
+            <h1 className="mt-1 text-3xl font-semibold">AI Reverse Profile Runs</h1>
             <p className="mt-2 text-white/70 max-w-3xl">
-              Create, manage, and share reverse-profile sandbox tests for partner
-              validation. Each run is tracked as an AI flow record inside MCAS.
+              This is the system-of-record for every AI reverse-profile run created in
+              MCAS. Each run stores the submitted answers, scored output, wording output,
+              export payload, and timestamps.
             </p>
           </div>
 
@@ -166,7 +174,7 @@ export default async function Page(props: {
                 <th className="text-left px-4 py-3">Partner</th>
                 <th className="text-left px-4 py-3">Framework</th>
                 <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Created</th>
+                <th className="text-left px-4 py-3">Timeline</th>
                 <th className="text-left px-4 py-3">Links</th>
               </tr>
             </thead>
@@ -183,15 +191,19 @@ export default async function Page(props: {
                       <div className="font-medium">
                         {run.run_number || "—"} • {run.title || "Untitled run"}
                       </div>
+
                       <div className="mt-1 text-xs text-white/50">
                         Job ID: {run.job_id || "—"}
                       </div>
+
                       <div className="mt-1 text-xs text-white/50">
                         Campaign: {run.campaign_id || "—"}
                       </div>
+
                       <div className="mt-1 text-xs text-white/50">
                         Source: {run.source || "manual"}
                       </div>
+
                       <div className="mt-2 text-[11px] text-white/35 font-mono break-all">
                         {run.id}
                       </div>
@@ -215,9 +227,24 @@ export default async function Page(props: {
                     </td>
 
                     <td className="px-4 py-4 text-white/60">
-                      {run.created_at
-                        ? new Date(run.created_at).toLocaleString()
-                        : "-"}
+                      <div>
+                        Created:{" "}
+                        {run.created_at
+                          ? new Date(run.created_at).toLocaleString()
+                          : "-"}
+                      </div>
+                      <div className="mt-1">
+                        Submitted:{" "}
+                        {run.submitted_at
+                          ? new Date(run.submitted_at).toLocaleString()
+                          : "-"}
+                      </div>
+                      <div className="mt-1">
+                        Scored:{" "}
+                        {run.scored_at
+                          ? new Date(run.scored_at).toLocaleString()
+                          : "-"}
+                      </div>
                     </td>
 
                     <td className="px-4 py-4">
@@ -231,7 +258,10 @@ export default async function Page(props: {
                           Open Test
                         </a>
 
-                        <CopyTextButton text={testLink} label="Copy Test Link" />
+                        <CopyTextButton
+                          text={testLink}
+                          label="Copy Test Link"
+                        />
 
                         <a
                           href={resultPath}
@@ -242,7 +272,10 @@ export default async function Page(props: {
                           Open Result
                         </a>
 
-                        <CopyTextButton text={resultLink} label="Copy Result Link" />
+                        <CopyTextButton
+                          text={resultLink}
+                          label="Copy Result Link"
+                        />
                       </div>
 
                       <div className="mt-2 text-[11px] text-white/35 break-all">
@@ -256,7 +289,7 @@ export default async function Page(props: {
               {(!runs || runs.length === 0) && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-white/60 text-center">
-                    No reverse profile runs found.
+                    No AI reverse profile runs found.
                   </td>
                 </tr>
               )}
