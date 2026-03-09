@@ -559,7 +559,7 @@ export async function POST(
             context: {
               first_name: taker.first_name || "there",
               test_name: (test.name as string) || "your assessment",
-              report_link: baseReportUrl, // ✅ new visibility report link
+              report_link: baseReportUrl,
               org_name: orgName,
               support_email: supportEmail,
             },
@@ -576,7 +576,7 @@ export async function POST(
         console.error("[visibility submit] test_taker_report unexpected error", e);
       }
 
-      // ✅ Internal notification (optional, but keeps parity)
+      // ✅ Internal notification (keeps parity with other tests)
       let ownerNotification: any = null;
       try {
         const sentTo =
@@ -621,15 +621,23 @@ export async function POST(
         console.error("[visibility submit] owner notification unexpected error", e);
       }
 
-      // ✅ IMPORTANT: force the public client to use redirect (not /result)
-      // PublicTestClient hard-routes to /result when show_results is true.
-      // Setting show_results: false triggers the existing redirect branch.
+      // ✅ BULLETPROOF: force the public client to follow redirect and not /result
+      // Your PublicTestClient hard-routes to /result when show_results !== false.
+      // So we return ALL variants it might read.
       return NextResponse.json({
         ok: true,
         totals,
 
-        show_results: false, // ✅ forces client to follow redirect
+        show_results: false,
+        showResults: false,
+
         redirect: reportPath,
+        redirect_url: reportPath,
+        redirectUrl: reportPath,
+
+        next_steps_url: reportPath,
+        nextStepsUrl: reportPath,
+        link_meta: { next_steps_url: reportPath },
 
         link: {
           show_results: linkBehavior.show_results,
@@ -924,7 +932,6 @@ export async function POST(
     const baseResultUrl = `${origin}${resultPath}`;
 
     // ✅ QSC PUBLIC report destination
-    // Test takers must ONLY get the Growth report (entrepreneur) or leader page.
     const qscGrowthPath = `/qsc/${encodeURIComponent(
       token
     )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
@@ -935,7 +942,7 @@ export async function POST(
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
 
-    // Mark completed + persist correct last_result_url (prevents old /report links being reused)
+    // Mark completed + persist correct last_result_url
     await sb
       .from("test_takers")
       .update({
