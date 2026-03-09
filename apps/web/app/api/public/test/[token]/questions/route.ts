@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type LinkRow = { token: string; test_id: string };
+type LinkRow = { token: string; test_id: string; org_id?: string };
 type TestRow = { id: string; slug: string | null; meta: any | null };
 
 // Your app uses test_questions.id as the question_id (see submit route).
@@ -21,11 +21,27 @@ type TestQuestionRow = {
 
 function getPortalClient(): any {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE!;
+  const serviceRole =
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE!;
   if (!url || !serviceRole) throw new Error("Missing Supabase env vars");
   return createClient(url, serviceRole, {
     auth: { persistSession: false },
     db: { schema: "portal" },
+  }) as any;
+}
+
+function getVisibilityClient(): any {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRole =
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE!;
+  if (!url || !serviceRole) throw new Error("Missing Supabase env vars");
+  return createClient(url, serviceRole, {
+    auth: { persistSession: false },
+    db: { schema: "visibility" },
   }) as any;
 }
 
@@ -138,6 +154,11 @@ async function resolveEffectiveTestId(args: {
   return { effectiveTestId: wrapperTest.id, resolvedBy: "wrapper_no_sources" };
 }
 
+function optionOrder(code: string) {
+  const c = String(code || "").trim().toUpperCase();
+  return c === "A" ? 1 : c === "B" ? 2 : c === "C" ? 3 : c === "D" ? 4 : 99;
+}
+
 export async function GET(_req: NextRequest, ctx: { params: { token?: string } }) {
   try {
     const token = String(ctx.params?.token || "").trim();
@@ -150,7 +171,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
     // 1) resolve link -> test_id
     const { data: linkRow, error: linkErr } = (await sb
       .from("test_links")
-      .select("token, test_id")
+      .select("token, test_id, org_id")
       .eq("token", token)
       .maybeSingle()) as { data: LinkRow | null; error: any };
 
@@ -177,7 +198,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       wrapperTest: testRow,
     });
 
-    // 3) load questions directly from portal.test_questions
+    // 3) load questions directly from portal.test_questions (existing behaviour)
     const { data: rows, error: qErr } = (await sb
       .from("test_questions")
       .select("id, idx, order, type, text, options, category")
@@ -196,7 +217,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       );
     }
 
-    const questions = (rows ?? []).map((q) => ({
+    const portalQuestions = (rows ?? []).map((q) => ({
       id: q.id,
       idx: q.idx ?? null,
       order: q.order ?? null,
@@ -206,17 +227,117 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       category: q.category ?? null,
     }));
 
+    // ✅ If portal has questions, return them unchanged (no impact to existing tests)
+    if (portalQuestions.length > 0) {
+      return NextResponse.json({
+        ok: true,
+        token: linkRow.token,
+        test_id: linkRow.test_id,
+        effective_test_id: effectiveTestId,
+        questions: portalQuestions,
+        __debug: {
+          engine: "portal.test_questions",
+          wrapper_slug: testRow.slug ?? null,
+          wrapper_is_wrapper: (testRow.meta?.wrapper === true) || false,
+          resolved_by: resolvedBy,
+          question_count: portalQuestions.length,
+        },
+      });
+    }
+
+    // ✅ Fallback: Visibility engine questions (only if linked in visibility.tests)
+    const vis = getVisibilityClient();
+
+    const { data: vTest, error: vTestErr } = await vis
+      .from("tests")
+      .select("id")
+      .eq("portal_test_id", linkRow.test_id)
+      .maybeSingle();
+
+    if (vTestErr) {
+      return NextResponse.json(
+        { ok: false, error: `Visibility test lookup failed: ${vTestErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!vTest?.id) {
+      // No portal questions AND not a visibility test -> return empty as before
+      return NextResponse.json({
+        ok: true,
+        token: linkRow.token,
+        test_id: linkRow.test_id,
+        effective_test_id: effectiveTestId,
+        questions: [],
+        __debug: {
+          engine: "none",
+          wrapper_slug: testRow.slug ?? null,
+          resolved_by: resolvedBy,
+          question_count: 0,
+        },
+      });
+    }
+
+    const { data: vQs, error: vqErr } = await vis
+      .from("questions")
+      .select("id, idx, code, pillar, question_text")
+      .eq("test_id", vTest.id)
+      .eq("is_active", true)
+      .order("idx", { ascending: true });
+
+    if (vqErr) {
+      return NextResponse.json(
+        { ok: false, error: `Visibility questions load failed: ${vqErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    const qIds = (vQs ?? []).map((q: any) => q.id);
+
+    const { data: vOpts, error: voErr } = await vis
+      .from("options")
+      .select("question_id, option_code, option_text")
+      .in("question_id", qIds)
+      .eq("is_active", true);
+
+    if (voErr) {
+      return NextResponse.json(
+        { ok: false, error: `Visibility options load failed: ${voErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    const optByQ: Record<string, { option_code: string; option_text: string }[]> = {};
+    for (const o of vOpts ?? []) {
+      optByQ[o.question_id] = optByQ[o.question_id] || [];
+      optByQ[o.question_id].push({ option_code: o.option_code, option_text: o.option_text });
+    }
+
+    const visibilityQuestions: TestQuestionRow[] = (vQs ?? []).map((q: any) => {
+      const opts = (optByQ[q.id] || []).sort((a, b) => optionOrder(a.option_code) - optionOrder(b.option_code));
+      return {
+        id: q.id,                 // important: UI submits question_id = this id
+        idx: q.idx ?? null,
+        order: q.idx ?? null,
+        type: "single",
+        text: q.question_text ?? null,
+        options: opts.map((x) => x.option_text),
+        category: String(q.pillar ?? "") || "scored",
+      };
+    });
+
     return NextResponse.json({
       ok: true,
       token: linkRow.token,
-      test_id: linkRow.test_id, // linked/org-facing test id
-      effective_test_id: effectiveTestId, // canonical content test id
-      questions,
+      test_id: linkRow.test_id,
+      effective_test_id: effectiveTestId, // still included for compatibility
+      questions: visibilityQuestions,
       __debug: {
+        engine: "visibility.questions/options",
+        visibility_test_id: vTest.id,
         wrapper_slug: testRow.slug ?? null,
-        wrapper_is_wrapper: (testRow.meta?.wrapper === true) || false,
         resolved_by: resolvedBy,
-        question_count: questions.length,
+        question_count: visibilityQuestions.length,
       },
     });
   } catch (e: any) {
