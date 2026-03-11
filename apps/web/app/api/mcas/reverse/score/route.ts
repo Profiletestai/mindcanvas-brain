@@ -87,24 +87,13 @@ async function getWordMappings(
 }
 
 async function nextRunNumber(sb: ReturnType<typeof supa>): Promise<string> {
-  const { data, error } = await sb.rpc("nextval", {
-    seq_name: "mcas.reverse_profile_run_number_seq",
-  } as any);
+  const { data, error } = await sb.rpc("next_reverse_profile_run_number");
 
-  if (!error && data != null) {
-    return `RP-${String(data).padStart(6, "0")}`;
+  if (error || !data) {
+    throw new Error(error?.message || "Failed to generate run number");
   }
 
-  const { data: row } = await sb
-    .from("reverse_profile_runs")
-    .select("run_number")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const last = String(row?.run_number || "RP-000000").replace("RP-", "");
-  const next = Number(last || "0") + 1;
-  return `RP-${String(next).padStart(6, "0")}`;
+  return String(data);
 }
 
 export async function POST(req: Request) {
