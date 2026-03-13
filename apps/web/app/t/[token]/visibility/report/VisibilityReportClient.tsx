@@ -24,31 +24,24 @@ type AB = "A" | "B" | "C" | "D";
 type Tier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type Readiness = "stabilise" | "ready_to_progress";
 
-type ReportMeta = {
-  org_name?: string | null;
-  org_logo_url?: string | null;
-  test_name?: string | null;
-  generated_at?: string | null;
-};
-
-type Signals = {
-  tier?: Tier | null;
-  level?: number | null;
-  style?: AB | null;
-  readiness?: Readiness | null;
-  pillar_scores?: Record<string, number> | null; // discoverability/trust/conversion => %
-  pillar_band?: Record<string, string> | null;
+type VisibilitySignals = {
+  tier: Tier;
+  level: number;
+  style: AB;
+  readiness: Readiness;
+  pillar_scores?: Record<string, number>;
+  pillar_band?: Record<string, string>;
   weakest_pillar?: string | null;
   strongest_pillar?: string | null;
-  pattern_tags?: string[] | null;
+  pattern_tags?: string[];
 };
 
-type Graphs = {
-  tier_counts?: Record<string, number> | null;
-  personality_points?: Record<string, number> | null;
-  ladder?: { tier?: Tier | null; level?: number | null } | null;
-  pillars?: Record<string, number> | null; // discoverability/trust/conversion => %
-  pillar_band?: Record<string, string> | null;
+type VisibilityGraphs = {
+  tier_counts?: Record<string, number>;
+  personality_points?: Record<string, number>;
+  ladder?: { tier: Tier; level: number };
+  pillars?: Record<string, number>;
+  pillar_band?: Record<string, string>;
 };
 
 type KBBlock = {
@@ -56,32 +49,39 @@ type KBBlock = {
   short_summary?: string;
   paragraphs?: string[];
   bullets?: string[];
-  callouts?: Array<{ title?: string; body?: string }>;
+  transition?: string;
 };
 
 type KBSection = {
   key: string;
-  title: string;
-  blocks: KBBlock[];
+  title?: string;
+  blocks?: KBBlock[];
 };
 
-type ApiVisibilityReportResponse = {
-  ok: boolean;
-  data?: {
-    token?: string;
-    tid?: string | null;
-    sid?: string | null;
-    submission_id?: string;
-    engine_key?: string;
-    version?: number;
-    audience?: string;
-
-    meta?: ReportMeta;
-    signals?: Signals;
-    graphs?: Graphs;
-    sections?: KBSection[];
+type ApiKBReport = {
+  token: string;
+  tid?: string | null;
+  sid?: string | null;
+  submission_id: string;
+  engine_key: string;
+  version: number;
+  audience: string;
+  meta?: {
+    org_name?: string | null;
+    org_logo_url?: string | null;
+    test_name?: string | null;
+    generated_at?: string | null;
   };
+  signals?: VisibilitySignals;
+  graphs?: VisibilityGraphs;
+  sections?: KBSection[];
+};
+
+type ApiResponse = {
+  ok: boolean;
+  data?: ApiKBReport;
   error?: string;
+  __meta?: any;
 };
 
 function safeText(x: any): string {
@@ -95,15 +95,20 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function readinessLabel(r?: Readiness | null) {
-  return r === "ready_to_progress" ? "Ready to progress" : "Stabilise";
-}
-
 function tierBand(level: number): Tier {
   if (level <= 5) return "Invisible";
   if (level <= 10) return "Emerging";
   if (level <= 15) return "Established";
   return "Magnetic";
+}
+
+function readinessLabel(r: Readiness) {
+  return r === "ready_to_progress" ? "Ready to progress" : "Stabilise";
+}
+
+function fullNameFallback(first?: any, last?: any) {
+  const n = [first, last].filter(Boolean).join(" ").trim();
+  return n || "Your";
 }
 
 async function fetchJson(url: string) {
@@ -129,8 +134,6 @@ const BRAND = {
   teal: "#38E1C6",
   blue: "#4FB3FF",
   purple: "#7C3AED",
-  amber: "#F59E0B",
-  red: "#EF4444",
 
   tier: {
     Invisible: "#64748B", // slate
@@ -145,12 +148,6 @@ const BRAND = {
     C: "#F59E0B",
     D: "#EF4444",
   } as Record<AB, string>,
-
-  pillar: {
-    discoverability: "#4FB3FF",
-    trust: "#38E1C6",
-    conversion: "#7C3AED",
-  } as Record<string, string>,
 };
 
 /* ---------------- UI atoms ---------------- */
@@ -223,28 +220,9 @@ function GlassCard({
             {right}
           </div>
         )}
-        {children}
+        <div className={title || subtitle || right ? "mt-4" : ""}>{children}</div>
       </div>
     </div>
-  );
-}
-
-function Pill({ text, color }: { text: string; color: string }) {
-  return (
-    <span
-      className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-      style={{
-        borderColor: "rgba(255,255,255,0.18)",
-        background: "rgba(0,0,0,0.18)",
-        color: "rgba(255,255,255,0.92)",
-      }}
-    >
-      <span
-        className="h-2 w-2 rounded-full"
-        style={{ background: color, boxShadow: `0 0 12px ${color}66` }}
-      />
-      {text}
-    </span>
   );
 }
 
@@ -255,7 +233,7 @@ function LadderGrid({ level }: { level: number }) {
   const steps = Array.from({ length: 20 }, (_, i) => i + 1);
 
   return (
-    <div className="mt-5 grid grid-cols-10 gap-2">
+    <div className="mt-2 grid grid-cols-10 gap-2">
       {steps.map((s) => {
         const isActive = s === active;
         const band = tierBand(s);
@@ -269,7 +247,9 @@ function LadderGrid({ level }: { level: number }) {
               background: isActive
                 ? `linear-gradient(180deg, ${bandColor}33, rgba(255,255,255,0.10))`
                 : "rgba(255,255,255,0.04)",
-              boxShadow: isActive ? `0 0 0 1px rgba(255,255,255,0.12), 0 0 18px ${bandColor}55` : "none",
+              boxShadow: isActive
+                ? `0 0 0 1px rgba(255,255,255,0.12), 0 0 18px ${bandColor}55`
+                : "none",
               color: isActive ? "white" : "rgba(255,255,255,0.75)",
             }}
             title={`${band} • Level ${s}`}
@@ -312,7 +292,10 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-3 w-3 rounded-full" style={{ background: c, boxShadow: `0 0 12px ${c}66` }} />
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
+                    />
                     <div className="text-sm font-semibold">{t}</div>
                   </div>
                   <div className="text-xs" style={{ color: BRAND.textDim }}>
@@ -328,70 +311,67 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
   );
 }
 
-/* ---------------- KB content rendering ---------------- */
+/* ---------------- KB renderer ---------------- */
 
-function BlockRenderer({ b }: { b: KBBlock }) {
+function SectionBlock({ b }: { b: KBBlock }) {
   return (
     <div className="space-y-3">
-      {b.title ? <div className="text-base font-semibold">{b.title}</div> : null}
-
       {b.short_summary ? (
-        <div className="text-sm" style={{ color: "rgba(255,255,255,0.85)" }}>
-          {b.short_summary}
+        <div
+          className="rounded-2xl border px-4 py-3 text-sm"
+          style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.18)", color: "rgba(255,255,255,0.82)" }}
+        >
+          <span className="font-semibold">In short:</span> {b.short_summary}
         </div>
       ) : null}
 
-      {Array.isArray(b.paragraphs) && b.paragraphs.length > 0 ? (
-        <div className="space-y-2">
-          {b.paragraphs.filter(Boolean).map((p, idx) => (
-            <p key={idx} className="text-sm leading-6" style={{ color: "rgba(255,255,255,0.80)" }}>
+      {Array.isArray(b.paragraphs) && b.paragraphs.length ? (
+        <div className="space-y-3">
+          {b.paragraphs.map((p, i) => (
+            <p key={i} className="text-sm leading-6" style={{ color: "rgba(255,255,255,0.80)" }}>
               {p}
             </p>
           ))}
         </div>
       ) : null}
 
-      {Array.isArray(b.bullets) && b.bullets.length > 0 ? (
-        <ul className="list-disc pl-5 space-y-1">
-          {b.bullets.filter(Boolean).map((x, idx) => (
-            <li key={idx} className="text-sm" style={{ color: "rgba(255,255,255,0.80)" }}>
+      {Array.isArray(b.bullets) && b.bullets.length ? (
+        <ul className="list-disc pl-6 space-y-2 text-sm" style={{ color: "rgba(255,255,255,0.80)" }}>
+          {b.bullets.map((x, i) => (
+            <li key={i} className="leading-6">
               {x}
             </li>
           ))}
         </ul>
       ) : null}
 
-      {Array.isArray(b.callouts) && b.callouts.length > 0 ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {b.callouts.map((c, idx) => (
-            <div
-              key={idx}
-              className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
-            >
-              {c?.title ? <div className="text-sm font-semibold">{c.title}</div> : null}
-              {c?.body ? (
-                <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
-                  {c.body}
-                </div>
-              ) : null}
-            </div>
-          ))}
+      {b.transition ? (
+        <div className="pt-1 text-xs" style={{ color: BRAND.textFaint }}>
+          {b.transition}
         </div>
       ) : null}
     </div>
   );
 }
 
-function SectionRenderer({ s }: { s: KBSection }) {
+function KBSections({ sections }: { sections: KBSection[] }) {
   return (
-    <GlassCard title={s.title}>
-      <div className="mt-4 space-y-6">
-        {(s.blocks || []).map((b, idx) => (
-          <BlockRenderer key={idx} b={b} />
-        ))}
-      </div>
-    </GlassCard>
+    <div className="space-y-6">
+      {sections.map((s) => (
+        <GlassCard key={s.key} title={s.title || s.key}>
+          <div className="space-y-6">
+            {(s.blocks || []).map((b, idx) => (
+              <div key={idx}>
+                {b.title && (
+                  <div className="text-base font-semibold mb-2">{b.title}</div>
+                )}
+                <SectionBlock b={b} />
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      ))}
+    </div>
   );
 }
 
@@ -403,22 +383,19 @@ export default function VisibilityReportClient({
   src,
 }: {
   token: string;
-  tid?: string;
+  tid?: string; // allow empty, because we may use sid
   src?: string;
 }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const [report, setReport] = useState<ApiVisibilityReportResponse["data"] | null>(null);
+  const [report, setReport] = useState<ApiKBReport | null>(null);
 
-  // ✅ Prefer sid if present
-  const sid = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    const p = new URLSearchParams(window.location.search);
-    return (p.get("sid") || p.get("submission_id") || "").trim();
-  }, []);
-
-  const effectiveTid = (tid || "").trim();
+  // ✅ If you later decide to navigate by sid, we support it.
+  const sidFromUrl =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("sid") || ""
+      : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -429,24 +406,26 @@ export default function VisibilityReportClient({
         setErr(null);
         setReport(null);
 
-        if (!sid && !effectiveTid) {
-          throw new Error("Missing sid or tid");
-        }
+        const cleanTid = (tid || "").trim();
+        const cleanSid = (sidFromUrl || "").trim();
 
-        const qs = new URLSearchParams();
-        if (sid) qs.set("sid", sid);
-        else qs.set("tid", effectiveTid);
+        if (!cleanTid && !cleanSid) throw new Error("Missing tid or sid");
 
-        if (src) qs.set("src", src);
+        // ✅ IMPORTANT: call the KB-driven endpoint
+        const url =
+          `/api/public/visibility/${encodeURIComponent(token)}/report?` +
+          (cleanSid
+            ? `sid=${encodeURIComponent(cleanSid)}`
+            : `tid=${encodeURIComponent(cleanTid)}`) +
+          `&audience=taker_report&nocache=1` +
+          (src ? `&src=${encodeURIComponent(src)}` : "");
 
-        const url = `/api/public/visibility/${encodeURIComponent(token)}/report?${qs.toString()}`;
-
-        const j: ApiVisibilityReportResponse = await fetchJson(url);
+        const j: ApiResponse = await fetchJson(url);
         if (cancelled) return;
 
-        if (!j?.data) throw new Error("Missing report data");
-        setReport(j.data);
-
+        const data = j.data;
+        if (!data) throw new Error("Missing report data");
+        setReport(data);
         setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
@@ -458,58 +437,57 @@ export default function VisibilityReportClient({
     return () => {
       cancelled = true;
     };
-  }, [token, effectiveTid, sid, src]);
+  }, [token, tid, src, sidFromUrl]);
 
-  const meta = report?.meta || {};
-  const signals = report?.signals || {};
-  const graphs = report?.graphs || {};
+  const signals = report?.signals;
+  const graphs = report?.graphs;
   const sections = Array.isArray(report?.sections) ? report!.sections! : [];
 
-  const orgName = meta?.org_name || "MindCanvas";
-  const testName = meta?.test_name || "Visibility Ladder";
-
-  const tier = (signals.tier || graphs.ladder?.tier || "Invisible") as Tier;
-  const level = Number(signals.level ?? graphs.ladder?.level ?? 1);
-  const readiness = (signals.readiness || "stabilise") as Readiness;
-  const style = (signals.style || "A") as AB;
-
   const tierCountsData = useMemo(() => {
-    const counts = graphs.tier_counts || {};
+    const counts = graphs?.tier_counts || {};
     return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
       name: t,
       value: Number((counts as any)[t] ?? 0),
       color: BRAND.tier[t],
     }));
-  }, [graphs.tier_counts]);
+  }, [graphs]);
 
   const personalityData = useMemo(() => {
-    const pts = graphs.personality_points || {};
+    const pts = graphs?.personality_points || {};
     const order: AB[] = ["A", "B", "C", "D"];
     return order.map((k) => ({
       name: k,
       value: Number((pts as any)[k] ?? 0),
       color: BRAND.ab[k],
     }));
-  }, [graphs.personality_points]);
+  }, [graphs]);
 
-  const pillarBarData = useMemo(() => {
-    const p = graphs.pillars || signals.pillar_scores || {};
-    const band = graphs.pillar_band || signals.pillar_band || {};
-    const items = ["discoverability", "trust", "conversion"].map((k) => ({
-      key: k,
-      name: k === "discoverability" ? "Discoverability" : k === "trust" ? "Trust" : "Conversion",
-      value: Number((p as any)[k] ?? 0),
-      band: String((band as any)[k] ?? ""),
-      color: BRAND.pillar[k],
-    }));
-    return items;
-  }, [graphs.pillars, graphs.pillar_band, signals.pillar_scores, signals.pillar_band]);
+  const pillarRadarData = useMemo(() => {
+    const p = graphs?.pillars || signals?.pillar_scores || {};
+    const d = Number((p as any).discoverability ?? 0);
+    const t = Number((p as any).trust ?? 0);
+    const c = Number((p as any).conversion ?? 0);
+    const hasAny = [d, t, c].some((n) => Number.isFinite(n) && n > 0);
+    if (!hasAny) return null;
 
-  const radarData = useMemo(() => {
-    // nice “shape” chart for pillars too
-    if (!pillarBarData?.length) return null;
-    return pillarBarData.map((x) => ({ pillar: x.name, score: Number(x.value ?? 0) }));
-  }, [pillarBarData]);
+    return [
+      { pillar: "Discoverability", score: clamp(Math.round(d), 0, 100) },
+      { pillar: "Trust", score: clamp(Math.round(t), 0, 100) },
+      { pillar: "Conversion", score: clamp(Math.round(c), 0, 100) },
+    ];
+  }, [graphs, signals]);
+
+  const orgName = report?.meta?.org_name || "MindCanvas";
+  const testName = report?.meta?.test_name || "Visibility Ladder";
+  const takerName = fullNameFallback(
+    (report as any)?.taker?.first_name,
+    (report as any)?.taker?.last_name
+  );
+
+  const tier = (signals?.tier || graphs?.ladder?.tier || "Emerging") as Tier;
+  const level = Number(signals?.level ?? graphs?.ladder?.level ?? 0);
+  const readiness = (signals?.readiness || "stabilise") as Readiness;
+  const style = (signals?.style || "A") as AB;
 
   if (loading) {
     return (
@@ -537,8 +515,8 @@ export default function VisibilityReportClient({
             style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BRAND.border}` }}
           >
             <div>token: {token}</div>
-            <div>tid: {effectiveTid || "—"}</div>
-            <div>sid: {sid || "—"}</div>
+            <div>tid: {safeText(tid || "")}</div>
+            <div>sid: {safeText(sidFromUrl || "")}</div>
           </div>
           <Link href={`/t/${token}`} className="underline text-sm">
             Go back
@@ -551,18 +529,15 @@ export default function VisibilityReportClient({
   const tierColor = BRAND.tier[tier];
   const styleColor = BRAND.ab[style];
 
-  const strongest = safeText(signals.strongest_pillar);
-  const weakest = safeText(signals.weakest_pillar);
-
   return (
     <Shell>
       <div className="mx-auto max-w-6xl p-6 space-y-6">
         <GlassCard
-          title={`Visibility Ladder Report`}
+          title={`${takerName} Visibility Ladder`}
           subtitle={`${orgName} • ${testName}`}
           right={
             <div
-              className="rounded-2xl border p-4 min-w-[260px]"
+              className="rounded-2xl border p-4 min-w-[240px]"
               style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
             >
               <div className="text-xs" style={{ color: BRAND.textFaint }}>
@@ -590,47 +565,19 @@ export default function VisibilityReportClient({
                   </div>
                 </div>
               </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {strongest ? (
-                  <Pill text={`Strongest: ${strongest}`} color={BRAND.pillar[strongest] || BRAND.teal} />
-                ) : null}
-                {weakest ? (
-                  <Pill text={`Weakest: ${weakest}`} color={BRAND.pillar[weakest] || BRAND.blue} />
-                ) : null}
-              </div>
             </div>
           }
         >
-          <div className="mt-2 text-white/85">
+          <div className="text-white/85">
             <span className="font-semibold" style={{ color: tierColor }}>
               {tier}
             </span>{" "}
             • Level <span className="font-semibold">{level}</span> •{" "}
             <span className="font-semibold">{readinessLabel(readiness)}</span>
           </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs" style={{ color: BRAND.textDim }}>
-            {Array.isArray(signals.pattern_tags) && signals.pattern_tags.length ? (
-              <>
-                <span style={{ color: BRAND.textFaint }}>Patterns:</span>
-                {signals.pattern_tags.slice(0, 6).map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-full border px-3 py-1"
-                    style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
-                  >
-                    {t.replace(/_/g, " ")}
-                  </span>
-                ))}
-              </>
-            ) : (
-              <span style={{ color: BRAND.textFaint }}>Patterns: none detected</span>
-            )}
-          </div>
         </GlassCard>
 
-        {/* --- Visual dashboard area --- */}
+        {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <GlassCard
             title="Your ladder position"
@@ -643,8 +590,11 @@ export default function VisibilityReportClient({
             <TierPyramid tier={tier} level={level} />
           </GlassCard>
 
-          <GlassCard title="Signal distribution" subtitle="How your answers mapped into each tier (Q9–Q25).">
-            <div className="mt-4 h-[320px]">
+          <GlassCard
+            title="Signal distribution"
+            subtitle="How your answers across Q9–Q25 mapped into each tier."
+          >
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={tierCountsData} barCategoryGap={22}>
                   <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
@@ -673,61 +623,49 @@ export default function VisibilityReportClient({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <GlassCard
-            title="Your visibility pillars"
-            subtitle="These scores are computed from Q9–Q25 using your Supabase scoring rules."
+            title="Pillars overview"
+            subtitle="Discoverability, Trust, and Conversion."
           >
-            <div className="mt-4 h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pillarBarData} barCategoryGap={28} layout="vertical">
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis
-                    type="number"
-                    domain={[0, 100]}
-                    tick={{ fill: "rgba(255,255,255,0.70)" }}
-                    stroke="rgba(255,255,255,0.12)"
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fill: "rgba(255,255,255,0.78)" }}
-                    width={130}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                    contentStyle={{
-                      background: "rgba(7,18,38,0.92)",
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: 14,
-                      color: "white",
-                    }}
-                    formatter={(v: any, _name: any, props: any) => {
-                      const band = props?.payload?.band ? ` • ${props.payload.band}` : "";
-                      return [`${v}%${band}`, "Score"];
-                    }}
-                    labelFormatter={(l) => String(l)}
-                  />
-                  <Bar dataKey="value" radius={[14, 14, 14, 14]}>
-                    {pillarBarData.map((d) => (
-                      <Cell key={d.key} fill={d.color} fillOpacity={0.9} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {pillarBarData.map((p) => (
-                <Pill
-                  key={p.key}
-                  text={`${p.name}: ${p.value}%${p.band ? ` • ${p.band}` : ""}`}
-                  color={p.color}
-                />
-              ))}
+            <div className="h-[320px]">
+              {pillarRadarData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={pillarRadarData}>
+                    <PolarGrid stroke="rgba(255,255,255,0.14)" />
+                    <PolarAngleAxis dataKey="pillar" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                    <PolarRadiusAxis
+                      angle={30}
+                      domain={[0, 100]}
+                      tick={{ fill: "rgba(255,255,255,0.55)" }}
+                      stroke="rgba(255,255,255,0.12)"
+                    />
+                    <Radar dataKey="score" stroke={BRAND.teal} fill={BRAND.teal} fillOpacity={0.25} />
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(7,18,38,0.92)",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        borderRadius: 14,
+                        color: "white",
+                      }}
+                      labelStyle={{ color: "rgba(255,255,255,0.9)" }}
+                    />
+                  </RadarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div
+                  className="h-full rounded-2xl flex items-center justify-center text-sm"
+                  style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
+                >
+                  Pillar scores will appear here once enabled.
+                </div>
+              )}
             </div>
           </GlassCard>
 
-          <GlassCard title="Your execution style" subtitle="Based on Q1–Q8 weighting (personality points).">
-            <div className="mt-4 h-[320px]">
+          <GlassCard
+            title="Your execution style"
+            subtitle="Based on Q1–Q8 weighting."
+          >
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={personalityData} barCategoryGap={24}>
                   <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
@@ -761,25 +699,32 @@ export default function VisibilityReportClient({
           </GlassCard>
         </div>
 
-        {/* --- KB-driven narrative report --- */}
-        <div className="space-y-6">
+        {/* ✅ KB-driven narrative report */}
+        <GlassCard
+          title="Your personalised report"
+          subtitle="This narrative is selected dynamically from the Visibility Ladder knowledge base."
+          right={
+            <div className="text-xs" style={{ color: BRAND.textFaint }}>
+              engine: <span style={{ color: "rgba(255,255,255,0.75)" }}>{report.engine_key}</span>{" "}
+              • v{report.version}
+            </div>
+          }
+        >
           {sections.length ? (
-            sections.map((s) => <SectionRenderer key={s.key} s={s} />)
+            <KBSections sections={sections} />
           ) : (
-            <GlassCard
-              title="Your personalised report"
-              subtitle="No knowledge-base sections were returned. This usually means there are no generic fallback blocks in the KB."
+            <div
+              className="rounded-2xl p-4 text-sm"
+              style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}`, color: BRAND.textDim }}
             >
-              <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-                Ask an admin to add generic blocks with empty triggers for each section key.
-              </div>
-            </GlassCard>
+              No KB sections were returned. This usually means the KB doesn’t contain fallback blocks for one or more
+              section keys.
+            </div>
           )}
-        </div>
-
-        <div className="pt-2 text-xs text-center" style={{ color: BRAND.textFaint }}>
-          powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
-        </div>
+          <div className="pt-4 text-xs" style={{ color: BRAND.textFaint }}>
+            powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
+          </div>
+        </GlassCard>
       </div>
     </Shell>
   );
