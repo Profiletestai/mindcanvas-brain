@@ -18,14 +18,20 @@ function portal() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = getKey();
   if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key, { db: { schema: "portal" }, auth: { persistSession: false } });
+  return createClient(url, key, {
+    db: { schema: "portal" },
+    auth: { persistSession: false },
+  });
 }
 
 function visibility() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = getKey();
   if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key, { db: { schema: "visibility" }, auth: { persistSession: false } });
+  return createClient(url, key, {
+    db: { schema: "visibility" },
+    auth: { persistSession: false },
+  });
 }
 
 function safeString(x: any) {
@@ -86,11 +92,18 @@ type AiInsights = {
 
 function aiEnabled() {
   // default ON unless explicitly disabled
-  return String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !== "false";
+  return (
+    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !==
+    "false"
+  );
 }
 
 function openaiModel() {
-  return process.env.OPENAI_VISIBILITY_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  return (
+    process.env.OPENAI_VISIBILITY_MODEL ||
+    process.env.OPENAI_MODEL ||
+    "gpt-4.1-mini"
+  );
 }
 
 function openaiKey() {
@@ -107,11 +120,31 @@ function aiSchema() {
       properties: {
         executive_summary: { type: "string" },
         what_this_means: { type: "string" },
-        strengths: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 7 },
-        friction: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 7 },
+        strengths: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 7,
+        },
+        friction: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 2,
+          maxItems: 7,
+        },
         strategic_opportunity: { type: "string" },
-        plan_7_days: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 10 },
-        plan_30_days: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 12 },
+        plan_7_days: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 10,
+        },
+        plan_30_days: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 12,
+        },
         closing_note: { type: "string" },
       },
       required: [
@@ -138,8 +171,8 @@ function buildAiPrompt(input: {
 }) {
   const { orgName, testName, takerName, signals, graphs, sections } = input;
 
-  // Keep context tight + deterministic base narrative for grounding.
-  const baseNarrative = sections
+  // Grounding context: keep tight and deterministic
+  const baseNarrative = (sections || [])
     .map((s) => {
       const blocks = Array.isArray(s?.blocks) ? s.blocks : [];
       const text = blocks
@@ -159,8 +192,8 @@ function buildAiPrompt(input: {
       role: "system",
       content: [
         "You are an expert business positioning strategist and report writer.",
-        "Write in plain, confident language. No fluff. No hype. No therapy tone.",
-        "Be specific, but never invent facts that are not in the provided signals.",
+        "Write in plain, confident language. No fluff. No hype.",
+        "Do not invent facts. Only use the provided signals + narrative.",
         "Output MUST match the provided JSON schema exactly.",
       ].join(" "),
     },
@@ -191,13 +224,21 @@ function buildAiPrompt(input: {
 }
 
 function extractOutputText(respJson: any): string {
-  // Responses API returns content in output[].content[] items.
+  // Responses API sometimes includes a convenience field `output_text`
+  if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
+    return respJson.output_text.trim();
+  }
+
+  // Standard shape: output[].content[] items
   const out = Array.isArray(respJson?.output) ? respJson.output : [];
   for (const item of out) {
     if (item?.type !== "message") continue;
     const content = Array.isArray(item?.content) ? item.content : [];
-    const t = content.find((c: any) => c?.type === "output_text")?.text;
-    if (typeof t === "string" && t.trim()) return t.trim();
+    for (const c of content) {
+      if (c?.type === "output_text" && typeof c?.text === "string" && c.text.trim()) {
+        return c.text.trim();
+      }
+    }
   }
   return "";
 }
@@ -216,8 +257,7 @@ async function generateAiInsights(payload: {
   const model = openaiModel();
   const messages = buildAiPrompt(payload);
 
-  // IMPORTANT:
-  // Structured output in Responses API uses text.format (not response_format). :contentReference[oaicite:1]{index=1}
+  // Structured output in Responses API uses `text.format`
   const body = {
     model,
     input: messages,
@@ -230,27 +270,36 @@ async function generateAiInsights(payload: {
     },
   };
 
-  const r = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 25_000);
+  const t = setTimeout(() => controller.abort(), timeoutMs);
 
-  const j = await r.json().catch(() => ({} as any));
-  if (!r.ok) {
-    const msg = j?.error?.message || `OpenAI HTTP ${r.status}`;
-    throw new Error(msg);
+  try {
+    const r = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const j = await r.json().catch(() => ({} as any));
+    if (!r.ok) {
+      const msg = j?.error?.message || `OpenAI HTTP ${r.status}`;
+      throw new Error(msg);
+    }
+
+    const text = extractOutputText(j);
+    if (!text) throw new Error("OpenAI returned no output_text");
+
+    // Because we requested json_schema, output_text should be valid JSON
+    const parsed = JSON.parse(text);
+    return parsed as AiInsights;
+  } finally {
+    clearTimeout(t);
   }
-
-  const text = extractOutputText(j);
-  if (!text) throw new Error("OpenAI returned no output_text");
-
-  // Because we requested json_schema, output_text should be valid JSON.
-  const parsed = JSON.parse(text);
-  return parsed as AiInsights;
 }
 
 /* ---------------- Route ---------------- */
@@ -260,15 +309,24 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const token = safeString(ctx.params?.token);
     const tid = safeString(req.nextUrl.searchParams.get("tid"));
     const sid = safeString(req.nextUrl.searchParams.get("sid"));
-    const audience = safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
+    const audience =
+      safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
-    if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
-    if (!tid && !sid) return NextResponse.json({ ok: false, error: "Missing tid or sid" }, { status: 400 });
+    if (!token)
+      return NextResponse.json(
+        { ok: false, error: "Missing token" },
+        { status: 400 }
+      );
+    if (!tid && !sid)
+      return NextResponse.json(
+        { ok: false, error: "Missing tid or sid" },
+        { status: 400 }
+      );
 
     const sb = portal();
     const vis = visibility();
 
-    // 0) Load taker (required for public route)
+    // 0) Load taker (required for tid public route)
     let taker: any = null;
     if (tid) {
       const { data: takerRow, error: takerErr } = await sb
@@ -277,8 +335,13 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         .eq("id", tid)
         .eq("link_token", token)
         .maybeSingle();
+
       if (takerErr) throw new Error(takerErr.message);
-      if (!takerRow) return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
+      if (!takerRow)
+        return NextResponse.json(
+          { ok: false, error: "Taker not found for this token" },
+          { status: 404 }
+        );
       taker = takerRow;
     }
 
@@ -296,24 +359,37 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       if (subsErr) throw new Error(subsErr.message);
 
       const takerEmail = safeString(taker?.email).toLowerCase();
-      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
+      const takerName = [taker?.first_name, taker?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
 
       const byMeta =
-        (subs || []).find((s: any) => safeString(s?.metadata?.taker_id) === tid) || null;
+        (subs || []).find(
+          (s: any) => safeString(s?.metadata?.taker_id) === tid
+        ) || null;
 
       const byEmail =
         !byMeta && takerEmail
-          ? (subs || []).find((s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail) || null
+          ? (subs || []).find(
+              (s: any) =>
+                safeString(s?.taker_email).toLowerCase() === takerEmail
+            ) || null
           : null;
 
       const byName =
         !byMeta && !byEmail && takerName
-          ? (subs || []).find((s: any) => safeString(s?.taker_name) === takerName) || null
+          ? (subs || []).find(
+              (s: any) => safeString(s?.taker_name) === takerName
+            ) || null
           : null;
 
       const picked = byMeta || byEmail || byName;
       if (!picked?.id) {
-        return NextResponse.json({ ok: false, error: "No visibility submission found for this token/taker yet." }, { status: 404 });
+        return NextResponse.json(
+          { ok: false, error: "No visibility submission found for this token/taker yet." },
+          { status: 404 }
+        );
       }
 
       submissionId = String(picked.id);
@@ -330,14 +406,20 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
+    if (!result)
+      return NextResponse.json(
+        { ok: false, error: "Visibility results not found." },
+        { status: 404 }
+      );
 
     // 3) Ensure pillar signals exist (compute via RPC if missing)
     if (!hasPillarSignals(result)) {
       try {
-        const pillarRpc = await callRpc<any>(vis, "compute_pillar_signals_for_submission", {
-          p_submission_id: submissionId,
-        });
+        const pillarRpc = await callRpc<any>(
+          vis,
+          "compute_pillar_signals_for_submission",
+          { p_submission_id: submissionId }
+        );
 
         if (pillarRpc?.ok === true && pillarRpc?.computed) {
           const computed = pillarRpc.computed;
@@ -349,7 +431,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
               pillar_bands: computed.pillar_bands ?? {},
               weakest_pillar: computed.weakest_pillar ?? null,
               strongest_pillar: computed.strongest_pillar ?? null,
-              pattern_tags: Array.isArray(computed.pattern_tags) ? computed.pattern_tags : [],
+              pattern_tags: Array.isArray(computed.pattern_tags)
+                ? computed.pattern_tags
+                : [],
             })
             .eq("id", result.id);
 
@@ -371,20 +455,26 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const engineKey = String(result.engine_key || "visibility_v1");
     const version = Number(result.version || 1);
 
-    // 4) Deterministic report cache lookup
-    const cachedDet = await callRpc<any>(vis, "get_generated_report", {
+    // 4) Cache lookup for this audience
+    const cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
       p_engine_key: engineKey,
       p_version: version,
     });
 
-    if (cachedDet) {
+    if (cached) {
       return NextResponse.json(
         {
           ok: true,
-          data: cachedDet,
-          __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
+          data: cached,
+          __meta: {
+            cached: true,
+            submission_id: submissionId,
+            engine_key: engineKey,
+            version,
+            audience,
+          },
         },
         { status: 200 }
       );
@@ -404,7 +494,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       pattern_tags: result.pattern_tags || [],
     };
 
-    // 6) Build deterministic sections from KB
+    // 6) Sections from KB
     const sectionKeys = [
       "framework_foundation",
       "snapshot",
@@ -466,7 +556,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       pillar_band: result.pillar_bands || {},
     };
 
-    // 8) Meta for header
+    // 8) Meta
     const { data: orgRow } = await sb
       .from("orgs")
       .select("id, slug, name, logo_url")
@@ -481,12 +571,13 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
     const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
     const testName = (testRow as any)?.name || "Visibility Ladder";
-    const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null;
+    const takerName =
+      [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
+      null;
 
-    // 9) AI: auto-generate at report load, cached separately as taker_report_ai
-    // This keeps the base deterministic report stable.
+    // 9) Seamless AI generation + caching (stored under audience taker_report_ai)
     let ai: AiInsights | null = null;
-    let ai_meta: any = { enabled: false };
+    const ai_meta: any = { enabled: false };
 
     if (aiEnabled()) {
       ai_meta.enabled = true;
@@ -505,7 +596,6 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
           ai_meta.model = cachedAi?.ai_meta?.model || null;
           ai_meta.generated_at = cachedAi?.ai_meta?.generated_at || null;
         } else {
-          // generate now (seamless)
           const aiOut = await generateAiInsights({
             orgName,
             testName,
@@ -520,7 +610,6 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
           ai_meta.model = openaiModel();
           ai_meta.generated_at = new Date().toISOString();
 
-          // store AI cache payload as a minimal report json
           const aiCacheJson = {
             token,
             tid: tid || null,
@@ -577,7 +666,6 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       graphs,
       sections,
 
-      // ✅ Seamless AI layer (may be null if disabled or error)
       ai,
       ai_meta,
     };
@@ -597,11 +685,20 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       {
         ok: true,
         data: reportJson,
-        __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
+        __meta: {
+          cached: false,
+          submission_id: submissionId,
+          engine_key: engineKey,
+          version,
+          audience,
+        },
       },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: String(e?.message || e) },
+      { status: 500 }
+    );
   }
 }
