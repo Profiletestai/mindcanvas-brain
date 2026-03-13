@@ -66,41 +66,85 @@ function hasPillarSignals(result: any) {
   const pb = result?.pillar_bands;
   const wp = result?.weakest_pillar;
   const sp = result?.strongest_pillar;
-  // “good enough” test: pillar_scores has at least one key
+
   const okScores =
     ps &&
     typeof ps === "object" &&
     (Object.keys(ps).length > 0 ||
       ["discoverability", "trust", "conversion"].some((k) => ps?.[k] != null));
+
   const okBands = pb && typeof pb === "object" && Object.keys(pb).length > 0;
+
   return Boolean(okScores || okBands || wp || sp);
 }
 
-export async function GET(
-  req: NextRequest,
-  ctx: { params: { token: string } }
-) {
+async function loadLinkMeta(sb: ReturnType<typeof portal>, token: string) {
+  // Try canonical column set first
+  const a1 = await sb
+    .from("test_links")
+    .select("show_results, redirect_url, hidden_results_message, next_steps_url, email_report")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (!a1.error && a1.data) {
+    const d: any = a1.data;
+    return {
+      show_results: d.show_results ?? true,
+      redirect_url: d.redirect_url ?? null,
+      hidden_results_message: d.hidden_results_message ?? null,
+      next_steps_url: d.next_steps_url ?? null,
+      email_report: d.email_report ?? false,
+    };
+  }
+
+  // Fallback for older schema
+  const a2 = await sb
+    .from("test_links")
+    .select("show_results, redirect_url, hidden_results_message, next_steps_url, email_results")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (!a2.error && a2.data) {
+    const d: any = a2.data;
+    return {
+      show_results: d.show_results ?? true,
+      redirect_url: d.redirect_url ?? null,
+      hidden_results_message: d.hidden_results_message ?? null,
+      next_steps_url: d.next_steps_url ?? null,
+      email_report: d.email_results ?? false,
+    };
+  }
+
+  return {
+    show_results: true,
+    redirect_url: null,
+    hidden_results_message: null,
+    next_steps_url: null,
+    email_report: false,
+  };
+}
+
+export async function GET(req: NextRequest, ctx: { params: { token: string } }) {
   try {
     const token = safeString(ctx.params?.token);
     const tid = safeString(req.nextUrl.searchParams.get("tid"));
-    const sid = safeString(req.nextUrl.searchParams.get("sid")); // ✅ NEW: submission id
+    const sid = safeString(req.nextUrl.searchParams.get("sid")); // submission id optional
     const audience = safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
-    if (!token)
+    if (!token) {
       return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
-
-    // We support either tid OR sid. tid is your original approach, sid is cleaner.
+    }
     if (!tid && !sid) {
-      return NextResponse.json(
-        { ok: false, error: "Missing tid or sid" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "Missing tid or sid" }, { status: 400 });
     }
 
     const sb = portal();
     const vis = visibility();
 
-    // If tid is present, validate taker belongs to this token (existing behaviour)
+    // Link meta (Next Steps, etc.)
+    const linkMeta = await loadLinkMeta(sb, token);
+
+    // If tid is present, validate taker belongs to this token
     let taker: any = null;
     if (tid) {
       const { data: takerRow, error: takerErr } = await sb
@@ -111,25 +155,18 @@ export async function GET(
         .maybeSingle();
 
       if (takerErr) throw new Error(takerErr.message);
-      if (!takerRow)
-        return NextResponse.json(
-          { ok: false, error: "Taker not found for this token" },
-          { status: 404 }
-        );
-
+      if (!takerRow) {
+        return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
+      }
       taker = takerRow;
     }
 
-    // ---------------------------------------------------------
     // 1) Resolve submission_id
-    // ---------------------------------------------------------
     let submissionId: string | null = null;
 
-    // ✅ Best path: sid query param
     if (sid) {
       submissionId = sid;
     } else {
-      // Legacy path: find latest visibility submission for this taker+token
       const { data: subs, error: subsErr } = await vis
         .from("submissions")
         .select("id, created_at, token, taker_email, taker_name, metadata")
@@ -140,33 +177,19 @@ export async function GET(
       if (subsErr) throw new Error(subsErr.message);
 
       const takerEmail = safeString(taker?.email).toLowerCase();
-      const takerName = [taker?.first_name, taker?.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
 
-      // Priority matching:
-      // 1) metadata.taker_id == tid (if your submit stored it)
-      // 2) taker_email matches portal taker email
-      // 3) taker_name matches portal taker name (last resort)
       const byMeta =
-        (subs || []).find(
-          (s: any) => safeString(s?.metadata?.taker_id) === tid
-        ) || null;
+        (subs || []).find((s: any) => safeString(s?.metadata?.taker_id) === tid) || null;
 
       const byEmail =
         !byMeta && takerEmail
-          ? (subs || []).find(
-              (s: any) =>
-                safeString(s?.taker_email).toLowerCase() === takerEmail
-            ) || null
+          ? (subs || []).find((s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail) || null
           : null;
 
       const byName =
         !byMeta && !byEmail && takerName
-          ? (subs || []).find(
-              (s: any) => safeString(s?.taker_name) === takerName
-            ) || null
+          ? (subs || []).find((s: any) => safeString(s?.taker_name) === takerName) || null
           : null;
 
       const picked = byMeta || byEmail || byName;
@@ -182,15 +205,10 @@ export async function GET(
     }
 
     if (!submissionId) {
-      return NextResponse.json(
-        { ok: false, error: "Failed to resolve submission_id" },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: "Failed to resolve submission_id" }, { status: 500 });
     }
 
-    // ---------------------------------------------------------
     // 2) Load latest visibility.results for that submission
-    // ---------------------------------------------------------
     let { data: result, error: resErr } = await vis
       .from("results")
       .select(
@@ -201,23 +219,14 @@ export async function GET(
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result) {
-      return NextResponse.json(
-        { ok: false, error: "Visibility results not found." },
-        { status: 404 }
-      );
-    }
+    if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
 
-    // ---------------------------------------------------------
     // 3) Ensure pillar signals exist (compute via RPC if missing)
-    // ---------------------------------------------------------
     if (!hasPillarSignals(result)) {
       try {
-        const pillarRpc = await callRpc<any>(
-          vis,
-          "compute_pillar_signals_for_submission",
-          { p_submission_id: submissionId }
-        );
+        const pillarRpc = await callRpc<any>(vis, "compute_pillar_signals_for_submission", {
+          p_submission_id: submissionId,
+        });
 
         if (pillarRpc?.ok === true && pillarRpc?.computed) {
           const computed = pillarRpc.computed;
@@ -229,13 +238,10 @@ export async function GET(
               pillar_bands: computed.pillar_bands ?? {},
               weakest_pillar: computed.weakest_pillar ?? null,
               strongest_pillar: computed.strongest_pillar ?? null,
-              pattern_tags: Array.isArray(computed.pattern_tags)
-                ? computed.pattern_tags
-                : [],
+              pattern_tags: Array.isArray(computed.pattern_tags) ? computed.pattern_tags : [],
             })
             .eq("id", result.id);
 
-          // re-read result (so signals are accurate)
           const reread = await vis
             .from("results")
             .select(
@@ -247,7 +253,6 @@ export async function GET(
           if (!reread.error && reread.data) result = reread.data;
         }
       } catch (e) {
-        // Don’t fail report load if pillar RPC fails — just continue with what we have
         console.warn("[visibility report] pillar RPC failed", e);
       }
     }
@@ -255,9 +260,7 @@ export async function GET(
     const engineKey = String(result.engine_key || "visibility_v1");
     const version = Number(result.version || 1);
 
-    // ---------------------------------------------------------
     // 4) Cache lookup
-    // ---------------------------------------------------------
     const cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -270,39 +273,26 @@ export async function GET(
         {
           ok: true,
           data: cached,
-          __meta: {
-            cached: true,
-            submission_id: submissionId,
-            engine_key: engineKey,
-            version,
-            audience,
-          },
+          __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
         },
         { status: 200 }
       );
     }
 
-    // ---------------------------------------------------------
-    // 5) Signals object used for KB matching
-    // ---------------------------------------------------------
+    // 5) Signals used for KB matching
     const signals = {
       tier: result.tier,
       level: Number(result.level ?? 0),
       style: result.personality_type,
       readiness: result.readiness,
-
-      // ✅ these now exist reliably
       pillar_scores: result.pillar_scores || {},
       pillar_band: result.pillar_bands || {},
-
       weakest_pillar: result.weakest_pillar ?? null,
       strongest_pillar: result.strongest_pillar ?? null,
       pattern_tags: result.pattern_tags || [],
     };
 
-    // ---------------------------------------------------------
-    // 6) Assemble from KB blocks (deterministic)
-    // ---------------------------------------------------------
+    // 6) Assemble from KB blocks
     const sectionKeys = [
       "framework_foundation",
       "snapshot",
@@ -337,9 +327,7 @@ export async function GET(
         });
       }
 
-      const contentBlocks = (blocks || [])
-        .map((b: any) => b.content)
-        .filter(Boolean);
+      const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
 
       sections.push({
         key,
@@ -357,9 +345,7 @@ export async function GET(
       );
     }
 
-    // ---------------------------------------------------------
     // 7) Graph payload (UI-ready)
-    // ---------------------------------------------------------
     const graphs = {
       tier_counts: result.tier_counts || {},
       personality_points: result.personality_points || {},
@@ -368,28 +354,17 @@ export async function GET(
       pillar_band: result.pillar_bands || {},
     };
 
-    // ---------------------------------------------------------
     // 8) Meta for header
-    // ---------------------------------------------------------
-    // If we only have sid (no tid), we may not have taker/org. We can still return report without them.
     let orgRow: any = null;
     let testRow: any = null;
 
     if (taker?.org_id) {
-      const orgRes = await sb
-        .from("orgs")
-        .select("id, slug, name, logo_url")
-        .eq("id", taker.org_id)
-        .maybeSingle();
+      const orgRes = await sb.from("orgs").select("id, slug, name, logo_url").eq("id", taker.org_id).maybeSingle();
       if (!orgRes.error) orgRow = orgRes.data || null;
     }
 
     if (taker?.test_id) {
-      const testRes = await sb
-        .from("tests")
-        .select("id, name, slug")
-        .eq("id", taker.test_id)
-        .maybeSingle();
+      const testRes = await sb.from("tests").select("id, name, slug").eq("id", taker.test_id).maybeSingle();
       if (!testRes.error) testRow = testRes.data || null;
     }
 
@@ -407,6 +382,8 @@ export async function GET(
         org_logo_url: orgRow?.logo_url || null,
         test_name: testRow?.name || "Visibility Ladder",
         generated_at: new Date().toISOString(),
+        // ✅ expose link meta so UI can show Next Step and keep behaviour consistent
+        link_meta: linkMeta,
       },
 
       signals,
@@ -414,9 +391,7 @@ export async function GET(
       sections,
     };
 
-    // ---------------------------------------------------------
     // 9) Cache write
-    // ---------------------------------------------------------
     await callRpc<any>(vis, "upsert_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -431,20 +406,11 @@ export async function GET(
       {
         ok: true,
         data: reportJson,
-        __meta: {
-          cached: false,
-          submission_id: submissionId,
-          engine_key: engineKey,
-          version,
-          audience,
-        },
+        __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
       },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
