@@ -61,7 +61,8 @@ function toZeroBasedSelected(row: any): number | null {
   return null;
 }
 
-const asNumber = (x: any, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
+const asNumber = (x: any, d = 0) =>
+  Number.isFinite(Number(x)) ? Number(x) : d;
 
 function normalizeEmail(v: any): string {
   const s = typeof v === "string" ? v.trim() : "";
@@ -119,7 +120,6 @@ async function loadLinkBehavior(
   sb: ReturnType<typeof supa>,
   token: string
 ): Promise<LinkBehavior> {
-  // ✅ attempt using current schema (email_report)
   const a1 = await sb
     .from("test_links")
     .select(
@@ -139,7 +139,6 @@ async function loadLinkBehavior(
     };
   }
 
-  // ⚠️ fallback: older schema might have email_results
   const a2 = await sb
     .from("test_links")
     .select(
@@ -178,10 +177,7 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function computeTierAndLevel(
-  tierCounts: Record<Tier, number>,
-  totalSignals: number
-) {
+function computeTierAndLevel(tierCounts: Record<Tier, number>, totalSignals: number) {
   const tierRank: Record<Tier, number> = {
     Invisible: 1,
     Emerging: 2,
@@ -222,7 +218,7 @@ function computeTierAndLevel(
 
   const dominance = totalSignals ? (support + 0.5 * above) / totalSignals : 0;
   const tierLevel = clamp(Math.ceil(dominance * 5), 1, 5);
-  const level = base[dominant] + tierLevel;
+  const level = base[dominant] + tierLevel; // 1..20
 
   return { tier: dominant, level, tierLevel, support, above, below, dominance };
 }
@@ -239,28 +235,18 @@ function computeReadiness(tierLevel: number, below: number): Readiness {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(
-  req: Request,
-  { params }: { params: { token: string } }
-) {
+export async function POST(req: Request, { params }: { params: { token: string } }) {
   try {
     const token = params.token?.trim();
     if (!token) {
-      return NextResponse.json(
-        { ok: false, error: "Missing token" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
     }
 
     const body = (await req.json().catch(() => ({}))) as any;
-    const takerId: string | undefined =
-      body.taker_id || body.takerId || body.tid;
+    const takerId: string | undefined = body.taker_id || body.takerId || body.tid;
 
     if (!takerId) {
-      return NextResponse.json(
-        { ok: false, error: "Missing taker_id" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "Missing taker_id" }, { status: 400 });
     }
 
     const answers: any[] = Array.isArray(body.answers) ? body.answers : [];
@@ -280,10 +266,7 @@ export async function POST(
       .maybeSingle();
 
     if (takerErr || !taker) {
-      return NextResponse.json(
-        { ok: false, error: "Taker not found for this token" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
     }
 
     // Load wrapper test row (the one linked to the token)
@@ -294,10 +277,7 @@ export async function POST(
       .maybeSingle();
 
     if (testErr || !test) {
-      return NextResponse.json(
-        { ok: false, error: "Test not found for taker" },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: "Test not found for taker" }, { status: 500 });
     }
 
     // ✅ VISIBILITY BRANCH (only activates if linked in visibility.tests)
@@ -411,10 +391,7 @@ export async function POST(
       const readiness = computeReadiness(tierLevel, below);
 
       // Persist into visibility schema
-      const fullName = [taker.first_name, taker.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+      const fullName = [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim();
 
       const { data: sub, error: subErr } = await vis
         .from("submissions")
@@ -431,35 +408,69 @@ export async function POST(
         .select("id")
         .single();
 
-      if (subErr) {
+      if (subErr || !sub?.id) {
         return NextResponse.json(
-          { ok: false, error: `Visibility submission insert failed: ${subErr.message}` },
+          { ok: false, error: `Visibility submission insert failed: ${subErr?.message || "unknown"}` },
           { status: 500 }
         );
       }
 
-      const { error: resErr } = await vis.from("results").insert({
-        submission_id: sub.id,
-        engine_key: "visibility_v1",
-        version: 1,
-        personality_type,
-        personality_points: personalityPoints,
-        tier,
-        level,
-        tier_counts: tierCounts,
-        readiness,
-        computed: { tier_level: tierLevel },
-        debug: { ladderSignals, support, above, below, dominance },
-      });
+      // Insert result + keep id so we can enrich pillar signals immediately
+      const { data: resRow, error: resErr } = await vis
+        .from("results")
+        .insert({
+          submission_id: sub.id,
+          engine_key: "visibility_v1",
+          version: 1,
+          personality_type,
+          personality_points: personalityPoints,
+          tier,
+          level,
+          tier_counts: tierCounts,
+          readiness,
+          computed: { tier_level: tierLevel },
+          debug: { ladderSignals, support, above, below, dominance },
+        })
+        .select("id")
+        .single();
 
-      if (resErr) {
+      if (resErr || !resRow?.id) {
         return NextResponse.json(
-          { ok: false, error: `Visibility results insert failed: ${resErr.message}` },
+          { ok: false, error: `Visibility results insert failed: ${resErr?.message || "unknown"}` },
           { status: 500 }
         );
       }
 
-      // Also store a minimal totals payload into portal tables (so portal UX doesn’t break)
+      // ✅ BEST: compute pillar signals immediately at submit-time (so report has pillars on first load)
+      let pillarComputed: any = null;
+      try {
+        const { data: pillarRpc, error: pillarErr } = await vis.rpc(
+          "compute_pillar_signals_for_submission",
+          { p_submission_id: sub.id }
+        );
+
+        if (!pillarErr && pillarRpc?.ok === true && pillarRpc?.computed) {
+          pillarComputed = pillarRpc.computed;
+
+          await vis
+            .from("results")
+            .update({
+              pillar_scores: pillarComputed.pillar_scores ?? {},
+              pillar_bands: pillarComputed.pillar_bands ?? {},
+              weakest_pillar: pillarComputed.weakest_pillar ?? null,
+              strongest_pillar: pillarComputed.strongest_pillar ?? null,
+              pattern_tags: Array.isArray(pillarComputed.pattern_tags)
+                ? pillarComputed.pattern_tags
+                : [],
+            })
+            .eq("id", resRow.id);
+        }
+      } catch (e) {
+        // do not fail submit if pillar computation fails; report endpoint can still compute later
+        console.warn("[visibility submit] pillar compute failed", e);
+      }
+
+      // Also store a totals payload into portal tables (so portal UX doesn’t break)
       const totals = {
         visibility: {
           tier,
@@ -468,11 +479,20 @@ export async function POST(
           personality_type,
           personality_points: personalityPoints,
           tier_counts: tierCounts,
+
+          // ✅ include pillars when available (helps portal snapshot later)
+          pillar_scores: pillarComputed?.pillar_scores ?? undefined,
+          pillar_bands: pillarComputed?.pillar_bands ?? undefined,
+          weakest_pillar: pillarComputed?.weakest_pillar ?? undefined,
+          strongest_pillar: pillarComputed?.strongest_pillar ?? undefined,
+          pattern_tags: pillarComputed?.pattern_tags ?? undefined,
         },
         meta: {
           engine: "visibility_v1",
           portal_test_id: taker.test_id,
           visibility_test_id: vTest.id,
+          submission_id: sub.id,
+          result_id: resRow.id,
         },
       };
 
@@ -508,17 +528,17 @@ export async function POST(
         );
       }
 
-      // ✅ Canonical base for ALL absolute links
+      // Canonical base for ALL absolute links
       const origin = getBaseUrl();
 
-      // ✅ NEW: bespoke Visibility report route
-      const reportPath = `/t/${encodeURIComponent(
-        token
-      )}/visibility/report?tid=${encodeURIComponent(taker.id)}`;
+      // Bespoke Visibility report route
+      const reportPath = `/t/${encodeURIComponent(token)}/visibility/report?tid=${encodeURIComponent(
+        taker.id
+      )}`;
 
-      const resultPath = `/t/${encodeURIComponent(
-        token
-      )}/result?tid=${encodeURIComponent(taker.id)}`;
+      const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
+        taker.id
+      )}`;
 
       const baseReportUrl = `${origin}${reportPath}`;
       const baseResultUrl = `${origin}${resultPath}`;
@@ -541,14 +561,12 @@ export async function POST(
         .maybeSingle();
 
       const orgName =
-        String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() ||
-        "MindCanvas";
+        String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() || "MindCanvas";
 
       const supportEmail =
-        normalizeEmail((orgRow as any)?.support_email) ||
-        getDefaultSupportEmail();
+        normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
 
-      // ✅ Email report link to test taker (if enabled)
+      // Email report link to test taker (if enabled)
       let takerEmailResult: any = null;
       try {
         if (linkBehavior.email_report && normalizeEmail(taker.email)) {
@@ -558,7 +576,7 @@ export async function POST(
             to: String(taker.email),
             context: {
               first_name: taker.first_name || "there",
-              test_name: (test.name as string) || "your assessment",
+              test_name: (test.name as string) || "Visibility Ladder",
               report_link: baseReportUrl,
               org_name: orgName,
               support_email: supportEmail,
@@ -566,22 +584,18 @@ export async function POST(
           });
 
           if (!takerEmailResult?.ok) {
-            console.error(
-              "[visibility submit] test_taker_report failed",
-              takerEmailResult
-            );
+            console.error("[visibility submit] test_taker_report failed", takerEmailResult);
           }
         }
       } catch (e) {
         console.error("[visibility submit] test_taker_report unexpected error", e);
       }
 
-      // ✅ Internal notification (keeps parity with other tests)
+      // Internal notification (keeps parity with other tests)
       let ownerNotification: any = null;
       try {
         const sentTo =
-          normalizeEmail((orgRow as any)?.notification_email) ||
-          getDefaultInternalEmail();
+          normalizeEmail((orgRow as any)?.notification_email) || getDefaultInternalEmail();
 
         if (normalizeEmail(sentTo)) {
           const internalReportLink = `${origin}/portal/${(orgRow as any)?.slug}/database/${taker.id}`;
@@ -600,7 +614,7 @@ export async function POST(
               test_taker_mobile: (taker as any).phone || "",
               test_taker_org: (taker as any).company || "",
 
-              test_name: (test.name as string) || "your assessment",
+              test_name: (test.name as string) || "Visibility Ladder",
 
               internal_report_link: internalReportLink,
               internal_results_dashboard_link: internalResultsDashboardLink,
@@ -611,10 +625,7 @@ export async function POST(
           });
 
           if (!ownerNotification?.ok) {
-            console.error(
-              "[visibility submit] test_owner_notification failed",
-              ownerNotification
-            );
+            console.error("[visibility submit] test_owner_notification failed", ownerNotification);
           }
         }
       } catch (e) {
@@ -623,22 +634,25 @@ export async function POST(
 
       // ✅ BULLETPROOF: force the public client to follow redirect and not /result
       // Your PublicTestClient hard-routes to /result when show_results !== false.
-      // So we return ALL variants it might read.
       return NextResponse.json({
         ok: true,
         totals,
 
+        // hard signal to client
         show_results: false,
         showResults: false,
 
+        // redirect variants
         redirect: reportPath,
         redirect_url: reportPath,
         redirectUrl: reportPath,
 
+        // next steps variants (treat as report for now; UI button can use this)
         next_steps_url: reportPath,
         nextStepsUrl: reportPath,
         link_meta: { next_steps_url: reportPath },
 
+        // keep original link block
         link: {
           show_results: linkBehavior.show_results,
           redirect_url: linkBehavior.redirect_url,
@@ -647,8 +661,16 @@ export async function POST(
           email_report: linkBehavior.email_report,
         },
 
+        // urls
         result_url: baseResultUrl,
         report_url: baseReportUrl,
+
+        // visibility ids for debugging / future
+        visibility: {
+          submission_id: sub.id,
+          result_id: resRow.id,
+          visibility_test_id: vTest.id,
+        },
 
         owner_notification: ownerNotification,
         taker_email: takerEmailResult,
@@ -658,13 +680,10 @@ export async function POST(
     // ---------- Existing behaviour for all other tests ----------
     const effectiveTestId = resolveEffectiveTestId(test);
 
-    // Determine test family/type (existing)
     const slug: string = (test.slug as string) || "";
     const meta: any = test.meta || {};
     const frameworkType: string =
-      (meta?.frameworkType as string) ||
-      (meta?.frameworktype as string) ||
-      "";
+      (meta?.frameworkType as string) || (meta?.frameworktype as string) || "";
     const kind: string = (meta?.kind as string) || "";
     const resultType: string =
       (meta?.resultType as string) || (meta?.resulttype as string) || "";
@@ -676,9 +695,7 @@ export async function POST(
     const kindLower = kind.toLowerCase();
     const resultTypeLower = resultType.toLowerCase();
     const qscVariantLower = qscVariant.toLowerCase();
-    const testFamilyLower = String(
-      meta?.test_family || meta?.testFamily || ""
-    ).toLowerCase();
+    const testFamilyLower = String(meta?.test_family || meta?.testFamily || "").toLowerCase();
 
     const isQscTest =
       slugLower.startsWith("qsc-") ||
@@ -689,14 +706,10 @@ export async function POST(
       ["entrepreneur", "leader", "leaders"].includes(qscVariantLower);
 
     const isQscEntrepreneur =
-      isQscTest &&
-      (qscVariantLower === "entrepreneur" || slugLower.includes("core"));
+      isQscTest && (qscVariantLower === "entrepreneur" || slugLower.includes("core"));
 
-    const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur
-      ? "entrepreneur"
-      : "leader";
+    const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur ? "entrepreneur" : "leader";
 
-    // Load questions with profile_map FROM effective test
     const { data: questions, error: qErr } = await sb
       .from("test_questions")
       .select("id, idx, profile_map")
@@ -705,26 +718,19 @@ export async function POST(
       .order("created_at", { ascending: true });
 
     if (qErr) {
-      return NextResponse.json(
-        { ok: false, error: `Questions load failed: ${qErr.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: `Questions load failed: ${qErr.message}` }, { status: 500 });
     }
 
     const byId: Record<string, QuestionRow> = {};
     for (const q of questions || []) byId[q.id] = q;
 
-    // Labels FROM effective test
     const { data: labels, error: labErr } = await sb
       .from("test_profile_labels")
       .select("profile_code, profile_name, frequency_code")
       .eq("test_id", effectiveTestId);
 
     if (labErr) {
-      return NextResponse.json(
-        { ok: false, error: `Labels load failed: ${labErr.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: `Labels load failed: ${labErr.message}` }, { status: 500 });
     }
 
     const nameToCode = new Map<string, string>();
@@ -733,9 +739,7 @@ export async function POST(
     for (const r of labels || []) {
       const code = String((r as any).profile_code || "").trim();
       const name = String((r as any).profile_name || "").trim();
-      const f = String((r as any).frequency_code || "")
-        .trim()
-        .toUpperCase();
+      const f = String((r as any).frequency_code || "").trim().toUpperCase();
 
       if (name && code) nameToCode.set(name, code);
       if (code) {
@@ -748,7 +752,6 @@ export async function POST(
       }
     }
 
-    // Compute totals (legacy frequency/profile scoring)
     const freqTotals: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
     const profileTotals: Record<string, number> = {};
 
@@ -756,8 +759,7 @@ export async function POST(
       const row = answers[idx];
       const qid = row?.question_id || row?.qid || row?.id;
       const q: QuestionRow | undefined = qid ? byId[qid] : undefined;
-      if (!q || !Array.isArray(q.profile_map) || q.profile_map.length === 0)
-        continue;
+      if (!q || !Array.isArray(q.profile_map) || q.profile_map.length === 0) continue;
 
       const sel = toZeroBasedSelected(row);
       if (sel == null || sel < 0 || sel >= q.profile_map.length) continue;
@@ -766,7 +768,6 @@ export async function POST(
       const points = asNumber(entry.points, 0);
       let pcode = String(entry.profile || "").trim();
 
-      // Resolve profile name → code if needed
       if (pcode && !/^P(?:ROFILE)?[_\s-]?\d+$/i.test(pcode)) {
         const fromName = nameToCode.get(pcode);
         if (fromName) pcode = fromName;
@@ -779,24 +780,15 @@ export async function POST(
       if (f) freqTotals[f] += points;
     }
 
-    // Persist submission snapshot (keep wrapper test_id for org reporting)
     const totals = {
-      frequencies: {
-        A: freqTotals.A,
-        B: freqTotals.B,
-        C: freqTotals.C,
-        D: freqTotals.D,
-      },
+      frequencies: { A: freqTotals.A, B: freqTotals.B, C: freqTotals.C, D: freqTotals.D },
       profiles: profileTotals,
-      meta: {
-        wrapper_test_id: taker.test_id,
-        effective_test_id: effectiveTestId,
-      },
+      meta: { wrapper_test_id: taker.test_id, effective_test_id: effectiveTestId },
     };
 
     const { error: subErr } = await sb.from("test_submissions").insert({
       taker_id: taker.id,
-      test_id: taker.test_id, // wrapper
+      test_id: taker.test_id,
       link_token: token,
       totals,
       answers_json: answers,
@@ -809,10 +801,7 @@ export async function POST(
     });
 
     if (subErr) {
-      return NextResponse.json(
-        { ok: false, error: `Submission insert failed: ${subErr.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: `Submission insert failed: ${subErr.message}` }, { status: 500 });
     }
 
     const { error: upErr } = await sb
@@ -820,10 +809,7 @@ export async function POST(
       .upsert({ taker_id: taker.id, totals }, { onConflict: "taker_id" });
 
     if (upErr) {
-      return NextResponse.json(
-        { ok: false, error: `Results upsert failed: ${upErr.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: `Results upsert failed: ${upErr.message}` }, { status: 500 });
     }
 
     // ---------------- QSC SCORING ----------------
@@ -843,16 +829,12 @@ export async function POST(
           })
           .filter((a: any) => a.question_id && a.choice >= 0);
 
-        const scoring = calculateQscScores(
-          questionsForScoring,
-          answersForScoring
-        );
+        const scoring = calculateQscScores(questionsForScoring, answersForScoring);
 
         let qscProfileId: string | null = null;
 
         if (scoring.combinedProfileCode) {
-          const [personalityKey, mindsetKey] =
-            scoring.combinedProfileCode.split("_");
+          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
 
           const personalityMap: Record<string, string> = {
             FIRE: "A",
@@ -879,8 +861,7 @@ export async function POST(
               .eq("mindset_level", mindset_level)
               .maybeSingle();
 
-            if (!qscProfileError)
-              qscProfileId = (qscProfileRow as any)?.id ?? null;
+            if (!qscProfileError) qscProfileId = (qscProfileRow as any)?.id ?? null;
           }
         }
 
@@ -907,10 +888,7 @@ export async function POST(
           );
 
         if (qscUpsertError) {
-          console.error(
-            "QSC scoring: failed to upsert qsc_results",
-            qscUpsertError
-          );
+          console.error("QSC scoring: failed to upsert qsc_results", qscUpsertError);
         }
       } catch (e) {
         console.error("QSC scoring: unexpected error", e);
@@ -918,31 +896,20 @@ export async function POST(
     }
     // ---------------- END QSC SCORING ----------------
 
-    // ✅ Canonical base for ALL absolute links
     const origin = getBaseUrl();
 
-    const reportPath = `/t/${encodeURIComponent(
-      token
-    )}/report?tid=${encodeURIComponent(taker.id)}`;
-    const resultPath = `/t/${encodeURIComponent(
-      token
-    )}/result?tid=${encodeURIComponent(taker.id)}`;
+    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
+    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(taker.id)}`;
 
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
-    // ✅ QSC PUBLIC report destination
-    const qscGrowthPath = `/qsc/${encodeURIComponent(
-      token
-    )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
-    const qscLeaderPath = `/qsc/${encodeURIComponent(
-      token
-    )}/leader?tid=${encodeURIComponent(taker.id)}`;
+    const qscGrowthPath = `/qsc/${encodeURIComponent(token)}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
+    const qscLeaderPath = `/qsc/${encodeURIComponent(token)}/leader?tid=${encodeURIComponent(taker.id)}`;
 
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
 
-    // Mark completed + persist correct last_result_url
     await sb
       .from("test_takers")
       .update({
@@ -952,10 +919,8 @@ export async function POST(
       .eq("id", taker.id)
       .eq("link_token", token);
 
-    // Email the correct report page
     const reportUrlForEmail = isQscTest ? qscPublicUrl : baseReportUrl;
 
-    // ✅ Decide redirect deterministically using show_results
     const redirectUrl: string =
       linkBehavior.show_results === true
         ? isQscTest
@@ -965,7 +930,6 @@ export async function POST(
         ? linkBehavior.redirect_url.trim()
         : resultPath;
 
-    // Load org (needed for email template placeholders)
     const { data: orgRow } = await sb
       .from("orgs")
       .select("id, slug, name, support_email, notification_email, website_url")
@@ -973,13 +937,11 @@ export async function POST(
       .maybeSingle();
 
     const orgName =
-      String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() ||
-      "MindCanvas";
+      String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() || "MindCanvas";
 
     const supportEmail =
       normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
 
-    // ✅ Email report link to test taker (if enabled)
     let takerEmailResult: any = null;
     try {
       if (linkBehavior.email_report && normalizeEmail(taker.email)) {
@@ -1004,12 +966,10 @@ export async function POST(
       console.error("[submit] test_taker_report unexpected error", e);
     }
 
-    // ✅ Send internal notification
     let ownerNotification: any = null;
     try {
       const sentTo =
-        normalizeEmail((orgRow as any)?.notification_email) ||
-        getDefaultInternalEmail();
+        normalizeEmail((orgRow as any)?.notification_email) || getDefaultInternalEmail();
 
       const firstName = (taker as any).first_name || "";
       const lastName = (taker as any).last_name || "";
@@ -1043,10 +1003,7 @@ export async function POST(
         });
 
         if (!ownerNotification?.ok) {
-          console.error(
-            "[submit] test_owner_notification failed",
-            ownerNotification
-          );
+          console.error("[submit] test_owner_notification failed", ownerNotification);
         }
       }
     } catch (e) {
