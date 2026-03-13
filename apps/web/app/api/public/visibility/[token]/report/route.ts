@@ -1,4 +1,4 @@
-//apps/web/app/api/public/visibility/[token]/report/route.ts
+// apps/web/app/api/public/visibility/[token]/report/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -18,14 +18,20 @@ function portal() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = getKey();
   if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key, { db: { schema: "portal" }, auth: { persistSession: false } });
+  return createClient(url, key, {
+    db: { schema: "portal" },
+    auth: { persistSession: false },
+  });
 }
 
 function visibility() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = getKey();
   if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key, { db: { schema: "visibility" }, auth: { persistSession: false } });
+  return createClient(url, key, {
+    db: { schema: "visibility" },
+    auth: { persistSession: false },
+  });
 }
 
 function defaultTitles(key: string) {
@@ -51,49 +57,141 @@ async function callRpc<T>(sb: any, fn: string, args: any): Promise<T> {
   return data as T;
 }
 
-export async function GET(req: NextRequest, ctx: { params: { token: string } }) {
-  try {
-    const token = String(ctx.params?.token || "").trim();
-    const tid = String(req.nextUrl.searchParams.get("tid") || "").trim();
-    const audience = String(req.nextUrl.searchParams.get("audience") || "taker_report").trim();
+function safeString(x: any) {
+  return typeof x === "string" ? x.trim() : "";
+}
 
-    if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
-    if (!tid) return NextResponse.json({ ok: false, error: "Missing tid" }, { status: 400 });
+function hasPillarSignals(result: any) {
+  const ps = result?.pillar_scores;
+  const pb = result?.pillar_bands;
+  const wp = result?.weakest_pillar;
+  const sp = result?.strongest_pillar;
+  // “good enough” test: pillar_scores has at least one key
+  const okScores =
+    ps &&
+    typeof ps === "object" &&
+    (Object.keys(ps).length > 0 ||
+      ["discoverability", "trust", "conversion"].some((k) => ps?.[k] != null));
+  const okBands = pb && typeof pb === "object" && Object.keys(pb).length > 0;
+  return Boolean(okScores || okBands || wp || sp);
+}
+
+export async function GET(
+  req: NextRequest,
+  ctx: { params: { token: string } }
+) {
+  try {
+    const token = safeString(ctx.params?.token);
+    const tid = safeString(req.nextUrl.searchParams.get("tid"));
+    const sid = safeString(req.nextUrl.searchParams.get("sid")); // ✅ NEW: submission id
+    const audience = safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
+
+    if (!token)
+      return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
+
+    // We support either tid OR sid. tid is your original approach, sid is cleaner.
+    if (!tid && !sid) {
+      return NextResponse.json(
+        { ok: false, error: "Missing tid or sid" },
+        { status: 400 }
+      );
+    }
 
     const sb = portal();
     const vis = visibility();
 
-    // 1) Validate taker belongs to this token
-    const { data: taker, error: takerErr } = await sb
-      .from("test_takers")
-      .select("id, org_id, test_id, link_token, first_name, last_name, email")
-      .eq("id", tid)
-      .eq("link_token", token)
-      .maybeSingle();
-    if (takerErr) throw new Error(takerErr.message);
-    if (!taker) return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
+    // If tid is present, validate taker belongs to this token (existing behaviour)
+    let taker: any = null;
+    if (tid) {
+      const { data: takerRow, error: takerErr } = await sb
+        .from("test_takers")
+        .select("id, org_id, test_id, link_token, first_name, last_name, email")
+        .eq("id", tid)
+        .eq("link_token", token)
+        .maybeSingle();
 
-    // 2) Find latest visibility submission for this taker+token
-    const { data: subs, error: subsErr } = await vis
-      .from("submissions")
-      .select("id, created_at, token, metadata")
-      .eq("token", token)
-      .order("created_at", { ascending: false })
-      .limit(40);
-    if (subsErr) throw new Error(subsErr.message);
+      if (takerErr) throw new Error(takerErr.message);
+      if (!takerRow)
+        return NextResponse.json(
+          { ok: false, error: "Taker not found for this token" },
+          { status: 404 }
+        );
 
-    const submission = (subs || []).find((s: any) => String(s?.metadata?.taker_id || "") === String(tid));
-    if (!submission?.id) {
+      taker = takerRow;
+    }
+
+    // ---------------------------------------------------------
+    // 1) Resolve submission_id
+    // ---------------------------------------------------------
+    let submissionId: string | null = null;
+
+    // ✅ Best path: sid query param
+    if (sid) {
+      submissionId = sid;
+    } else {
+      // Legacy path: find latest visibility submission for this taker+token
+      const { data: subs, error: subsErr } = await vis
+        .from("submissions")
+        .select("id, created_at, token, taker_email, taker_name, metadata")
+        .eq("token", token)
+        .order("created_at", { ascending: false })
+        .limit(80);
+
+      if (subsErr) throw new Error(subsErr.message);
+
+      const takerEmail = safeString(taker?.email).toLowerCase();
+      const takerName = [taker?.first_name, taker?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      // Priority matching:
+      // 1) metadata.taker_id == tid (if your submit stored it)
+      // 2) taker_email matches portal taker email
+      // 3) taker_name matches portal taker name (last resort)
+      const byMeta =
+        (subs || []).find(
+          (s: any) => safeString(s?.metadata?.taker_id) === tid
+        ) || null;
+
+      const byEmail =
+        !byMeta && takerEmail
+          ? (subs || []).find(
+              (s: any) =>
+                safeString(s?.taker_email).toLowerCase() === takerEmail
+            ) || null
+          : null;
+
+      const byName =
+        !byMeta && !byEmail && takerName
+          ? (subs || []).find(
+              (s: any) => safeString(s?.taker_name) === takerName
+            ) || null
+          : null;
+
+      const picked = byMeta || byEmail || byName;
+
+      if (!picked?.id) {
+        return NextResponse.json(
+          { ok: false, error: "No visibility submission found for this token/taker yet." },
+          { status: 404 }
+        );
+      }
+
+      submissionId = String(picked.id);
+    }
+
+    if (!submissionId) {
       return NextResponse.json(
-        { ok: false, error: "No visibility submission found for this taker+token yet." },
-        { status: 404 }
+        { ok: false, error: "Failed to resolve submission_id" },
+        { status: 500 }
       );
     }
 
-    const submissionId = submission.id as string;
-
-    // 3) Load latest visibility.results row for that submission
-    const { data: result, error: resErr } = await vis
+    // ---------------------------------------------------------
+    // 2) Load latest visibility.results for that submission
+    // ---------------------------------------------------------
+    let { data: result, error: resErr } = await vis
       .from("results")
       .select(
         "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, pattern_tags"
@@ -101,26 +199,65 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       .eq("submission_id", submissionId)
       .order("created_at", { ascending: false })
       .maybeSingle();
-    if (resErr) throw new Error(resErr.message);
-    if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
 
-    // 4) Signals object used for KB matching
-    const signals = {
-      tier: result.tier,
-      level: Number(result.level ?? 0),
-      style: result.personality_type,
-      readiness: result.readiness,
-      pillar_scores: result.pillar_scores || {},
-      pillar_band: result.pillar_bands || {},
-      weakest_pillar: result.weakest_pillar ?? null,
-      strongest_pillar: result.strongest_pillar ?? null,
-      pattern_tags: result.pattern_tags || [],
-    };
+    if (resErr) throw new Error(resErr.message);
+    if (!result) {
+      return NextResponse.json(
+        { ok: false, error: "Visibility results not found." },
+        { status: 404 }
+      );
+    }
+
+    // ---------------------------------------------------------
+    // 3) Ensure pillar signals exist (compute via RPC if missing)
+    // ---------------------------------------------------------
+    if (!hasPillarSignals(result)) {
+      try {
+        const pillarRpc = await callRpc<any>(
+          vis,
+          "compute_pillar_signals_for_submission",
+          { p_submission_id: submissionId }
+        );
+
+        if (pillarRpc?.ok === true && pillarRpc?.computed) {
+          const computed = pillarRpc.computed;
+
+          await vis
+            .from("results")
+            .update({
+              pillar_scores: computed.pillar_scores ?? {},
+              pillar_bands: computed.pillar_bands ?? {},
+              weakest_pillar: computed.weakest_pillar ?? null,
+              strongest_pillar: computed.strongest_pillar ?? null,
+              pattern_tags: Array.isArray(computed.pattern_tags)
+                ? computed.pattern_tags
+                : [],
+            })
+            .eq("id", result.id);
+
+          // re-read result (so signals are accurate)
+          const reread = await vis
+            .from("results")
+            .select(
+              "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, pattern_tags"
+            )
+            .eq("id", result.id)
+            .maybeSingle();
+
+          if (!reread.error && reread.data) result = reread.data;
+        }
+      } catch (e) {
+        // Don’t fail report load if pillar RPC fails — just continue with what we have
+        console.warn("[visibility report] pillar RPC failed", e);
+      }
+    }
 
     const engineKey = String(result.engine_key || "visibility_v1");
     const version = Number(result.version || 1);
 
-    // 5) Cache lookup (RPC)
+    // ---------------------------------------------------------
+    // 4) Cache lookup
+    // ---------------------------------------------------------
     const cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -128,19 +265,44 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       p_version: version,
     });
 
-    // cached returns jsonb or null
     if (cached) {
       return NextResponse.json(
         {
           ok: true,
           data: cached,
-          __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
+          __meta: {
+            cached: true,
+            submission_id: submissionId,
+            engine_key: engineKey,
+            version,
+            audience,
+          },
         },
         { status: 200 }
       );
     }
 
-    // 6) Assemble from KB blocks (no AI yet; deterministic)
+    // ---------------------------------------------------------
+    // 5) Signals object used for KB matching
+    // ---------------------------------------------------------
+    const signals = {
+      tier: result.tier,
+      level: Number(result.level ?? 0),
+      style: result.personality_type,
+      readiness: result.readiness,
+
+      // ✅ these now exist reliably
+      pillar_scores: result.pillar_scores || {},
+      pillar_band: result.pillar_bands || {},
+
+      weakest_pillar: result.weakest_pillar ?? null,
+      strongest_pillar: result.strongest_pillar ?? null,
+      pattern_tags: result.pattern_tags || [],
+    };
+
+    // ---------------------------------------------------------
+    // 6) Assemble from KB blocks (deterministic)
+    // ---------------------------------------------------------
     const sectionKeys = [
       "framework_foundation",
       "snapshot",
@@ -159,7 +321,6 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const selectedBlocks: any[] = [];
 
     for (const key of sectionKeys) {
-      // first pass: match with signals
       let blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
         p_section_key: key,
         p_audience: audience,
@@ -167,17 +328,18 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         p_limit: 6,
       });
 
-      // fallback: generic blocks (empty triggers) if none matched
       if (!blocks || blocks.length === 0) {
         blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
           p_section_key: key,
           p_audience: audience,
-          p_signals: {}, // generic fallback rows should have empty triggers
+          p_signals: {},
           p_limit: 6,
         });
       }
 
-      const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
+      const contentBlocks = (blocks || [])
+        .map((b: any) => b.content)
+        .filter(Boolean);
 
       sections.push({
         key,
@@ -195,7 +357,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       );
     }
 
+    // ---------------------------------------------------------
     // 7) Graph payload (UI-ready)
+    // ---------------------------------------------------------
     const graphs = {
       tier_counts: result.tier_counts || {},
       personality_points: result.personality_points || {},
@@ -204,31 +368,44 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       pillar_band: result.pillar_bands || {},
     };
 
+    // ---------------------------------------------------------
     // 8) Meta for header
-    const { data: orgRow } = await sb
-      .from("orgs")
-      .select("id, slug, name, logo_url")
-      .eq("id", taker.org_id)
-      .maybeSingle();
+    // ---------------------------------------------------------
+    // If we only have sid (no tid), we may not have taker/org. We can still return report without them.
+    let orgRow: any = null;
+    let testRow: any = null;
 
-    const { data: testRow } = await sb
-      .from("tests")
-      .select("id, name, slug")
-      .eq("id", taker.test_id)
-      .maybeSingle();
+    if (taker?.org_id) {
+      const orgRes = await sb
+        .from("orgs")
+        .select("id, slug, name, logo_url")
+        .eq("id", taker.org_id)
+        .maybeSingle();
+      if (!orgRes.error) orgRow = orgRes.data || null;
+    }
+
+    if (taker?.test_id) {
+      const testRes = await sb
+        .from("tests")
+        .select("id, name, slug")
+        .eq("id", taker.test_id)
+        .maybeSingle();
+      if (!testRes.error) testRow = testRes.data || null;
+    }
 
     const reportJson = {
       token,
-      tid,
+      tid: tid || null,
+      sid: submissionId,
       submission_id: submissionId,
       engine_key: engineKey,
       version,
       audience,
 
       meta: {
-        org_name: (orgRow as any)?.name || (orgRow as any)?.slug || null,
-        org_logo_url: (orgRow as any)?.logo_url || null,
-        test_name: (testRow as any)?.name || "Visibility Ladder",
+        org_name: orgRow?.name || orgRow?.slug || null,
+        org_logo_url: orgRow?.logo_url || null,
+        test_name: testRow?.name || "Visibility Ladder",
         generated_at: new Date().toISOString(),
       },
 
@@ -237,7 +414,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       sections,
     };
 
-    // 9) Cache write (RPC upsert)
+    // ---------------------------------------------------------
+    // 9) Cache write
+    // ---------------------------------------------------------
     await callRpc<any>(vis, "upsert_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -249,10 +428,23 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     });
 
     return NextResponse.json(
-      { ok: true, data: reportJson, __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience } },
+      {
+        ok: true,
+        data: reportJson,
+        __meta: {
+          cached: false,
+          submission_id: submissionId,
+          engine_key: engineKey,
+          version,
+          audience,
+        },
+      },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: String(e?.message || e) },
+      { status: 500 }
+    );
   }
 }
