@@ -1,4 +1,3 @@
-// apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -87,22 +86,17 @@ type VisibilityKbReport = {
     org_logo_url?: string | null;
     test_name?: string | null;
     generated_at?: string | null;
+
     mode?: "deterministic" | "ai" | string;
+    ai_error?: string;
   };
 
   signals?: Signals;
   graphs?: Graphs;
   sections?: Section[];
 
-  // ✅ Seamless AI payload (returned on taker_report)
   ai?: AiInsights | null;
-  ai_meta?: {
-    enabled?: boolean;
-    cached?: boolean;
-    model?: string | null;
-    generated_at?: string | null;
-    error?: string;
-  };
+  ai_meta?: any;
 };
 
 type VisibilityKbApiResponse = {
@@ -161,7 +155,10 @@ function readinessLabel(r?: Readiness) {
 }
 
 function fullName(taker?: any) {
-  const n = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
+  const n = [taker?.first_name, taker?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   return n || "Your";
 }
 
@@ -188,6 +185,9 @@ async function fetchJson<T = any>(url: string): Promise<T> {
 const BRAND = {
   bg: "#061A3A",
   accent: "#0F6DFF",
+  lightNeutral: "#E6EDF5",
+  white: "#FFFFFF",
+
   textDim: "rgba(255,255,255,0.75)",
   textFaint: "rgba(255,255,255,0.55)",
   border: "rgba(255,255,255,0.14)",
@@ -205,6 +205,12 @@ const BRAND = {
     C: "#F59E0B",
     D: "#EF4444",
   } as Record<AB, string>,
+
+  pillars: {
+    discoverability: "#0F6DFF",
+    trust: "#38E1C6",
+    conversion: "#F59E0B",
+  } as Record<string, string>,
 };
 
 /* ---------------- UI atoms ---------------- */
@@ -268,11 +274,11 @@ function GlassCard({
           <div className="flex items-start justify-between gap-4">
             <div>
               {title && <div className="text-lg font-semibold">{title}</div>}
-              {subtitle ? (
+              {subtitle && (
                 <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
                   {subtitle}
                 </div>
-              ) : null}
+              )}
             </div>
             {right}
           </div>
@@ -305,7 +311,13 @@ function PrimaryButton({
 
   if (href) {
     return (
-      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
+      <a
+        className={cls}
+        style={style}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         {children}
       </a>
     );
@@ -339,7 +351,13 @@ function SecondaryButton({
 
   if (href) {
     return (
-      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
+      <a
+        className={cls}
+        style={style}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         {children}
       </a>
     );
@@ -351,7 +369,7 @@ function SecondaryButton({
   );
 }
 
-/* ---------------- Visuals ---------------- */
+/* ---------------- Visuals: Ladder + Tier pyramid ---------------- */
 
 function LadderGrid({ level }: { level: number }) {
   const active = clamp(level, 1, 20);
@@ -368,7 +386,9 @@ function LadderGrid({ level }: { level: number }) {
             key={s}
             className="h-9 rounded-xl border text-[11px] flex items-center justify-center select-none"
             style={{
-              borderColor: isActive ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.12)",
+              borderColor: isActive
+                ? "rgba(255,255,255,0.30)"
+                : "rgba(255,255,255,0.12)",
               background: isActive
                 ? `linear-gradient(180deg, ${bandColor}33, rgba(255,255,255,0.10))`
                 : "rgba(255,255,255,0.04)",
@@ -385,14 +405,165 @@ function LadderGrid({ level }: { level: number }) {
   );
 }
 
-/* ---------------- Narrative section rendering ---------------- */
+function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
+  const tiers: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
+
+  return (
+    <div className="mt-6">
+      <div className="text-xs" style={{ color: BRAND.textFaint }}>
+        Pyramid view (tier emphasis)
+      </div>
+
+      <div className="mt-3 flex items-center justify-center">
+        <div className="w-full max-w-[520px] space-y-2">
+          {tiers.map((t, idx) => {
+            const isActive = t === tier;
+            const c = BRAND.tier[t];
+            const widthPct = 60 + idx * 12; // 60,72,84,96
+            return (
+              <div key={t} className="flex items-center justify-center">
+                <div
+                  className="h-12 rounded-2xl border flex items-center justify-between px-4"
+                  style={{
+                    width: `${widthPct}%`,
+                    borderColor: isActive
+                      ? "rgba(255,255,255,0.28)"
+                      : "rgba(255,255,255,0.12)",
+                    background: isActive
+                      ? `linear-gradient(90deg, ${c}66, rgba(255,255,255,0.06))`
+                      : "rgba(255,255,255,0.04)",
+                    boxShadow: isActive ? `0 0 22px ${c}55` : "none",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
+                    />
+                    <div className="text-sm font-semibold">{t}</div>
+                  </div>
+                  <div className="text-xs" style={{ color: BRAND.textDim }}>
+                    {isActive ? `Level ${level}` : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Pillars graphic (replace radar) ---------------- */
+
+function PillarsBars({
+  pillars,
+  weakest,
+  strongest,
+}: {
+  pillars: Record<string, number>;
+  weakest?: string | null;
+  strongest?: string | null;
+}) {
+  const items = [
+    { key: "discoverability", label: "Discoverability" },
+    { key: "trust", label: "Trust" },
+    { key: "conversion", label: "Conversion" },
+  ].map((p) => ({
+    ...p,
+    value: Number((pillars as any)?.[p.key] ?? 0),
+    color: BRAND.pillars[p.key] || BRAND.accent,
+    tag:
+      p.key === strongest
+        ? "Strongest"
+        : p.key === weakest
+        ? "Weakest"
+        : "",
+  }));
+
+  const hasAny = items.some((x) => Number.isFinite(x.value) && x.value > 0);
+
+  if (!hasAny) {
+    return (
+      <div
+        className="h-full rounded-2xl flex items-center justify-center text-sm"
+        style={{
+          background: "rgba(0,0,0,0.18)",
+          border: `1px solid ${BRAND.border}`,
+        }}
+      >
+        Pillar scores will appear here once enabled.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {items.map((it) => {
+        const pct = clamp(Math.round(it.value), 0, 100);
+        return (
+          <div key={it.key} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold">
+                {it.label}{" "}
+                {it.tag ? (
+                  <span
+                    className="ml-2 text-[11px] px-2 py-0.5 rounded-full border"
+                    style={{
+                      borderColor: "rgba(255,255,255,0.18)",
+                      color: "rgba(255,255,255,0.80)",
+                      background: "rgba(0,0,0,0.18)",
+                    }}
+                  >
+                    {it.tag}
+                  </span>
+                ) : null}
+              </div>
+              <div className="text-sm" style={{ color: BRAND.textDim }}>
+                {pct}%
+              </div>
+            </div>
+
+            <div
+              className="h-3 rounded-full overflow-hidden border"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.06)",
+              }}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${it.color}, rgba(255,255,255,0.18))`,
+                  boxShadow: `0 0 18px ${it.color}55`,
+                }}
+              />
+            </div>
+
+            <div className="text-xs" style={{ color: BRAND.textFaint }}>
+              {it.key === "discoverability"
+                ? "Can the market reliably find you?"
+                : it.key === "trust"
+                ? "Does it feel safe and credible to choose you?"
+                : "Is it easy to take action right now?"}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- Narrative section rendering (no double headings) ---------------- */
 
 function SectionCard({ section }: { section: Section }) {
   const title = safeString(section?.title) || safeString(section?.key);
   const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
 
   return (
-    <GlassCard title={title}>
+    <GlassCard title={title} subtitle="">
       <div className="mt-3 space-y-5">
         {blocks.map((b, idx) => {
           const bt = safeString(b?.title);
@@ -405,21 +576,34 @@ function SectionCard({ section }: { section: Section }) {
             <div
               key={idx}
               className="rounded-2xl p-5 border"
-              style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
             >
-              {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
+              {showBlockTitle ? (
+                <div className="text-base font-semibold">{bt}</div>
+              ) : null}
 
               {short ? (
                 <div
                   className="mt-3 rounded-xl border px-4 py-3 text-sm"
-                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.05)" }}
+                  style={{
+                    borderColor: "rgba(255,255,255,0.14)",
+                    background: "rgba(255,255,255,0.05)",
+                  }}
                 >
                   <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
-                  <span style={{ color: "rgba(255,255,255,0.88)" }}>{short}</span>
+                  <span style={{ color: "rgba(255,255,255,0.88)" }}>
+                    {short}
+                  </span>
                 </div>
               ) : null}
 
-              <div className="mt-4 space-y-3 text-sm leading-6" style={{ color: "rgba(255,255,255,0.85)" }}>
+              <div
+                className="mt-4 space-y-3 text-sm leading-6"
+                style={{ color: "rgba(255,255,255,0.85)" }}
+              >
                 {ps.map((p, i) => (
                   <p key={i}>{p}</p>
                 ))}
@@ -438,17 +622,150 @@ function SectionCard({ section }: { section: Section }) {
   );
 }
 
-function BulletList({ items }: { items: string[] }) {
-  if (!items?.length) return null;
+/* ---------------- AI rendering (simple, clean) ---------------- */
+
+function InsightsCard({
+  ai,
+  aiMeta,
+  error,
+  loading,
+}: {
+  ai: AiInsights | null | undefined;
+  aiMeta?: any;
+  error?: string | null;
+  loading?: boolean;
+}) {
+  // Clean heading only (per your request)
   return (
-    <ul className="mt-2 space-y-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
-      {items.map((x, i) => (
-        <li key={i} className="flex gap-2">
-          <span style={{ color: BRAND.accent }}>•</span>
-          <span>{x}</span>
-        </li>
-      ))}
-    </ul>
+    <GlassCard title="Insights" subtitle="">
+      {loading ? (
+        <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+          Generating insights…
+        </div>
+      ) : error ? (
+        <div className="mt-2 text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
+          Insights generation failed: {error}
+        </div>
+      ) : ai ? (
+        <div className="mt-4 space-y-4">
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: "rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.14)",
+            }}
+          >
+            <div className="text-sm font-semibold">Executive summary</div>
+            <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+              {ai.executive_summary}
+            </div>
+          </div>
+
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: "rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.14)",
+            }}
+          >
+            <div className="text-sm font-semibold">What this means</div>
+            <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+              {ai.what_this_means}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">Strengths</div>
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
+                {ai.strengths?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">Friction</div>
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
+                {ai.friction?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: "rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.14)",
+            }}
+          >
+            <div className="text-sm font-semibold">Strategic opportunity</div>
+            <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+              {ai.strategic_opportunity}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">7-day plan</div>
+              <ol className="mt-2 list-decimal pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
+                {ai.plan_7_days?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            </div>
+
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">30-day plan</div>
+              <ol className="mt-2 list-decimal pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
+                {ai.plan_30_days?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+
+          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+            {aiMeta?.model ? `model: ${aiMeta.model}` : ""}{" "}
+            {aiMeta?.cached === true ? "• cached" : aiMeta?.cached === false ? "• fresh" : ""}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+          Insights are not available yet.
+        </div>
+      )}
+
+      <div className="pt-2 text-xs" style={{ color: BRAND.textFaint }}>
+        powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
+      </div>
+    </GlassCard>
   );
 }
 
@@ -468,29 +785,40 @@ export default function VisibilityReportClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const [portalMeta, setPortalMeta] = useState<PortalReportResponse["data"] | null>(null);
+  // portal report endpoint (taker + link meta)
+  const [portalMeta, setPortalMeta] =
+    useState<PortalReportResponse["data"] | null>(null);
+
+  // KB report endpoint (deterministic + AI injected by API)
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
 
-  const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
-  const testName = portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
+  const orgName =
+    portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
+  const testName =
+    portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
   const takerName = fullName(portalMeta?.taker);
 
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
+  // core result labels (from kb signals)
   const tier: Tier | null = (kbReport?.signals?.tier as Tier) || null;
   const level: number = Number(kbReport?.signals?.level ?? 0);
   const style: AB | null = (kbReport?.signals?.style as AB) || null;
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
 
+  // tier counts (bar chart)
   const tierCountsData = useMemo(() => {
     const counts = kbReport?.graphs?.tier_counts || {};
-    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
-      name: t,
-      value: Number((counts as any)[t] ?? 0),
-      color: BRAND.tier[t],
-    }));
+    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map(
+      (t) => ({
+        name: t,
+        value: Number((counts as any)[t] ?? 0),
+        color: BRAND.tier[t],
+      })
+    );
   }, [kbReport?.graphs]);
 
+  // personality points (bar chart)
   const personalityData = useMemo(() => {
     const pts = kbReport?.graphs?.personality_points || {};
     const order: AB[] = ["A", "B", "C", "D"];
@@ -501,21 +829,9 @@ export default function VisibilityReportClient({
     }));
   }, [kbReport?.graphs]);
 
-  const radarData = useMemo(() => {
-    const pillars = kbReport?.graphs?.pillars || {};
-    const has = pillars && typeof pillars === "object" && Object.keys(pillars).length > 0;
-    if (!has) return null;
-
-    const d = Number((pillars as any).discoverability ?? 0);
-    const t = Number((pillars as any).trust ?? 0);
-    const c = Number((pillars as any).conversion ?? 0);
-
-    return [
-      { pillar: "Discoverability", score: d },
-      { pillar: "Trust", score: t },
-      { pillar: "Conversion", score: c },
-    ];
-  }, [kbReport?.graphs]);
+  const pillars = (kbReport?.graphs?.pillars || {}) as Record<string, number>;
+  const weakest = kbReport?.signals?.weakest_pillar ?? null;
+  const strongest = kbReport?.signals?.strongest_pillar ?? null;
 
   async function downloadPdf() {
     try {
@@ -574,7 +890,9 @@ export default function VisibilityReportClient({
         setErr(null);
 
         // 1) Portal report (taker + link meta)
-        const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}${
+        const portalUrl = `/api/public/test/${encodeURIComponent(
+          token
+        )}/report?tid=${encodeURIComponent(tid)}${
           src ? `&src=${encodeURIComponent(src)}` : ""
         }`;
 
@@ -582,10 +900,10 @@ export default function VisibilityReportClient({
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
 
-        // 2) KB report (deterministic + seamless AI embedded)
-        const kbUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-          tid
-        )}&audience=taker_report`;
+        // 2) Visibility report (KB + AI layer returned by API)
+        const kbUrl = `/api/public/visibility/${encodeURIComponent(
+          token
+        )}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
 
         const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
@@ -621,13 +939,18 @@ export default function VisibilityReportClient({
     return (
       <Shell>
         <div className="mx-auto max-w-6xl p-6 space-y-4">
-          <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
+          <div className="text-2xl font-semibold">
+            Couldn’t load Visibility report
+          </div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
           </p>
           <div
             className="rounded-2xl p-4 text-xs"
-            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BRAND.border}` }}
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: `1px solid ${BRAND.border}`,
+            }}
           >
             <div>token: {token}</div>
             <div>tid: {tid}</div>
@@ -644,9 +967,9 @@ export default function VisibilityReportClient({
   const styleColor = style ? BRAND.ab[style] : "rgba(255,255,255,0.85)";
   const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
 
-  const aiEnabledFlag = kbReport?.ai_meta?.enabled === true;
-  const aiError = safeString(kbReport?.ai_meta?.error);
-  const ai = kbReport?.ai || null;
+  const ai = kbReport?.ai ?? null;
+  const aiMeta = kbReport?.ai_meta ?? null;
+  const aiError = safeString(kbReport?.meta?.ai_error);
 
   return (
     <Shell>
@@ -658,13 +981,20 @@ export default function VisibilityReportClient({
           right={
             <div className="flex flex-col gap-3 items-end">
               <div className="flex flex-wrap gap-2 justify-end">
-                <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
-                {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next step</PrimaryButton> : null}
+                <SecondaryButton onClick={downloadPdf}>
+                  Download PDF
+                </SecondaryButton>
+                {nextStepsUrl ? (
+                  <PrimaryButton href={nextStepsUrl}>Next step</PrimaryButton>
+                ) : null}
               </div>
 
               <div
                 className="rounded-2xl border p-4 min-w-[240px]"
-                style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
+                style={{
+                  borderColor: BRAND.border,
+                  background: "rgba(0,0,0,0.18)",
+                }}
               >
                 <div className="text-xs" style={{ color: BRAND.textFaint }}>
                   At a glance
@@ -678,11 +1008,15 @@ export default function VisibilityReportClient({
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Level</div>
-                    <div className="font-semibold">{Number.isFinite(level) && level > 0 ? level : "—"}</div>
+                    <div className="font-semibold">
+                      {Number.isFinite(level) && level > 0 ? level : "—"}
+                    </div>
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Readiness</div>
-                    <div className="font-semibold">{readinessLabel(readiness)}</div>
+                    <div className="font-semibold">
+                      {readinessLabel(readiness)}
+                    </div>
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Style</div>
@@ -712,22 +1046,49 @@ export default function VisibilityReportClient({
           </div>
         </GlassCard>
 
+        {/* Insights (AI) — clean heading only */}
+        <InsightsCard
+          ai={ai}
+          aiMeta={aiMeta}
+          error={aiError || null}
+          loading={false}
+        />
+
         {/* Graph cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GlassCard title="Your ladder position" subtitle="20 levels across 4 tiers. You’re highlighted at your level.">
+          <GlassCard
+            title="Your ladder position"
+            subtitle="20 levels across 4 tiers. You’re highlighted at your level."
+          >
             <LadderGrid level={level || 1} />
             <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
-              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20 Magnetic
+              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20
+              Magnetic
             </div>
+
+            {/* ✅ Restore the pyramid view (your screenshot 3 style) */}
+            <TierPyramid tier={tier || tierBand(level || 1)} level={level || 1} />
           </GlassCard>
 
-          <GlassCard title="Signal distribution" subtitle="How your answers across Q9–Q25 mapped into each tier.">
+          <GlassCard
+            title="Signal distribution"
+            subtitle="How your answers across Q9–Q25 mapped into each tier."
+          >
             <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={tierCountsData} barCategoryGap={22}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeDasharray="4 6"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: "rgba(255,255,255,0.78)" }}
+                  />
+                  <YAxis
+                    tick={{ fill: "rgba(255,255,255,0.70)" }}
+                    allowDecimals={false}
+                  />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     contentStyle={{
@@ -750,39 +1111,10 @@ export default function VisibilityReportClient({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* ✅ Replace the radar with clean pillar bars (easier to “tower-ise” later) */}
           <GlassCard title="Pillars overview" subtitle="Discoverability, Trust, and Conversion.">
-            <div className="mt-4 h-[320px]">
-              {radarData ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={radarData}>
-                    <PolarGrid stroke="rgba(255,255,255,0.14)" />
-                    <PolarAngleAxis dataKey="pillar" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                    <PolarRadiusAxis
-                      angle={30}
-                      domain={[0, 100]}
-                      tick={{ fill: "rgba(255,255,255,0.55)" }}
-                      stroke="rgba(255,255,255,0.12)"
-                    />
-                    <Radar dataKey="score" stroke={BRAND.accent} fill={BRAND.accent} fillOpacity={0.22} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "rgba(7,18,38,0.92)",
-                        border: "1px solid rgba(255,255,255,0.14)",
-                        borderRadius: 14,
-                        color: "white",
-                      }}
-                      labelStyle={{ color: "rgba(255,255,255,0.9)" }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div
-                  className="h-full rounded-2xl flex items-center justify-center text-sm"
-                  style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
-                >
-                  Pillar scores will appear here once enabled.
-                </div>
-              )}
+            <div className="mt-4">
+              <PillarsBars pillars={pillars} weakest={weakest} strongest={strongest} />
             </div>
           </GlassCard>
 
@@ -790,9 +1122,18 @@ export default function VisibilityReportClient({
             <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={personalityData} barCategoryGap={24}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeDasharray="4 6"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: "rgba(255,255,255,0.78)" }}
+                  />
+                  <YAxis
+                    tick={{ fill: "rgba(255,255,255,0.70)" }}
+                    allowDecimals={false}
+                  />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     contentStyle={{
@@ -821,123 +1162,14 @@ export default function VisibilityReportClient({
           </GlassCard>
         </div>
 
-        {/* ✅ AI insights (seamless, no second call) */}
-        <GlassCard
-          title="AI insights"
-          subtitle="A tailored interpretation + a simple action plan (7 days + 30 days)."
-          right={
-            aiEnabledFlag ? (
-              <div className="text-xs" style={{ color: BRAND.textFaint }}>
-                {kbReport.ai_meta?.model ? `model: ${kbReport.ai_meta?.model}` : ""}
-                {kbReport.ai_meta?.cached === true ? " • cached" : " • fresh"}
-              </div>
-            ) : null
-          }
-        >
-          {!aiEnabledFlag ? (
-            <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-              AI is disabled for this report.
-            </div>
-          ) : aiError ? (
-            <div className="mt-2 text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
-              AI generation failed: {aiError}
-            </div>
-          ) : !ai ? (
-            <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-              AI insights are generating. Refresh this page in a moment.
-            </div>
-          ) : (
-            <div className="mt-4 space-y-5">
-              <div
-                className="rounded-2xl p-5 border"
-                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-sm font-semibold">Executive summary</div>
-                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {ai.executive_summary}
-                </div>
-              </div>
-
-              <div
-                className="rounded-2xl p-5 border"
-                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-sm font-semibold">What this means</div>
-                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {ai.what_this_means}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div
-                  className="rounded-2xl p-5 border"
-                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-                >
-                  <div className="text-sm font-semibold">What’s working</div>
-                  <BulletList items={ai.strengths || []} />
-                </div>
-
-                <div
-                  className="rounded-2xl p-5 border"
-                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-                >
-                  <div className="text-sm font-semibold">Where friction exists</div>
-                  <BulletList items={ai.friction || []} />
-                </div>
-              </div>
-
-              <div
-                className="rounded-2xl p-5 border"
-                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-sm font-semibold">Your strategic opportunity</div>
-                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {ai.strategic_opportunity}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div
-                  className="rounded-2xl p-5 border"
-                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-                >
-                  <div className="text-sm font-semibold">7-day plan</div>
-                  <BulletList items={ai.plan_7_days || []} />
-                </div>
-
-                <div
-                  className="rounded-2xl p-5 border"
-                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-                >
-                  <div className="text-sm font-semibold">30-day plan</div>
-                  <BulletList items={ai.plan_30_days || []} />
-                </div>
-              </div>
-
-              <div
-                className="rounded-2xl p-5 border"
-                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-sm font-semibold">Closing note</div>
-                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {ai.closing_note}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="pt-3 text-xs" style={{ color: BRAND.textFaint }}>
-            powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
-          </div>
-        </GlassCard>
-
         {/* Narrative (KB-driven) */}
         <GlassCard
           title="Your personalised report"
           subtitle="This narrative is selected dynamically from the Visibility Ladder knowledge base."
           right={
             <div className="text-xs" style={{ color: BRAND.textFaint }}>
-              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1}
+              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v
+              {kbReport.version ?? 1}
             </div>
           }
         >
@@ -947,7 +1179,10 @@ export default function VisibilityReportClient({
             ) : (
               <div
                 className="rounded-2xl p-4 text-sm"
-                style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
+                style={{
+                  background: "rgba(0,0,0,0.18)",
+                  border: `1px solid ${BRAND.border}`,
+                }}
               >
                 No narrative sections were returned yet.
               </div>
