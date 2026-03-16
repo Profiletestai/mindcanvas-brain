@@ -93,8 +93,7 @@ type AiInsights = {
 function aiEnabled() {
   // default ON unless explicitly disabled
   return (
-    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !==
-    "false"
+    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !== "false"
   );
 }
 
@@ -257,7 +256,7 @@ async function generateAiInsights(payload: {
   const model = openaiModel();
   const messages = buildAiPrompt(payload);
 
-  // Structured output in Responses API uses `text.format`
+  // Structured output in Responses API uses `text.format` (NOT response_format)
   const body = {
     model,
     input: messages,
@@ -302,6 +301,17 @@ async function generateAiInsights(payload: {
   }
 }
 
+function isBadAiCache(row: any): boolean {
+  if (!row || typeof row !== "object") return true;
+  if (!row.ai || typeof row.ai !== "object") return true;
+
+  // error can live in ai_meta.error or meta.ai_error (older)
+  const aiErr = safeString(row?.ai_meta?.error) || safeString(row?.meta?.ai_error);
+  if (aiErr) return true;
+
+  return false;
+}
+
 /* ---------------- Route ---------------- */
 
 export async function GET(req: NextRequest, ctx: { params: { token: string } }) {
@@ -309,19 +319,14 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const token = safeString(ctx.params?.token);
     const tid = safeString(req.nextUrl.searchParams.get("tid"));
     const sid = safeString(req.nextUrl.searchParams.get("sid"));
-    const audience =
-      safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
+    const audience = safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
-    if (!token)
-      return NextResponse.json(
-        { ok: false, error: "Missing token" },
-        { status: 400 }
-      );
-    if (!tid && !sid)
-      return NextResponse.json(
-        { ok: false, error: "Missing tid or sid" },
-        { status: 400 }
-      );
+    if (!token) {
+      return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
+    }
+    if (!tid && !sid) {
+      return NextResponse.json({ ok: false, error: "Missing tid or sid" }, { status: 400 });
+    }
 
     const sb = portal();
     const vis = visibility();
@@ -337,11 +342,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         .maybeSingle();
 
       if (takerErr) throw new Error(takerErr.message);
-      if (!takerRow)
-        return NextResponse.json(
-          { ok: false, error: "Taker not found for this token" },
-          { status: 404 }
-        );
+      if (!takerRow) {
+        return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
+      }
       taker = takerRow;
     }
 
@@ -359,29 +362,18 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       if (subsErr) throw new Error(subsErr.message);
 
       const takerEmail = safeString(taker?.email).toLowerCase();
-      const takerName = [taker?.first_name, taker?.last_name]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
+      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
 
-      const byMeta =
-        (subs || []).find(
-          (s: any) => safeString(s?.metadata?.taker_id) === tid
-        ) || null;
+      const byMeta = (subs || []).find((s: any) => safeString(s?.metadata?.taker_id) === tid) || null;
 
       const byEmail =
         !byMeta && takerEmail
-          ? (subs || []).find(
-              (s: any) =>
-                safeString(s?.taker_email).toLowerCase() === takerEmail
-            ) || null
+          ? (subs || []).find((s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail) || null
           : null;
 
       const byName =
         !byMeta && !byEmail && takerName
-          ? (subs || []).find(
-              (s: any) => safeString(s?.taker_name) === takerName
-            ) || null
+          ? (subs || []).find((s: any) => safeString(s?.taker_name) === takerName) || null
           : null;
 
       const picked = byMeta || byEmail || byName;
@@ -406,20 +398,16 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result)
-      return NextResponse.json(
-        { ok: false, error: "Visibility results not found." },
-        { status: 404 }
-      );
+    if (!result) {
+      return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
+    }
 
     // 3) Ensure pillar signals exist (compute via RPC if missing)
     if (!hasPillarSignals(result)) {
       try {
-        const pillarRpc = await callRpc<any>(
-          vis,
-          "compute_pillar_signals_for_submission",
-          { p_submission_id: submissionId }
-        );
+        const pillarRpc = await callRpc<any>(vis, "compute_pillar_signals_for_submission", {
+          p_submission_id: submissionId,
+        });
 
         if (pillarRpc?.ok === true && pillarRpc?.computed) {
           const computed = pillarRpc.computed;
@@ -431,9 +419,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
               pillar_bands: computed.pillar_bands ?? {},
               weakest_pillar: computed.weakest_pillar ?? null,
               strongest_pillar: computed.strongest_pillar ?? null,
-              pattern_tags: Array.isArray(computed.pattern_tags)
-                ? computed.pattern_tags
-                : [],
+              pattern_tags: Array.isArray(computed.pattern_tags) ? computed.pattern_tags : [],
             })
             .eq("id", result.id);
 
@@ -456,242 +442,328 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const version = Number(result.version || 1);
 
     // 4) Cache lookup for this audience
-    const cached = await callRpc<any>(vis, "get_generated_report", {
+    let cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
       p_engine_key: engineKey,
       p_version: version,
     });
 
-    if (cached) {
+    // ---------------------------
+    // Helper: build deterministic sections (used on cache miss OR to hydrate missing AI)
+    // ---------------------------
+    const buildDeterministic = async () => {
+      const signals = {
+        tier: result.tier,
+        level: Number(result.level ?? 0),
+        style: result.personality_type,
+        readiness: result.readiness,
+
+        pillar_scores: result.pillar_scores || {},
+        pillar_band: result.pillar_bands || {},
+        weakest_pillar: result.weakest_pillar ?? null,
+        strongest_pillar: result.strongest_pillar ?? null,
+        pattern_tags: result.pattern_tags || [],
+      };
+
+      const sectionKeys = [
+        "framework_foundation",
+        "snapshot",
+        "pillars",
+        "level_meaning",
+        "strengths",
+        "friction",
+        "market_experience",
+        "opportunity",
+        "next_move",
+        "possible_next",
+        "closing",
+      ];
+
+      const sections: any[] = [];
+      const selectedBlocks: any[] = [];
+
+      for (const key of sectionKeys) {
+        let blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
+          p_section_key: key,
+          p_audience: audience,
+          p_signals: signals,
+          p_limit: 6,
+        });
+
+        if (!blocks || blocks.length === 0) {
+          blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
+            p_section_key: key,
+            p_audience: audience,
+            p_signals: {},
+            p_limit: 6,
+          });
+        }
+
+        const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
+
+        sections.push({
+          key,
+          title: contentBlocks?.[0]?.title || defaultTitles(key),
+          blocks: contentBlocks,
+        });
+
+        selectedBlocks.push(
+          (blocks || []).map((b: any) => ({
+            id: b.id,
+            match_score: b.match_score,
+            priority: b.priority,
+            triggers: b.triggers,
+          }))
+        );
+      }
+
+      const graphs = {
+        tier_counts: result.tier_counts || {},
+        personality_points: result.personality_points || {},
+        ladder: { tier: result.tier, level: Number(result.level ?? 0) },
+        pillars: result.pillar_scores || {},
+        pillar_band: result.pillar_bands || {},
+      };
+
+      const { data: orgRow } = await sb
+        .from("orgs")
+        .select("id, slug, name, logo_url")
+        .eq("id", taker.org_id)
+        .maybeSingle();
+
+      const { data: testRow } = await sb
+        .from("tests")
+        .select("id, name, slug")
+        .eq("id", taker.test_id)
+        .maybeSingle();
+
+      const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
+      const testName = (testRow as any)?.name || "Visibility Ladder";
+      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null;
+
+      return { signals, graphs, sections, selectedBlocks, orgRow, orgName, testName, takerName };
+    };
+
+    // 5) Cache miss → build report
+    if (!cached) {
+      const det = await buildDeterministic();
+
+      // Seamless AI: generated at report load and embedded into deterministic payload
+      let ai: AiInsights | null = null;
+      const ai_meta: any = { enabled: false };
+
+      if (aiEnabled()) {
+        ai_meta.enabled = true;
+
+        try {
+          const cachedAi = await callRpc<any>(vis, "get_generated_report", {
+            p_submission_id: submissionId,
+            p_audience: "taker_report_ai",
+            p_engine_key: engineKey,
+            p_version: version,
+          });
+
+          if (cachedAi && !isBadAiCache(cachedAi)) {
+            ai = cachedAi.ai as AiInsights;
+            ai_meta.cached = true;
+            ai_meta.model = cachedAi?.ai_meta?.model || null;
+            ai_meta.generated_at = cachedAi?.ai_meta?.generated_at || null;
+          } else {
+            const aiOut = await generateAiInsights({
+              orgName: det.orgName,
+              testName: det.testName,
+              takerName: det.takerName,
+              signals: det.signals,
+              graphs: det.graphs,
+              sections: det.sections,
+            });
+
+            ai = aiOut;
+            ai_meta.cached = false;
+            ai_meta.model = openaiModel();
+            ai_meta.generated_at = new Date().toISOString();
+
+            const aiCacheJson = {
+              token,
+              tid: tid || null,
+              sid: submissionId,
+              submission_id: submissionId,
+              engine_key: engineKey,
+              version,
+              audience: "taker_report_ai",
+              meta: {
+                org_name: det.orgName,
+                org_logo_url: (det.orgRow as any)?.logo_url || null,
+                test_name: det.testName,
+                generated_at: ai_meta.generated_at,
+                mode: "ai",
+              },
+              ai: aiOut,
+              ai_meta,
+            };
+
+            await callRpc<any>(vis, "upsert_generated_report", {
+              p_submission_id: submissionId,
+              p_audience: "taker_report_ai",
+              p_report_json: aiCacheJson,
+              p_signals: det.signals,
+              p_selected_blocks: [],
+              p_engine_key: engineKey,
+              p_version: version,
+            });
+          }
+        } catch (e: any) {
+          ai_meta.error = String(e?.message || e);
+          ai = null;
+        }
+      }
+
+      const reportJson = {
+        token,
+        tid: tid || null,
+        sid: submissionId,
+        submission_id: submissionId,
+        engine_key: engineKey,
+        version,
+        audience,
+        meta: {
+          org_name: det.orgName,
+          org_logo_url: (det.orgRow as any)?.logo_url || null,
+          test_name: det.testName,
+          generated_at: new Date().toISOString(),
+          mode: "deterministic",
+        },
+        signals: det.signals,
+        graphs: det.graphs,
+        sections: det.sections,
+        ai,
+        ai_meta,
+      };
+
+      await callRpc<any>(vis, "upsert_generated_report", {
+        p_submission_id: submissionId,
+        p_audience: audience,
+        p_report_json: reportJson,
+        p_signals: det.signals,
+        p_selected_blocks: det.selectedBlocks,
+        p_engine_key: engineKey,
+        p_version: version,
+      });
+
       return NextResponse.json(
         {
           ok: true,
-          data: cached,
-          __meta: {
-            cached: true,
-            submission_id: submissionId,
-            engine_key: engineKey,
-            version,
-            audience,
-          },
+          data: reportJson,
+          __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
         },
         { status: 200 }
       );
     }
 
-    // 5) Signals for KB matching
-    const signals = {
-      tier: result.tier,
-      level: Number(result.level ?? 0),
-      style: result.personality_type,
-      readiness: result.readiness,
+    // 6) Cache hit — STILL ensure AI is present in response (seamless)
+    // If cached deterministic has no AI, we hydrate it here and update cache.
+    if (audience === "taker_report" && aiEnabled()) {
+      const hasAi = cached?.ai && typeof cached.ai === "object";
+      const hasAiError = safeString(cached?.ai_meta?.error) || safeString(cached?.meta?.ai_error);
 
-      pillar_scores: result.pillar_scores || {},
-      pillar_band: result.pillar_bands || {},
-      weakest_pillar: result.weakest_pillar ?? null,
-      strongest_pillar: result.strongest_pillar ?? null,
-      pattern_tags: result.pattern_tags || [],
-    };
+      if (!hasAi || hasAiError) {
+        const det = await buildDeterministic();
 
-    // 6) Sections from KB
-    const sectionKeys = [
-      "framework_foundation",
-      "snapshot",
-      "pillars",
-      "level_meaning",
-      "strengths",
-      "friction",
-      "market_experience",
-      "opportunity",
-      "next_move",
-      "possible_next",
-      "closing",
-    ];
+        let ai: AiInsights | null = null;
+        const ai_meta: any = { enabled: true };
 
-    const sections: any[] = [];
-    const selectedBlocks: any[] = [];
+        try {
+          const cachedAi = await callRpc<any>(vis, "get_generated_report", {
+            p_submission_id: submissionId,
+            p_audience: "taker_report_ai",
+            p_engine_key: engineKey,
+            p_version: version,
+          });
 
-    for (const key of sectionKeys) {
-      let blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
-        p_section_key: key,
-        p_audience: audience,
-        p_signals: signals,
-        p_limit: 6,
-      });
+          if (cachedAi && !isBadAiCache(cachedAi)) {
+            ai = cachedAi.ai as AiInsights;
+            ai_meta.cached = true;
+            ai_meta.model = cachedAi?.ai_meta?.model || null;
+            ai_meta.generated_at = cachedAi?.ai_meta?.generated_at || null;
+          } else {
+            const aiOut = await generateAiInsights({
+              orgName: det.orgName,
+              testName: det.testName,
+              takerName: det.takerName,
+              signals: det.signals,
+              graphs: det.graphs,
+              sections: det.sections,
+            });
 
-      if (!blocks || blocks.length === 0) {
-        blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
-          p_section_key: key,
-          p_audience: audience,
-          p_signals: {},
-          p_limit: 6,
-        });
-      }
+            ai = aiOut;
+            ai_meta.cached = false;
+            ai_meta.model = openaiModel();
+            ai_meta.generated_at = new Date().toISOString();
 
-      const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
+            const aiCacheJson = {
+              token,
+              tid: tid || null,
+              sid: submissionId,
+              submission_id: submissionId,
+              engine_key: engineKey,
+              version,
+              audience: "taker_report_ai",
+              meta: {
+                org_name: det.orgName,
+                org_logo_url: (det.orgRow as any)?.logo_url || null,
+                test_name: det.testName,
+                generated_at: ai_meta.generated_at,
+                mode: "ai",
+              },
+              ai: aiOut,
+              ai_meta,
+            };
 
-      sections.push({
-        key,
-        title: contentBlocks?.[0]?.title || defaultTitles(key),
-        blocks: contentBlocks,
-      });
+            await callRpc<any>(vis, "upsert_generated_report", {
+              p_submission_id: submissionId,
+              p_audience: "taker_report_ai",
+              p_report_json: aiCacheJson,
+              p_signals: det.signals,
+              p_selected_blocks: [],
+              p_engine_key: engineKey,
+              p_version: version,
+            });
+          }
+        } catch (e: any) {
+          ai_meta.error = String(e?.message || e);
+          ai = null;
+        }
 
-      selectedBlocks.push(
-        (blocks || []).map((b: any) => ({
-          id: b.id,
-          match_score: b.match_score,
-          priority: b.priority,
-          triggers: b.triggers,
-        }))
-      );
-    }
+        // Merge into cached deterministic payload
+        const merged = {
+          ...cached,
+          engine_key: cached.engine_key || engineKey,
+          version: cached.version ?? version,
+          ai,
+          ai_meta,
+        };
 
-    // 7) Graphs
-    const graphs = {
-      tier_counts: result.tier_counts || {},
-      personality_points: result.personality_points || {},
-      ladder: { tier: result.tier, level: Number(result.level ?? 0) },
-      pillars: result.pillar_scores || {},
-      pillar_band: result.pillar_bands || {},
-    };
-
-    // 8) Meta
-    const { data: orgRow } = await sb
-      .from("orgs")
-      .select("id, slug, name, logo_url")
-      .eq("id", taker.org_id)
-      .maybeSingle();
-
-    const { data: testRow } = await sb
-      .from("tests")
-      .select("id, name, slug")
-      .eq("id", taker.test_id)
-      .maybeSingle();
-
-    const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
-    const testName = (testRow as any)?.name || "Visibility Ladder";
-    const takerName =
-      [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
-      null;
-
-    // 9) Seamless AI generation + caching (stored under audience taker_report_ai)
-    let ai: AiInsights | null = null;
-    const ai_meta: any = { enabled: false };
-
-    if (aiEnabled()) {
-      ai_meta.enabled = true;
-
-      try {
-        const cachedAi = await callRpc<any>(vis, "get_generated_report", {
+        // Update deterministic cache row with AI embedded (so next load is instant)
+        await callRpc<any>(vis, "upsert_generated_report", {
           p_submission_id: submissionId,
-          p_audience: "taker_report_ai",
+          p_audience: audience,
+          p_report_json: merged,
+          p_signals: merged?.signals || det.signals,
+          p_selected_blocks: merged?.selected_blocks || det.selectedBlocks,
           p_engine_key: engineKey,
           p_version: version,
         });
 
-        if (cachedAi?.ai && typeof cachedAi.ai === "object") {
-          ai = cachedAi.ai as AiInsights;
-          ai_meta.cached = true;
-          ai_meta.model = cachedAi?.ai_meta?.model || null;
-          ai_meta.generated_at = cachedAi?.ai_meta?.generated_at || null;
-        } else {
-          const aiOut = await generateAiInsights({
-            orgName,
-            testName,
-            takerName,
-            signals,
-            graphs,
-            sections,
-          });
-
-          ai = aiOut;
-          ai_meta.cached = false;
-          ai_meta.model = openaiModel();
-          ai_meta.generated_at = new Date().toISOString();
-
-          const aiCacheJson = {
-            token,
-            tid: tid || null,
-            sid: submissionId,
-            submission_id: submissionId,
-            engine_key: engineKey,
-            version,
-            audience: "taker_report_ai",
-            meta: {
-              org_name: orgName,
-              org_logo_url: (orgRow as any)?.logo_url || null,
-              test_name: testName,
-              generated_at: ai_meta.generated_at,
-              mode: "ai",
-            },
-            ai: aiOut,
-            ai_meta,
-          };
-
-          await callRpc<any>(vis, "upsert_generated_report", {
-            p_submission_id: submissionId,
-            p_audience: "taker_report_ai",
-            p_report_json: aiCacheJson,
-            p_signals: signals,
-            p_selected_blocks: [],
-            p_engine_key: engineKey,
-            p_version: version,
-          });
-        }
-      } catch (e: any) {
-        ai_meta.error = String(e?.message || e);
-        ai = null;
+        cached = merged;
       }
     }
-
-    const reportJson = {
-      token,
-      tid: tid || null,
-      sid: submissionId,
-      submission_id: submissionId,
-      engine_key: engineKey,
-      version,
-      audience,
-
-      meta: {
-        org_name: orgName,
-        org_logo_url: (orgRow as any)?.logo_url || null,
-        test_name: testName,
-        generated_at: new Date().toISOString(),
-        mode: "deterministic",
-      },
-
-      signals,
-      graphs,
-      sections,
-
-      ai,
-      ai_meta,
-    };
-
-    // 10) Cache deterministic report
-    await callRpc<any>(vis, "upsert_generated_report", {
-      p_submission_id: submissionId,
-      p_audience: audience,
-      p_report_json: reportJson,
-      p_signals: signals,
-      p_selected_blocks: selectedBlocks,
-      p_engine_key: engineKey,
-      p_version: version,
-    });
 
     return NextResponse.json(
       {
         ok: true,
-        data: reportJson,
-        __meta: {
-          cached: false,
-          submission_id: submissionId,
-          engine_key: engineKey,
-          version,
-          audience,
-        },
+        data: cached,
+        __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
       },
       { status: 200 }
     );

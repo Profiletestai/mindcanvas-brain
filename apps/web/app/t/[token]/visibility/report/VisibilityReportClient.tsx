@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import dynamic from "next/dynamic";
 import {
   ResponsiveContainer,
   BarChart,
@@ -63,6 +62,17 @@ type Section = {
   blocks?: ContentBlock[];
 };
 
+type AiInsights = {
+  executive_summary: string;
+  what_this_means: string;
+  strengths: string[];
+  friction: string[];
+  strategic_opportunity: string;
+  plan_7_days: string[];
+  plan_30_days: string[];
+  closing_note: string;
+};
+
 type VisibilityKbReport = {
   token: string;
   tid: string | null;
@@ -77,15 +87,22 @@ type VisibilityKbReport = {
     org_logo_url?: string | null;
     test_name?: string | null;
     generated_at?: string | null;
-
-    // AI-related (optional)
     mode?: "deterministic" | "ai" | string;
-    ai_error?: string;
   };
 
   signals?: Signals;
   graphs?: Graphs;
   sections?: Section[];
+
+  // ✅ Seamless AI payload (returned on taker_report)
+  ai?: AiInsights | null;
+  ai_meta?: {
+    enabled?: boolean;
+    cached?: boolean;
+    model?: string | null;
+    generated_at?: string | null;
+    error?: string;
+  };
 };
 
 type VisibilityKbApiResponse = {
@@ -116,7 +133,7 @@ type PortalReportResponse = {
       email_report?: boolean | null;
       meta?: any;
     };
-    totals?: any; // includes totals.visibility sometimes
+    totals?: any;
     debug?: any;
   };
   error?: string;
@@ -251,11 +268,11 @@ function GlassCard({
           <div className="flex items-start justify-between gap-4">
             <div>
               {title && <div className="text-lg font-semibold">{title}</div>}
-              {subtitle && (
+              {subtitle ? (
                 <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
                   {subtitle}
                 </div>
-              )}
+              ) : null}
             </div>
             {right}
           </div>
@@ -334,7 +351,7 @@ function SecondaryButton({
   );
 }
 
-/* ---------------- Visuals: Ladder + Tier chart ---------------- */
+/* ---------------- Visuals ---------------- */
 
 function LadderGrid({ level }: { level: number }) {
   const active = clamp(level, 1, 20);
@@ -368,14 +385,14 @@ function LadderGrid({ level }: { level: number }) {
   );
 }
 
-/* ---------------- Narrative section rendering (no double headings) ---------------- */
+/* ---------------- Narrative section rendering ---------------- */
 
 function SectionCard({ section }: { section: Section }) {
   const title = safeString(section?.title) || safeString(section?.key);
-
   const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
+
   return (
-    <GlassCard title={title} subtitle="">
+    <GlassCard title={title}>
       <div className="mt-3 space-y-5">
         {blocks.map((b, idx) => {
           const bt = safeString(b?.title);
@@ -388,10 +405,7 @@ function SectionCard({ section }: { section: Section }) {
             <div
               key={idx}
               className="rounded-2xl p-5 border"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
+              style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
             >
               {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
 
@@ -424,6 +438,20 @@ function SectionCard({ section }: { section: Section }) {
   );
 }
 
+function BulletList({ items }: { items: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="mt-2 space-y-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+      {items.map((x, i) => (
+        <li key={i} className="flex gap-2">
+          <span style={{ color: BRAND.accent }}>•</span>
+          <span>{x}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /* ---------------- Main ---------------- */
 
 export default function VisibilityReportClient({
@@ -440,16 +468,8 @@ export default function VisibilityReportClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // portal report endpoint (taker + link meta)
   const [portalMeta, setPortalMeta] = useState<PortalReportResponse["data"] | null>(null);
-
-  // KB report endpoint (deterministic)
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
-
-  // AI audience report (generated/cached automatically at load)
-  const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiReport, setAiReport] = useState<VisibilityKbReport | null>(null);
 
   const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
   const testName = portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
@@ -457,13 +477,11 @@ export default function VisibilityReportClient({
 
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
-  // core result labels (from kb signals)
   const tier: Tier | null = (kbReport?.signals?.tier as Tier) || null;
   const level: number = Number(kbReport?.signals?.level ?? 0);
   const style: AB | null = (kbReport?.signals?.style as AB) || null;
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
 
-  // tier counts (bar chart)
   const tierCountsData = useMemo(() => {
     const counts = kbReport?.graphs?.tier_counts || {};
     return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
@@ -473,7 +491,6 @@ export default function VisibilityReportClient({
     }));
   }, [kbReport?.graphs]);
 
-  // personality points (bar chart)
   const personalityData = useMemo(() => {
     const pts = kbReport?.graphs?.personality_points || {};
     const order: AB[] = ["A", "B", "C", "D"];
@@ -484,7 +501,6 @@ export default function VisibilityReportClient({
     }));
   }, [kbReport?.graphs]);
 
-  // pillar radar (optional — you said we can polish later)
   const radarData = useMemo(() => {
     const pillars = kbReport?.graphs?.pillars || {};
     const has = pillars && typeof pillars === "object" && Object.keys(pillars).length > 0;
@@ -506,7 +522,10 @@ export default function VisibilityReportClient({
       const node = reportRootRef.current;
       if (!node) return;
 
-      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([html2canvasPromise(), jsPdfPromise()]);
+      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
+        html2canvasPromise(),
+        jsPdfPromise(),
+      ]);
 
       const canvas = await html2canvas(node, {
         backgroundColor: BRAND.bg,
@@ -520,7 +539,6 @@ export default function VisibilityReportClient({
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      // fit image to page width
       const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -536,7 +554,10 @@ export default function VisibilityReportClient({
         }
       }
 
-      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(/[^\w\-]+/g, "_");
+      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
+        /[^\w\-]+/g,
+        "_"
+      );
       pdf.save(safeName);
     } catch (e: any) {
       console.error("[visibility] pdf export failed", e);
@@ -561,7 +582,7 @@ export default function VisibilityReportClient({
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
 
-        // 2) KB deterministic report
+        // 2) KB report (deterministic + seamless AI embedded)
         const kbUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
           tid
         )}&audience=taker_report`;
@@ -571,42 +592,6 @@ export default function VisibilityReportClient({
         setKbReport(kbRes?.data ?? null);
 
         setLoading(false);
-
-        // 3) Seamless AI generation at report load (best):
-        // call same endpoint with audience=taker_report_ai using sid if we have it
-        const sid = safeString(kbRes?.data?.submission_id || kbRes?.data?.sid);
-        if (sid) {
-          setAiStatus("loading");
-          setAiError(null);
-
-          const aiUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?sid=${encodeURIComponent(
-            sid
-          )}&audience=taker_report_ai`;
-
-          try {
-            const aiRes = await fetchJson<VisibilityKbApiResponse>(aiUrl);
-            if (cancelled) return;
-
-            const payload = aiRes?.data ?? null;
-            setAiReport(payload);
-
-            const errMsg = safeString(payload?.meta?.ai_error);
-            if (errMsg) {
-              setAiStatus("error");
-              setAiError(errMsg);
-            } else {
-              // even if "mode" isn't returned yet, caching run succeeded
-              setAiStatus("ready");
-              setAiError(null);
-            }
-          } catch (e: any) {
-            if (cancelled) return;
-            setAiStatus("error");
-            setAiError(String(e?.message || e));
-          }
-        } else {
-          setAiStatus("idle");
-        }
       } catch (e: any) {
         if (cancelled) return;
         setErr(String(e?.message || e));
@@ -657,8 +642,11 @@ export default function VisibilityReportClient({
 
   const tierColor = tier ? BRAND.tier[tier] : "rgba(255,255,255,0.85)";
   const styleColor = style ? BRAND.ab[style] : "rgba(255,255,255,0.85)";
-
   const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
+
+  const aiEnabledFlag = kbReport?.ai_meta?.enabled === true;
+  const aiError = safeString(kbReport?.ai_meta?.error);
+  const ai = kbReport?.ai || null;
 
   return (
     <Shell>
@@ -833,6 +821,116 @@ export default function VisibilityReportClient({
           </GlassCard>
         </div>
 
+        {/* ✅ AI insights (seamless, no second call) */}
+        <GlassCard
+          title="AI insights"
+          subtitle="A tailored interpretation + a simple action plan (7 days + 30 days)."
+          right={
+            aiEnabledFlag ? (
+              <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                {kbReport.ai_meta?.model ? `model: ${kbReport.ai_meta?.model}` : ""}
+                {kbReport.ai_meta?.cached === true ? " • cached" : " • fresh"}
+              </div>
+            ) : null
+          }
+        >
+          {!aiEnabledFlag ? (
+            <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+              AI is disabled for this report.
+            </div>
+          ) : aiError ? (
+            <div className="mt-2 text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
+              AI generation failed: {aiError}
+            </div>
+          ) : !ai ? (
+            <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+              AI insights are generating. Refresh this page in a moment.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-5">
+              <div
+                className="rounded-2xl p-5 border"
+                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+              >
+                <div className="text-sm font-semibold">Executive summary</div>
+                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+                  {ai.executive_summary}
+                </div>
+              </div>
+
+              <div
+                className="rounded-2xl p-5 border"
+                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+              >
+                <div className="text-sm font-semibold">What this means</div>
+                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+                  {ai.what_this_means}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div
+                  className="rounded-2xl p-5 border"
+                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+                >
+                  <div className="text-sm font-semibold">What’s working</div>
+                  <BulletList items={ai.strengths || []} />
+                </div>
+
+                <div
+                  className="rounded-2xl p-5 border"
+                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+                >
+                  <div className="text-sm font-semibold">Where friction exists</div>
+                  <BulletList items={ai.friction || []} />
+                </div>
+              </div>
+
+              <div
+                className="rounded-2xl p-5 border"
+                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+              >
+                <div className="text-sm font-semibold">Your strategic opportunity</div>
+                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+                  {ai.strategic_opportunity}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div
+                  className="rounded-2xl p-5 border"
+                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+                >
+                  <div className="text-sm font-semibold">7-day plan</div>
+                  <BulletList items={ai.plan_7_days || []} />
+                </div>
+
+                <div
+                  className="rounded-2xl p-5 border"
+                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+                >
+                  <div className="text-sm font-semibold">30-day plan</div>
+                  <BulletList items={ai.plan_30_days || []} />
+                </div>
+              </div>
+
+              <div
+                className="rounded-2xl p-5 border"
+                style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+              >
+                <div className="text-sm font-semibold">Closing note</div>
+                <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+                  {ai.closing_note}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-3 text-xs" style={{ color: BRAND.textFaint }}>
+            powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
+          </div>
+        </GlassCard>
+
         {/* Narrative (KB-driven) */}
         <GlassCard
           title="Your personalised report"
@@ -854,55 +952,6 @@ export default function VisibilityReportClient({
                 No narrative sections were returned yet.
               </div>
             )}
-          </div>
-        </GlassCard>
-
-        {/* Seamless AI layer */}
-        <GlassCard
-          title="AI insights"
-          subtitle="Client-facing layer: a tailored interpretation + a simple action plan (7 days + 30 days)."
-        >
-          {aiStatus === "idle" ? (
-            <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-              AI is not enabled for this report yet (no submission id was available).
-            </div>
-          ) : aiStatus === "loading" ? (
-            <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-              AI insights are generating/caching. Refresh this page in a moment.
-            </div>
-          ) : aiStatus === "error" ? (
-            <div className="mt-2 text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
-              AI generation failed: {aiError || "Unknown error"}
-            </div>
-          ) : (
-            <div className="mt-2 space-y-3">
-              <div className="text-sm" style={{ color: BRAND.textDim }}>
-                AI is generated and cached. Next step is to render the structured AI output.
-              </div>
-
-              {/* This is what the AI payload SHOULD look like once your report route returns it */}
-              <div
-                className="rounded-2xl p-4 text-xs whitespace-pre-wrap"
-                style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}`, color: "rgba(255,255,255,0.78)" }}
-              >
-{`Expected AI JSON shape (example):
-{
-  "ai": {
-    "summary": "Plain-language interpretation of tier/level + what it means.",
-    "strengths": ["...", "..."],
-    "friction": ["...", "..."],
-    "opportunity": "Single highest-impact strategic opportunity.",
-    "plan_7_days": ["3 quick wins..."],
-    "plan_30_days": ["Stabilise/progress plan..."],
-    "tone": "supportive, consultant-led"
-  }
-}`}
-              </div>
-            </div>
-          )}
-
-          <div className="pt-2 text-xs" style={{ color: BRAND.textFaint }}>
-            powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
           </div>
         </GlassCard>
       </div>
