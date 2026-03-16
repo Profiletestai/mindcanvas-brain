@@ -58,7 +58,6 @@ async function callRpc<T>(sb: any, fn: string, args: any): Promise<T> {
 }
 
 function pickSummary(sections: any[]) {
-  // Try to extract short_summary and/or first paragraph from key sections
   const pick = (k: string) => sections.find((s) => s?.key === k);
 
   const snap = pick("snapshot");
@@ -69,8 +68,11 @@ function pickSummary(sections: any[]) {
   const firstText = (sec: any) => {
     const b = sec?.blocks?.[0];
     if (!b) return "";
-    if (typeof b.short_summary === "string" && b.short_summary.trim()) return b.short_summary.trim();
-    const p0 = Array.isArray(b.paragraphs) ? String(b.paragraphs[0] || "").trim() : "";
+    if (typeof b.short_summary === "string" && b.short_summary.trim())
+      return b.short_summary.trim();
+    const p0 = Array.isArray(b.paragraphs)
+      ? String(b.paragraphs[0] || "").trim()
+      : "";
     return p0;
   };
 
@@ -82,13 +84,52 @@ function pickSummary(sections: any[]) {
   };
 }
 
-export async function GET(req: NextRequest, ctx: { params: { takerId: string } }) {
+/** Detect if result row already has pillar signals */
+function hasPillarSignals(result: any) {
+  const ps = result?.pillar_scores;
+  const pb = result?.pillar_bands;
+  const wp = result?.weakest_pillar;
+  const sp = result?.strongest_pillar;
+
+  const okScores =
+    ps &&
+    typeof ps === "object" &&
+    (Object.keys(ps).length > 0 ||
+      ["discoverability", "trust", "conversion"].some((k) => ps?.[k] != null));
+
+  const okBands = pb && typeof pb === "object" && Object.keys(pb).length > 0;
+
+  return Boolean(okScores || okBands || wp || sp);
+}
+
+/** Detect if cached report payload includes pillar scores */
+function cachedHasPillars(cached: any) {
+  const p =
+    cached?.graphs?.pillars ||
+    cached?.signals?.pillar_scores ||
+    cached?.graphs?.pillar_band ||
+    cached?.signals?.pillar_band;
+
+  return p && typeof p === "object" && Object.keys(p).length > 0;
+}
+
+export async function GET(
+  req: NextRequest,
+  ctx: { params: { takerId: string } }
+) {
   try {
     const takerId = String(ctx.params?.takerId || "").trim();
     const orgSlug = String(req.nextUrl.searchParams.get("org") || "").trim(); // REQUIRED
-    const audience = String(req.nextUrl.searchParams.get("audience") || "internal_snapshot").trim();
+    const audience = String(
+      req.nextUrl.searchParams.get("audience") || "internal_snapshot"
+    ).trim();
 
-    if (!takerId) return NextResponse.json({ ok: false, error: "Missing takerId" }, { status: 400 });
+    if (!takerId)
+      return NextResponse.json(
+        { ok: false, error: "Missing takerId" },
+        { status: 400 }
+      );
+
     if (!orgSlug) {
       return NextResponse.json(
         { ok: false, error: "Missing org slug. Pass ?org=whatswhats-global" },
@@ -107,7 +148,11 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       .maybeSingle();
 
     if (orgErr) throw new Error(orgErr.message);
-    if (!org) return NextResponse.json({ ok: false, error: "Org not found" }, { status: 404 });
+    if (!org)
+      return NextResponse.json(
+        { ok: false, error: "Org not found" },
+        { status: 404 }
+      );
 
     // 2) Load taker and validate belongs to org
     const { data: taker, error: takerErr } = await sb
@@ -117,22 +162,32 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       .maybeSingle();
 
     if (takerErr) throw new Error(takerErr.message);
-    if (!taker) return NextResponse.json({ ok: false, error: "Taker not found" }, { status: 404 });
+    if (!taker)
+      return NextResponse.json(
+        { ok: false, error: "Taker not found" },
+        { status: 404 }
+      );
 
     if (String(taker.org_id) !== String(org.id)) {
-      return NextResponse.json({ ok: false, error: "Taker not in this org" }, { status: 403 });
+      return NextResponse.json(
+        { ok: false, error: "Taker not in this org" },
+        { status: 403 }
+      );
     }
 
-    // 3) Find latest visibility submission for this taker (no token needed internally)
+    // 3) Find latest visibility submission for this taker
     const { data: subs, error: subsErr } = await vis
       .from("submissions")
       .select("id, created_at, token, metadata")
       .order("created_at", { ascending: false })
-      .limit(60);
+      .limit(120);
 
     if (subsErr) throw new Error(subsErr.message);
 
-    const submission = (subs || []).find((s: any) => String(s?.metadata?.taker_id || "") === String(takerId));
+    const submission = (subs || []).find(
+      (s: any) => String(s?.metadata?.taker_id || "") === String(takerId)
+    );
+
     if (!submission?.id) {
       return NextResponse.json(
         { ok: false, error: "No visibility submission found for this taker yet." },
@@ -144,7 +199,7 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
     const token = String(submission.token || taker.link_token || "").trim() || null;
 
     // 4) Load latest visibility.results for that submission
-    const { data: result, error: resErr } = await vis
+    let { data: result, error: resErr } = await vis
       .from("results")
       .select(
         "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, pattern_tags"
@@ -154,9 +209,83 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
+    if (!result)
+      return NextResponse.json(
+        { ok: false, error: "Visibility results not found." },
+        { status: 404 }
+      );
 
-    // 5) Signals used for KB matching
+    const engineKey = String(result.engine_key || "visibility_v1");
+    const version = Number(result.version || 1);
+
+    // 5) Cache lookup — but only return it if it has pillars (otherwise regenerate)
+    const cached = await callRpc<any>(vis, "get_generated_report", {
+      p_submission_id: submissionId,
+      p_audience: audience,
+      p_engine_key: engineKey,
+      p_version: version,
+    });
+
+    if (cached && cachedHasPillars(cached)) {
+      return NextResponse.json(
+        {
+          ok: true,
+          data: cached,
+          __meta: {
+            cached: true,
+            submission_id: submissionId,
+            engine_key: engineKey,
+            version,
+            audience,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // 6) Ensure pillar signals exist on results (compute via RPC if missing)
+    if (!hasPillarSignals(result)) {
+      try {
+        const pillarRpc = await callRpc<any>(
+          vis,
+          "compute_pillar_signals_for_submission",
+          { p_submission_id: submissionId }
+        );
+
+        if (pillarRpc?.ok === true && pillarRpc?.computed) {
+          const computed = pillarRpc.computed;
+
+          await vis
+            .from("results")
+            .update({
+              pillar_scores: computed.pillar_scores ?? {},
+              pillar_bands: computed.pillar_bands ?? {},
+              weakest_pillar: computed.weakest_pillar ?? null,
+              strongest_pillar: computed.strongest_pillar ?? null,
+              pattern_tags: Array.isArray(computed.pattern_tags)
+                ? computed.pattern_tags
+                : [],
+            })
+            .eq("id", result.id);
+
+          // re-read updated result
+          const reread = await vis
+            .from("results")
+            .select(
+              "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, pattern_tags"
+            )
+            .eq("id", result.id)
+            .maybeSingle();
+
+          if (!reread.error && reread.data) result = reread.data;
+        }
+      } catch (e) {
+        // Don’t fail snapshot if pillar RPC fails — keep going.
+        console.warn("[visibility snapshot] pillar RPC failed", e);
+      }
+    }
+
+    // 7) Signals used for KB matching
     const signals = {
       tier: result.tier,
       level: Number(result.level ?? 0),
@@ -169,30 +298,16 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       pattern_tags: result.pattern_tags || [],
     };
 
-    const engineKey = String(result.engine_key || "visibility_v1");
-    const version = Number(result.version || 1);
-
-    // 6) Cache lookup
-    const cached = await callRpc<any>(vis, "get_generated_report", {
-      p_submission_id: submissionId,
-      p_audience: audience,
-      p_engine_key: engineKey,
-      p_version: version,
-    });
-
-    if (cached) {
-      return NextResponse.json(
-        {
-          ok: true,
-          data: cached,
-          __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
-        },
-        { status: 200 }
-      );
-    }
-
-    // 7) Assemble INTERNAL snapshot sections (smaller set)
-    const sectionKeys = ["snapshot", "pillars", "strengths", "friction", "opportunity", "next_move", "closing"];
+    // 8) Assemble INTERNAL snapshot sections
+    const sectionKeys = [
+      "snapshot",
+      "pillars",
+      "strengths",
+      "friction",
+      "opportunity",
+      "next_move",
+      "closing",
+    ];
 
     const sections: any[] = [];
     const selectedBlocks: any[] = [];
@@ -214,7 +329,9 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
         });
       }
 
-      const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
+      const contentBlocks = (blocks || [])
+        .map((b: any) => b.content)
+        .filter(Boolean);
 
       sections.push({
         key,
@@ -232,6 +349,7 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       );
     }
 
+    // 9) Graph payload (now always reflects latest result row)
     const graphs = {
       tier_counts: result.tier_counts || {},
       personality_points: result.personality_points || {},
@@ -241,7 +359,12 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
     };
 
     const reportJson = {
-      org: { id: org.id, slug: org.slug, name: org.name, logo_url: (org as any)?.logo_url || null },
+      org: {
+        id: org.id,
+        slug: org.slug,
+        name: org.name,
+        logo_url: (org as any)?.logo_url || null,
+      },
       token,
       tid: takerId,
       submission_id: submissionId,
@@ -251,7 +374,9 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
 
       meta: {
         generated_at: new Date().toISOString(),
-        test_taker_name: [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || null,
+        test_taker_name:
+          [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() ||
+          null,
         test_taker_email: taker.email || null,
       },
 
@@ -261,7 +386,7 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       sections,
     };
 
-    // 8) Cache write
+    // 10) Cache write (overwrite old cached report that lacked pillars)
     await callRpc<any>(vis, "upsert_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -276,11 +401,20 @@ export async function GET(req: NextRequest, ctx: { params: { takerId: string } }
       {
         ok: true,
         data: reportJson,
-        __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
+        __meta: {
+          cached: false,
+          submission_id: submissionId,
+          engine_key: engineKey,
+          version,
+          audience,
+        },
       },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: String(e?.message || e) },
+      { status: 500 }
+    );
   }
 }

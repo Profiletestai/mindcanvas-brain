@@ -11,11 +11,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   Cell,
 } from "recharts";
 
@@ -155,10 +150,7 @@ function readinessLabel(r?: Readiness) {
 }
 
 function fullName(taker?: any) {
-  const n = [taker?.first_name, taker?.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const n = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
   return n || "Your";
 }
 
@@ -311,13 +303,7 @@ function PrimaryButton({
 
   if (href) {
     return (
-      <a
-        className={cls}
-        style={style}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
         {children}
       </a>
     );
@@ -351,13 +337,7 @@ function SecondaryButton({
 
   if (href) {
     return (
-      <a
-        className={cls}
-        style={style}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
         {children}
       </a>
     );
@@ -386,9 +366,7 @@ function LadderGrid({ level }: { level: number }) {
             key={s}
             className="h-9 rounded-xl border text-[11px] flex items-center justify-center select-none"
             style={{
-              borderColor: isActive
-                ? "rgba(255,255,255,0.30)"
-                : "rgba(255,255,255,0.12)",
+              borderColor: isActive ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.12)",
               background: isActive
                 ? `linear-gradient(180deg, ${bandColor}33, rgba(255,255,255,0.10))`
                 : "rgba(255,255,255,0.04)",
@@ -419,16 +397,14 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
           {tiers.map((t, idx) => {
             const isActive = t === tier;
             const c = BRAND.tier[t];
-            const widthPct = 60 + idx * 12; // 60,72,84,96
+            const widthPct = 60 + idx * 12;
             return (
               <div key={t} className="flex items-center justify-center">
                 <div
                   className="h-12 rounded-2xl border flex items-center justify-between px-4"
                   style={{
                     width: `${widthPct}%`,
-                    borderColor: isActive
-                      ? "rgba(255,255,255,0.28)"
-                      : "rgba(255,255,255,0.12)",
+                    borderColor: isActive ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.12)",
                     background: isActive
                       ? `linear-gradient(90deg, ${c}66, rgba(255,255,255,0.06))`
                       : "rgba(255,255,255,0.04)",
@@ -436,10 +412,7 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className="h-3 w-3 rounded-full"
-                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
-                    />
+                    <div className="h-3 w-3 rounded-full" style={{ background: c, boxShadow: `0 0 12px ${c}66` }} />
                     <div className="text-sm font-semibold">{t}</div>
                   </div>
                   <div className="text-xs" style={{ color: BRAND.textDim }}>
@@ -455,7 +428,30 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
   );
 }
 
-/* ---------------- Pillars graphic (replace radar) ---------------- */
+/* ---------------- Pillars data (use API pillars if present, else derive from tier_counts) ---------------- */
+
+function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
+  const inv = Number(tierCounts?.Invisible ?? 0);
+  const em = Number(tierCounts?.Emerging ?? 0);
+  const est = Number(tierCounts?.Established ?? 0);
+  const mag = Number(tierCounts?.Magnetic ?? 0);
+  const total = inv + em + est + mag;
+
+  if (!total) return null;
+
+  // Matches the earlier radar logic you had:
+  const discoverability = ((total - inv) / total) * 100;
+  const trust = ((est + mag) / total) * 100;
+  const conversion = (mag / total) * 100;
+
+  return {
+    discoverability: Math.round(discoverability),
+    trust: Math.round(trust),
+    conversion: Math.round(conversion),
+  };
+}
+
+/* ---------------- Pillars graphic (bars) ---------------- */
 
 function PillarsBars({
   pillars,
@@ -474,12 +470,7 @@ function PillarsBars({
     ...p,
     value: Number((pillars as any)?.[p.key] ?? 0),
     color: BRAND.pillars[p.key] || BRAND.accent,
-    tag:
-      p.key === strongest
-        ? "Strongest"
-        : p.key === weakest
-        ? "Weakest"
-        : "",
+    tag: p.key === strongest ? "Strongest" : p.key === weakest ? "Weakest" : "",
   }));
 
   const hasAny = items.some((x) => Number.isFinite(x.value) && x.value > 0);
@@ -487,11 +478,8 @@ function PillarsBars({
   if (!hasAny) {
     return (
       <div
-        className="h-full rounded-2xl flex items-center justify-center text-sm"
-        style={{
-          background: "rgba(0,0,0,0.18)",
-          border: `1px solid ${BRAND.border}`,
-        }}
+        className="h-[260px] rounded-2xl flex items-center justify-center text-sm"
+        style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
       >
         Pillar scores will appear here once enabled.
       </div>
@@ -506,7 +494,7 @@ function PillarsBars({
           <div key={it.key} className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">
-                {it.label}{" "}
+                {it.label}
                 {it.tag ? (
                   <span
                     className="ml-2 text-[11px] px-2 py-0.5 rounded-full border"
@@ -576,34 +564,21 @@ function SectionCard({ section }: { section: Section }) {
             <div
               key={idx}
               className="rounded-2xl p-5 border"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
+              style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
             >
-              {showBlockTitle ? (
-                <div className="text-base font-semibold">{bt}</div>
-              ) : null}
+              {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
 
               {short ? (
                 <div
                   className="mt-3 rounded-xl border px-4 py-3 text-sm"
-                  style={{
-                    borderColor: "rgba(255,255,255,0.14)",
-                    background: "rgba(255,255,255,0.05)",
-                  }}
+                  style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.05)" }}
                 >
                   <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
-                  <span style={{ color: "rgba(255,255,255,0.88)" }}>
-                    {short}
-                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.88)" }}>{short}</span>
                 </div>
               ) : null}
 
-              <div
-                className="mt-4 space-y-3 text-sm leading-6"
-                style={{ color: "rgba(255,255,255,0.85)" }}
-              >
+              <div className="mt-4 space-y-3 text-sm leading-6" style={{ color: "rgba(255,255,255,0.85)" }}>
                 {ps.map((p, i) => (
                   <p key={i}>{p}</p>
                 ))}
@@ -622,20 +597,17 @@ function SectionCard({ section }: { section: Section }) {
   );
 }
 
-/* ---------------- AI rendering (simple, clean) ---------------- */
+/* ---------------- AI rendering (heading only, no footer/model text) ---------------- */
 
 function InsightsCard({
   ai,
-  aiMeta,
   error,
   loading,
 }: {
   ai: AiInsights | null | undefined;
-  aiMeta?: any;
   error?: string | null;
   loading?: boolean;
 }) {
-  // Clean heading only (per your request)
   return (
     <GlassCard title="Insights" subtitle="">
       {loading ? (
@@ -648,26 +620,14 @@ function InsightsCard({
         </div>
       ) : ai ? (
         <div className="mt-4 space-y-4">
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
+          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
             <div className="text-sm font-semibold">Executive summary</div>
             <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.executive_summary}
             </div>
           </div>
 
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
+          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
             <div className="text-sm font-semibold">What this means</div>
             <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.what_this_means}
@@ -675,13 +635,7 @@ function InsightsCard({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">Strengths</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.strengths?.map((s, i) => (
@@ -690,13 +644,7 @@ function InsightsCard({
               </ul>
             </div>
 
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">Friction</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.friction?.map((s, i) => (
@@ -706,13 +654,7 @@ function InsightsCard({
             </div>
           </div>
 
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
+          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
             <div className="text-sm font-semibold">Strategic opportunity</div>
             <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.strategic_opportunity}
@@ -720,13 +662,7 @@ function InsightsCard({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">7-day plan</div>
               <ol className="mt-2 list-decimal pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.plan_7_days?.map((s, i) => (
@@ -735,13 +671,7 @@ function InsightsCard({
               </ol>
             </div>
 
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">30-day plan</div>
               <ol className="mt-2 list-decimal pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.plan_30_days?.map((s, i) => (
@@ -750,21 +680,12 @@ function InsightsCard({
               </ol>
             </div>
           </div>
-
-          <div className="text-xs" style={{ color: BRAND.textFaint }}>
-            {aiMeta?.model ? `model: ${aiMeta.model}` : ""}{" "}
-            {aiMeta?.cached === true ? "• cached" : aiMeta?.cached === false ? "• fresh" : ""}
-          </div>
         </div>
       ) : (
         <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
           Insights are not available yet.
         </div>
       )}
-
-      <div className="pt-2 text-xs" style={{ color: BRAND.textFaint }}>
-        powered by <span style={{ color: "rgba(255,255,255,0.75)" }}>profiletest.ai</span>
-      </div>
     </GlassCard>
   );
 }
@@ -785,40 +706,29 @@ export default function VisibilityReportClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // portal report endpoint (taker + link meta)
-  const [portalMeta, setPortalMeta] =
-    useState<PortalReportResponse["data"] | null>(null);
-
-  // KB report endpoint (deterministic + AI injected by API)
+  const [portalMeta, setPortalMeta] = useState<PortalReportResponse["data"] | null>(null);
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
 
-  const orgName =
-    portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
-  const testName =
-    portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
+  const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
+  const testName = portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
   const takerName = fullName(portalMeta?.taker);
 
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
-  // core result labels (from kb signals)
   const tier: Tier | null = (kbReport?.signals?.tier as Tier) || null;
   const level: number = Number(kbReport?.signals?.level ?? 0);
   const style: AB | null = (kbReport?.signals?.style as AB) || null;
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
 
-  // tier counts (bar chart)
   const tierCountsData = useMemo(() => {
     const counts = kbReport?.graphs?.tier_counts || {};
-    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map(
-      (t) => ({
-        name: t,
-        value: Number((counts as any)[t] ?? 0),
-        color: BRAND.tier[t],
-      })
-    );
+    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
+      name: t,
+      value: Number((counts as any)[t] ?? 0),
+      color: BRAND.tier[t],
+    }));
   }, [kbReport?.graphs]);
 
-  // personality points (bar chart)
   const personalityData = useMemo(() => {
     const pts = kbReport?.graphs?.personality_points || {};
     const order: AB[] = ["A", "B", "C", "D"];
@@ -829,7 +739,18 @@ export default function VisibilityReportClient({
     }));
   }, [kbReport?.graphs]);
 
-  const pillars = (kbReport?.graphs?.pillars || {}) as Record<string, number>;
+  // ✅ Pillars: prefer API pillar_scores, else derive from tier counts (old radar logic)
+  const pillars = useMemo(() => {
+    const apiPillars = (kbReport?.graphs?.pillars || {}) as Record<string, number>;
+    const hasApi = apiPillars && typeof apiPillars === "object" && Object.keys(apiPillars).length > 0;
+
+    if (hasApi) return apiPillars;
+
+    const tc = (kbReport?.graphs?.tier_counts || {}) as Record<string, number>;
+    const derived = derivePillarsFromTierCounts(tc);
+    return derived || {};
+  }, [kbReport?.graphs]);
+
   const weakest = kbReport?.signals?.weakest_pillar ?? null;
   const strongest = kbReport?.signals?.strongest_pillar ?? null;
 
@@ -870,10 +791,7 @@ export default function VisibilityReportClient({
         }
       }
 
-      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
-        /[^\w\-]+/g,
-        "_"
-      );
+      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(/[^\w\-]+/g, "_");
       pdf.save(safeName);
     } catch (e: any) {
       console.error("[visibility] pdf export failed", e);
@@ -889,10 +807,7 @@ export default function VisibilityReportClient({
         setLoading(true);
         setErr(null);
 
-        // 1) Portal report (taker + link meta)
-        const portalUrl = `/api/public/test/${encodeURIComponent(
-          token
-        )}/report?tid=${encodeURIComponent(tid)}${
+        const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}${
           src ? `&src=${encodeURIComponent(src)}` : ""
         }`;
 
@@ -900,10 +815,7 @@ export default function VisibilityReportClient({
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
 
-        // 2) Visibility report (KB + AI layer returned by API)
-        const kbUrl = `/api/public/visibility/${encodeURIComponent(
-          token
-        )}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
+        const kbUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
 
         const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
@@ -939,19 +851,11 @@ export default function VisibilityReportClient({
     return (
       <Shell>
         <div className="mx-auto max-w-6xl p-6 space-y-4">
-          <div className="text-2xl font-semibold">
-            Couldn’t load Visibility report
-          </div>
+          <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
           </p>
-          <div
-            className="rounded-2xl p-4 text-xs"
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: `1px solid ${BRAND.border}`,
-            }}
-          >
+          <div className="rounded-2xl p-4 text-xs" style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BRAND.border}` }}>
             <div>token: {token}</div>
             <div>tid: {tid}</div>
           </div>
@@ -968,34 +872,22 @@ export default function VisibilityReportClient({
   const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
 
   const ai = kbReport?.ai ?? null;
-  const aiMeta = kbReport?.ai_meta ?? null;
   const aiError = safeString(kbReport?.meta?.ai_error);
 
   return (
     <Shell>
       <div ref={reportRootRef} className="mx-auto max-w-6xl p-6 space-y-6">
-        {/* Header */}
         <GlassCard
           title={`${takerName} Visibility Ladder`}
           subtitle={`${orgName} • ${testName}`}
           right={
             <div className="flex flex-col gap-3 items-end">
               <div className="flex flex-wrap gap-2 justify-end">
-                <SecondaryButton onClick={downloadPdf}>
-                  Download PDF
-                </SecondaryButton>
-                {nextStepsUrl ? (
-                  <PrimaryButton href={nextStepsUrl}>Next step</PrimaryButton>
-                ) : null}
+                <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
+                {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next step</PrimaryButton> : null}
               </div>
 
-              <div
-                className="rounded-2xl border p-4 min-w-[240px]"
-                style={{
-                  borderColor: BRAND.border,
-                  background: "rgba(0,0,0,0.18)",
-                }}
-              >
+              <div className="rounded-2xl border p-4 min-w-[240px]" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}>
                 <div className="text-xs" style={{ color: BRAND.textFaint }}>
                   At a glance
                 </div>
@@ -1008,15 +900,11 @@ export default function VisibilityReportClient({
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Level</div>
-                    <div className="font-semibold">
-                      {Number.isFinite(level) && level > 0 ? level : "—"}
-                    </div>
+                    <div className="font-semibold">{Number.isFinite(level) && level > 0 ? level : "—"}</div>
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Readiness</div>
-                    <div className="font-semibold">
-                      {readinessLabel(readiness)}
-                    </div>
+                    <div className="font-semibold">{readinessLabel(readiness)}</div>
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Style</div>
@@ -1046,49 +934,25 @@ export default function VisibilityReportClient({
           </div>
         </GlassCard>
 
-        {/* Insights (AI) — clean heading only */}
-        <InsightsCard
-          ai={ai}
-          aiMeta={aiMeta}
-          error={aiError || null}
-          loading={false}
-        />
+        {/* ✅ Insights (AI) — heading only, no footer */}
+        <InsightsCard ai={ai} error={aiError || null} loading={false} />
 
-        {/* Graph cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GlassCard
-            title="Your ladder position"
-            subtitle="20 levels across 4 tiers. You’re highlighted at your level."
-          >
+          <GlassCard title="Your ladder position" subtitle="20 levels across 4 tiers. You’re highlighted at your level.">
             <LadderGrid level={level || 1} />
             <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
-              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20
-              Magnetic
+              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20 Magnetic
             </div>
-
-            {/* ✅ Restore the pyramid view (your screenshot 3 style) */}
             <TierPyramid tier={tier || tierBand(level || 1)} level={level || 1} />
           </GlassCard>
 
-          <GlassCard
-            title="Signal distribution"
-            subtitle="How your answers across Q9–Q25 mapped into each tier."
-          >
+          <GlassCard title="Signal distribution" subtitle="How your answers across Q9–Q25 mapped into each tier.">
             <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={tierCountsData} barCategoryGap={22}>
-                  <CartesianGrid
-                    stroke="rgba(255,255,255,0.12)"
-                    strokeDasharray="4 6"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: "rgba(255,255,255,0.78)" }}
-                  />
-                  <YAxis
-                    tick={{ fill: "rgba(255,255,255,0.70)" }}
-                    allowDecimals={false}
-                  />
+                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
+                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     contentStyle={{
@@ -1111,7 +975,6 @@ export default function VisibilityReportClient({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ✅ Replace the radar with clean pillar bars (easier to “tower-ise” later) */}
           <GlassCard title="Pillars overview" subtitle="Discoverability, Trust, and Conversion.">
             <div className="mt-4">
               <PillarsBars pillars={pillars} weakest={weakest} strongest={strongest} />
@@ -1122,18 +985,9 @@ export default function VisibilityReportClient({
             <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={personalityData} barCategoryGap={24}>
-                  <CartesianGrid
-                    stroke="rgba(255,255,255,0.12)"
-                    strokeDasharray="4 6"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: "rgba(255,255,255,0.78)" }}
-                  />
-                  <YAxis
-                    tick={{ fill: "rgba(255,255,255,0.70)" }}
-                    allowDecimals={false}
-                  />
+                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
+                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     contentStyle={{
@@ -1162,14 +1016,12 @@ export default function VisibilityReportClient({
           </GlassCard>
         </div>
 
-        {/* Narrative (KB-driven) */}
         <GlassCard
           title="Your personalised report"
           subtitle="This narrative is selected dynamically from the Visibility Ladder knowledge base."
           right={
             <div className="text-xs" style={{ color: BRAND.textFaint }}>
-              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v
-              {kbReport.version ?? 1}
+              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1}
             </div>
           }
         >
@@ -1177,13 +1029,7 @@ export default function VisibilityReportClient({
             {sections.length ? (
               sections.map((s) => <SectionCard key={s.key} section={s} />)
             ) : (
-              <div
-                className="rounded-2xl p-4 text-sm"
-                style={{
-                  background: "rgba(0,0,0,0.18)",
-                  border: `1px solid ${BRAND.border}`,
-                }}
-              >
+              <div className="rounded-2xl p-4 text-sm" style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}>
                 No narrative sections were returned yet.
               </div>
             )}
