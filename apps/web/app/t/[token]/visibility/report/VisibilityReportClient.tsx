@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   ResponsiveContainer,
@@ -82,7 +83,6 @@ type VisibilityKbReport = {
     org_logo_url?: string | null;
     test_name?: string | null;
     generated_at?: string | null;
-
     mode?: "deterministic" | "ai" | string;
     ai_error?: string;
   };
@@ -151,10 +151,7 @@ function readinessLabel(r?: Readiness) {
 }
 
 function fullName(taker?: any) {
-  const n = [taker?.first_name, taker?.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const n = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
   return n || "Your";
 }
 
@@ -166,15 +163,14 @@ function tierBand(level: number): Tier {
 }
 
 function formatDate(iso?: string | null) {
-  const s = safeString(iso);
-  if (!s) return "";
-  const d = new Date(s);
-  if (!Number.isFinite(d.getTime())) return s;
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
 }
 
 async function fetchJson<T = any>(url: string): Promise<T> {
@@ -196,8 +192,8 @@ const BRAND = {
   lightNeutral: "#E6EDF5",
   white: "#FFFFFF",
 
-  textDim: "rgba(255,255,255,0.78)",
-  textFaint: "rgba(255,255,255,0.58)",
+  textDim: "rgba(255,255,255,0.75)",
+  textFaint: "rgba(255,255,255,0.55)",
   border: "rgba(255,255,255,0.14)",
 
   tier: {
@@ -272,15 +268,14 @@ function GlassCard({
       <div
         className="rounded-[27px] p-6"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))",
           border: `1px solid ${BRAND.border}`,
           backdropFilter: "blur(10px)",
         }}
       >
         {(title || subtitle || right) && (
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <div>
               {title && <div className="text-lg font-semibold">{title}</div>}
               {subtitle && (
                 <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
@@ -319,13 +314,7 @@ function PrimaryButton({
 
   if (href) {
     return (
-      <a
-        className={cls}
-        style={style}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
         {children}
       </a>
     );
@@ -359,13 +348,7 @@ function SecondaryButton({
 
   if (href) {
     return (
-      <a
-        className={cls}
-        style={style}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
         {children}
       </a>
     );
@@ -394,9 +377,7 @@ function LadderGrid({ level }: { level: number }) {
             key={s}
             className="h-9 rounded-xl border text-[11px] flex items-center justify-center select-none"
             style={{
-              borderColor: isActive
-                ? "rgba(255,255,255,0.30)"
-                : "rgba(255,255,255,0.12)",
+              borderColor: isActive ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.12)",
               background: isActive
                 ? `linear-gradient(180deg, ${bandColor}33, rgba(255,255,255,0.10))`
                 : "rgba(255,255,255,0.04)",
@@ -414,13 +395,13 @@ function LadderGrid({ level }: { level: number }) {
 }
 
 function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
-  // ✅ Correct order: Magnetic at TOP → ... → Invisible at BOTTOM
+  // ✅ Correct ordering: Magnetic at TOP → Invisible at BOTTOM
   const tiers: Tier[] = ["Magnetic", "Established", "Emerging", "Invisible"];
 
   return (
     <div className="mt-6">
       <div className="text-xs" style={{ color: BRAND.textFaint }}>
-        Pyramid view (tier emphasis)
+        Pyramid view shows tier ordering at a glance (Magnetic at top → Invisible at bottom).
       </div>
 
       <div className="mt-3 flex items-center justify-center">
@@ -428,16 +409,15 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
           {tiers.map((t, idx) => {
             const isActive = t === tier;
             const c = BRAND.tier[t];
-            const widthPct = 96 - idx * 12; // 96,84,72,60
+            // top is narrow, bottom is wide
+            const widthPct = 60 + (tiers.length - 1 - idx) * 12; // 96,84,72,60
             return (
               <div key={t} className="flex items-center justify-center">
                 <div
                   className="h-12 rounded-2xl border flex items-center justify-between px-4"
                   style={{
                     width: `${widthPct}%`,
-                    borderColor: isActive
-                      ? "rgba(255,255,255,0.28)"
-                      : "rgba(255,255,255,0.12)",
+                    borderColor: isActive ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.12)",
                     background: isActive
                       ? `linear-gradient(90deg, ${c}66, rgba(255,255,255,0.06))`
                       : "rgba(255,255,255,0.04)",
@@ -445,10 +425,7 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <div
-                      className="h-3 w-3 rounded-full"
-                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
-                    />
+                    <div className="h-3 w-3 rounded-full" style={{ background: c, boxShadow: `0 0 12px ${c}66` }} />
                     <div className="text-sm font-semibold">{t}</div>
                   </div>
                   <div className="text-xs" style={{ color: BRAND.textDim }}>
@@ -464,20 +441,20 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
   );
 }
 
-/* ---------------- Pillars helpers ---------------- */
+/* ---------------- Pillars fallback (if API pillars missing) ---------------- */
 
 function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
-  const inv = Number((tierCounts as any)?.Invisible ?? 0);
-  const em = Number((tierCounts as any)?.Emerging ?? 0);
-  const est = Number((tierCounts as any)?.Established ?? 0);
-  const mag = Number((tierCounts as any)?.Magnetic ?? 0);
+  const inv = Number(tierCounts?.Invisible ?? 0);
+  const em = Number(tierCounts?.Emerging ?? 0);
+  const est = Number(tierCounts?.Established ?? 0);
+  const mag = Number(tierCounts?.Magnetic ?? 0);
   const total = inv + em + est + mag;
   if (!total) return null;
 
-  // same logic you had before:
-  const discoverability = ((total - inv) / total) * 100;
-  const trust = ((est + mag) / total) * 100;
-  const conversion = (mag / total) * 100;
+  // Simple, explainable fallback:
+  const discoverability = ((total - inv) / total) * 100; // less invisible = more discoverable
+  const trust = ((est + mag) / total) * 100; // higher tiers imply trust signals
+  const conversion = (mag / total) * 100; // magnetic implies easiest path to action
 
   return {
     discoverability: Math.round(discoverability),
@@ -485,6 +462,8 @@ function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
     conversion: Math.round(conversion),
   };
 }
+
+/* ---------------- Pillars graphic (bars) ---------------- */
 
 function PillarsBars({
   pillars,
@@ -496,19 +475,14 @@ function PillarsBars({
   strongest?: string | null;
 }) {
   const items = [
-    { key: "discoverability", label: "Discoverability" },
-    { key: "trust", label: "Trust" },
-    { key: "conversion", label: "Conversion" },
+    { key: "discoverability", label: "Discoverability", blurb: "Can the market reliably find you?" },
+    { key: "trust", label: "Trust", blurb: "Does it feel safe and credible to choose you?" },
+    { key: "conversion", label: "Conversion", blurb: "Is it easy to take action right now?" },
   ].map((p) => ({
     ...p,
     value: Number((pillars as any)?.[p.key] ?? 0),
     color: BRAND.pillars[p.key] || BRAND.accent,
-    tag:
-      p.key === strongest
-        ? "Strongest"
-        : p.key === weakest
-        ? "Weakest"
-        : "",
+    tag: p.key === strongest ? "Strongest" : p.key === weakest ? "Weakest" : "",
   }));
 
   const hasAny = items.some((x) => Number.isFinite(x.value) && x.value > 0);
@@ -516,11 +490,8 @@ function PillarsBars({
   if (!hasAny) {
     return (
       <div
-        className="h-[260px] rounded-2xl flex items-center justify-center text-sm"
-        style={{
-          background: "rgba(0,0,0,0.18)",
-          border: `1px solid ${BRAND.border}`,
-        }}
+        className="h-[220px] rounded-2xl flex items-center justify-center text-sm"
+        style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
       >
         Pillar scores will appear here once enabled.
       </div>
@@ -572,11 +543,7 @@ function PillarsBars({
             </div>
 
             <div className="text-xs" style={{ color: BRAND.textFaint }}>
-              {it.key === "discoverability"
-                ? "Can the market reliably find you?"
-                : it.key === "trust"
-                ? "Does it feel safe and credible to choose you?"
-                : "Is it easy to take action right now?"}
+              {it.blurb}
             </div>
           </div>
         );
@@ -585,27 +552,34 @@ function PillarsBars({
   );
 }
 
-/* ---------------- Narrative rendering (no double headings) ---------------- */
+/* ---------------- Narrative section rendering (no double headings) ---------------- */
 
 function SectionCard({
-  section,
+  title,
+  subtitle,
   children,
 }: {
-  section: Section;
-  children?: ReactNode;
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
 }) {
+  return (
+    <GlassCard title={title} subtitle={subtitle || ""}>
+      <div className="mt-3">{children}</div>
+    </GlassCard>
+  );
+}
+
+function NarrativeSection({ section }: { section: Section }) {
   const title = safeString(section?.title) || safeString(section?.key);
   const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
 
   return (
-    <GlassCard title={title} subtitle="">
-      {children ? <div className="mt-4">{children}</div> : null}
-
-      <div className="mt-4 space-y-5">
+    <SectionCard title={title}>
+      <div className="space-y-5">
         {blocks.map((b, idx) => {
           const bt = safeString(b?.title);
-          const showBlockTitle =
-            bt && bt.toLowerCase() !== title.toLowerCase();
+          const showBlockTitle = bt && bt.toLowerCase() !== title.toLowerCase();
           const short = safeString(b?.short_summary);
           const ps = Array.isArray(b?.paragraphs) ? b.paragraphs : [];
           const transition = safeString(b?.transition);
@@ -619,9 +593,7 @@ function SectionCard({
                 background: "rgba(0,0,0,0.14)",
               }}
             >
-              {showBlockTitle ? (
-                <div className="text-base font-semibold">{bt}</div>
-              ) : null}
+              {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
 
               {short ? (
                 <div
@@ -632,16 +604,11 @@ function SectionCard({
                   }}
                 >
                   <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
-                  <span style={{ color: "rgba(255,255,255,0.88)" }}>
-                    {short}
-                  </span>
+                  <span style={{ color: "rgba(255,255,255,0.88)" }}>{short}</span>
                 </div>
               ) : null}
 
-              <div
-                className="mt-4 space-y-3 text-sm leading-6"
-                style={{ color: "rgba(255,255,255,0.85)" }}
-              >
+              <div className="mt-4 space-y-3 text-sm leading-6" style={{ color: "rgba(255,255,255,0.85)" }}>
                 {ps.map((p, i) => (
                   <p key={i}>{p}</p>
                 ))}
@@ -656,11 +623,11 @@ function SectionCard({
           );
         })}
       </div>
-    </GlassCard>
+    </SectionCard>
   );
 }
 
-/* ---------------- AI rendering (clean) ---------------- */
+/* ---------------- AI rendering (no footer/model text) ---------------- */
 
 function InsightsCard({
   ai,
@@ -672,83 +639,44 @@ function InsightsCard({
   loading?: boolean;
 }) {
   return (
-    <GlassCard title="Insights" subtitle="">
+    <SectionCard title="Insights" subtitle="A tailored interpretation + a simple action plan (7 days + 30 days).">
       {loading ? (
-        <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+        <div className="text-sm" style={{ color: BRAND.textDim }}>
           Generating insights…
         </div>
       ) : error ? (
-        <div
-          className="mt-2 text-sm"
-          style={{ color: "rgba(248,113,113,0.95)" }}
-        >
+        <div className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
           Insights generation failed: {error}
         </div>
       ) : ai ? (
-        <div className="mt-4 space-y-4">
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
+        <div className="space-y-4">
+          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
             <div className="text-sm font-semibold">Executive summary</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
+            <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.executive_summary}
             </div>
           </div>
 
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
+          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
             <div className="text-sm font-semibold">What this means</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
+            <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.what_this_means}
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">Strengths</div>
-              <ul
-                className="mt-2 list-disc pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.strengths?.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
             </div>
 
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">Friction</div>
-              <ul
-                className="mt-2 list-disc pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
+              <ul className="mt-2 list-disc pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.friction?.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
@@ -756,82 +684,39 @@ function InsightsCard({
             </div>
           </div>
 
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
+          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
             <div className="text-sm font-semibold">Strategic opportunity</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
+            <div className="mt-2 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.strategic_opportunity}
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">7-day plan</div>
-              <ol
-                className="mt-2 list-decimal pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
+              <ol className="mt-2 list-decimal pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.plan_7_days?.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ol>
             </div>
 
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
+            <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}>
               <div className="text-sm font-semibold">30-day plan</div>
-              <ol
-                className="mt-2 list-decimal pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
+              <ol className="mt-2 list-decimal pl-5 text-sm space-y-1" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.plan_30_days?.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ol>
             </div>
           </div>
-
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
-            <div className="text-sm font-semibold">Closing note</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
-              {ai.closing_note}
-            </div>
-          </div>
         </div>
       ) : (
-        <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+        <div className="text-sm" style={{ color: BRAND.textDim }}>
           Insights are not available yet.
         </div>
       )}
-    </GlassCard>
+    </SectionCard>
   );
 }
 
@@ -839,58 +724,54 @@ function InsightsCard({
 
 export default function VisibilityReportClient({
   token,
-  tid,
+  tid: tidProp,
   src,
 }: {
   token: string;
   tid: string;
   src?: string;
 }) {
+  const searchParams = useSearchParams();
   const reportRootRef = useRef<HTMLDivElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const [portalMeta, setPortalMeta] =
-    useState<PortalReportResponse["data"] | null>(null);
+  const [portalMeta, setPortalMeta] = useState<PortalReportResponse["data"] | null>(null);
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
 
-  const orgName =
-    portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
-  const testName =
-    portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
-  const orgLogo =
-    portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
+  // ✅ Fix “Missing tid or sid” properly:
+  // If page forgot to pass tid, fall back to ?tid=... from URL.
+  const tid = safeString(tidProp) || safeString(searchParams.get("tid"));
 
+  const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
+  const orgLogo = portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
+  const testName = portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
   const takerName = fullName(portalMeta?.taker);
-  const preparedFor = `Prepared for: ${takerName}`;
-  const reportDate =
-    formatDate(kbReport?.meta?.generated_at) ||
-    formatDate(new Date().toISOString());
 
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
-  // core result labels
   const tier: Tier | null = (kbReport?.signals?.tier as Tier) || null;
   const level: number = Number(kbReport?.signals?.level ?? 0);
   const style: AB | null = (kbReport?.signals?.style as AB) || null;
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
 
-  // tier counts chart data
+  const tierColor = tier ? BRAND.tier[tier] : "rgba(255,255,255,0.85)";
+  const styleColor = style ? BRAND.ab[style] : "rgba(255,255,255,0.85)";
+
+  const generatedDate = formatDate(kbReport?.meta?.generated_at || null) || formatDate(new Date().toISOString());
+
   const tierCountsData = useMemo(() => {
-    const counts = (kbReport?.graphs?.tier_counts || {}) as Record<string, number>;
-    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map(
-      (t) => ({
-        name: t,
-        value: Number((counts as any)[t] ?? 0),
-        color: BRAND.tier[t],
-      })
-    );
+    const counts = kbReport?.graphs?.tier_counts || {};
+    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
+      name: t,
+      value: Number((counts as any)[t] ?? 0),
+      color: BRAND.tier[t],
+    }));
   }, [kbReport?.graphs]);
 
-  // execution style chart data
   const personalityData = useMemo(() => {
-    const pts = (kbReport?.graphs?.personality_points || {}) as Record<string, number>;
+    const pts = kbReport?.graphs?.personality_points || {};
     const order: AB[] = ["A", "B", "C", "D"];
     return order.map((k) => ({
       name: k,
@@ -899,23 +780,18 @@ export default function VisibilityReportClient({
     }));
   }, [kbReport?.graphs]);
 
-  // ✅ Pillars: prefer signals.pillar_scores, else graphs.pillars, else derived
   const pillars = useMemo(() => {
-    const sP = (kbReport?.signals?.pillar_scores || {}) as Record<string, number>;
-    if (sP && typeof sP === "object" && Object.keys(sP).length > 0) return sP;
-
-    const gP = (kbReport?.graphs?.pillars || {}) as Record<string, number>;
-    if (gP && typeof gP === "object" && Object.keys(gP).length > 0) return gP;
+    const apiPillars = (kbReport?.graphs?.pillars || {}) as Record<string, number>;
+    const hasApi = apiPillars && typeof apiPillars === "object" && Object.keys(apiPillars).length > 0;
+    if (hasApi) return apiPillars;
 
     const tc = (kbReport?.graphs?.tier_counts || {}) as Record<string, number>;
-    return derivePillarsFromTierCounts(tc) || {};
-  }, [kbReport?.signals, kbReport?.graphs]);
+    const derived = derivePillarsFromTierCounts(tc);
+    return derived || {};
+  }, [kbReport?.graphs]);
 
   const weakest = kbReport?.signals?.weakest_pillar ?? null;
   const strongest = kbReport?.signals?.strongest_pillar ?? null;
-
-  const ai = kbReport?.ai ?? null;
-  const aiError = safeString(kbReport?.meta?.ai_error);
 
   async function downloadPdf() {
     try {
@@ -954,10 +830,7 @@ export default function VisibilityReportClient({
         }
       }
 
-      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
-        /[^\w\-]+/g,
-        "_"
-      );
+      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(/[^\w\-]+/g, "_");
       pdf.save(safeName);
     } catch (e: any) {
       console.error("[visibility] pdf export failed", e);
@@ -973,10 +846,10 @@ export default function VisibilityReportClient({
         setLoading(true);
         setErr(null);
 
-        // Portal meta (taker + next steps)
-        const portalUrl = `/api/public/test/${encodeURIComponent(
-          token
-        )}/report?tid=${encodeURIComponent(tid)}${
+        if (!token) throw new Error("Missing token");
+        if (!tid) throw new Error("Missing tid (taker id). Ensure URL includes ?tid=...");
+
+        const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}${
           src ? `&src=${encodeURIComponent(src)}` : ""
         }`;
 
@@ -984,10 +857,9 @@ export default function VisibilityReportClient({
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
 
-        // Visibility KB report (includes AI injected by API)
-        const kbUrl = `/api/public/visibility/${encodeURIComponent(
-          token
-        )}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
+        const kbUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+          tid
+        )}&audience=taker_report`;
 
         const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
@@ -1023,21 +895,16 @@ export default function VisibilityReportClient({
     return (
       <Shell>
         <div className="mx-auto max-w-6xl p-6 space-y-4">
-          <div className="text-2xl font-semibold">
-            Couldn’t load Visibility report
-          </div>
+          <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
           </p>
           <div
             className="rounded-2xl p-4 text-xs"
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: `1px solid ${BRAND.border}`,
-            }}
+            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BRAND.border}` }}
           >
             <div>token: {token}</div>
-            <div>tid: {tid}</div>
+            <div>tid: {tid || "—"}</div>
           </div>
           <Link href={`/t/${token}`} className="underline text-sm">
             Go back
@@ -1047,24 +914,17 @@ export default function VisibilityReportClient({
     );
   }
 
-  const tierColor = tier ? BRAND.tier[tier] : "rgba(255,255,255,0.85)";
-  const styleColor = style ? BRAND.ab[style] : "rgba(255,255,255,0.85)";
-  const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
+  const sectionsAll = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
+  const byKey = new Map<string, Section>();
+  for (const s of sectionsAll) byKey.set(s.key, s);
 
-  // --- section mapping helpers ---
-  const getSection = (key: string) => sections.find((s) => s.key === key);
-  const sectionOrder: string[] = [
-    // intro
-    "welcome",
-    "how_to_use",
-    "understanding_visibility_ladder",
-    "tiers_and_levels",
-    "behaviour_profiles",
+  // Intro sections (should come from KB once inserted there)
+  const introKeys = ["welcome", "how_to_use", "understanding", "tiers_levels", "behaviour_profiles"];
+  const introSections = introKeys.map((k) => byKey.get(k)).filter(Boolean) as Section[];
 
-    // AI layer (not a KB section)
-    "__ai_insights__",
-
-    // dynamic
+  // Dynamic report sections (existing keys)
+  const dynamicKeys = [
+    "framework_foundation",
     "snapshot",
     "pillars",
     "level_meaning",
@@ -1076,252 +936,280 @@ export default function VisibilityReportClient({
     "possible_next",
     "closing",
   ];
+  const dynamicSections = dynamicKeys.map((k) => byKey.get(k)).filter(Boolean) as Section[];
 
-  const renderSectionWithInjectedGraphs = (s: Section) => {
-    // Graph injection per section (keeps report readable)
-    if (s.key === "tiers_and_levels") {
-      return (
-        <SectionCard key={s.key} section={s}>
-          <div className="rounded-2xl border p-5" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
-            <div className="text-sm font-semibold">Your ladder position</div>
-            <div className="mt-1 text-xs" style={{ color: BRAND.textFaint }}>
-              20 levels across 4 tiers. You’re highlighted at your level.
-            </div>
-            <LadderGrid level={level || 1} />
-            <div className="mt-3 text-xs" style={{ color: BRAND.textFaint }}>
-              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20 Magnetic
-            </div>
-            <TierPyramid tier={tier || tierBand(level || 1)} level={level || 1} />
-          </div>
-        </SectionCard>
-      );
-    }
-
-    if (s.key === "snapshot") {
-      return (
-        <SectionCard key={s.key} section={s}>
-          <div className="rounded-2xl border p-5" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
-            <div className="text-sm font-semibold">Signal distribution</div>
-            <div className="mt-1 text-xs" style={{ color: BRAND.textFaint }}>
-              How your answers across Q9–Q25 mapped into each tier.
-            </div>
-            <div className="mt-4 h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={tierCountsData} barCategoryGap={22}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                    contentStyle={{
-                      background: "rgba(7,18,38,0.92)",
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: 14,
-                      color: "white",
-                    }}
-                    labelStyle={{ color: "rgba(255,255,255,0.9)" }}
-                  />
-                  <Bar dataKey="value" radius={[14, 14, 6, 6]}>
-                    {tierCountsData.map((d) => (
-                      <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </SectionCard>
-      );
-    }
-
-    if (s.key === "pillars") {
-      return (
-        <SectionCard key={s.key} section={s}>
-          <div className="rounded-2xl border p-5" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
-            <div className="text-sm font-semibold">Pillars overview</div>
-            <div className="mt-1 text-xs" style={{ color: BRAND.textFaint }}>
-              Discoverability, Trust, and Conversion — a quick view of how the market is likely experiencing you.
-            </div>
-            <div className="mt-4">
-              <PillarsBars pillars={pillars} weakest={weakest} strongest={strongest} />
-            </div>
-          </div>
-        </SectionCard>
-      );
-    }
-
-    if (s.key === "behaviour_profiles") {
-      return (
-        <SectionCard key={s.key} section={s}>
-          <div className="rounded-2xl border p-5" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
-            <div className="text-sm font-semibold">Your execution style</div>
-            <div className="mt-1 text-xs" style={{ color: BRAND.textFaint }}>
-              Based on Q1–Q8 weighting. This helps explain what styles of visibility work will feel natural for you.
-            </div>
-
-            <div className="mt-4 h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={personalityData} barCategoryGap={24}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                    contentStyle={{
-                      background: "rgba(7,18,38,0.92)",
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: 14,
-                      color: "white",
-                    }}
-                    labelStyle={{ color: "rgba(255,255,255,0.9)" }}
-                  />
-                  <Bar dataKey="value" radius={[14, 14, 6, 6]}>
-                    {personalityData.map((d) => (
-                      <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="mt-3 text-sm" style={{ color: BRAND.textDim }}>
-              Primary style:{" "}
-              <span className="font-semibold" style={{ color: styleColor }}>
-                {style || "—"}
-              </span>
-            </div>
-          </div>
-        </SectionCard>
-      );
-    }
-
-    return <SectionCard key={s.key} section={s} />;
-  };
+  const ai = kbReport?.ai ?? null;
+  const aiError = safeString(kbReport?.meta?.ai_error);
 
   return (
     <Shell>
       <div ref={reportRootRef} className="mx-auto max-w-6xl p-6 space-y-6">
-        {/* -------- Polished header (matches your spec) -------- */}
+        {/* ---------------- Header (polished) ---------------- */}
         <GlassCard
-          title={undefined}
-          subtitle={undefined}
+          title={orgName}
+          subtitle={testName}
           right={
-            <div
-              className="rounded-2xl border p-4 min-w-[280px]"
-              style={{
-                borderColor: BRAND.border,
-                background: "rgba(0,0,0,0.18)",
-              }}
-            >
-              <div className="text-xs" style={{ color: BRAND.textFaint }}>
-                Scores
+            <div className="flex flex-col items-end gap-3">
+              <div className="flex gap-2">
+                <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
+                {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton> : null}
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <div style={{ color: BRAND.textFaint }}>Tier</div>
-                  <div className="font-semibold" style={{ color: tierColor }}>
-                    {tier || "—"}
+
+              <div
+                className="rounded-2xl border p-4 min-w-[260px]"
+                style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
+              >
+                <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                  Scores
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div style={{ color: BRAND.textFaint }}>Tier</div>
+                    <div className="font-semibold" style={{ color: tierColor }}>
+                      {tier || "—"}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ color: BRAND.textFaint }}>Level</div>
-                  <div className="font-semibold">
-                    {Number.isFinite(level) && level > 0 ? level : "—"}
+                  <div>
+                    <div style={{ color: BRAND.textFaint }}>Level</div>
+                    <div className="font-semibold">{Number.isFinite(level) && level > 0 ? level : "—"}</div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ color: BRAND.textFaint }}>Readiness</div>
-                  <div className="font-semibold">{readinessLabel(readiness)}</div>
-                </div>
-                <div>
-                  <div style={{ color: BRAND.textFaint }}>Style</div>
-                  <div className="font-semibold" style={{ color: styleColor }}>
-                    {style || "—"}
+                  <div>
+                    <div style={{ color: BRAND.textFaint }}>Readiness</div>
+                    <div className="font-semibold">{readinessLabel(readiness)}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: BRAND.textFaint }}>Style</div>
+                    <div className="font-semibold" style={{ color: styleColor }}>
+                      {style || "—"}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           }
         >
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            {/* Left side header content */}
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                {orgLogo ? (
-                  <div
-                    className="h-12 w-12 rounded-xl border overflow-hidden bg-white/10 shrink-0"
-                    style={{ borderColor: BRAND.border }}
-                  >
-                    <img
-                      src={orgLogo}
-                      alt={orgName}
-                      className="h-full w-full object-cover"
-                      onError={(e: any) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="h-12 w-12 rounded-xl border bg-white/5 shrink-0"
-                    style={{ borderColor: BRAND.border }}
-                  />
-                )}
-
-                <div className="min-w-0">
-                  <div className="text-xl font-semibold truncate">{orgName}</div>
-                  <div className="text-sm" style={{ color: BRAND.textDim }}>
-                    {testName}
-                  </div>
-                </div>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4 items-center">
+            {orgLogo ? (
+              <div
+                className="h-12 w-12 rounded-2xl border overflow-hidden bg-white/5 flex items-center justify-center"
+                style={{ borderColor: "rgba(255,255,255,0.14)" }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={orgLogo}
+                  alt={orgName}
+                  className="h-full w-full object-cover"
+                  onError={(e: any) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
+            ) : (
+              <div />
+            )}
 
-              <div className="mt-4 space-y-1 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
-                <div>
-                  <span style={{ color: BRAND.textFaint }}>Prepared for:</span>{" "}
-                  <span className="font-semibold">{takerName}</span>
-                </div>
-                <div>
-                  <span style={{ color: BRAND.textFaint }}>Date:</span>{" "}
-                  <span className="font-semibold">{reportDate}</span>
-                </div>
-                <div>
-                  <span style={{ color: BRAND.textFaint }}>Framework created by:</span>{" "}
-                  <span className="font-semibold">Bogdan Stan</span>
-                </div>
+            <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm" style={{ color: BRAND.textDim }}>
+              <div>
+                <span style={{ color: BRAND.textFaint }}>Prepared for </span>
+                <span className="font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {takerName}
+                </span>
               </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
-                {nextStepsUrl ? (
-                  <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton>
-                ) : null}
+              <div>
+                <span style={{ color: BRAND.textFaint }}>Date </span>
+                <span className="font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {generatedDate}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: BRAND.textFaint }}>Framework created by </span>
+                <span className="font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  Bogdan Stan
+                </span>
               </div>
             </div>
+          </div>
 
-            {/* Right side is handled by GlassCard.right */}
+          <div className="mt-4 text-white/85">
+            <span className="font-semibold" style={{ color: tierColor }}>
+              {tier || "—"}
+            </span>{" "}
+            {level ? (
+              <>
+                • Level <span className="font-semibold">{level}</span>
+              </>
+            ) : null}{" "}
+            {readiness ? (
+              <>
+                • <span className="font-semibold">{readinessLabel(readiness)}</span>
+              </>
+            ) : null}
           </div>
         </GlassCard>
 
-        {/* -------- Sections with graphs in the relevant places -------- */}
-        <div className="space-y-6">
-          {sectionOrder.map((k) => {
-            if (k === "__ai_insights__") {
-              return (
-                <InsightsCard key={k} ai={ai} error={aiError || null} loading={false} />
-              );
-            }
+        {/* ---------------- Intro + AI ---------------- */}
+        {introSections.length ? (
+          <div className="space-y-6">
+            {introSections.map((s) => (
+              <NarrativeSection key={s.key} section={s} />
+            ))}
+          </div>
+        ) : (
+          <SectionCard
+            title="Intro sections (pending)"
+            subtitle="Once these are inserted into visibility.kb_blocks, they will render here automatically."
+          >
+            <div className="text-sm" style={{ color: BRAND.textDim }}>
+              Missing KB section keys (expected): <b>welcome</b>, <b>how_to_use</b>, <b>understanding</b>,{" "}
+              <b>tiers_levels</b>, <b>behaviour_profiles</b>.
+            </div>
+          </SectionCard>
+        )}
 
-            const s = getSection(k);
-            if (!s) return null;
-            return renderSectionWithInjectedGraphs(s);
-          })}
-        </div>
+        <InsightsCard ai={ai} error={aiError || null} loading={false} />
 
-        {/* Small “engine” footer but unobtrusive (optional). Remove if you don't want it. */}
-        <div className="text-xs text-center" style={{ color: BRAND.textFaint }}>
-          engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1}
-        </div>
+        {/* ---------------- Understanding section + graphs aligned ---------------- */}
+        <SectionCard
+          title="Understanding the Visibility Ladder"
+          subtitle="Tiers describe your overall positioning. Levels show how stable and consistent your signals are within that tier."
+        >
+          <div className="text-sm leading-6" style={{ color: "rgba(255,255,255,0.85)" }}>
+            The ladder has four tiers (Invisible, Emerging, Established, Magnetic) and 20 levels. Your tier answers:{" "}
+            <b>“How does the market currently place you?”</b> Your level answers:{" "}
+            <b>“How consistent and reliable are your signals?”</b>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div
+              className="rounded-2xl border p-5"
+              style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+            >
+              <div className="text-base font-semibold">Your ladder position</div>
+              <div className="mt-1 text-xs" style={{ color: BRAND.textFaint }}>
+                How to read this: your highlighted number is your current level. Levels 1–5 Invisible, 6–10 Emerging,
+                11–15 Established, 16–20 Magnetic.
+              </div>
+              <LadderGrid level={level || 1} />
+              <div className="mt-3 text-xs" style={{ color: BRAND.textFaint }}>
+                Pyramid view shows the tier ordering at a glance (Magnetic at top → Invisible at bottom).
+              </div>
+              <TierPyramid tier={tier || tierBand(level || 1)} level={level || 1} />
+            </div>
+
+            <div
+              className="rounded-2xl border p-5"
+              style={{ borderColor: "rgba(255,255,255,0.14)", background: "rgba(0,0,0,0.14)" }}
+            >
+              <div className="text-base font-semibold">Signal distribution</div>
+              <div className="mt-1 text-xs" style={{ color: BRAND.textFaint }}>
+                How to read this: the mix of your answers across tiers influences your dominant tier and your stability
+                level.
+              </div>
+
+              <div className="mt-4 h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={tierCountsData} barCategoryGap={22}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
+                    <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                    <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                      contentStyle={{
+                        background: "rgba(7,18,38,0.92)",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        borderRadius: 14,
+                        color: "white",
+                      }}
+                      labelStyle={{ color: "rgba(255,255,255,0.9)" }}
+                    />
+                    <Bar dataKey="value" radius={[14, 14, 6, 6]}>
+                      {tierCountsData.map((d) => (
+                        <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* ---------------- Pillars + Behaviour (graphs placed with meaning) ---------------- */}
+        <SectionCard
+          title="Your Visibility Pillars"
+          subtitle="Discoverability, Trust, and Conversion shape how the market responds to you."
+        >
+          <div className="text-sm leading-6" style={{ color: "rgba(255,255,255,0.85)" }}>
+            Strong visibility is not only being seen. If one pillar lags, momentum slows. The goal is to strengthen the
+            weakest pillar until the market experience becomes predictable.
+          </div>
+
+          <div className="mt-5">
+            <PillarsBars pillars={pillars} weakest={weakest} strongest={strongest} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Your behaviour profile" subtitle="Based on Q1–Q8 weighting (how you naturally execute growth).">
+          <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
+            This chart shows your execution style distribution (A–D). Your primary style is highlighted.
+          </div>
+
+          <div className="mt-4 h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={personalityData} barCategoryGap={24}>
+                <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
+                <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
+                <Tooltip
+                  cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                  contentStyle={{
+                    background: "rgba(7,18,38,0.92)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: 14,
+                    color: "white",
+                  }}
+                  labelStyle={{ color: "rgba(255,255,255,0.9)" }}
+                />
+                <Bar dataKey="value" radius={[14, 14, 6, 6]}>
+                  {personalityData.map((d) => (
+                    <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="mt-3 text-sm" style={{ color: BRAND.textDim }}>
+            Primary style:{" "}
+            <span className="font-semibold" style={{ color: styleColor }}>
+              {style || "—"}
+            </span>
+          </div>
+        </SectionCard>
+
+        {/* ---------------- Dynamic narrative (after intro) ---------------- */}
+        <GlassCard
+          title="Your personalised report"
+          subtitle="This narrative is selected dynamically from the Visibility Ladder knowledge base."
+          right={
+            <div className="text-xs" style={{ color: BRAND.textFaint }}>
+              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1}
+            </div>
+          }
+        >
+          <div className="mt-5 space-y-6">
+            {dynamicSections.length ? (
+              dynamicSections.map((s) => <NarrativeSection key={s.key} section={s} />)
+            ) : (
+              <div
+                className="rounded-2xl p-4 text-sm"
+                style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
+              >
+                No narrative sections were returned yet.
+              </div>
+            )}
+          </div>
+        </GlassCard>
       </div>
     </Shell>
   );
