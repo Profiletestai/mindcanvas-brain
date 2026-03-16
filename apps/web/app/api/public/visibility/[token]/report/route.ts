@@ -98,11 +98,17 @@ function aiEnabled() {
 }
 
 function openaiModel() {
-  return (
+  const m =
     process.env.OPENAI_VISIBILITY_MODEL ||
     process.env.OPENAI_MODEL ||
-    "gpt-4.1-mini"
-  );
+    "gpt-4.1-mini";
+
+  // Guardrail: if someone accidentally put the API key into a model env var
+  if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) {
+    return "gpt-4.1-mini";
+  }
+
+  return m;
 }
 
 function openaiKey() {
