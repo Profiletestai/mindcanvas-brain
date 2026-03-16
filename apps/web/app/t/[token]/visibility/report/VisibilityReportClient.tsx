@@ -82,6 +82,7 @@ type VisibilityKbReport = {
     org_logo_url?: string | null;
     test_name?: string | null;
     generated_at?: string | null;
+
     mode?: "deterministic" | "ai" | string;
     ai_error?: string;
   };
@@ -401,7 +402,6 @@ function LadderGrid({ level }: { level: number }) {
 }
 
 function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
-  // NOTE: your “pyramid order” polish (Magnetic top → Invisible bottom) will be handled later.
   const tiers: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
 
   return (
@@ -434,7 +434,10 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
                   <div className="flex items-center gap-3">
                     <div
                       className="h-3 w-3 rounded-full"
-                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
+                      style={{
+                        background: c,
+                        boxShadow: `0 0 12px ${c}66`,
+                      }}
                     />
                     <div className="text-sm font-semibold">{t}</div>
                   </div>
@@ -451,7 +454,7 @@ function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
   );
 }
 
-/* ---------------- Pillars (fallback derivation) ---------------- */
+/* ---------------- Pillars data (use API pillars if present, else derive from tier_counts) ---------------- */
 
 function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
   const inv = Number(tierCounts?.Invisible ?? 0);
@@ -459,6 +462,7 @@ function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
   const est = Number(tierCounts?.Established ?? 0);
   const mag = Number(tierCounts?.Magnetic ?? 0);
   const total = inv + em + est + mag;
+
   if (!total) return null;
 
   const discoverability = ((total - inv) / total) * 100;
@@ -471,6 +475,8 @@ function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
     conversion: Math.round(conversion),
   };
 }
+
+/* ---------------- Pillars graphic (bars) ---------------- */
 
 function PillarsBars({
   pillars,
@@ -489,7 +495,8 @@ function PillarsBars({
     ...p,
     value: Number((pillars as any)?.[p.key] ?? 0),
     color: BRAND.pillars[p.key] || BRAND.accent,
-    tag: p.key === strongest ? "Strongest" : p.key === weakest ? "Weakest" : "",
+    tag:
+      p.key === strongest ? "Strongest" : p.key === weakest ? "Weakest" : "",
   }));
 
   const hasAny = items.some((x) => Number.isFinite(x.value) && x.value > 0);
@@ -551,6 +558,14 @@ function PillarsBars({
                 }}
               />
             </div>
+
+            <div className="text-xs" style={{ color: BRAND.textFaint }}>
+              {it.key === "discoverability"
+                ? "Can the market reliably find you?"
+                : it.key === "trust"
+                ? "Does it feel safe and credible to choose you?"
+                : "Is it easy to take action right now?"}
+            </div>
           </div>
         );
       })}
@@ -558,7 +573,7 @@ function PillarsBars({
   );
 }
 
-/* ---------------- Narrative section rendering ---------------- */
+/* ---------------- Narrative section rendering (no double headings) ---------------- */
 
 function SectionCard({ section }: { section: Section }) {
   const title = safeString(section?.title) || safeString(section?.key);
@@ -596,7 +611,9 @@ function SectionCard({ section }: { section: Section }) {
                   }}
                 >
                   <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
-                  <span style={{ color: "rgba(255,255,255,0.88)" }}>{short}</span>
+                  <span style={{ color: "rgba(255,255,255,0.88)" }}>
+                    {short}
+                  </span>
                 </div>
               ) : null}
 
@@ -622,7 +639,7 @@ function SectionCard({ section }: { section: Section }) {
   );
 }
 
-/* ---------------- Insights (AI) ---------------- */
+/* ---------------- AI rendering (heading only, no footer/model text) ---------------- */
 
 function InsightsCard({
   ai,
@@ -663,6 +680,114 @@ function InsightsCard({
               {ai.executive_summary}
             </div>
           </div>
+
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: "rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.14)",
+            }}
+          >
+            <div className="text-sm font-semibold">What this means</div>
+            <div
+              className="mt-2 text-sm leading-6"
+              style={{ color: "rgba(255,255,255,0.86)" }}
+            >
+              {ai.what_this_means}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">Strengths</div>
+              <ul
+                className="mt-2 list-disc pl-5 text-sm space-y-1"
+                style={{ color: "rgba(255,255,255,0.86)" }}
+              >
+                {ai.strengths?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">Friction</div>
+              <ul
+                className="mt-2 list-disc pl-5 text-sm space-y-1"
+                style={{ color: "rgba(255,255,255,0.86)" }}
+              >
+                {ai.friction?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: "rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.14)",
+            }}
+          >
+            <div className="text-sm font-semibold">Strategic opportunity</div>
+            <div
+              className="mt-2 text-sm leading-6"
+              style={{ color: "rgba(255,255,255,0.86)" }}
+            >
+              {ai.strategic_opportunity}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">7-day plan</div>
+              <ol
+                className="mt-2 list-decimal pl-5 text-sm space-y-1"
+                style={{ color: "rgba(255,255,255,0.86)" }}
+              >
+                {ai.plan_7_days?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            </div>
+
+            <div
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "rgba(255,255,255,0.14)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="text-sm font-semibold">30-day plan</div>
+              <ol
+                className="mt-2 list-decimal pl-5 text-sm space-y-1"
+                style={{ color: "rgba(255,255,255,0.86)" }}
+              >
+                {ai.plan_30_days?.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
@@ -673,12 +798,11 @@ function InsightsCard({
   );
 }
 
-/* ---------------- Query param fallback (the PROPER FIX) ---------------- */
+/* ---------------- URL param helpers (FIX for Missing tid/sid) ---------------- */
 
 function getQueryParam(name: string): string {
   if (typeof window === "undefined") return "";
-  const sp = new URLSearchParams(window.location.search);
-  return (sp.get(name) || "").trim();
+  return new URLSearchParams(window.location.search).get(name)?.trim() || "";
 }
 
 /* ---------------- Main ---------------- */
@@ -689,7 +813,7 @@ export default function VisibilityReportClient({
   src,
 }: {
   token: string;
-  tid?: string; // ✅ allow undefined; we self-heal via URL
+  tid?: string; // ✅ allow missing; we will read from URL
   src?: string;
 }) {
   const reportRootRef = useRef<HTMLDivElement | null>(null);
@@ -697,15 +821,18 @@ export default function VisibilityReportClient({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const [portalMeta, setPortalMeta] = useState<PortalReportResponse["data"] | null>(null);
+  const [portalMeta, setPortalMeta] =
+    useState<PortalReportResponse["data"] | null>(null);
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
 
-  // ✅ Effective IDs (robust)
+  // ✅ Self-heal ids
   const effectiveTid = safeString(tid) || getQueryParam("tid");
   const effectiveSid = getQueryParam("sid");
 
-  const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
-  const testName = portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
+  const orgName =
+    portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
+  const testName =
+    portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
   const takerName = fullName(portalMeta?.taker);
 
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
@@ -717,11 +844,13 @@ export default function VisibilityReportClient({
 
   const tierCountsData = useMemo(() => {
     const counts = kbReport?.graphs?.tier_counts || {};
-    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map((t) => ({
-      name: t,
-      value: Number((counts as any)[t] ?? 0),
-      color: BRAND.tier[t],
-    }));
+    return (["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]).map(
+      (t) => ({
+        name: t,
+        value: Number((counts as any)[t] ?? 0),
+        color: BRAND.tier[t],
+      })
+    );
   }, [kbReport?.graphs]);
 
   const personalityData = useMemo(() => {
@@ -735,12 +864,18 @@ export default function VisibilityReportClient({
   }, [kbReport?.graphs]);
 
   const pillars = useMemo(() => {
-    const apiPillars = (kbReport?.graphs?.pillars || {}) as Record<string, number>;
-    const hasApi = apiPillars && typeof apiPillars === "object" && Object.keys(apiPillars).length > 0;
+    const apiPillars = (kbReport?.graphs?.pillars ||
+      {}) as Record<string, number>;
+    const hasApi =
+      apiPillars &&
+      typeof apiPillars === "object" &&
+      Object.keys(apiPillars).length > 0;
+
     if (hasApi) return apiPillars;
 
     const tc = (kbReport?.graphs?.tier_counts || {}) as Record<string, number>;
-    return derivePillarsFromTierCounts(tc) || {};
+    const derived = derivePillarsFromTierCounts(tc);
+    return derived || {};
   }, [kbReport?.graphs]);
 
   const weakest = kbReport?.signals?.weakest_pillar ?? null;
@@ -802,27 +937,36 @@ export default function VisibilityReportClient({
         setLoading(true);
         setErr(null);
 
-        // ✅ HARD GUARD: do not call API without tid/sid
+        // ✅ Guard: never call API without tid/sid
         if (!effectiveTid && !effectiveSid) {
-          throw new Error("Missing tid or sid in the URL. Add ?tid=<takerId> to the report URL.");
+          throw new Error(
+            "Missing tid or sid. Your report URL must include ?tid=<takerId> (or ?sid=<submissionId>)."
+          );
         }
 
-        // 1) Portal report (requires tid)
+        // 1) Portal report requires tid. If we only have sid, we skip portal meta.
         if (effectiveTid) {
-          const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-            effectiveTid
-          )}${src ? `&src=${encodeURIComponent(src)}` : ""}`;
+          const portalUrl = `/api/public/test/${encodeURIComponent(
+            token
+          )}/report?tid=${encodeURIComponent(effectiveTid)}${
+            src ? `&src=${encodeURIComponent(src)}` : ""
+          }`;
 
           const portalRes = await fetchJson<PortalReportResponse>(portalUrl);
           if (cancelled) return;
           setPortalMeta(portalRes?.data ?? null);
+        } else {
+          setPortalMeta(null);
         }
 
-        // 2) Visibility report (KB+AI) — allow tid OR sid
+        // 2) Visibility report supports tid OR sid
         const qs = effectiveSid
           ? `sid=${encodeURIComponent(effectiveSid)}`
           : `tid=${encodeURIComponent(effectiveTid)}`;
-        const kbUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?${qs}&audience=taker_report`;
+
+        const kbUrl = `/api/public/visibility/${encodeURIComponent(
+          token
+        )}/report?${qs}&audience=taker_report`;
 
         const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
@@ -858,10 +1002,14 @@ export default function VisibilityReportClient({
     return (
       <Shell>
         <div className="mx-auto max-w-6xl p-6 space-y-4">
-          <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
+          <div className="text-2xl font-semibold">
+            Couldn’t load Visibility report
+          </div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
           </p>
+
+          {/* Debug (helps us diagnose broken URLs instantly) */}
           <div
             className="rounded-2xl p-4 text-xs"
             style={{
@@ -874,6 +1022,7 @@ export default function VisibilityReportClient({
             <div>tid(url): {effectiveTid}</div>
             <div>sid(url): {effectiveSid}</div>
           </div>
+
           <Link href={`/t/${token}`} className="underline text-sm">
             Go back
           </Link>
@@ -898,13 +1047,20 @@ export default function VisibilityReportClient({
           right={
             <div className="flex flex-col gap-3 items-end">
               <div className="flex flex-wrap gap-2 justify-end">
-                <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
-                {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next step</PrimaryButton> : null}
+                <SecondaryButton onClick={downloadPdf}>
+                  Download PDF
+                </SecondaryButton>
+                {nextStepsUrl ? (
+                  <PrimaryButton href={nextStepsUrl}>Next step</PrimaryButton>
+                ) : null}
               </div>
 
               <div
                 className="rounded-2xl border p-4 min-w-[240px]"
-                style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.18)" }}
+                style={{
+                  borderColor: BRAND.border,
+                  background: "rgba(0,0,0,0.18)",
+                }}
               >
                 <div className="text-xs" style={{ color: BRAND.textFaint }}>
                   At a glance
@@ -918,11 +1074,15 @@ export default function VisibilityReportClient({
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Level</div>
-                    <div className="font-semibold">{Number.isFinite(level) && level > 0 ? level : "—"}</div>
+                    <div className="font-semibold">
+                      {Number.isFinite(level) && level > 0 ? level : "—"}
+                    </div>
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Readiness</div>
-                    <div className="font-semibold">{readinessLabel(readiness)}</div>
+                    <div className="font-semibold">
+                      {readinessLabel(readiness)}
+                    </div>
                   </div>
                   <div>
                     <div style={{ color: BRAND.textFaint }}>Style</div>
@@ -946,7 +1106,10 @@ export default function VisibilityReportClient({
             ) : null}{" "}
             {readiness ? (
               <>
-                • <span className="font-semibold">{readinessLabel(readiness)}</span>
+                •{" "}
+                <span className="font-semibold">
+                  {readinessLabel(readiness)}
+                </span>
               </>
             ) : null}
           </div>
@@ -955,21 +1118,37 @@ export default function VisibilityReportClient({
         <InsightsCard ai={ai} error={aiError || null} loading={false} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GlassCard title="Your ladder position" subtitle="20 levels across 4 tiers. You’re highlighted at your level.">
+          <GlassCard
+            title="Your ladder position"
+            subtitle="20 levels across 4 tiers. You’re highlighted at your level."
+          >
             <LadderGrid level={level || 1} />
             <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
-              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20 Magnetic
+              Bands: 1–5 Invisible • 6–10 Emerging • 11–15 Established • 16–20
+              Magnetic
             </div>
             <TierPyramid tier={tier || tierBand(level || 1)} level={level || 1} />
           </GlassCard>
 
-          <GlassCard title="Signal distribution" subtitle="How your answers across Q9–Q25 mapped into each tier.">
+          <GlassCard
+            title="Signal distribution"
+            subtitle="How your answers across Q9–Q25 mapped into each tier."
+          >
             <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={tierCountsData} barCategoryGap={22}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeDasharray="4 6"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: "rgba(255,255,255,0.78)" }}
+                  />
+                  <YAxis
+                    tick={{ fill: "rgba(255,255,255,0.70)" }}
+                    allowDecimals={false}
+                  />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     contentStyle={{
@@ -992,19 +1171,38 @@ export default function VisibilityReportClient({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <GlassCard title="Pillars overview" subtitle="Discoverability, Trust, and Conversion.">
+          <GlassCard
+            title="Pillars overview"
+            subtitle="Discoverability, Trust, and Conversion."
+          >
             <div className="mt-4">
-              <PillarsBars pillars={pillars} weakest={weakest} strongest={strongest} />
+              <PillarsBars
+                pillars={pillars}
+                weakest={weakest}
+                strongest={strongest}
+              />
             </div>
           </GlassCard>
 
-          <GlassCard title="Your execution style" subtitle="Based on Q1–Q8 weighting.">
+          <GlassCard
+            title="Your execution style"
+            subtitle="Based on Q1–Q8 weighting."
+          >
             <div className="mt-4 h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={personalityData} barCategoryGap={24}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.12)" strokeDasharray="4 6" />
-                  <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.78)" }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.70)" }} allowDecimals={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.12)"
+                    strokeDasharray="4 6"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: "rgba(255,255,255,0.78)" }}
+                  />
+                  <YAxis
+                    tick={{ fill: "rgba(255,255,255,0.70)" }}
+                    allowDecimals={false}
+                  />
                   <Tooltip
                     cursor={{ fill: "rgba(255,255,255,0.05)" }}
                     contentStyle={{
@@ -1038,7 +1236,8 @@ export default function VisibilityReportClient({
           subtitle="This narrative is selected dynamically from the Visibility Ladder knowledge base."
           right={
             <div className="text-xs" style={{ color: BRAND.textFaint }}>
-              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1}
+              engine: {safeString(kbReport.engine_key || "visibility_v1")} • v
+              {kbReport.version ?? 1}
             </div>
           }
         >
@@ -1048,7 +1247,10 @@ export default function VisibilityReportClient({
             ) : (
               <div
                 className="rounded-2xl p-4 text-sm"
-                style={{ background: "rgba(0,0,0,0.18)", border: `1px solid ${BRAND.border}` }}
+                style={{
+                  background: "rgba(0,0,0,0.18)",
+                  border: `1px solid ${BRAND.border}`,
+                }}
               >
                 No narrative sections were returned yet.
               </div>
