@@ -40,14 +40,14 @@ function safeString(x: any) {
 
 function defaultTitles(key: string) {
   const m: Record<string, string> = {
-    // ✅ intro keys (new)
-    welcome: "A Personal Welcome From Bogdan Stan",
-    how_to_use: "How To Use This Report",
-    understanding_visibility_ladder: "Understanding The Visibility Ladder",
+    // ✅ intro keys
+    welcome: "A personal welcome",
+    how_to_use: "How to use this report",
+    understanding: "Understanding the Visibility Ladder",
     tiers_levels: "Explanation of tiers and levels",
     behaviour_profiles: "Explanation of behaviour profiles",
 
-    // existing dynamic keys
+    // ✅ existing keys
     framework_foundation: "Framework foundation",
     snapshot: "Your visibility snapshot",
     pillars: "Your visibility pillars",
@@ -99,10 +99,7 @@ type AiInsights = {
 };
 
 function aiEnabled() {
-  return (
-    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !==
-    "false"
-  );
+  return String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !== "false";
 }
 
 function openaiModel() {
@@ -111,11 +108,7 @@ function openaiModel() {
     process.env.OPENAI_MODEL ||
     "gpt-4.1-mini";
 
-  // Guardrail: prevent accidental API key pasted into model var
-  if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) {
-    return "gpt-4.1-mini";
-  }
-
+  if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) return "gpt-4.1-mini";
   return m;
 }
 
@@ -133,31 +126,11 @@ function aiSchema() {
       properties: {
         executive_summary: { type: "string" },
         what_this_means: { type: "string" },
-        strengths: {
-          type: "array",
-          items: { type: "string" },
-          minItems: 3,
-          maxItems: 7,
-        },
-        friction: {
-          type: "array",
-          items: { type: "string" },
-          minItems: 2,
-          maxItems: 7,
-        },
+        strengths: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 7 },
+        friction: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 7 },
         strategic_opportunity: { type: "string" },
-        plan_7_days: {
-          type: "array",
-          items: { type: "string" },
-          minItems: 3,
-          maxItems: 10,
-        },
-        plan_30_days: {
-          type: "array",
-          items: { type: "string" },
-          minItems: 3,
-          maxItems: 12,
-        },
+        plan_7_days: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 10 },
+        plan_30_days: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 12 },
         closing_note: { type: "string" },
       },
       required: [
@@ -239,7 +212,6 @@ function extractOutputText(respJson: any): string {
   if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
     return respJson.output_text.trim();
   }
-
   const out = Array.isArray(respJson?.output) ? respJson.output : [];
   for (const item of out) {
     if (item?.type !== "message") continue;
@@ -267,7 +239,6 @@ async function generateAiInsights(payload: {
   const model = openaiModel();
   const messages = buildAiPrompt(payload);
 
-  // ✅ Responses API uses text.format (NOT response_format)
   const body = {
     model,
     input: messages,
@@ -314,7 +285,16 @@ function isBadAiCache(row: any): boolean {
   if (!row || typeof row !== "object") return true;
   if (!row.ai || typeof row.ai !== "object") return true;
   const aiErr = safeString(row?.ai_meta?.error) || safeString(row?.meta?.ai_error);
-  return Boolean(aiErr);
+  if (aiErr) return true;
+  return false;
+}
+
+function cachedMissingIntro(cached: any) {
+  const want = new Set(["welcome", "how_to_use", "understanding", "tiers_levels", "behaviour_profiles"]);
+  const secs = Array.isArray(cached?.sections) ? cached.sections : [];
+  const have = new Set(secs.map((s: any) => String(s?.key || "")));
+  for (const k of want) if (!have.has(k)) return true;
+  return false;
 }
 
 /* ---------------- Route ---------------- */
@@ -332,10 +312,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const sb = portal();
     const vis = visibility();
 
-    // ✅ Resolve submission_id first (works for tid OR sid)
-    let submissionId: string | null = sid || null;
-
-    // If tid exists, load taker for strict token validation (public route)
+    // 0) Load taker (required for tid public route)
     let taker: any = null;
     if (tid) {
       const { data: takerRow, error: takerErr } = await sb
@@ -350,6 +327,8 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       taker = takerRow;
     }
 
+    // 1) Resolve submission_id
+    let submissionId: string | null = sid || null;
     if (!submissionId) {
       const { data: subs, error: subsErr } = await vis
         .from("submissions")
@@ -364,39 +343,22 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
 
       const byMeta = (subs || []).find((s: any) => safeString(s?.metadata?.taker_id) === tid) || null;
-
       const byEmail =
         !byMeta && takerEmail
           ? (subs || []).find((s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail) || null
           : null;
-
       const byName =
         !byMeta && !byEmail && takerName
           ? (subs || []).find((s: any) => safeString(s?.taker_name) === takerName) || null
           : null;
 
       const picked = byMeta || byEmail || byName;
-      if (!picked?.id) {
-        return NextResponse.json({ ok: false, error: "No visibility submission found for this token/taker yet." }, { status: 404 });
-      }
+      if (!picked?.id) return NextResponse.json({ ok: false, error: "No visibility submission found for this token/taker yet." }, { status: 404 });
+
       submissionId = String(picked.id);
     }
 
-    // ✅ Load submission row (bulletproof org/test resolution even if tid missing)
-    const { data: submission, error: subErr } = await vis
-      .from("submissions")
-      .select("id, org_id, token, metadata")
-      .eq("id", submissionId)
-      .maybeSingle();
-
-    if (subErr) throw new Error(subErr.message);
-    if (!submission) return NextResponse.json({ ok: false, error: "Submission not found." }, { status: 404 });
-
-    const portalOrgId = submission.org_id;
-    const portalTestId =
-      safeString((submission as any)?.metadata?.portal_test_id) || (taker?.test_id ?? null);
-
-    // Load latest results
+    // 2) Load latest results
     let { data: result, error: resErr } = await vis
       .from("results")
       .select(
@@ -409,6 +371,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     if (resErr) throw new Error(resErr.message);
     if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
 
+    // 3) Ensure pillar signals exist (compute via RPC if missing)
     if (!hasPillarSignals(result)) {
       try {
         const pillarRpc = await callRpc<any>(vis, "compute_pillar_signals_for_submission", {
@@ -447,7 +410,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const engineKey = String(result.engine_key || "visibility_v1");
     const version = Number(result.version || 1);
 
-    // Cache lookup
+    // 4) Cache lookup
     let cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -455,12 +418,19 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       p_version: version,
     });
 
+    // ✅ If cached report exists but is missing intro keys, treat as cache miss (rebuild)
+    if (cached && audience === "taker_report" && cachedMissingIntro(cached)) {
+      cached = null;
+    }
+
+    // deterministic builder
     const buildDeterministic = async () => {
       const signals = {
         tier: result.tier,
         level: Number(result.level ?? 0),
         style: result.personality_type,
         readiness: result.readiness,
+
         pillar_scores: result.pillar_scores || {},
         pillar_band: result.pillar_bands || {},
         weakest_pillar: result.weakest_pillar ?? null,
@@ -468,13 +438,15 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         pattern_tags: result.pattern_tags || [],
       };
 
-      // ✅ intro first, then dynamic
+      // ✅ INTRO KEYS FIRST
       const sectionKeys = [
         "welcome",
         "how_to_use",
-        "understanding_visibility_ladder",
+        "understanding",
         "tiers_levels",
         "behaviour_profiles",
+
+        // ✅ then the existing dynamic narrative
         "framework_foundation",
         "snapshot",
         "pillars",
@@ -510,6 +482,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
         const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
 
+        // still push a stub section so the UI can show “pending” only when truly empty
         sections.push({
           key,
           title: contentBlocks?.[0]?.title || defaultTitles(key),
@@ -537,30 +510,23 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       const { data: orgRow } = await sb
         .from("orgs")
         .select("id, slug, name, logo_url")
-        .eq("id", portalOrgId)
+        .eq("id", taker.org_id)
         .maybeSingle();
 
-      const { data: testRow } = portalTestId
-        ? await sb
-            .from("tests")
-            .select("id, name, slug")
-            .eq("id", portalTestId)
-            .maybeSingle()
-        : { data: null };
+      const { data: testRow } = await sb
+        .from("tests")
+        .select("id, name, slug")
+        .eq("id", taker.test_id)
+        .maybeSingle();
 
       const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
       const testName = (testRow as any)?.name || "Visibility Ladder";
-      const takerName =
-        tid && taker
-          ? [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null
-          : safeString((submission as any)?.metadata?.taker_name) ||
-            safeString((submission as any)?.metadata?.takerName) ||
-            null;
+      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null;
 
       return { signals, graphs, sections, selectedBlocks, orgRow, orgName, testName, takerName };
     };
 
-    // Cache miss: build + write
+    // 5) Cache miss → build report + AI
     if (!cached) {
       const det = await buildDeterministic();
 
@@ -666,14 +632,21 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       });
 
       return NextResponse.json(
-        { ok: true, data: reportJson, __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience } },
+        {
+          ok: true,
+          data: reportJson,
+          __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
+        },
         { status: 200 }
       );
     }
 
-    // Cache hit: return
     return NextResponse.json(
-      { ok: true, data: cached, __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience } },
+      {
+        ok: true,
+        data: cached,
+        __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
+      },
       { status: 200 }
     );
   } catch (e: any) {
