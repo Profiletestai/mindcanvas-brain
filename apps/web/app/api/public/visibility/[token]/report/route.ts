@@ -40,6 +40,14 @@ function safeString(x: any) {
 
 function defaultTitles(key: string) {
   const m: Record<string, string> = {
+    // ✅ intro keys (new)
+    welcome: "A Personal Welcome From Bogdan Stan",
+    how_to_use: "How To Use This Report",
+    understanding_visibility_ladder: "Understanding The Visibility Ladder",
+    tiers_levels: "Explanation of tiers and levels",
+    behaviour_profiles: "Explanation of behaviour profiles",
+
+    // existing dynamic keys
     framework_foundation: "Framework foundation",
     snapshot: "Your visibility snapshot",
     pillars: "Your visibility pillars",
@@ -91,9 +99,9 @@ type AiInsights = {
 };
 
 function aiEnabled() {
-  // default ON unless explicitly disabled
   return (
-    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !== "false"
+    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !==
+    "false"
   );
 }
 
@@ -103,7 +111,7 @@ function openaiModel() {
     process.env.OPENAI_MODEL ||
     "gpt-4.1-mini";
 
-  // Guardrail: if someone accidentally put the API key into a model env var
+  // Guardrail: prevent accidental API key pasted into model var
   if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) {
     return "gpt-4.1-mini";
   }
@@ -176,7 +184,6 @@ function buildAiPrompt(input: {
 }) {
   const { orgName, testName, takerName, signals, graphs, sections } = input;
 
-  // Grounding context: keep tight and deterministic
   const baseNarrative = (sections || [])
     .map((s) => {
       const blocks = Array.isArray(s?.blocks) ? s.blocks : [];
@@ -229,12 +236,10 @@ function buildAiPrompt(input: {
 }
 
 function extractOutputText(respJson: any): string {
-  // Responses API sometimes includes a convenience field `output_text`
   if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
     return respJson.output_text.trim();
   }
 
-  // Standard shape: output[].content[] items
   const out = Array.isArray(respJson?.output) ? respJson.output : [];
   for (const item of out) {
     if (item?.type !== "message") continue;
@@ -262,7 +267,7 @@ async function generateAiInsights(payload: {
   const model = openaiModel();
   const messages = buildAiPrompt(payload);
 
-  // Structured output in Responses API uses `text.format` (NOT response_format)
+  // ✅ Responses API uses text.format (NOT response_format)
   const body = {
     model,
     input: messages,
@@ -299,9 +304,7 @@ async function generateAiInsights(payload: {
     const text = extractOutputText(j);
     if (!text) throw new Error("OpenAI returned no output_text");
 
-    // Because we requested json_schema, output_text should be valid JSON
-    const parsed = JSON.parse(text);
-    return parsed as AiInsights;
+    return JSON.parse(text) as AiInsights;
   } finally {
     clearTimeout(t);
   }
@@ -310,12 +313,8 @@ async function generateAiInsights(payload: {
 function isBadAiCache(row: any): boolean {
   if (!row || typeof row !== "object") return true;
   if (!row.ai || typeof row.ai !== "object") return true;
-
-  // error can live in ai_meta.error or meta.ai_error (older)
   const aiErr = safeString(row?.ai_meta?.error) || safeString(row?.meta?.ai_error);
-  if (aiErr) return true;
-
-  return false;
+  return Boolean(aiErr);
 }
 
 /* ---------------- Route ---------------- */
@@ -327,17 +326,16 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const sid = safeString(req.nextUrl.searchParams.get("sid"));
     const audience = safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
-    if (!token) {
-      return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
-    }
-    if (!tid && !sid) {
-      return NextResponse.json({ ok: false, error: "Missing tid or sid" }, { status: 400 });
-    }
+    if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
+    if (!tid && !sid) return NextResponse.json({ ok: false, error: "Missing tid or sid" }, { status: 400 });
 
     const sb = portal();
     const vis = visibility();
 
-    // 0) Load taker (required for tid public route)
+    // ✅ Resolve submission_id first (works for tid OR sid)
+    let submissionId: string | null = sid || null;
+
+    // If tid exists, load taker for strict token validation (public route)
     let taker: any = null;
     if (tid) {
       const { data: takerRow, error: takerErr } = await sb
@@ -348,14 +346,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         .maybeSingle();
 
       if (takerErr) throw new Error(takerErr.message);
-      if (!takerRow) {
-        return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
-      }
+      if (!takerRow) return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
       taker = takerRow;
     }
-
-    // 1) Resolve submission_id
-    let submissionId: string | null = sid || null;
 
     if (!submissionId) {
       const { data: subs, error: subsErr } = await vis
@@ -384,16 +377,26 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
       const picked = byMeta || byEmail || byName;
       if (!picked?.id) {
-        return NextResponse.json(
-          { ok: false, error: "No visibility submission found for this token/taker yet." },
-          { status: 404 }
-        );
+        return NextResponse.json({ ok: false, error: "No visibility submission found for this token/taker yet." }, { status: 404 });
       }
-
       submissionId = String(picked.id);
     }
 
-    // 2) Load latest results
+    // ✅ Load submission row (bulletproof org/test resolution even if tid missing)
+    const { data: submission, error: subErr } = await vis
+      .from("submissions")
+      .select("id, org_id, token, metadata")
+      .eq("id", submissionId)
+      .maybeSingle();
+
+    if (subErr) throw new Error(subErr.message);
+    if (!submission) return NextResponse.json({ ok: false, error: "Submission not found." }, { status: 404 });
+
+    const portalOrgId = submission.org_id;
+    const portalTestId =
+      safeString((submission as any)?.metadata?.portal_test_id) || (taker?.test_id ?? null);
+
+    // Load latest results
     let { data: result, error: resErr } = await vis
       .from("results")
       .select(
@@ -404,11 +407,8 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result) {
-      return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
-    }
+    if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
 
-    // 3) Ensure pillar signals exist (compute via RPC if missing)
     if (!hasPillarSignals(result)) {
       try {
         const pillarRpc = await callRpc<any>(vis, "compute_pillar_signals_for_submission", {
@@ -447,7 +447,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const engineKey = String(result.engine_key || "visibility_v1");
     const version = Number(result.version || 1);
 
-    // 4) Cache lookup for this audience
+    // Cache lookup
     let cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: audience,
@@ -455,16 +455,12 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       p_version: version,
     });
 
-    // ---------------------------
-    // Helper: build deterministic sections (used on cache miss OR to hydrate missing AI)
-    // ---------------------------
     const buildDeterministic = async () => {
       const signals = {
         tier: result.tier,
         level: Number(result.level ?? 0),
         style: result.personality_type,
         readiness: result.readiness,
-
         pillar_scores: result.pillar_scores || {},
         pillar_band: result.pillar_bands || {},
         weakest_pillar: result.weakest_pillar ?? null,
@@ -472,7 +468,13 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         pattern_tags: result.pattern_tags || [],
       };
 
+      // ✅ intro first, then dynamic
       const sectionKeys = [
+        "welcome",
+        "how_to_use",
+        "understanding_visibility_ladder",
+        "tiers_levels",
+        "behaviour_profiles",
         "framework_foundation",
         "snapshot",
         "pillars",
@@ -535,27 +537,33 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       const { data: orgRow } = await sb
         .from("orgs")
         .select("id, slug, name, logo_url")
-        .eq("id", taker.org_id)
+        .eq("id", portalOrgId)
         .maybeSingle();
 
-      const { data: testRow } = await sb
-        .from("tests")
-        .select("id, name, slug")
-        .eq("id", taker.test_id)
-        .maybeSingle();
+      const { data: testRow } = portalTestId
+        ? await sb
+            .from("tests")
+            .select("id, name, slug")
+            .eq("id", portalTestId)
+            .maybeSingle()
+        : { data: null };
 
       const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
       const testName = (testRow as any)?.name || "Visibility Ladder";
-      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null;
+      const takerName =
+        tid && taker
+          ? [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null
+          : safeString((submission as any)?.metadata?.taker_name) ||
+            safeString((submission as any)?.metadata?.takerName) ||
+            null;
 
       return { signals, graphs, sections, selectedBlocks, orgRow, orgName, testName, takerName };
     };
 
-    // 5) Cache miss → build report
+    // Cache miss: build + write
     if (!cached) {
       const det = await buildDeterministic();
 
-      // Seamless AI: generated at report load and embedded into deterministic payload
       let ai: AiInsights | null = null;
       const ai_meta: any = { enabled: false };
 
@@ -658,125 +666,17 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       });
 
       return NextResponse.json(
-        {
-          ok: true,
-          data: reportJson,
-          __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
-        },
+        { ok: true, data: reportJson, __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience } },
         { status: 200 }
       );
     }
 
-    // 6) Cache hit — STILL ensure AI is present in response (seamless)
-    // If cached deterministic has no AI, we hydrate it here and update cache.
-    if (audience === "taker_report" && aiEnabled()) {
-      const hasAi = cached?.ai && typeof cached.ai === "object";
-      const hasAiError = safeString(cached?.ai_meta?.error) || safeString(cached?.meta?.ai_error);
-
-      if (!hasAi || hasAiError) {
-        const det = await buildDeterministic();
-
-        let ai: AiInsights | null = null;
-        const ai_meta: any = { enabled: true };
-
-        try {
-          const cachedAi = await callRpc<any>(vis, "get_generated_report", {
-            p_submission_id: submissionId,
-            p_audience: "taker_report_ai",
-            p_engine_key: engineKey,
-            p_version: version,
-          });
-
-          if (cachedAi && !isBadAiCache(cachedAi)) {
-            ai = cachedAi.ai as AiInsights;
-            ai_meta.cached = true;
-            ai_meta.model = cachedAi?.ai_meta?.model || null;
-            ai_meta.generated_at = cachedAi?.ai_meta?.generated_at || null;
-          } else {
-            const aiOut = await generateAiInsights({
-              orgName: det.orgName,
-              testName: det.testName,
-              takerName: det.takerName,
-              signals: det.signals,
-              graphs: det.graphs,
-              sections: det.sections,
-            });
-
-            ai = aiOut;
-            ai_meta.cached = false;
-            ai_meta.model = openaiModel();
-            ai_meta.generated_at = new Date().toISOString();
-
-            const aiCacheJson = {
-              token,
-              tid: tid || null,
-              sid: submissionId,
-              submission_id: submissionId,
-              engine_key: engineKey,
-              version,
-              audience: "taker_report_ai",
-              meta: {
-                org_name: det.orgName,
-                org_logo_url: (det.orgRow as any)?.logo_url || null,
-                test_name: det.testName,
-                generated_at: ai_meta.generated_at,
-                mode: "ai",
-              },
-              ai: aiOut,
-              ai_meta,
-            };
-
-            await callRpc<any>(vis, "upsert_generated_report", {
-              p_submission_id: submissionId,
-              p_audience: "taker_report_ai",
-              p_report_json: aiCacheJson,
-              p_signals: det.signals,
-              p_selected_blocks: [],
-              p_engine_key: engineKey,
-              p_version: version,
-            });
-          }
-        } catch (e: any) {
-          ai_meta.error = String(e?.message || e);
-          ai = null;
-        }
-
-        // Merge into cached deterministic payload
-        const merged = {
-          ...cached,
-          engine_key: cached.engine_key || engineKey,
-          version: cached.version ?? version,
-          ai,
-          ai_meta,
-        };
-
-        // Update deterministic cache row with AI embedded (so next load is instant)
-        await callRpc<any>(vis, "upsert_generated_report", {
-          p_submission_id: submissionId,
-          p_audience: audience,
-          p_report_json: merged,
-          p_signals: merged?.signals || det.signals,
-          p_selected_blocks: merged?.selected_blocks || det.selectedBlocks,
-          p_engine_key: engineKey,
-          p_version: version,
-        });
-
-        cached = merged;
-      }
-    }
-
+    // Cache hit: return
     return NextResponse.json(
-      {
-        ok: true,
-        data: cached,
-        __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
-      },
+      { ok: true, data: cached, __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience } },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
