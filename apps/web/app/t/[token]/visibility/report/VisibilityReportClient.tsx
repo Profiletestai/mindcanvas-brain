@@ -1053,7 +1053,7 @@ export default function VisibilityReportClient({
         </GlassCard>
 
         {/* Intro sections (KB-driven) */}
-        <GlassCard title="Intro sections" subtitle="Welcome + how to use the report + framework explanations (KB-driven).">
+        <GlassCard title="Intro sections">
           {introSections.length ? (
             <div className="mt-2 space-y-6">
               {introSections.map((s) => (
@@ -1136,7 +1136,7 @@ export default function VisibilityReportClient({
         ) : null}
 
         {/* Remaining dynamic content */}
-        <GlassCard title="Your personalised report" subtitle="This narrative is selected dynamically from the Visibility Ladder knowledge base.">
+        <GlassCard title="Your personalised report">
           {remainingSections.length ? (
             <div className="mt-4 space-y-6">
               {remainingSections.map((s) => (
