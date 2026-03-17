@@ -1,4 +1,5 @@
 // apps/web/app/api/public/visibility/[token]/report/route.ts
+// apps/web/app/api/public/visibility/[token]/report/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -41,8 +42,8 @@ function safeString(x: any) {
 function defaultTitles(key: string) {
   const m: Record<string, string> = {
     // ✅ intro keys
-    welcome: "A personal welcome",
-    how_to_use: "How to use this report",
+    welcome: "A Personal Welcome From Bogdan Stan",
+    how_to_use: "How To Use This Report",
     understanding: "Understanding the Visibility Ladder",
     tiers_levels: "Explanation of tiers and levels",
     behaviour_profiles: "Explanation of behaviour profiles",
@@ -99,7 +100,9 @@ type AiInsights = {
 };
 
 function aiEnabled() {
-  return String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !== "false";
+  return (
+    String(process.env.VISIBILITY_AI_ENABLED || "true").toLowerCase() !== "false"
+  );
 }
 
 function openaiModel() {
@@ -108,7 +111,11 @@ function openaiModel() {
     process.env.OPENAI_MODEL ||
     "gpt-4.1-mini";
 
-  if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) return "gpt-4.1-mini";
+  // Guardrail: if someone accidentally put the API key into a model env var
+  if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) {
+    return "gpt-4.1-mini";
+  }
+
   return m;
 }
 
@@ -126,11 +133,31 @@ function aiSchema() {
       properties: {
         executive_summary: { type: "string" },
         what_this_means: { type: "string" },
-        strengths: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 7 },
-        friction: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 7 },
+        strengths: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 7,
+        },
+        friction: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 2,
+          maxItems: 7,
+        },
         strategic_opportunity: { type: "string" },
-        plan_7_days: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 10 },
-        plan_30_days: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 12 },
+        plan_7_days: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 10,
+        },
+        plan_30_days: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 3,
+          maxItems: 12,
+        },
         closing_note: { type: "string" },
       },
       required: [
@@ -209,15 +236,23 @@ function buildAiPrompt(input: {
 }
 
 function extractOutputText(respJson: any): string {
-  if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
+  if (
+    typeof respJson?.output_text === "string" &&
+    respJson.output_text.trim()
+  ) {
     return respJson.output_text.trim();
   }
+
   const out = Array.isArray(respJson?.output) ? respJson.output : [];
   for (const item of out) {
     if (item?.type !== "message") continue;
     const content = Array.isArray(item?.content) ? item.content : [];
     for (const c of content) {
-      if (c?.type === "output_text" && typeof c?.text === "string" && c.text.trim()) {
+      if (
+        c?.type === "output_text" &&
+        typeof c?.text === "string" &&
+        c.text.trim()
+      ) {
         return c.text.trim();
       }
     }
@@ -239,6 +274,7 @@ async function generateAiInsights(payload: {
   const model = openaiModel();
   const messages = buildAiPrompt(payload);
 
+  // Structured output in Responses API uses `text.format`
   const body = {
     model,
     input: messages,
@@ -289,11 +325,25 @@ function isBadAiCache(row: any): boolean {
   return false;
 }
 
-function cachedMissingIntro(cached: any) {
-  const want = new Set(["welcome", "how_to_use", "understanding", "tiers_levels", "behaviour_profiles"]);
+/**
+ * ✅ Stronger intro validation:
+ * Treat as "missing" if:
+ * - section key isn't present, OR
+ * - section exists but blocks are empty (KB row missing/inactive)
+ */
+function cachedMissingIntroOrEmptyBlocks(cached: any) {
+  const want = ["welcome", "how_to_use", "understanding", "tiers_levels", "behaviour_profiles"];
   const secs = Array.isArray(cached?.sections) ? cached.sections : [];
-  const have = new Set(secs.map((s: any) => String(s?.key || "")));
-  for (const k of want) if (!have.has(k)) return true;
+
+  const byKey = new Map<string, any>();
+  for (const s of secs) byKey.set(String(s?.key || ""), s);
+
+  for (const k of want) {
+    const s = byKey.get(k);
+    if (!s) return true;
+    const blocks = Array.isArray(s?.blocks) ? s.blocks : [];
+    if (blocks.length === 0) return true;
+  }
   return false;
 }
 
@@ -304,10 +354,19 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const token = safeString(ctx.params?.token);
     const tid = safeString(req.nextUrl.searchParams.get("tid"));
     const sid = safeString(req.nextUrl.searchParams.get("sid"));
-    const audience = safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
+    const audience =
+      safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
-    if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
-    if (!tid && !sid) return NextResponse.json({ ok: false, error: "Missing tid or sid" }, { status: 400 });
+    if (!token)
+      return NextResponse.json(
+        { ok: false, error: "Missing token" },
+        { status: 400 }
+      );
+    if (!tid && !sid)
+      return NextResponse.json(
+        { ok: false, error: "Missing tid or sid" },
+        { status: 400 }
+      );
 
     const sb = portal();
     const vis = visibility();
@@ -323,12 +382,17 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         .maybeSingle();
 
       if (takerErr) throw new Error(takerErr.message);
-      if (!takerRow) return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
+      if (!takerRow)
+        return NextResponse.json(
+          { ok: false, error: "Taker not found for this token" },
+          { status: 404 }
+        );
       taker = takerRow;
     }
 
     // 1) Resolve submission_id
     let submissionId: string | null = sid || null;
+
     if (!submissionId) {
       const { data: subs, error: subsErr } = await vis
         .from("submissions")
@@ -340,20 +404,35 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       if (subsErr) throw new Error(subsErr.message);
 
       const takerEmail = safeString(taker?.email).toLowerCase();
-      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
+      const takerName = [taker?.first_name, taker?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
 
-      const byMeta = (subs || []).find((s: any) => safeString(s?.metadata?.taker_id) === tid) || null;
+      const byMeta =
+        (subs || []).find((s: any) => safeString(s?.metadata?.taker_id) === tid) ||
+        null;
+
       const byEmail =
         !byMeta && takerEmail
-          ? (subs || []).find((s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail) || null
+          ? (subs || []).find(
+              (s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail
+            ) || null
           : null;
+
       const byName =
         !byMeta && !byEmail && takerName
-          ? (subs || []).find((s: any) => safeString(s?.taker_name) === takerName) || null
+          ? (subs || []).find((s: any) => safeString(s?.taker_name) === takerName) ||
+            null
           : null;
 
       const picked = byMeta || byEmail || byName;
-      if (!picked?.id) return NextResponse.json({ ok: false, error: "No visibility submission found for this token/taker yet." }, { status: 404 });
+      if (!picked?.id) {
+        return NextResponse.json(
+          { ok: false, error: "No visibility submission found for this token/taker yet." },
+          { status: 404 }
+        );
+      }
 
       submissionId = String(picked.id);
     }
@@ -369,14 +448,20 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result) return NextResponse.json({ ok: false, error: "Visibility results not found." }, { status: 404 });
+    if (!result)
+      return NextResponse.json(
+        { ok: false, error: "Visibility results not found." },
+        { status: 404 }
+      );
 
     // 3) Ensure pillar signals exist (compute via RPC if missing)
     if (!hasPillarSignals(result)) {
       try {
-        const pillarRpc = await callRpc<any>(vis, "compute_pillar_signals_for_submission", {
-          p_submission_id: submissionId,
-        });
+        const pillarRpc = await callRpc<any>(
+          vis,
+          "compute_pillar_signals_for_submission",
+          { p_submission_id: submissionId }
+        );
 
         if (pillarRpc?.ok === true && pillarRpc?.computed) {
           const computed = pillarRpc.computed;
@@ -388,7 +473,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
               pillar_bands: computed.pillar_bands ?? {},
               weakest_pillar: computed.weakest_pillar ?? null,
               strongest_pillar: computed.strongest_pillar ?? null,
-              pattern_tags: Array.isArray(computed.pattern_tags) ? computed.pattern_tags : [],
+              pattern_tags: Array.isArray(computed.pattern_tags)
+                ? computed.pattern_tags
+                : [],
             })
             .eq("id", result.id);
 
@@ -418,8 +505,8 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       p_version: version,
     });
 
-    // ✅ If cached report exists but is missing intro keys, treat as cache miss (rebuild)
-    if (cached && audience === "taker_report" && cachedMissingIntro(cached)) {
+    // ✅ If cached report exists but is missing intro keys OR intro blocks, rebuild
+    if (cached && audience === "taker_report" && cachedMissingIntroOrEmptyBlocks(cached)) {
       cached = null;
     }
 
@@ -438,15 +525,15 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         pattern_tags: result.pattern_tags || [],
       };
 
-      // ✅ INTRO KEYS FIRST
       const sectionKeys = [
+        // ✅ Intro sections first
         "welcome",
         "how_to_use",
         "understanding",
         "tiers_levels",
         "behaviour_profiles",
 
-        // ✅ then the existing dynamic narrative
+        // ✅ Then dynamic narrative
         "framework_foundation",
         "snapshot",
         "pillars",
@@ -466,7 +553,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       for (const key of sectionKeys) {
         let blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
           p_section_key: key,
-          p_audience: audience,
+          p_audience: "taker_report", // ✅ lock to taker KB audience (prevents surprises)
           p_signals: signals,
           p_limit: 6,
         });
@@ -474,7 +561,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         if (!blocks || blocks.length === 0) {
           blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
             p_section_key: key,
-            p_audience: audience,
+            p_audience: "taker_report",
             p_signals: {},
             p_limit: 6,
           });
@@ -482,7 +569,6 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
         const contentBlocks = (blocks || []).map((b: any) => b.content).filter(Boolean);
 
-        // still push a stub section so the UI can show “pending” only when truly empty
         sections.push({
           key,
           title: contentBlocks?.[0]?.title || defaultTitles(key),
@@ -521,7 +607,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
       const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
       const testName = (testRow as any)?.name || "Visibility Ladder";
-      const takerName = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() || null;
+      const takerName =
+        [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
+        null;
 
       return { signals, graphs, sections, selectedBlocks, orgRow, orgName, testName, takerName };
     };
@@ -635,7 +723,13 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         {
           ok: true,
           data: reportJson,
-          __meta: { cached: false, submission_id: submissionId, engine_key: engineKey, version, audience },
+          __meta: {
+            cached: false,
+            submission_id: submissionId,
+            engine_key: engineKey,
+            version,
+            audience,
+          },
         },
         { status: 200 }
       );
@@ -645,11 +739,20 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       {
         ok: true,
         data: cached,
-        __meta: { cached: true, submission_id: submissionId, engine_key: engineKey, version, audience },
+        __meta: {
+          cached: true,
+          submission_id: submissionId,
+          engine_key: engineKey,
+          version,
+          audience,
+        },
       },
       { status: 200 }
     );
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: String(e?.message || e) },
+      { status: 500 }
+    );
   }
 }
