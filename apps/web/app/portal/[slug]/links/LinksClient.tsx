@@ -61,7 +61,7 @@ export default function LinksClient(props: {
   const [redirectUrl, setRedirectUrl] = useState("");
   const [hiddenResultsMessage, setHiddenResultsMessage] = useState("");
 
-  // When results are shown (report page CTA)
+  // Always required
   const [nextStepsUrl, setNextStepsUrl] = useState("");
 
   const [status, setStatus] = useState<string | null>(null);
@@ -165,18 +165,16 @@ export default function LinksClient(props: {
     }
 
     // REQUIRED RULES
-    if (!showResults) {
-      if (!isValidUrl(redirectUrl)) {
-        setStatus("Redirect URL is required when results are hidden.");
-        setLoading(false);
-        return;
-      }
-    } else {
-      if (!isValidUrl(nextStepsUrl)) {
-        setStatus("Next steps URL is required when results are shown.");
-        setLoading(false);
-        return;
-      }
+    if (!isValidUrl(nextStepsUrl)) {
+      setStatus("Next steps URL is required.");
+      setLoading(false);
+      return;
+    }
+
+    if (!showResults && !isValidUrl(redirectUrl)) {
+      setStatus("Redirect URL is required when results are hidden.");
+      setLoading(false);
+      return;
     }
 
     try {
@@ -196,10 +194,8 @@ export default function LinksClient(props: {
           showResults,
           emailReport,
           hiddenResultsMessage: messageToSave,
-
           redirectUrl: !showResults ? redirectUrl.trim() : null,
-          nextStepsUrl: showResults ? nextStepsUrl.trim() : null,
-
+          nextStepsUrl: nextStepsUrl.trim(),
           expiresAt: expiresAt || null,
         }),
       });
@@ -393,6 +389,22 @@ export default function LinksClient(props: {
             <span>Email the report</span>
           </label>
 
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">
+              Next steps URL <span className="text-red-600">*</span>
+            </span>
+            <input
+              type="url"
+              className="w-full rounded border border-gray-300 p-2 text-sm"
+              placeholder="e.g. https://your-site.com/book-a-call"
+              value={nextStepsUrl}
+              onChange={(e) => setNextStepsUrl(e.target.value)}
+            />
+            <span className="mt-1 block text-xs text-gray-500">
+              This is always required and will be saved as the next-step destination for this link.
+            </span>
+          </label>
+
           {!showResults && (
             <label className="block text-sm">
               <span className="mb-1 block font-medium">
@@ -407,24 +419,6 @@ export default function LinksClient(props: {
               />
               <span className="mt-1 block text-xs text-gray-500">
                 If results are hidden, the test taker will be redirected here after completing the test.
-              </span>
-            </label>
-          )}
-
-          {showResults && (
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium">
-                Next steps URL <span className="text-red-600">*</span>
-              </span>
-              <input
-                type="url"
-                className="w-full rounded border border-gray-300 p-2 text-sm"
-                placeholder="e.g. https://your-site.com/book-a-call"
-                value={nextStepsUrl}
-                onChange={(e) => setNextStepsUrl(e.target.value)}
-              />
-              <span className="mt-1 block text-xs text-gray-500">
-                This will be used as the “Next steps” call-to-action link on the report.
               </span>
             </label>
           )}
@@ -654,4 +648,3 @@ export default function LinksClient(props: {
     </div>
   );
 }
-

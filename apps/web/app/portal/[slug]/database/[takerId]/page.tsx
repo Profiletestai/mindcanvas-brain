@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
+import { getBaseUrl } from "@/lib/baseUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,47 @@ function BarRow({
 
 type QscAudience = "entrepreneur" | "leader";
 
+async function fetchVisibilityInternalSnapshot(args: {
+  orgSlug: string;
+  takerId: string;
+}) {
+  const { orgSlug, takerId } = args;
+
+  try {
+    const origin = getBaseUrl();
+    const url = `${origin}/api/portal/visibility/taker/${encodeURIComponent(
+      takerId
+    )}/snapshot?org=${encodeURIComponent(orgSlug)}&audience=internal_snapshot`;
+
+    const res = await fetch(url, { cache: "no-store" });
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) return null;
+
+    const j = await res.json().catch(() => null);
+    if (!res.ok || !j?.ok) return null;
+    return j?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function prettyTier(t?: string | null) {
+  const s = String(t || "").trim();
+  return s || "—";
+}
+
+function prettyStyle(s?: string | null) {
+  const t = String(s || "").trim().toUpperCase();
+  return t || "—";
+}
+
+function prettyReadiness(r?: string | null) {
+  const t = String(r || "").trim().toLowerCase();
+  if (t === "ready_to_progress") return "Ready to progress";
+  if (t === "stabilise") return "Stabilise";
+  return t || "—";
+}
+
 export default async function TakerDetail({
   params,
 }: {
@@ -156,6 +198,11 @@ export default async function TakerDetail({
 
   const latest = (results ?? [])[0] || null;
   const totalsRaw = parseTotals(latest?.totals);
+
+  // ✅ Detect Visibility engine totals (from your submit route)
+  const isVisibility =
+    Boolean(totalsRaw?.visibility) ||
+    String(totalsRaw?.meta?.engine || "").toLowerCase().includes("visibility");
 
   // ----- Meta + framework lookup ------------------------------------------
   const meta: any = (test?.meta as any) ?? {};
@@ -381,7 +428,8 @@ export default async function TakerDetail({
 
     qscSnapshotUrl = `${base}${query}`;
 
-    const extendedPath = qscAudience === "leader" ? "/extended-leader" : "/extended";
+    const extendedPath =
+      qscAudience === "leader" ? "/extended-leader" : "/extended";
     qscExtendedUrl = `${base}${extendedPath}${query}`;
 
     const strategicPath = qscAudience === "leader" ? "/leader" : "/entrepreneur";
@@ -393,6 +441,11 @@ export default async function TakerDetail({
 
   if (isQsc) {
     reportUrl = qscStrategicUrl;
+  } else if (isVisibility && taker.link_token) {
+    // ✅ Visibility should open the bespoke visibility report
+    reportUrl = `/t/${encodeURIComponent(
+      taker.link_token
+    )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
   } else if (taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
@@ -402,6 +455,12 @@ export default async function TakerDetail({
   }
 
   const freqDefs: any[] = freqSource || [];
+
+  // ✅ Load internal visibility snapshot (Option B2 endpoint)
+  const visibilitySnapshot = await fetchVisibilityInternalSnapshot({
+    orgSlug: slug,
+    takerId: taker.id,
+  });
 
   return (
     <div className="space-y-6">
@@ -442,6 +501,156 @@ export default async function TakerDetail({
           <dd className="col-span-2">{taker.role_title || "—"}</dd>
         </dl>
       </section>
+
+      {/* ✅ Visibility Snapshot Panel (Portal-only) */}
+      {visibilitySnapshot && (
+        <section className="rounded-xl border p-4 bg-white space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-medium">Visibility Snapshot</h2>
+              <p className="text-sm text-gray-500">
+                Internal summary (KB-driven)
+              </p>
+            </div>
+
+            {taker.link_token && (
+              <Link
+                href={`/t/${encodeURIComponent(
+                  taker.link_token
+                )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
+              >
+                Open Visibility Report
+              </Link>
+            )}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Tier
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {prettyTier(visibilitySnapshot?.signals?.tier)}
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Level
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {Number(visibilitySnapshot?.signals?.level ?? 0) || "—"}
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Style
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {prettyStyle(visibilitySnapshot?.signals?.style)}
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-slate-50 p-3">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Readiness
+              </div>
+              <div className="mt-1 text-lg font-semibold">
+                {prettyReadiness(visibilitySnapshot?.signals?.readiness)}
+              </div>
+            </div>
+          </div>
+
+          {visibilitySnapshot?.summary && (
+            <div className="rounded-lg border bg-white p-3">
+              <div className="text-sm font-medium">Quick take</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-700">
+                {visibilitySnapshot.summary.snapshot ? (
+                  <p>
+                    <span className="font-semibold">Snapshot:</span>{" "}
+                    {visibilitySnapshot.summary.snapshot}
+                  </p>
+                ) : null}
+                {visibilitySnapshot.summary.pillars ? (
+                  <p>
+                    <span className="font-semibold">Pillars:</span>{" "}
+                    {visibilitySnapshot.summary.pillars}
+                  </p>
+                ) : null}
+                {visibilitySnapshot.summary.opportunity ? (
+                  <p>
+                    <span className="font-semibold">Opportunity:</span>{" "}
+                    {visibilitySnapshot.summary.opportunity}
+                  </p>
+                ) : null}
+                {visibilitySnapshot.summary.next_move ? (
+                  <p>
+                    <span className="font-semibold">Next move:</span>{" "}
+                    {visibilitySnapshot.summary.next_move}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {Array.isArray(visibilitySnapshot?.sections) &&
+            visibilitySnapshot.sections.length > 0 && (
+              <div className="space-y-2">
+                {visibilitySnapshot.sections.map((sec: any) => (
+                  <details
+                    key={sec.key}
+                    className="rounded-lg border bg-white p-3"
+                  >
+                    <summary className="cursor-pointer font-medium">
+                      {sec.title || sec.key}
+                    </summary>
+                    <div className="mt-3 space-y-3 text-sm text-slate-700">
+                      {(sec.blocks || []).map((b: any, idx: number) => (
+                        <div key={idx} className="space-y-2">
+                          {b?.paragraphs && Array.isArray(b.paragraphs) ? (
+                            b.paragraphs
+                              .map((p: any) => String(p || "").trim())
+                              .filter(Boolean)
+                              .map((p: string, i: number) => (
+                                <p key={i} className="leading-relaxed">
+                                  {p}
+                                </p>
+                              ))
+                          ) : b?.short_summary ? (
+                            <p className="leading-relaxed">
+                              {String(b.short_summary)}
+                            </p>
+                          ) : null}
+
+                          {b?.bullets && Array.isArray(b.bullets) && b.bullets.length ? (
+                            <ul className="list-disc pl-5 space-y-1">
+                              {b.bullets
+                                .map((x: any) => String(x || "").trim())
+                                .filter(Boolean)
+                                .map((x: string, i: number) => (
+                                  <li key={i}>{x}</li>
+                                ))}
+                            </ul>
+                          ) : null}
+
+                          {b?.transition ? (
+                            <p className="text-slate-500 italic">
+                              {String(b.transition)}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+        </section>
+      )}
 
       {/* Latest Result */}
       <section className="rounded-xl border p-4 bg-white space-y-4">
