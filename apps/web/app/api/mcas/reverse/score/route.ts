@@ -13,6 +13,19 @@ function supa() {
   );
 }
 
+function getBearerToken(req: Request): string | null {
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  return auth.slice("Bearer ".length).trim() || null;
+}
+
+function isAuthorized(req: Request): boolean {
+  const expected = process.env.MCAS_API_BEARER_TOKEN || "";
+  if (!expected) return false;
+  const received = getBearerToken(req);
+  return !!received && received === expected;
+}
+
 type AnswersMap = Record<string, string>;
 
 type FrameworkOption = {
@@ -102,6 +115,13 @@ async function nextRunNumber(sb: ReturnType<typeof supa>): Promise<string> {
 
 export async function POST(req: Request) {
   try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
 
     const partner_key = String(body?.partner_key || "").trim();
