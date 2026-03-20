@@ -1,4 +1,4 @@
-// apps/web/app/api/public/test/[token]/report/route.ts
+//apps/web/app/api/public/test/[token]/report/route.ts
 /* eslint-disable no-console */
 import "server-only";
 import { NextResponse } from "next/server";
@@ -71,7 +71,6 @@ type TestMeta = {
 
   report_engine?: string;
 
-  // ✅ Framework blocks engine pointer
   framework_id?: string;
   frameworkId?: string;
   framework_slug?: string;
@@ -85,6 +84,11 @@ type TestMeta = {
 
   frequencies?: Array<{ code: AB; label: string }>;
   profiles?: Array<{ code: string; name: string; frequency?: AB; description?: string }>;
+
+  wrapper?: boolean;
+  source_test_id?: string;
+  default_source_test?: string;
+  source_tests?: string[];
 };
 
 type TestRow = {
@@ -311,6 +315,10 @@ function sanitizeLinkMetaForPortal(linkMeta: any) {
   }
 
   return link;
+}
+
+function isUuidLike(s: string) {
+  return /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(String(s || "").trim());
 }
 
 // --- Supabase client (admin) ---
@@ -670,7 +678,6 @@ async function fetchFrameworkBlocksForKeys(opts: {
   const res = await q;
   if (res.error || !Array.isArray(res.data)) return new Map<string, FrameworkBlockRow>();
 
-  // ✅ deterministic: prefer highest version, then newest updated_at
   const map = new Map<string, any>();
   for (const r of res.data as any[]) {
     const key = String(r.block_key || "");
@@ -762,6 +769,73 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
 
 const GLOBAL_POST_PROFILE_KEYS = new Set<string>(["global.conclusion", "global.cta_next_steps"]);
 
+// -------- wrapper resolution --------
+
+function resolveSourceTestIdFromMeta(meta: any): string | null {
+  const m = meta && typeof meta === "object" ? meta : {};
+
+  const direct =
+    typeof m.default_source_test === "string"
+      ? m.default_source_test
+      : typeof m.source_test_id === "string"
+        ? m.source_test_id
+        : null;
+
+  if (direct && isUuidLike(direct)) return direct;
+
+  if (Array.isArray(m.source_tests)) {
+    const first = m.source_tests.find((x: any) => typeof x === "string" && isUuidLike(x));
+    if (first) return first;
+  }
+
+  return null;
+}
+
+async function resolveEffectiveTestRow(opts: {
+  wrapperTestRow: TestRow | null;
+  savedEffectiveTestId?: string | null;
+}) {
+  const wrapperTestRow = opts.wrapperTestRow;
+  if (!wrapperTestRow) {
+    return {
+      effectiveTestId: null,
+      effectiveTestRow: null,
+      resolvedBy: "no_wrapper_test",
+    };
+  }
+
+  const savedId = String(opts.savedEffectiveTestId || "").trim();
+  if (savedId && isUuidLike(savedId)) {
+    const savedRow = await fetchTestRow(savedId);
+    if (savedRow) {
+      return {
+        effectiveTestId: savedRow.id,
+        effectiveTestRow: savedRow,
+        resolvedBy: "submission.meta.effective_test_id",
+      };
+    }
+  }
+
+  const wrapperMeta = (wrapperTestRow.meta || {}) as TestMeta;
+  const fromMeta = resolveSourceTestIdFromMeta(wrapperMeta);
+  if (fromMeta) {
+    const sourceRow = await fetchTestRow(fromMeta);
+    if (sourceRow) {
+      return {
+        effectiveTestId: sourceRow.id,
+        effectiveTestRow: sourceRow,
+        resolvedBy: "wrapper.meta.source",
+      };
+    }
+  }
+
+  return {
+    effectiveTestId: wrapperTestRow.id,
+    effectiveTestRow: wrapperTestRow,
+    resolvedBy: "wrapper_self",
+  };
+}
+
 // ---------------- Handler ----------------
 
 export async function GET(req: Request, { params }: { params: { token: string } }) {
@@ -778,37 +852,64 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const meta = await resolveLinkMeta(token);
     if (!meta) return NextResponse.json({ ok: false, error: "Invalid or expired link" }, { status: 404 });
 
-    const testRow = await fetchTestRow(meta.test_id);
-    const testMeta = (testRow?.meta || {}) as TestMeta;
+    const wrapperTestRow = await fetchTestRow(meta.test_id);
+    const wrapperTestMeta = (wrapperTestRow?.meta || {}) as TestMeta;
 
-    // Framework pointer
+    const subRes = await fetchLatestSubmission(takerId, token);
+    const sub = subRes.row;
+    if (!sub) {
+      return NextResponse.json({ ok: false, error: "Submission not found for this taker/token." }, { status: 404 });
+    }
+
+    const savedRead = readSavedTotals(sub.totals);
+
+    const effectiveResolved = await resolveEffectiveTestRow({
+      wrapperTestRow,
+      savedEffectiveTestId: savedRead.effective_test_id,
+    });
+
+    const effectiveTestRow = effectiveResolved.effectiveTestRow || wrapperTestRow;
+    const effectiveTestId = effectiveResolved.effectiveTestId || wrapperTestRow?.id || meta.test_id;
+    const effectiveTestMeta = ((effectiveTestRow?.meta || {}) as TestMeta) || {};
+
+    const testMeta = {
+      ...effectiveTestMeta,
+      ...wrapperTestMeta,
+    } as TestMeta;
+
     const frameworkId =
-      (typeof (testMeta as any)?.framework_id === "string" && (testMeta as any).framework_id.trim()) ||
-      (typeof (testMeta as any)?.frameworkId === "string" && (testMeta as any).frameworkId.trim()) ||
+      (typeof wrapperTestMeta?.framework_id === "string" && wrapperTestMeta.framework_id.trim()) ||
+      (typeof (wrapperTestMeta as any)?.frameworkId === "string" && (wrapperTestMeta as any).frameworkId.trim()) ||
+      (typeof effectiveTestMeta?.framework_id === "string" && effectiveTestMeta.framework_id.trim()) ||
+      (typeof (effectiveTestMeta as any)?.frameworkId === "string" && (effectiveTestMeta as any).frameworkId.trim()) ||
       "";
 
-    // Storage framework choice (OperatingFrame lives here)
-    const storageChoice = resolveStorageFramework(testMeta);
+    const storageChoice = (() => {
+      const wrapperChoice = resolveStorageFramework(wrapperTestMeta);
+      if (wrapperChoice.use) return wrapperChoice;
+      return resolveStorageFramework(effectiveTestMeta);
+    })();
+
     const useStorageFramework = storageChoice.use;
 
-    const slugLower = String(testRow?.slug || "").toLowerCase();
-    const nameLower = String(testRow?.name || "").toLowerCase();
+    const slugLower = String(wrapperTestRow?.slug || "").toLowerCase();
+    const nameLower = String(wrapperTestRow?.name || "").toLowerCase();
     const storagePathLower = String(storageChoice.path || "").toLowerCase();
 
-    // ✅ Robust OperatingFrame detection
     const isOperatingFrame =
       storagePathLower.startsWith("operatingframe/") ||
       storagePathLower.includes("/operatingframe/") ||
       slugLower.includes("operatingframe") ||
       nameLower.includes("operatingframe");
 
-    // Decide engine (HARD OVERRIDE for OperatingFrame)
-    const reportEngine = String((testMeta as any)?.report_engine || "").trim();
+    const reportEngine =
+      String(wrapperTestMeta?.report_engine || "").trim() ||
+      String(effectiveTestMeta?.report_engine || "").trim();
+
     const useBlocksEngine = !isOperatingFrame && reportEngine === "native_v2_blocks";
 
     const orgSlug = String(meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach").trim();
 
-    // still used for lookups
     let fw: any = await loadFrameworkBySlug(orgSlug);
     let frameworkSource: "filesystem" | "storage" | "blocks" | "framework_blocks" = "filesystem";
 
@@ -823,7 +924,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     }
 
     const look = buildLookups(fw);
-    const dbLabels = await fetchDbLabels(meta.test_id);
+
+    // ✅ use EFFECTIVE source test for labels / questions / qual blocks
+    const dbLabels = await fetchDbLabels(effectiveTestId);
+    const qmap = await fetchQuestionMaps(effectiveTestId);
+    const qualQs = await fetchQualQuestions(effectiveTestId);
 
     const metaFreqs = Array.isArray(testMeta?.frequencies) ? testMeta.frequencies : null;
     const metaProfiles = Array.isArray(testMeta?.profiles) ? testMeta.profiles : null;
@@ -844,16 +949,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       return { code, name: fromDb || fromMeta || fromLegacy || `Profile ${n}` };
     });
 
-    const subRes = await fetchLatestSubmission(takerId, token);
-    const sub = subRes.row;
-    if (!sub) {
-      return NextResponse.json({ ok: false, error: "Submission not found for this taker/token." }, { status: 404 });
-    }
-
     const taker = await fetchTakerRow(takerId);
 
-    const savedRead = readSavedTotals(sub.totals);
-    const qmap = await fetchQuestionMaps(meta.test_id);
     const comp = computeFromAnswers(sub.answers_json, qmap);
 
     const freqTotals: Record<AB, number> = savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
@@ -881,7 +978,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const topFreqName = frequency_labels.find((f) => f.code === top_freq)?.name || top_freq;
 
     const tokenCtx: Record<string, string> = {
-      TEST_NAME: meta.test_name || testRow?.name || "Profile Test",
+      TEST_NAME: meta.test_name || wrapperTestRow?.name || effectiveTestRow?.name || testMeta?.test || "Profile Test",
       ORG_SLUG: orgSlug,
       PRIMARY_FREQ_NAME: topFreqName,
       PRIMARY_PROFILE_NAME: top_profile_name,
@@ -895,7 +992,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     let sections: SectionsPayload | null = null;
 
-    // IMPORTANT: OperatingFrame must not run blocks engine
     if (useBlocksEngine) {
       if (frameworkId) {
         const fwRow = await fetchFrameworkById(frameworkId);
@@ -966,7 +1062,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           });
         }
 
-        const qualQs = await fetchQualQuestions(meta.test_id);
         const segSection = buildSegmentationSection(qualQs, sub.answers_json);
         if (segSection) {
           const insertAfterId = "global.how_to_use";
@@ -991,7 +1086,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
         frameworkSource = "framework_blocks";
       } else {
-        const layoutSections = await fetchLayoutSections(testRow?.report_layout_template_id);
+        const layoutId = wrapperTestRow?.report_layout_template_id || effectiveTestRow?.report_layout_template_id || null;
+        const layoutSections = await fetchLayoutSections(layoutId);
 
         const globalKeys = layoutSections.filter((s) => s.scope === "global").map((s) => s.key);
         const profileKeys = layoutSections.filter((s) => s.scope === "profile").map((s) => s.key);
@@ -1043,7 +1139,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           }
         }
 
-        const qualQs = await fetchQualQuestions(meta.test_id);
         const segSection = buildSegmentationSection(qualQs, sub.answers_json);
         if (segSection) {
           const insertAfterId = "global.how_to_use";
@@ -1062,10 +1157,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           framework_version: storageChoice.version || null,
           framework_bucket: storageChoice.bucket || null,
           framework_path: storageChoice.path || null,
+          framework_id: frameworkId || null,
+          framework_slug: null,
         };
       }
     } else {
-      // Non-blocks path: leave sections null (OperatingFrame uses its own JSON client)
       sections = null;
     }
 
@@ -1082,7 +1178,7 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         org_slug: orgSlug,
         org_name: meta.org_name || null,
         org_logo_url: meta.org_logo_url || null,
-        test_name: meta.test_name || testRow?.name || testMeta?.test || "Profile Test",
+        test_name: meta.test_name || wrapperTestRow?.name || effectiveTestRow?.name || testMeta?.test || "Profile Test",
 
         taker: {
           id: takerId,
@@ -1112,7 +1208,6 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           frameworkSource,
           framework_id: frameworkId || null,
 
-          // ✅ expose storage framework pointer so ReportGateClient can load OperatingFrame JSON reliably
           storageFrameworkBucket: storageChoice.bucket || null,
           storageFrameworkPath: storageChoice.path || null,
 
@@ -1121,9 +1216,17 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           allowRedirectInPortal,
           isOperatingFrame,
           isLead,
+
+          wrapper_test_id: wrapperTestRow?.id || null,
+          effective_test_id: effectiveTestId || null,
+          effective_test_slug: effectiveTestRow?.slug || null,
+          effective_resolved_by: effectiveResolved.resolvedBy,
+          submission_match: subRes.matched,
+          saved_wrapper_test_id: savedRead.wrapper_test_id || null,
+          saved_effective_test_id: savedRead.effective_test_id || null,
         },
 
-        version: useBlocksEngine ? "portal-native-v2-blocks+framework_or_layout+labels+qual" : "portal-v1",
+        version: useBlocksEngine ? "portal-native-v2-blocks+effective_test_resolution" : "portal-v1",
       },
     });
   } catch (e: any) {
