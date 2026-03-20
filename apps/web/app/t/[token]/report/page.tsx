@@ -1,4 +1,3 @@
-// apps/web/app/t/[token]/report/page.tsx
 import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
@@ -6,6 +5,13 @@ import ReportGateClient from "./ReportGateClient";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+type PortalTestRow = {
+  id: string;
+  slug: string | null;
+  name: string | null;
+  meta: any | null;
+};
 
 function getKey() {
   return (
@@ -36,7 +42,33 @@ function visibility() {
   });
 }
 
-function looksLikeQscTest(test: { slug?: string | null; name?: string | null; meta?: any | null } | null) {
+function isUuidLike(s: string) {
+  return /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(
+    String(s || "").trim()
+  );
+}
+
+function resolveSourceTestIdFromMeta(meta: any): string | null {
+  const m = meta && typeof meta === "object" ? meta : {};
+
+  const direct =
+    typeof m.default_source_test === "string"
+      ? m.default_source_test
+      : typeof m.source_test_id === "string"
+        ? m.source_test_id
+        : null;
+
+  if (direct && isUuidLike(direct)) return direct;
+
+  if (Array.isArray(m.source_tests)) {
+    const first = m.source_tests.find((x: any) => typeof x === "string" && isUuidLike(x));
+    if (first) return first;
+  }
+
+  return null;
+}
+
+function looksLikeQscTest(test: PortalTestRow | null) {
   const slug = String(test?.slug || "").toLowerCase();
   const name = String(test?.name || "").toLowerCase();
   const meta = test?.meta && typeof test.meta === "object" ? test.meta : {};
@@ -62,6 +94,30 @@ function looksLikeQscTest(test: { slug?: string | null; name?: string | null; me
   );
 }
 
+async function fetchPortalTestRow(sb: ReturnType<typeof portal>, testId: string): Promise<PortalTestRow | null> {
+  const { data, error } = await sb
+    .from("tests")
+    .select("id, slug, name, meta")
+    .eq("id", testId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as PortalTestRow;
+}
+
+async function resolveEffectiveTestRow(
+  sb: ReturnType<typeof portal>,
+  wrapperTestRow: PortalTestRow | null
+): Promise<PortalTestRow | null> {
+  if (!wrapperTestRow) return null;
+
+  const sourceTestId = resolveSourceTestIdFromMeta(wrapperTestRow.meta);
+  if (!sourceTestId) return wrapperTestRow;
+
+  const sourceRow = await fetchPortalTestRow(sb, sourceTestId);
+  return sourceRow || wrapperTestRow;
+}
+
 export default async function ReportPage({
   params,
   searchParams,
@@ -81,7 +137,6 @@ export default async function ReportPage({
     const sb = portal();
     const vis = visibility();
 
-    // token -> linked portal test
     const { data: link, error: linkErr } = await sb
       .from("test_links")
       .select("test_id")
@@ -103,14 +158,15 @@ export default async function ReportPage({
         redirect(`/t/${encodeURIComponent(token)}/visibility/report?${qs.toString()}`);
       }
 
-      // 2) QSC hard route
-      const { data: testRow, error: testErr } = await sb
-        .from("tests")
-        .select("id, slug, name, meta")
-        .eq("id", link.test_id)
-        .maybeSingle();
+      // 2) Resolve wrapper + effective source for robust QSC detection
+      const wrapperTestRow = await fetchPortalTestRow(sb, link.test_id);
+      const effectiveTestRow = await resolveEffectiveTestRow(sb, wrapperTestRow);
 
-      if (!testErr && testRow && looksLikeQscTest(testRow as any)) {
+      const isQsc =
+        looksLikeQscTest(wrapperTestRow) ||
+        looksLikeQscTest(effectiveTestRow);
+
+      if (isQsc) {
         const qs = new URLSearchParams();
         qs.set("tid", tid);
         redirect(`/qsc/${encodeURIComponent(token)}/entrepreneur?${qs.toString()}`);
