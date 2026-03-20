@@ -13,6 +13,19 @@ function supa() {
   );
 }
 
+function getBearerToken(req: Request): string | null {
+  const auth = req.headers.get("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return null;
+  return auth.slice("Bearer ".length).trim() || null;
+}
+
+function isAuthorized(req: Request): boolean {
+  const expected = process.env.MCAS_API_BEARER_TOKEN || "";
+  if (!expected) return false;
+  const received = getBearerToken(req);
+  return !!received && received === expected;
+}
+
 type AnswersMap = Record<string, string>;
 
 type FrameworkOption = {
@@ -72,7 +85,7 @@ async function getWordMappings(
   mappingType: string,
   mappingCode: string
 ): Promise<string[]> {
-  const { data } = await sb
+  const { data, error } = await sb
     .from("word_mappings")
     .select("word_or_phrase, sort_order")
     .eq("framework_slug", frameworkSlug)
@@ -80,6 +93,10 @@ async function getWordMappings(
     .eq("mapping_type", mappingType)
     .eq("mapping_code", mappingCode)
     .order("sort_order", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   return (data || [])
     .map((x: any) => String(x.word_or_phrase || "").trim())
@@ -98,6 +115,13 @@ async function nextRunNumber(sb: ReturnType<typeof supa>): Promise<string> {
 
 export async function POST(req: Request) {
   try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
 
     const partner_key = String(body?.partner_key || "").trim();
@@ -113,13 +137,24 @@ export async function POST(req: Request) {
     const answers = (body?.answers || {}) as AnswersMap;
 
     if (!partner_key) {
-      return NextResponse.json({ ok: false, error: "partner_key is required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "partner_key is required" },
+        { status: 400 }
+      );
     }
+
     if (!job_id) {
-      return NextResponse.json({ ok: false, error: "job_id is required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "job_id is required" },
+        { status: 400 }
+      );
     }
+
     if (!title) {
-      return NextResponse.json({ ok: false, error: "title is required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "title is required" },
+        { status: 400 }
+      );
     }
 
     const sb = supa();
@@ -131,10 +166,17 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (partnerErr) {
-      return NextResponse.json({ ok: false, error: partnerErr.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: partnerErr.message },
+        { status: 500 }
+      );
     }
+
     if (!partner || !partner.is_active) {
-      return NextResponse.json({ ok: false, error: "Invalid or inactive partner_key" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Invalid or inactive partner_key" },
+        { status: 400 }
+      );
     }
 
     const { data: fw, error: fwErr } = await sb
@@ -145,10 +187,17 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (fwErr) {
-      return NextResponse.json({ ok: false, error: fwErr.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: fwErr.message },
+        { status: 500 }
+      );
     }
+
     if (!fw) {
-      return NextResponse.json({ ok: false, error: "Framework not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Framework not found" },
+        { status: 404 }
+      );
     }
 
     const definition = (fw.definition || {}) as any;
@@ -158,7 +207,10 @@ export async function POST(req: Request) {
 
     if (questions.length !== 25) {
       return NextResponse.json(
-        { ok: false, error: `Framework must contain 25 questions. Found ${questions.length}.` },
+        {
+          ok: false,
+          error: `Framework must contain 25 questions. Found ${questions.length}.`,
+        },
         { status: 500 }
       );
     }
@@ -166,7 +218,10 @@ export async function POST(req: Request) {
     for (let i = 1; i <= 25; i++) {
       const qCode = `Q${i}`;
       if (!answers[qCode]) {
-        return NextResponse.json({ ok: false, error: `Missing answer for ${qCode}` }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, error: `Missing answer for ${qCode}` },
+          { status: 400 }
+        );
       }
     }
 
@@ -196,7 +251,10 @@ export async function POST(req: Request) {
 
     if (createErr || !createdRun) {
       return NextResponse.json(
-        { ok: false, error: createErr?.message || "Failed to create reverse profile run" },
+        {
+          ok: false,
+          error: createErr?.message || "Failed to create reverse profile run",
+        },
         { status: 500 }
       );
     }
@@ -235,12 +293,18 @@ export async function POST(req: Request) {
       const q = qMap.get(qCode);
 
       if (!q) {
-        return NextResponse.json({ ok: false, error: `Question ${qCode} missing in framework` }, { status: 500 });
+        return NextResponse.json(
+          { ok: false, error: `Question ${qCode} missing in framework` },
+          { status: 500 }
+        );
       }
 
       const opt = q.options?.find((o) => o.code === optionCode);
       if (!opt) {
-        return NextResponse.json({ ok: false, error: `Invalid option ${optionCode} for ${qCode}` }, { status: 400 });
+        return NextResponse.json(
+          { ok: false, error: `Invalid option ${optionCode} for ${qCode}` },
+          { status: 400 }
+        );
       }
 
       answerAudit.push({
@@ -310,14 +374,26 @@ export async function POST(req: Request) {
 
     const flags: Array<{ code: string; severity: string }> = [];
     if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
-    if (verticalConfidence === "low") flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
-    if (verticalConfidence === "matched") flags.push({ code: "VERTICAL_CONFIDENCE_MATCHED", severity: "low" });
-    if (verticalReadinessSignal) flags.push({ code: "VERTICAL_READINESS_SIGNAL", severity: "low" });
+    if (verticalConfidence === "low") {
+      flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
+    }
+    if (verticalConfidence === "matched") {
+      flags.push({ code: "VERTICAL_CONFIDENCE_MATCHED", severity: "low" });
+    }
+    if (verticalReadinessSignal) {
+      flags.push({ code: "VERTICAL_READINESS_SIGNAL", severity: "low" });
+    }
 
     const [primaryCore, secondaryCore] = getTopTwoCore(coreDistribution);
 
     const topOsWords = topOperatingStyle
-      ? await getWordMappings(sb, framework_slug, framework_version, "operating_style", topOperatingStyle.code)
+      ? await getWordMappings(
+          sb,
+          framework_slug,
+          framework_version,
+          "operating_style",
+          topOperatingStyle.code
+        )
       : [];
 
     const cvWords = await getWordMappings(
@@ -358,25 +434,6 @@ export async function POST(req: Request) {
     };
 
     const resultPayload = {
-      type: "reverse_profile_result",
-      meta: {
-        run_id: createdRun.id,
-        run_number: createdRun.run_number,
-        run_type: createdRun.run_type || "reverse_profile_ai",
-        source: createdRun.source || source,
-      },
-      partner: {
-        partner_key: createdRun.partner_key,
-      },
-      job: {
-        job_id: createdRun.job_id,
-        campaign_id: createdRun.campaign_id,
-        title: createdRun.title,
-      },
-      framework: {
-        slug: framework_slug,
-        version: framework_version,
-      },
       scoring: {
         model_version: "mcas-score-v1",
         core_distribution: coreDistribution,
@@ -443,7 +500,10 @@ export async function POST(req: Request) {
       .eq("id", createdRun.id);
 
     if (updateErr) {
-      return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: updateErr.message },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(exportPayload);
