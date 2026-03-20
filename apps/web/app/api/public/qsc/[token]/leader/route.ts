@@ -137,12 +137,6 @@ function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
 }
 
-/**
- * Resolve wrapper test_id -> canonical content test_id (LEADER)
- * - Wrapper identified by tests.meta.wrapper === true
- * - Uses meta.source_tests + meta.default_source_test
- * - Picks by slug: leader => qsc-leaders
- */
 async function resolveContentTestId(
   sb: ReturnType<typeof supa>,
   wrapperTestId: string,
@@ -217,9 +211,6 @@ async function resolveContentTestId(
   return { contentTestId: wrapperTestId, resolvedBy: "wrapper_no_sources" };
 }
 
-/**
- * Resolve persona code A1..D5 using same resilience as result endpoint
- */
 function resolvePersonaCode(args: {
   resultRow: QscResultsRow;
   profile: QscProfileRow | null;
@@ -259,6 +250,78 @@ function resolvePersonaCode(args: {
   }
 
   return { personaCode: null, source: null };
+}
+
+async function fetchTemplatesByTestId(
+  sb: ReturnType<typeof supa>,
+  testId: string
+): Promise<TemplateRow[]> {
+  const { data, error } = await sb
+    .from("qsc_leader_report_templates")
+    .select("id, test_id, section_key, content, sort_order, is_active")
+    .eq("test_id", testId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error || !Array.isArray(data)) return [];
+  return data.map((r: any) => ({
+    ...r,
+    content: safeJsonParse(r.content),
+  })) as TemplateRow[];
+}
+
+async function fetchTemplatesGlobal(
+  sb: ReturnType<typeof supa>
+): Promise<TemplateRow[]> {
+  const { data, error } = await sb
+    .from("qsc_leader_report_templates")
+    .select("id, test_id, section_key, content, sort_order, is_active")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error || !Array.isArray(data)) return [];
+  return data.map((r: any) => ({
+    ...r,
+    content: safeJsonParse(r.content),
+  })) as TemplateRow[];
+}
+
+async function fetchSectionsByTestIdAndPersona(
+  sb: ReturnType<typeof supa>,
+  testId: string,
+  personaCode: string
+): Promise<PersonaSectionRow[]> {
+  const { data, error } = await sb
+    .from("qsc_leader_report_sections")
+    .select("id, test_id, persona_code, section_key, content, sort_order, is_active")
+    .eq("test_id", testId)
+    .eq("persona_code", personaCode)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error || !Array.isArray(data)) return [];
+  return data.map((r: any) => ({
+    ...r,
+    content: safeJsonParse(r.content),
+  })) as PersonaSectionRow[];
+}
+
+async function fetchSectionsGlobalByPersona(
+  sb: ReturnType<typeof supa>,
+  personaCode: string
+): Promise<PersonaSectionRow[]> {
+  const { data, error } = await sb
+    .from("qsc_leader_report_sections")
+    .select("id, test_id, persona_code, section_key, content, sort_order, is_active")
+    .eq("persona_code", personaCode)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error || !Array.isArray(data)) return [];
+  return data.map((r: any) => ({
+    ...r,
+    content: safeJsonParse(r.content),
+  })) as PersonaSectionRow[];
 }
 
 export async function GET(
@@ -306,7 +369,6 @@ export async function GET(
       | "token_latest"
       | null = null;
 
-    // (0) If token is a UUID, allow direct qsc_results.id lookup
     if (isUuidLike(tokenParam)) {
       const { data, error } = await sb
         .from("qsc_results")
@@ -326,7 +388,6 @@ export async function GET(
       }
     }
 
-    // (1) token + tid (deterministic)
     if (!results && tid && isUuidLike(tid)) {
       const { data, error } = await sb
         .from("qsc_results")
@@ -349,7 +410,6 @@ export async function GET(
       }
     }
 
-    // (2) token only — MUST be unique OR we reject
     if (!results) {
       const { count, error: countErr } = await sb
         .from("qsc_results")
@@ -403,7 +463,6 @@ export async function GET(
         }
       }
 
-      // last-resort fallback
       if (!results && c > 0) {
         const { data, error } = await sb
           .from("qsc_results")
@@ -437,7 +496,6 @@ export async function GET(
       );
     }
 
-    // Leader-only endpoint
     if (results.audience && results.audience !== "leader") {
       return NextResponse.json(
         {
@@ -449,12 +507,10 @@ export async function GET(
       );
     }
 
-    // wrapper -> canonical content test (qsc-leaders)
     const wrapperTestId = String(results.test_id);
     const { contentTestId, resolvedBy: contentResolvedBy } =
       await resolveContentTestId(sb, wrapperTestId, "leader");
 
-    // Load taker
     let taker: QscTakerRow | null = null;
 
     if (results.taker_id) {
@@ -491,7 +547,6 @@ export async function GET(
       if (data) taker = data as unknown as QscTakerRow;
     }
 
-    // Load profile snapshot
     let profile: QscProfileRow | null = null;
 
     if (results.qsc_profile_id) {
@@ -510,7 +565,6 @@ export async function GET(
       if (data) profile = data as unknown as QscProfileRow;
     }
 
-    // Fallback 1: direct persona code from combined_profile_code
     if (!profile) {
       const combinedRaw = String(results.combined_profile_code || "").trim();
       const directPersonaCode = looksLikePersonaCode(combinedRaw)
@@ -531,7 +585,6 @@ export async function GET(
       }
     }
 
-    // Fallback 2: derive from primary personality + primary mindset
     if (!profile) {
       const letter = personalityToLetter(results.primary_personality);
       const level = mindsetKeyToLevel(results.primary_mindset);
@@ -551,63 +604,52 @@ export async function GET(
       }
     }
 
-    // persona_code A1..D5
     const { personaCode, source: personaCodeSource } = resolvePersonaCode({
       resultRow: results,
       profile,
     });
 
-    // Templates
-    const { data: templateRows, error: tplErr } = await sb
-      .from("qsc_leader_report_templates")
-      .select("id, test_id, section_key, content, sort_order, is_active")
-      .eq("test_id", contentTestId)
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
+    let templates: TemplateRow[] = [];
+    let templateSource = "none";
 
-    if (tplErr) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `qsc_leader_report_templates load failed: ${tplErr.message}`,
-        },
-        { status: 500 }
-      );
+    templates = await fetchTemplatesByTestId(sb, contentTestId);
+    if (templates.length) {
+      templateSource = "content_test_id";
+    } else if (wrapperTestId !== contentTestId) {
+      templates = await fetchTemplatesByTestId(sb, wrapperTestId);
+      if (templates.length) {
+        templateSource = "wrapper_test_id";
+      }
     }
 
-    // Persona sections
-    let sectionRows: PersonaSectionRow[] = [];
-    if (personaCode) {
-      const { data: secRows, error: secErr } = await sb
-        .from("qsc_leader_report_sections")
-        .select("id, test_id, persona_code, section_key, content, sort_order, is_active")
-        .eq("test_id", contentTestId)
-        .eq("persona_code", personaCode)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+    if (!templates.length) {
+      templates = await fetchTemplatesGlobal(sb);
+      if (templates.length) {
+        templateSource = "global";
+      }
+    }
 
-      if (secErr) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `qsc_leader_report_sections load failed: ${secErr.message}`,
-          },
-          { status: 500 }
-        );
+    let sections: PersonaSectionRow[] = [];
+    let sectionSource = "none";
+
+    if (personaCode) {
+      sections = await fetchSectionsByTestIdAndPersona(sb, contentTestId, personaCode);
+      if (sections.length) {
+        sectionSource = "content_test_id+persona_code";
+      } else if (wrapperTestId !== contentTestId) {
+        sections = await fetchSectionsByTestIdAndPersona(sb, wrapperTestId, personaCode);
+        if (sections.length) {
+          sectionSource = "wrapper_test_id+persona_code";
+        }
       }
 
-      sectionRows = (secRows ?? []) as any;
+      if (!sections.length) {
+        sections = await fetchSectionsGlobalByPersona(sb, personaCode);
+        if (sections.length) {
+          sectionSource = "persona_code_global";
+        }
+      }
     }
-
-    const templates = (templateRows ?? []).map((r: any) => ({
-      ...r,
-      content: safeJsonParse(r.content),
-    })) as TemplateRow[];
-
-    const sections = (sectionRows ?? []).map((r: any) => ({
-      ...r,
-      content: safeJsonParse(r.content),
-    })) as PersonaSectionRow[];
 
     return NextResponse.json(
       {
@@ -616,7 +658,7 @@ export async function GET(
         profile,
         taker,
         report: {
-          test_id: contentTestId,
+          test_id: templates[0]?.test_id || contentTestId,
           persona_code: personaCode,
           templates,
           sections,
@@ -637,6 +679,8 @@ export async function GET(
           profile_mindset_level: profile?.mindset_level ?? null,
           template_count: templates.length,
           section_count: sections.length,
+          template_source: templateSource,
+          section_source: sectionSource,
           personality_percentages: results.personality_percentages ?? null,
           mindset_percentages: results.mindset_percentages ?? null,
         },
@@ -650,4 +694,3 @@ export async function GET(
     );
   }
 }
-
