@@ -36,11 +36,17 @@ type SubmitResponse = {
   show_results?: boolean;
   next_steps_url?: string | null;
   hidden_results_message?: string | null;
-  // also accept legacy variants
+
+  // legacy / alternate variants
   redirect_url?: string | null;
   redirectUrl?: string | null;
   showResults?: boolean;
   nextStepsUrl?: string | null;
+
+  // qsc-specific variants
+  qsc_public_path?: string | null;
+  qsc_public_url?: string | null;
+
   [k: string]: any;
 };
 
@@ -53,6 +59,10 @@ function safeString(x: any): string {
   if (typeof x === "string") return x;
   if (x == null) return "";
   return String(x);
+}
+
+function isAbsoluteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
 }
 
 export default function PublicTestClient({
@@ -79,7 +89,7 @@ export default function PublicTestClient({
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [textAnswers, setTextAnswers] = useState<TextAnswersMap>({});
 
-  // ✅ NEW: remember whether this token is the visibility engine
+  // visibility engine detection
   const [isVisibilityEngine, setIsVisibilityEngine] = useState(false);
 
   // details
@@ -129,7 +139,6 @@ export default function PublicTestClient({
         setOrgName(orgNameFromMeta);
         setIntroText(introFromMeta);
 
-        // notify TestShell only when not embedded
         if (!embed && typeof window !== "undefined") {
           const detail = { orgName: orgNameFromMeta, testName: nameFromMeta };
           window.dispatchEvent(new CustomEvent("mc_test_meta", { detail }));
@@ -141,7 +150,6 @@ export default function PublicTestClient({
         const list: Question[] = Array.isArray(qRes?.questions) ? qRes.questions : [];
         setQuestions(list);
 
-        // ✅ NEW: detect visibility engine from questions response debug
         const engine = safeString(qRes?.__debug?.engine).toLowerCase();
         setIsVisibilityEngine(engine.includes("visibility"));
 
@@ -189,21 +197,18 @@ export default function PublicTestClient({
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, embed]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(key("answers"), JSON.stringify(answers));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, token]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(key("text_answers"), JSON.stringify(textAnswers));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textAnswers, token]);
 
   useEffect(() => {
@@ -221,7 +226,6 @@ export default function PublicTestClient({
         })
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstName, lastName, email, phone, company, roleTitle, dataConsent, token]);
 
   const q = questions[i];
@@ -309,6 +313,8 @@ export default function PublicTestClient({
       safeString(j.redirect).trim() ||
       safeString((j as any).redirect_url).trim() ||
       safeString((j as any).redirectUrl).trim() ||
+      safeString((j as any).qsc_public_path).trim() ||
+      safeString((j as any).qsc_public_url).trim() ||
       "";
 
     const nextSteps =
@@ -360,7 +366,7 @@ export default function PublicTestClient({
         window.localStorage.removeItem(key("details"));
       }
 
-      // ✅ NEW: visibility always goes to the bespoke report route
+      // Visibility always goes to bespoke route
       if (isVisibilityEngine) {
         router.replace(`/t/${token}/visibility/report?tid=${encodeURIComponent(takerId)}`);
         return;
@@ -368,18 +374,29 @@ export default function PublicTestClient({
 
       const { redirect, nextSteps, showResults } = resolveRedirectAndNextSteps(j);
 
-      if (showResults !== false) {
-        router.replace(`/t/${token}/result?tid=${encodeURIComponent(takerId)}`);
-        return;
-      }
-
+      // ✅ CRITICAL FIX:
+      // Trust explicit backend redirect FIRST (QSC and other bespoke engines)
       if (redirect) {
-        if (typeof window !== "undefined") window.location.href = redirect;
+        if (isAbsoluteUrl(redirect)) {
+          window.location.href = redirect;
+        } else {
+          router.replace(redirect);
+        }
         return;
       }
 
       if (nextSteps) {
-        if (typeof window !== "undefined") window.location.href = nextSteps;
+        if (isAbsoluteUrl(nextSteps)) {
+          window.location.href = nextSteps;
+        } else {
+          router.replace(nextSteps);
+        }
+        return;
+      }
+
+      // Only fall back to generic /result when no explicit redirect was provided
+      if (showResults !== false) {
+        router.replace(`/t/${token}/result?tid=${encodeURIComponent(takerId)}`);
         return;
       }
 
