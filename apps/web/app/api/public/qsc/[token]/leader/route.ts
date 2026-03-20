@@ -123,6 +123,16 @@ function personalityToLetter(
   return null;
 }
 
+function mindsetKeyToLevel(m: string | null | undefined): number | null {
+  const x = String(m || "").trim().toUpperCase();
+  if (x === "ORIGIN") return 1;
+  if (x === "MOMENTUM") return 2;
+  if (x === "VECTOR") return 3;
+  if (x === "ORBIT") return 4;
+  if (x === "QUANTUM") return 5;
+  return null;
+}
+
 function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
 }
@@ -197,11 +207,18 @@ async function resolveContentTestId(
     }
   }
 
+  if (defaultSource && isUuidLike(defaultSource)) {
+    return {
+      contentTestId: defaultSource,
+      resolvedBy: "meta.default_source_test",
+    };
+  }
+
   return { contentTestId: wrapperTestId, resolvedBy: "wrapper_no_sources" };
 }
 
 /**
- * Resolve persona code A1..D5 using same strategy as result endpoint
+ * Resolve persona code A1..D5 using same resilience as result endpoint
  */
 function resolvePersonaCode(args: {
   resultRow: QscResultsRow;
@@ -234,7 +251,7 @@ function resolvePersonaCode(args: {
     typeof profile?.mindset_level === "number" &&
     Number.isFinite(profile.mindset_level)
       ? Number(profile.mindset_level)
-      : null;
+      : mindsetKeyToLevel(resultRow.primary_mindset);
 
   if (letter && level && level >= 1 && level <= 5) {
     const derived = `${letter}${level}`;
@@ -386,7 +403,7 @@ export async function GET(
         }
       }
 
-      // last-resort fallback (kept for edge cases)
+      // last-resort fallback
       if (!results && c > 0) {
         const { data, error } = await sb
           .from("qsc_results")
@@ -432,7 +449,7 @@ export async function GET(
       );
     }
 
-    // ✅ wrapper -> canonical content test (qsc-leaders)
+    // wrapper -> canonical content test (qsc-leaders)
     const wrapperTestId = String(results.test_id);
     const { contentTestId, resolvedBy: contentResolvedBy } =
       await resolveContentTestId(sb, wrapperTestId, "leader");
@@ -474,7 +491,7 @@ export async function GET(
       if (data) taker = data as unknown as QscTakerRow;
     }
 
-    // Load profile snapshot (needed for persona_code resolution)
+    // Load profile snapshot
     let profile: QscProfileRow | null = null;
 
     if (results.qsc_profile_id) {
@@ -493,13 +510,54 @@ export async function GET(
       if (data) profile = data as unknown as QscProfileRow;
     }
 
-    // ✅ persona_code A1..D5
+    // Fallback 1: direct persona code from combined_profile_code
+    if (!profile) {
+      const combinedRaw = String(results.combined_profile_code || "").trim();
+      const directPersonaCode = looksLikePersonaCode(combinedRaw)
+        ? combinedRaw.toUpperCase()
+        : null;
+
+      if (directPersonaCode) {
+        const { data, error } = await sb
+          .from("qsc_profiles")
+          .select("id, personality_code, mindset_level, profile_code, profile_label")
+          .eq("profile_code", directPersonaCode)
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          profile = data as unknown as QscProfileRow;
+        }
+      }
+    }
+
+    // Fallback 2: derive from primary personality + primary mindset
+    if (!profile) {
+      const letter = personalityToLetter(results.primary_personality);
+      const level = mindsetKeyToLevel(results.primary_mindset);
+
+      if (letter && level) {
+        const { data, error } = await sb
+          .from("qsc_profiles")
+          .select("id, personality_code, mindset_level, profile_code, profile_label")
+          .eq("personality_code", letter)
+          .eq("mindset_level", level)
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          profile = data as unknown as QscProfileRow;
+        }
+      }
+    }
+
+    // persona_code A1..D5
     const { personaCode, source: personaCodeSource } = resolvePersonaCode({
       resultRow: results,
       profile,
     });
 
-    // Templates (per canonical content test)
+    // Templates
     const { data: templateRows, error: tplErr } = await sb
       .from("qsc_leader_report_templates")
       .select("id, test_id, section_key, content, sort_order, is_active")
@@ -517,7 +575,7 @@ export async function GET(
       );
     }
 
-    // Persona sections (canonical content test + persona_code)
+    // Persona sections
     let sectionRows: PersonaSectionRow[] = [];
     if (personaCode) {
       const { data: secRows, error: secErr } = await sb
@@ -579,6 +637,8 @@ export async function GET(
           profile_mindset_level: profile?.mindset_level ?? null,
           template_count: templates.length,
           section_count: sections.length,
+          personality_percentages: results.personality_percentages ?? null,
+          mindset_percentages: results.mindset_percentages ?? null,
         },
       },
       { status: 200 }
