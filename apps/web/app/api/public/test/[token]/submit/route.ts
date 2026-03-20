@@ -14,6 +14,7 @@ type QuestionRow = {
   id: string;
   idx?: number | string | null;
   profile_map?: PMEntry[] | null;
+  weights?: any | null;
 };
 
 function supa() {
@@ -83,6 +84,37 @@ function getDefaultSupportEmail() {
   );
 }
 
+function personalityToLetter(v: string | null | undefined): "A" | "B" | "C" | "D" | null {
+  const s = String(v || "").trim().toUpperCase();
+  if (s === "A" || s === "B" || s === "C" || s === "D") return s as "A" | "B" | "C" | "D";
+  if (s === "FIRE") return "A";
+  if (s === "FLOW") return "B";
+  if (s === "FORM") return "C";
+  if (s === "FIELD") return "D";
+  return null;
+}
+
+function mindsetToLevel(v: string | null | undefined): 1 | 2 | 3 | 4 | 5 | null {
+  const s = String(v || "").trim().toUpperCase();
+  if (s === "ORIGIN") return 1;
+  if (s === "MOMENTUM") return 2;
+  if (s === "VECTOR") return 3;
+  if (s === "ORBIT") return 4;
+  if (s === "QUANTUM") return 5;
+  return null;
+}
+
+function deriveCombinedProfileCode(scoring: any): string | null {
+  const existing = String(scoring?.combinedProfileCode || "").trim();
+  if (existing) return existing;
+
+  const pp = String(scoring?.primaryPersonality || "").trim().toUpperCase();
+  const pm = String(scoring?.primaryMindset || "").trim().toUpperCase();
+  if (pp && pm) return `${pp}_${pm}`;
+
+  return null;
+}
+
 /**
  * Wrapper resolution:
  * If tests.meta.wrapper = true, use meta.default_source_test (or source_tests[0])
@@ -107,15 +139,9 @@ type LinkBehavior = {
   redirect_url: string | null;
   hidden_results_message: string | null;
   next_steps_url: string | null;
-  email_report: boolean; // ✅ real DB column
+  email_report: boolean;
 };
 
-/**
- * Load link behavior flags.
- *
- * Your DB column is `email_report`.
- * Some older code referenced `email_results`, so we fall back to that if needed.
- */
 async function loadLinkBehavior(
   sb: ReturnType<typeof supa>,
   token: string
@@ -218,7 +244,7 @@ function computeTierAndLevel(tierCounts: Record<Tier, number>, totalSignals: num
 
   const dominance = totalSignals ? (support + 0.5 * above) / totalSignals : 0;
   const tierLevel = clamp(Math.ceil(dominance * 5), 1, 5);
-  const level = base[dominant] + tierLevel; // 1..20
+  const level = base[dominant] + tierLevel;
 
   return { tier: dominant, level, tierLevel, support, above, below, dominance };
 }
@@ -252,10 +278,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const answers: any[] = Array.isArray(body.answers) ? body.answers : [];
     const sb = supa();
 
-    // Load link behavior flags (show/hide/redirect/email)
     const linkBehavior = await loadLinkBehavior(sb, token);
 
-    // Resolve taker → wrapper test (org-facing)
     const { data: taker, error: takerErr } = await sb
       .from("test_takers")
       .select(
@@ -269,7 +293,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
       return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
     }
 
-    // Load wrapper test row (the one linked to the token)
     const { data: test, error: testErr } = await sb
       .from("tests")
       .select("id, slug, meta, name")
@@ -280,8 +303,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       return NextResponse.json({ ok: false, error: "Test not found for taker" }, { status: 500 });
     }
 
-    // ✅ VISIBILITY BRANCH (only activates if linked in visibility.tests)
-    // This does NOT affect other tests.
+    // ✅ VISIBILITY BRANCH
     const vis = visSupa();
     const { data: vTest, error: vTestErr } = await vis
       .from("tests")
@@ -297,7 +319,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
 
     if (vTest?.id) {
-      // Load visibility questions + options scoring
       const { data: vQs, error: vqErr } = await vis
         .from("questions")
         .select("id, code, idx, pillar")
@@ -337,7 +358,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
         scoringMap[o.question_id]![ab] = o.scoring as Scoring;
       }
 
-      // Score
       const personalityPoints: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
       const tierCounts: Record<Tier, number> = {
         Invisible: 0,
@@ -347,7 +367,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
       };
       let ladderSignals = 0;
 
-      // Store answers as QCODE -> AB (for visibility.submissions.answers)
       const storedAnswers: Record<string, AB> = {};
 
       for (const row of answers) {
@@ -374,7 +393,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
         }
       }
 
-      // Dominant personality
       const types: AB[] = ["A", "B", "C", "D"];
       let personality_type: AB = "A";
       let best = -1;
@@ -390,7 +408,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
       const readiness = computeReadiness(tierLevel, below);
 
-      // Persist into visibility schema
       const fullName = [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim();
 
       const { data: sub, error: subErr } = await vis
@@ -415,7 +432,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
         );
       }
 
-      // Insert result + keep id so we can enrich pillar signals immediately
       const { data: resRow, error: resErr } = await vis
         .from("results")
         .insert({
@@ -441,7 +457,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
         );
       }
 
-      // ✅ BEST: compute pillar signals immediately at submit-time (so report has pillars on first load)
       let pillarComputed: any = null;
       try {
         const { data: pillarRpc, error: pillarErr } = await vis.rpc(
@@ -466,11 +481,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
             .eq("id", resRow.id);
         }
       } catch (e) {
-        // do not fail submit if pillar computation fails; report endpoint can still compute later
         console.warn("[visibility submit] pillar compute failed", e);
       }
 
-      // Also store a totals payload into portal tables (so portal UX doesn’t break)
       const totals = {
         visibility: {
           tier,
@@ -479,8 +492,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
           personality_type,
           personality_points: personalityPoints,
           tier_counts: tierCounts,
-
-          // ✅ include pillars when available (helps portal snapshot later)
           pillar_scores: pillarComputed?.pillar_scores ?? undefined,
           pillar_bands: pillarComputed?.pillar_bands ?? undefined,
           weakest_pillar: pillarComputed?.weakest_pillar ?? undefined,
@@ -528,10 +539,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
         );
       }
 
-      // Canonical base for ALL absolute links
       const origin = getBaseUrl();
 
-      // Bespoke Visibility report route
       const reportPath = `/t/${encodeURIComponent(token)}/visibility/report?tid=${encodeURIComponent(
         taker.id
       )}`;
@@ -543,7 +552,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const baseReportUrl = `${origin}${reportPath}`;
       const baseResultUrl = `${origin}${resultPath}`;
 
-      // Mark completed + persist last_result_url
       await sb
         .from("test_takers")
         .update({
@@ -553,7 +561,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
         .eq("id", taker.id)
         .eq("link_token", token);
 
-      // Load org (needed for email template placeholders)
       const { data: orgRow } = await sb
         .from("orgs")
         .select("id, slug, name, support_email, notification_email, website_url")
@@ -566,7 +573,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const supportEmail =
         normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
 
-      // Email report link to test taker (if enabled)
       let takerEmailResult: any = null;
       try {
         if (linkBehavior.email_report && normalizeEmail(taker.email)) {
@@ -591,7 +597,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
         console.error("[visibility submit] test_taker_report unexpected error", e);
       }
 
-      // Internal notification (keeps parity with other tests)
       let ownerNotification: any = null;
       try {
         const sentTo =
@@ -608,17 +613,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
             context: {
               owner_first_name: "",
               owner_full_name: "",
-
               test_taker_full_name: fullName || (taker as any).email || "",
               test_taker_email: (taker as any).email || "",
               test_taker_mobile: (taker as any).phone || "",
               test_taker_org: (taker as any).company || "",
-
               test_name: (test.name as string) || "Visibility Ladder",
-
               internal_report_link: internalReportLink,
               internal_results_dashboard_link: internalResultsDashboardLink,
-
               org_name: orgName,
               owner_website: (orgRow as any)?.website_url || "",
             },
@@ -632,27 +633,17 @@ export async function POST(req: Request, { params }: { params: { token: string }
         console.error("[visibility submit] owner notification unexpected error", e);
       }
 
-      // ✅ BULLETPROOF: force the public client to follow redirect and not /result
-      // Your PublicTestClient hard-routes to /result when show_results !== false.
       return NextResponse.json({
         ok: true,
         totals,
-
-        // hard signal to client
         show_results: false,
         showResults: false,
-
-        // redirect variants
         redirect: reportPath,
         redirect_url: reportPath,
         redirectUrl: reportPath,
-
-        // next steps variants (treat as report for now; UI button can use this)
         next_steps_url: reportPath,
         nextStepsUrl: reportPath,
         link_meta: { next_steps_url: reportPath },
-
-        // keep original link block
         link: {
           show_results: linkBehavior.show_results,
           redirect_url: linkBehavior.redirect_url,
@@ -660,18 +651,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
           next_steps_url: linkBehavior.next_steps_url,
           email_report: linkBehavior.email_report,
         },
-
-        // urls
         result_url: baseResultUrl,
         report_url: baseReportUrl,
-
-        // visibility ids for debugging / future
         visibility: {
           submission_id: sub.id,
           result_id: resRow.id,
           visibility_test_id: vTest.id,
         },
-
         owner_notification: ownerNotification,
         taker_email: takerEmailResult,
       });
@@ -712,7 +698,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
     const { data: questions, error: qErr } = await sb
       .from("test_questions")
-      .select("id, idx, profile_map")
+      .select("id, idx, profile_map, weights")
       .eq("test_id", effectiveTestId)
       .order("idx", { ascending: true })
       .order("created_at", { ascending: true });
@@ -819,6 +805,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
           id: q.id as string,
           idx: (q.idx as number | null) ?? null,
           profile_map: (q.profile_map ?? []) as any,
+          weights: q.weights ?? null,
         }));
 
         const answersForScoring = answers
@@ -829,69 +816,72 @@ export async function POST(req: Request, { params }: { params: { token: string }
           })
           .filter((a: any) => a.question_id && a.choice >= 0);
 
+        if (answersForScoring.length === 0) {
+          throw new Error("QSC scoring failed: no valid answers were available for scoring.");
+        }
+
         const scoring = calculateQscScores(questionsForScoring, answersForScoring);
+        const combinedProfileCode = deriveCombinedProfileCode(scoring);
+
+        const personality_code = personalityToLetter(scoring.primaryPersonality);
+        const mindset_level = mindsetToLevel(scoring.primaryMindset);
 
         let qscProfileId: string | null = null;
 
-        if (scoring.combinedProfileCode) {
-          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
+        if (personality_code && mindset_level) {
+          const { data: qscProfileRow, error: qscProfileError } = await sb
+            .from("qsc_profiles")
+            .select("id")
+            .eq("personality_code", personality_code)
+            .eq("mindset_level", mindset_level)
+            .maybeSingle();
 
-          const personalityMap: Record<string, string> = {
-            FIRE: "A",
-            FLOW: "B",
-            FORM: "C",
-            FIELD: "D",
-          };
-          const mindsetMap: Record<string, number> = {
-            ORIGIN: 1,
-            MOMENTUM: 2,
-            VECTOR: 3,
-            ORBIT: 4,
-            QUANTUM: 5,
-          };
-
-          const personality_code = personalityMap[personalityKey];
-          const mindset_level = mindsetMap[mindsetKey];
-
-          if (personality_code && mindset_level) {
-            const { data: qscProfileRow, error: qscProfileError } = await sb
-              .from("qsc_profiles")
-              .select("id")
-              .eq("personality_code", personality_code)
-              .eq("mindset_level", mindset_level)
-              .maybeSingle();
-
-            if (!qscProfileError) qscProfileId = (qscProfileRow as any)?.id ?? null;
+          if (qscProfileError) {
+            throw new Error(`QSC scoring failed during qsc_profiles lookup: ${qscProfileError.message}`);
           }
+
+          qscProfileId = (qscProfileRow as any)?.id ?? null;
         }
+
+        const qscPayload = {
+          taker_id: taker.id,
+          test_id: taker.test_id,
+          token,
+          audience: qscAudience,
+          personality_totals: scoring.personalityTotals ?? {},
+          personality_percentages: scoring.personalityPercentages ?? {},
+          mindset_totals: scoring.mindsetTotals ?? {},
+          mindset_percentages: scoring.mindsetPercentages ?? {},
+          primary_personality: scoring.primaryPersonality ?? null,
+          secondary_personality: scoring.secondaryPersonality ?? null,
+          primary_mindset: scoring.primaryMindset ?? null,
+          secondary_mindset: scoring.secondaryMindset ?? null,
+          combined_profile_code: combinedProfileCode,
+          qsc_profile_id: qscProfileId,
+        };
 
         const { error: qscUpsertError } = await sb
           .from("qsc_results")
-          .upsert(
-            {
-              taker_id: taker.id,
-              test_id: taker.test_id,
-              token,
-              audience: qscAudience,
-              personality_totals: scoring.personalityTotals,
-              personality_percentages: scoring.personalityPercentages,
-              mindset_totals: scoring.mindsetTotals,
-              mindset_percentages: scoring.mindsetPercentages,
-              primary_personality: scoring.primaryPersonality,
-              secondary_personality: scoring.secondaryPersonality,
-              primary_mindset: scoring.primaryMindset,
-              secondary_mindset: scoring.secondaryMindset,
-              combined_profile_code: scoring.combinedProfileCode,
-              qsc_profile_id: qscProfileId,
-            },
-            { onConflict: "taker_id" }
-          );
+          .upsert(qscPayload, { onConflict: "taker_id" });
 
         if (qscUpsertError) {
-          console.error("QSC scoring: failed to upsert qsc_results", qscUpsertError);
+          const { error: qscInsertError } = await sb.from("qsc_results").insert(qscPayload);
+
+          if (qscInsertError) {
+            throw new Error(
+              `QSC scoring failed to persist qsc_results. Upsert: ${qscUpsertError.message}. Insert fallback: ${qscInsertError.message}`
+            );
+          }
         }
-      } catch (e) {
-        console.error("QSC scoring: unexpected error", e);
+      } catch (e: any) {
+        console.error("QSC scoring failed", e);
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `QSC scoring failed: ${String(e?.message || e)}`,
+          },
+          { status: 500 }
+        );
       }
     }
     // ---------------- END QSC SCORING ----------------
@@ -986,17 +976,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
           context: {
             owner_first_name: "",
             owner_full_name: "",
-
             test_taker_full_name: fullName || (taker as any).email || "",
             test_taker_email: (taker as any).email || "",
             test_taker_mobile: (taker as any).phone || "",
             test_taker_org: (taker as any).company || "",
-
             test_name: (test.name as string) || slug || "your assessment",
-
             internal_report_link: internalReportLink,
             internal_results_dashboard_link: internalResultsDashboardLink,
-
             org_name: orgName,
             owner_website: (orgRow as any)?.website_url || "",
           },
@@ -1013,7 +999,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
     return NextResponse.json({
       ok: true,
       totals,
-
       link: {
         show_results: linkBehavior.show_results,
         redirect_url: linkBehavior.redirect_url,
@@ -1021,15 +1006,11 @@ export async function POST(req: Request, { params }: { params: { token: string }
         next_steps_url: linkBehavior.next_steps_url,
         email_report: linkBehavior.email_report,
       },
-
       redirect: redirectUrl,
-
       result_url: baseResultUrl,
       report_url: baseReportUrl,
-
       qsc_public_path: isQscTest ? qscPublicPath : null,
       qsc_public_url: isQscTest ? qscPublicUrl : null,
-
       owner_notification: ownerNotification,
       taker_email: takerEmailResult,
     });
