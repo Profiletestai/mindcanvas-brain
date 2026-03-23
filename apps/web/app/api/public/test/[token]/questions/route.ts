@@ -8,7 +8,11 @@ export const dynamic = "force-dynamic";
 type LinkRow = { token: string; test_id: string; org_id?: string };
 type TestRow = { id: string; slug: string | null; meta: any | null };
 
-// Your app uses test_questions.id as the question_id (see submit route).
+type ProfileMapEntry = {
+  points?: number;
+  profile?: string;
+};
+
 type TestQuestionRow = {
   id: string;
   idx?: number | null;
@@ -17,6 +21,8 @@ type TestQuestionRow = {
   text?: string | null;
   options?: string[] | null;
   category?: string | null;
+  profile_map?: ProfileMapEntry[] | string | null;
+  weights?: any | null;
 };
 
 function getPortalClient(): any {
@@ -55,6 +61,61 @@ function normSlug(v: any) {
   return String(v || "").trim().toLowerCase();
 }
 
+function parseMaybeJson<T = any>(value: any): T | null {
+  if (value == null) return null;
+  if (Array.isArray(value) || typeof value === "object") return value as T;
+  if (typeof value !== "string") return null;
+
+  const s = value.trim();
+  if (!s) return null;
+  if (!(s.startsWith("{") || s.startsWith("["))) return null;
+
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
+  }
+}
+
+function coerceProfileMapEntries(value: any): ProfileMapEntry[] {
+  const parsed = parseMaybeJson<any>(value);
+
+  const arr = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.profile_map)
+      ? parsed.profile_map
+      : Array.isArray(parsed?.weights)
+        ? parsed.weights
+        : Array.isArray(parsed?.map)
+          ? parsed.map
+          : [];
+
+  return arr
+    .map((entry: any) => ({
+      points: Number(entry?.points ?? 0),
+      profile: String(entry?.profile || "").trim(),
+    }))
+    .filter((entry: ProfileMapEntry) => Number.isFinite(Number(entry.points)) && !!entry.profile);
+}
+
+function buildSyntheticOptionsFromQuestion(q: TestQuestionRow): string[] | null {
+  if (Array.isArray(q.options) && q.options.length > 0) {
+    return q.options;
+  }
+
+  const mapEntries = coerceProfileMapEntries(q.profile_map);
+  if (mapEntries.length > 0) {
+    return Array.from({ length: mapEntries.length }, (_, i) => String(i + 1));
+  }
+
+  const weightEntries = coerceProfileMapEntries(q.weights);
+  if (weightEntries.length > 0) {
+    return Array.from({ length: weightEntries.length }, (_, i) => String(i + 1));
+  }
+
+  return null;
+}
+
 /**
  * Resolve the canonical test that actually owns the questions.
  *
@@ -71,15 +132,14 @@ async function resolveEffectiveTestId(args: {
 
   const meta = wrapperTest?.meta ?? {};
 
-  // 1) Generic shared-source clone support
   const genericSource =
     typeof meta?.source_test_id === "string"
       ? meta.source_test_id
       : typeof meta?.base_test_id === "string"
-      ? meta.base_test_id
-      : typeof meta?.parent_test_id === "string"
-      ? meta.parent_test_id
-      : null;
+        ? meta.base_test_id
+        : typeof meta?.parent_test_id === "string"
+          ? meta.parent_test_id
+          : null;
 
   if (genericSource && isUuidLike(genericSource)) {
     return {
@@ -88,7 +148,6 @@ async function resolveEffectiveTestId(args: {
     };
   }
 
-  // 2) Existing wrapper logic (used by QSC-style wrappers)
   const isWrapper = meta?.wrapper === true;
 
   if (!isWrapper) {
@@ -104,7 +163,6 @@ async function resolveEffectiveTestId(args: {
       ? meta.default_source_test
       : null;
 
-  // If we have multiple source tests, prefer specific known slugs when present
   if (sourceTests.length) {
     const clean = sourceTests.filter((id) => isUuidLike(id));
     if (clean.length) {
@@ -115,7 +173,6 @@ async function resolveEffectiveTestId(args: {
 
       const list = (candidates ?? []) as TestRow[];
 
-      // Prefer qsc-leaders if it exists
       const leaders = list.find((t) => normSlug(t.slug) === "qsc-leaders");
       if (leaders?.id) {
         return {
@@ -124,7 +181,6 @@ async function resolveEffectiveTestId(args: {
         };
       }
 
-      // Else prefer qsc-core
       const core = list.find((t) => normSlug(t.slug) === "qsc-core");
       if (core?.id) {
         return {
@@ -135,7 +191,6 @@ async function resolveEffectiveTestId(args: {
     }
   }
 
-  // Fallback: default source
   if (defaultSource && isUuidLike(defaultSource)) {
     return {
       effectiveTestId: defaultSource,
@@ -143,7 +198,6 @@ async function resolveEffectiveTestId(args: {
     };
   }
 
-  // Fallback: first source
   if (sourceTests.length && isUuidLike(sourceTests[0])) {
     return {
       effectiveTestId: sourceTests[0],
@@ -168,7 +222,6 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
 
     const sb = getPortalClient();
 
-    // 1) resolve link -> test_id
     const { data: linkRow, error: linkErr } = (await sb
       .from("test_links")
       .select("token, test_id, org_id")
@@ -179,7 +232,6 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       return NextResponse.json({ ok: false, error: "invalid link" }, { status: 404 });
     }
 
-    // 2) load test meta
     const { data: testRow, error: testErr } = (await sb
       .from("tests")
       .select("id, slug, meta")
@@ -198,10 +250,9 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       wrapperTest: testRow,
     });
 
-    // 3) load questions directly from portal.test_questions (existing behaviour)
     const { data: rows, error: qErr } = (await sb
       .from("test_questions")
-      .select("id, idx, order, type, text, options, category")
+      .select("id, idx, order, type, text, options, category, profile_map, weights")
       .eq("test_id", effectiveTestId)
       .order("order", { ascending: true })
       .order("idx", { ascending: true })
@@ -217,17 +268,23 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       );
     }
 
-    const portalQuestions = (rows ?? []).map((q) => ({
-      id: q.id,
-      idx: q.idx ?? null,
-      order: q.order ?? null,
-      type: q.type ?? null,
-      text: q.text ?? null,
-      options: q.options ?? null,
-      category: q.category ?? null,
-    }));
+    const portalQuestions = (rows ?? []).map((q) => {
+      const safeOptions = buildSyntheticOptionsFromQuestion(q);
+      const inferredType =
+        q.type ??
+        (safeOptions && safeOptions.length > 0 ? "single" : null);
 
-    // ✅ If portal has questions, return them unchanged (no impact to existing tests)
+      return {
+        id: q.id,
+        idx: q.idx ?? null,
+        order: q.order ?? null,
+        type: inferredType,
+        text: q.text ?? null,
+        options: safeOptions,
+        category: q.category ?? null,
+      };
+    });
+
     if (portalQuestions.length > 0) {
       return NextResponse.json({
         ok: true,
@@ -241,11 +298,16 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
           wrapper_is_wrapper: (testRow.meta?.wrapper === true) || false,
           resolved_by: resolvedBy,
           question_count: portalQuestions.length,
+          synthetic_options_applied: portalQuestions.some(
+            (q, i) =>
+              (!Array.isArray((rows ?? [])[i]?.options) || !(rows ?? [])[i]?.options?.length) &&
+              Array.isArray(q.options) &&
+              q.options.length > 0
+          ),
         },
       });
     }
 
-    // ✅ Fallback: Visibility engine questions (only if linked in visibility.tests)
     const vis = getVisibilityClient();
 
     const { data: vTest, error: vTestErr } = await vis
@@ -262,7 +324,6 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
     }
 
     if (!vTest?.id) {
-      // No portal questions AND not a visibility test -> return empty as before
       return NextResponse.json({
         ok: true,
         token: linkRow.token,
@@ -314,9 +375,11 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
     }
 
     const visibilityQuestions: TestQuestionRow[] = (vQs ?? []).map((q: any) => {
-      const opts = (optByQ[q.id] || []).sort((a, b) => optionOrder(a.option_code) - optionOrder(b.option_code));
+      const opts = (optByQ[q.id] || []).sort(
+        (a, b) => optionOrder(a.option_code) - optionOrder(b.option_code)
+      );
       return {
-        id: q.id,                 // important: UI submits question_id = this id
+        id: q.id,
         idx: q.idx ?? null,
         order: q.idx ?? null,
         type: "single",
@@ -330,7 +393,7 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
       ok: true,
       token: linkRow.token,
       test_id: linkRow.test_id,
-      effective_test_id: effectiveTestId, // still included for compatibility
+      effective_test_id: effectiveTestId,
       questions: visibilityQuestions,
       __debug: {
         engine: "visibility.questions/options",
@@ -344,4 +407,3 @@ export async function GET(_req: NextRequest, ctx: { params: { token?: string } }
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
-
