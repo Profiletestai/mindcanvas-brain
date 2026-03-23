@@ -1,4 +1,5 @@
 // apps/web/app/api/public/test/[token]/submit/route.ts
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { calculateQscScores } from "@/lib/qsc-scoring";
@@ -35,7 +36,6 @@ function visSupa() {
   return createClient(url, key, { db: { schema: "visibility" } });
 }
 
-// Accept PROFILE_1..8 or P1..P8 → A/B/C/D; fallback if value already starts with A/B/C/D
 function profileCodeToFreq(code: string): AB | null {
   const s = String(code || "").trim().toUpperCase();
   let n: number | null = null;
@@ -805,7 +805,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
           id: q.id as string,
           idx: (q.idx as number | null) ?? null,
           profile_map: (q.profile_map ?? []) as any,
-          weights: q.weights ?? null,
         }));
 
         const answersForScoring = answers
@@ -822,6 +821,17 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
         const scoring = calculateQscScores(questionsForScoring, answersForScoring);
         const combinedProfileCode = deriveCombinedProfileCode(scoring);
+
+        const hasPersonalityTotals = Object.keys(scoring.personalityTotals ?? {}).length > 0;
+        const hasMindsetTotals = Object.keys(scoring.mindsetTotals ?? {}).length > 0;
+
+        if (!hasPersonalityTotals || !hasMindsetTotals) {
+          throw new Error(
+            `QSC scoring produced empty totals. personality=${JSON.stringify(
+              scoring.personalityTotals ?? {}
+            )} mindset=${JSON.stringify(scoring.mindsetTotals ?? {})}`
+          );
+        }
 
         const personality_code = personalityToLetter(scoring.primaryPersonality);
         const mindset_level = mindsetToLevel(scoring.primaryMindset);
@@ -860,17 +870,35 @@ export async function POST(req: Request, { params }: { params: { token: string }
           qsc_profile_id: qscProfileId,
         };
 
-        const { error: qscUpsertError } = await sb
+        const { data: existingQscRow, error: existingQscErr } = await sb
           .from("qsc_results")
-          .upsert(qscPayload, { onConflict: "taker_id" });
+          .select("id")
+          .eq("taker_id", taker.id)
+          .maybeSingle();
 
-        if (qscUpsertError) {
-          const { error: qscInsertError } = await sb.from("qsc_results").insert(qscPayload);
+        if (existingQscErr) {
+          throw new Error(`QSC scoring failed during existing-row lookup: ${existingQscErr.message}`);
+        }
 
-          if (qscInsertError) {
-            throw new Error(
-              `QSC scoring failed to persist qsc_results. Upsert: ${qscUpsertError.message}. Insert fallback: ${qscInsertError.message}`
-            );
+        if (existingQscRow?.id) {
+          const { error: updateErr } = await sb
+            .from("qsc_results")
+            .update(qscPayload)
+            .eq("id", existingQscRow.id);
+
+          if (updateErr) {
+            throw new Error(`QSC scoring failed during update: ${updateErr.message}`);
+          }
+        } else {
+          const { error: insertErr } = await sb
+            .from("qsc_results")
+            .insert({
+              id: randomUUID(),
+              ...qscPayload,
+            });
+
+          if (insertErr) {
+            throw new Error(`QSC scoring failed during insert: ${insertErr.message}`);
           }
         }
       } catch (e: any) {
