@@ -1,7 +1,6 @@
 // apps/web/app/qsc/[token]/leader/page.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
@@ -31,7 +30,7 @@ type QscResultsRow = {
   primary_personality: PersonalityKey | null;
   primary_mindset: MindsetKey | null;
 
-  combined_profile_code: string | null; // persona_code (A1..D5)
+  combined_profile_code: string | null;
 };
 
 type QscProfileRow = {
@@ -62,11 +61,20 @@ type PersonaSectionRow = {
   sort_order: number;
 };
 
+type LinkMeta = {
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  next_steps_url?: string | null;
+  email_report?: boolean | null;
+};
+
 type ApiPayload = {
   ok: boolean;
   results: QscResultsRow;
   profile: QscProfileRow | null;
   taker: QscTakerRow | null;
+  link?: LinkMeta | null;
   report: {
     test_id: string;
     persona_code: string | null;
@@ -140,7 +148,6 @@ function contentToText(content: any): string {
 function renderDocText(content: any) {
   const t = contentToText(content).trim();
   if (!t) return null;
-  // ✅ style only: dark text for white containers
   return (
     <div className="text-[15px] text-slate-700 whitespace-pre-line leading-relaxed">
       {t}
@@ -167,7 +174,6 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
 
   return (
     <svg viewBox="0 0 160 160" className="h-40 w-40 md:h-48 md:w-48">
-      {/* ✅ style only: light track */}
       <circle
         cx={center}
         cy={center}
@@ -200,10 +206,8 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         );
       })}
 
-      {/* ✅ style only: white center to match container */}
       <circle cx={center} cy={center} r={radius - strokeWidth} fill="#ffffff" />
 
-      {/* ✅ style only: dark text */}
       <text x={center} y={center - 4} textAnchor="middle" fill="#0f172a">
         LEADERSHIP
       </text>
@@ -264,7 +268,6 @@ export default function QscLeaderStrategicReportPage({
 
         if (!j?.results) throw new Error("RESULT_NOT_FOUND");
 
-        // Safety bounce
         if (j.results.audience === "entrepreneur") {
           const base = `/qsc/${encodeURIComponent(token)}/entrepreneur`;
           const href = tid ? `${base}?tid=${encodeURIComponent(tid)}` : base;
@@ -295,7 +298,7 @@ export default function QscLeaderStrategicReportPage({
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
-        backgroundColor: "#020617", // keep page dark
+        backgroundColor: "#020617",
         windowWidth: element.scrollWidth,
         windowHeight: element.scrollHeight,
       });
@@ -335,9 +338,8 @@ export default function QscLeaderStrategicReportPage({
   const createdAt = result?.created_at ? new Date(result.created_at) : null;
   const takerDisplayName = getFullName(taker);
 
-  const snapshotHref = tid
-    ? `/qsc/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
-    : `/qsc/${encodeURIComponent(token)}`;
+  const nextStepsHref =
+    (data?.link?.next_steps_url || data?.link?.redirect_url || "").trim() || null;
 
   const personalityPercRaw =
     (result?.personality_percentages ?? {}) as PersonalityPercMap;
@@ -379,7 +381,6 @@ export default function QscLeaderStrategicReportPage({
     result?.combined_profile_code ||
     "Your Quantum Leadership Profile";
 
-  // Build maps from DB rows
   const templateByKey = useMemo(() => {
     const out: Record<string, TemplateRow> = {};
     for (const r of data?.report?.templates ?? []) out[r.section_key] = r;
@@ -392,7 +393,6 @@ export default function QscLeaderStrategicReportPage({
     return out;
   }, [data?.report?.sections]);
 
-  // Required keys (persona sections only)
   const missing = useMemo(() => {
     const required = [
       "quantum_profile_summary",
@@ -471,14 +471,13 @@ export default function QscLeaderStrategicReportPage({
             )}
 
             {debug && (
-            <p className="text-[15px] text-slate-300 max-w-2xl">
-             This report is rendered from{" "}
-            <code className="text-slate-100">portal.qsc_leader_report_templates</code>{" "}
-            and{" "}
-           <code className="text-slate-100">portal.qsc_leader_report_sections</code>.
-           </p>
-           )}
-
+              <p className="text-[15px] text-slate-300 max-w-2xl">
+                This report is rendered from{" "}
+                <code className="text-slate-100">portal.qsc_leader_report_templates</code>{" "}
+                and{" "}
+                <code className="text-slate-100">portal.qsc_leader_report_sections</code>.
+              </p>
+            )}
 
             {debug && data && (
               <pre className="mt-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-[11px] text-slate-200 whitespace-pre-wrap">
@@ -497,6 +496,17 @@ export default function QscLeaderStrategicReportPage({
               >
                 {downloading ? "Preparing PDF…" : "Download PDF"}
               </button>
+
+              {nextStepsHref ? (
+                <a
+                  href={nextStepsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-900"
+                >
+                  Next Steps
+                </a>
+              ) : null}
             </div>
 
             {createdAt && (
@@ -514,7 +524,6 @@ export default function QscLeaderStrategicReportPage({
           </div>
         </header>
 
-        {/* Only show missing warnings in debug mode */}
         {debug && missing.length > 0 && data && (
           <section className="rounded-3xl border border-rose-400/40 bg-rose-500/10 p-6">
             <div className="text-sm font-semibold text-rose-100">
@@ -530,7 +539,6 @@ export default function QscLeaderStrategicReportPage({
           </section>
         )}
 
-        {/* Profile header */}
         <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-2 text-slate-900">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
             STRATEGIC LEADERSHIP REPORT
@@ -538,7 +546,6 @@ export default function QscLeaderStrategicReportPage({
           <h2 className="text-2xl font-semibold">{personaName}</h2>
         </section>
 
-        {/* ✅ Introduction + How to use (side-by-side) from templates */}
         <section className="grid gap-6 md:grid-cols-2 items-start">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
             <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
@@ -563,7 +570,6 @@ export default function QscLeaderStrategicReportPage({
           </div>
         </section>
 
-        {/* Charts */}
         <section className="grid gap-6 md:grid-cols-2 items-start">
           <div className="rounded-3xl bg-white text-slate-900 border border-slate-200 p-6 md:p-7 space-y-4">
             <h2 className="text-lg font-semibold">Leadership Frequency Type</h2>
@@ -622,7 +628,6 @@ export default function QscLeaderStrategicReportPage({
           </div>
         </section>
 
-        {/* Matrix */}
         <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 text-slate-900">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
             Leadership Persona Matrix
@@ -638,7 +643,6 @@ export default function QscLeaderStrategicReportPage({
           </div>
         </section>
 
-        {/* Persona sections */}
         <section className="rounded-3xl border border-amber-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-amber-700">
             1. YOUR QUANTUM PROFILE SUMMARY
@@ -720,4 +724,3 @@ export default function QscLeaderStrategicReportPage({
     </div>
   );
 }
-

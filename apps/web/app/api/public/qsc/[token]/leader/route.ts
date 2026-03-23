@@ -224,9 +224,6 @@ async function resolveContentTestId(
   return { contentTestId: wrapperTestId, resolvedBy: "wrapper_no_sources" };
 }
 
-/**
- * Resolve persona code A1..D5 using same strategy as result endpoint
- */
 function resolvePersonaCode(args: {
   resultRow: QscResultsRow;
   profile: QscProfileRow | null;
