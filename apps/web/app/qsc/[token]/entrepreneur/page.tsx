@@ -1,12 +1,16 @@
+//apps/web/app/qsc/[token]/entrepreneur/page.tsx
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+
 import { QscMatrix } from "../../QscMatrix";
 import AppBackground from "@/components/ui/AppBackground";
+
+type Audience = "entrepreneur" | "leader";
 
 type PersonalityKey = "FIRE" | "FLOW" | "FORM" | "FIELD";
 type MindsetKey = "ORIGIN" | "MOMENTUM" | "VECTOR" | "ORBIT" | "QUANTUM";
@@ -18,66 +22,22 @@ type QscResultsRow = {
   id: string;
   test_id: string;
   token: string;
-  personality_totals: Record<string, number> | null;
-  personality_percentages: PersonalityPercMap | null;
-  mindset_totals: Record<string, number> | null;
-  mindset_percentages: MindsetPercMap | null;
-  primary_personality: PersonalityKey | null;
-  secondary_personality: PersonalityKey | null;
-  primary_mindset: MindsetKey | null;
-  secondary_mindset: MindsetKey | null;
-  combined_profile_code: string | null;
-  qsc_profile_id: string | null;
-  audience: "entrepreneur" | "leader" | null;
+  audience: Audience | null;
   created_at: string;
+
+  personality_percentages: PersonalityPercMap | null;
+  mindset_percentages: MindsetPercMap | null;
+
+  primary_personality: PersonalityKey | null;
+  primary_mindset: MindsetKey | null;
+
+  combined_profile_code: string | null;
 };
 
 type QscProfileRow = {
   id: string;
-  personality_code: string | null;
-  mindset_level: number | null;
-  profile_code: string | null;
   profile_label: string | null;
-  how_to_communicate: string | null;
-  decision_style: string | null;
-  business_challenges: string | null;
-  trust_signals: string | null;
-  offer_fit: string | null;
-  sale_blockers: string | null;
-};
-
-type QscPersonaRow = {
-  id: string;
-  test_id: string;
-  personality_code: string | null;
   mindset_level: number | null;
-  profile_code: string | null;
-  profile_label: string | null;
-
-  show_up_summary: string | null;
-  energisers: string | null;
-  drains: string | null;
-  communication_long: string | null;
-  admired_for: string | null;
-  stuck_points: string | null;
-
-  one_page_strengths: string | null;
-  one_page_risks: string | null;
-
-  combined_strengths: string | null;
-  combined_risks: string | null;
-  combined_big_lever: string | null;
-
-  emotional_stabilises: string | null;
-  emotional_destabilises: string | null;
-  emotional_patterns_to_watch: string | null;
-
-  decision_style_long: string | null;
-  support_yourself: string | null;
-
-  strategic_priority_1: string | null;
-  strategic_priority_2: string | null;
-  strategic_priority_3: string | null;
 };
 
 type QscTakerRow = {
@@ -85,15 +45,44 @@ type QscTakerRow = {
   first_name: string | null;
   last_name: string | null;
   email: string | null;
-  company: string | null;
-  role_title: string | null;
 };
 
-type QscPayload = {
+type TemplateRow = {
+  id: string;
+  section_key: string;
+  content: any;
+  sort_order: number;
+};
+
+type PersonaSectionRow = {
+  id: string;
+  persona_code: string;
+  section_key: string;
+  content: any;
+  sort_order: number;
+};
+
+type LinkMeta = {
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  next_steps_url?: string | null;
+  email_report?: boolean | null;
+};
+
+type ApiPayload = {
+  ok: boolean;
   results: QscResultsRow;
   profile: QscProfileRow | null;
-  persona?: QscPersonaRow | null;
   taker: QscTakerRow | null;
+  link?: LinkMeta | null;
+  report: {
+    test_id: string;
+    persona_code: string | null;
+    templates: TemplateRow[];
+    sections: PersonaSectionRow[];
+  };
+  __debug?: any;
 };
 
 const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
@@ -111,9 +100,12 @@ const MINDSET_LABELS: Record<MindsetKey, string> = {
   QUANTUM: "Quantum",
 };
 
-// ------------------------------------------------------
-// Helpers
-// ------------------------------------------------------
+const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
+  FIRE: "#f97316",
+  FLOW: "#0ea5e9",
+  FORM: "#22c55e",
+  FIELD: "#a855f7",
+};
 
 function normalisePercent(raw: number | undefined | null): number {
   if (raw == null || !Number.isFinite(raw)) return 0;
@@ -121,17 +113,53 @@ function normalisePercent(raw: number | undefined | null): number {
   return Math.min(100, Math.max(0, raw));
 }
 
+function getFullName(taker: QscTakerRow | null | undefined): string | null {
+  if (!taker) return null;
+  const first = (taker.first_name || "").trim();
+  const last = (taker.last_name || "").trim();
+  const full = `${first} ${last}`.trim();
+  if (full) return full;
+  const email = (taker.email || "").trim();
+  return email || null;
+}
+
+function safeParseJsonMaybe(v: any) {
+  if (v == null) return null;
+  if (typeof v === "object") return v;
+  if (typeof v !== "string") return v;
+  const s = v.trim();
+  if (!s) return null;
+  if (!(s.startsWith("{") || s.startsWith("["))) return v;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return v;
+  }
+}
+
+function contentToText(content: any): string {
+  const c = safeParseJsonMaybe(content);
+  if (c == null) return "";
+  if (typeof c === "string") return c;
+  if (typeof c?.text === "string") return c.text;
+  if (typeof c?.content === "string") return c.content;
+  return "";
+}
+
+function renderDocText(content: any) {
+  const t = contentToText(content).trim();
+  if (!t) return null;
+  return (
+    <div className="text-[15px] text-slate-700 whitespace-pre-line leading-relaxed">
+      {t}
+    </div>
+  );
+}
+
 type FrequencyDonutDatum = {
   key: PersonalityKey;
   label: string;
-  value: number; // 0–100
-};
-
-const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
-  FIRE: "#f97316",
-  FLOW: "#0ea5e9",
-  FORM: "#22c55e",
-  FIELD: "#a855f7",
+  value: number;
 };
 
 function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
@@ -146,16 +174,12 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
   let offset = 0;
 
   return (
-    <svg
-      viewBox="0 0 160 160"
-      className="h-40 w-40 md:h-48 md:w-48"
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 160 160" className="h-40 w-40 md:h-48 md:w-48">
       <circle
         cx={center}
         cy={center}
         r={radius}
-        stroke="rgba(15,23,42,0.9)"
+        stroke="rgba(15,23,42,0.12)"
         strokeWidth={strokeWidth}
         fill="transparent"
       />
@@ -166,6 +190,7 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         const dashArray = `${dash} ${circumference}`;
         const strokeDashoffset = offset;
         offset -= dash;
+
         return (
           <circle
             key={d.key}
@@ -182,62 +207,19 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         );
       })}
 
-      <circle cx={center} cy={center} r={radius - strokeWidth} fill="#020617" />
+      <circle cx={center} cy={center} r={radius - strokeWidth} fill="#ffffff" />
 
-      <text
-        x={center}
-        y={center - 4}
-        textAnchor="middle"
-        className="text-[9px] md:text-[10px]"
-        fill="#e5e7eb"
-      >
-        BUYER
+      <text x={center} y={center - 4} textAnchor="middle" fill="#0f172a">
+        LEADERSHIP
       </text>
-      <text
-        x={center}
-        y={center + 10}
-        textAnchor="middle"
-        className="text-[9px] md:text-[10px]"
-        fill="#e5e7eb"
-      >
+      <text x={center} y={center + 12} textAnchor="middle" fill="#0f172a">
         FREQUENCY
       </text>
     </svg>
   );
 }
 
-function derivePrimarySecondary<K extends string>(
-  perc: Partial<Record<K, number>>,
-  keys: readonly K[]
-): { primary: K | null; secondary: K | null } {
-  const entries = keys.map((k) => ({
-    key: k,
-    value: normalisePercent(perc[k] ?? 0),
-  }));
-
-  entries.sort((a, b) => b.value - a.value);
-
-  const primary = entries[0] && entries[0].value > 0 ? entries[0].key : null;
-  const secondary = entries[1] && entries[1].value > 0 ? entries[1].key : null;
-
-  return { primary, secondary };
-}
-
-function getFullName(taker: QscTakerRow | null | undefined): string | null {
-  if (!taker) return null;
-  const first = (taker.first_name || "").trim();
-  const last = (taker.last_name || "").trim();
-  const full = `${first} ${last}`.trim();
-  if (full) return full;
-  const email = (taker.email || "").trim();
-  return email || null;
-}
-
-// ------------------------------------------------------
-// Page
-// ------------------------------------------------------
-
-export default function QscEntrepreneurStrategicReportPage({
+export default function QscLeaderStrategicReportPage({
   params,
 }: {
   params: { token: string };
@@ -245,12 +227,12 @@ export default function QscEntrepreneurStrategicReportPage({
   const token = params.token;
   const searchParams = useSearchParams();
   const tid = searchParams?.get("tid") ?? "";
+  const debug = searchParams?.get("debug") === "1";
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [payload, setPayload] = useState<QscPayload | null>(null);
-  const [apiVersion, setApiVersion] = useState<string | null>(null);
+  const [data, setData] = useState<ApiPayload | null>(null);
 
   const [downloading, setDownloading] = useState(false);
   const reportRef = useRef<HTMLDivElement | null>(null);
@@ -263,16 +245,15 @@ export default function QscEntrepreneurStrategicReportPage({
         setLoading(true);
         setErr(null);
 
-        // Strategic Growth Report payload for entrepreneur/leader routing
         const apiUrl = tid
           ? `/api/public/qsc/${encodeURIComponent(
               token
-            )}/result?tid=${encodeURIComponent(tid)}`
-          : `/api/public/qsc/${encodeURIComponent(token)}/result`;
+            )}/leader?tid=${encodeURIComponent(tid)}`
+          : `/api/public/qsc/${encodeURIComponent(token)}/leader`;
 
         const res = await fetch(apiUrl, { cache: "no-store" });
-
         const ct = res.headers.get("content-type") || "";
+
         if (!ct.includes("application/json")) {
           const text = await res.text();
           throw new Error(
@@ -280,42 +261,22 @@ export default function QscEntrepreneurStrategicReportPage({
           );
         }
 
-        const j = (await res.json()) as {
-          ok?: boolean;
-          error?: string;
-          __api_version?: string;
-          results?: QscResultsRow;
-          profile?: QscProfileRow | null;
-          persona?: QscPersonaRow | null;
-          taker?: QscTakerRow | null;
-        };
+        const j = (await res.json()) as ApiPayload;
 
-        if (!res.ok || j.ok === false) {
-          throw new Error(j.error || `HTTP ${res.status}`);
+        if (!res.ok || j?.ok === false) {
+          throw new Error((j as any)?.error || `HTTP ${res.status}`);
         }
 
-        if (alive) setApiVersion(j.__api_version ?? null);
+        if (!j?.results) throw new Error("RESULT_NOT_FOUND");
 
-        if (!j.results) {
-          throw new Error("No QSC results found");
-        }
-
-        // If this is a LEADER result, route to Leaders strategic report page
-        if (j.results.audience === "leader") {
-          const base = `/qsc/${encodeURIComponent(token)}/leader`;
+        if (j.results.audience === "entrepreneur") {
+          const base = `/qsc/${encodeURIComponent(token)}/entrepreneur`;
           const href = tid ? `${base}?tid=${encodeURIComponent(tid)}` : base;
           router.replace(href);
           return;
         }
 
-        if (alive) {
-          setPayload({
-            results: j.results,
-            profile: j.profile ?? null,
-            persona: j.persona ?? null,
-            taker: j.taker ?? null,
-          });
-        }
+        if (alive) setData(j);
       } catch (e: any) {
         if (alive) setErr(String(e?.message || e || "Unknown error"));
       } finally {
@@ -335,7 +296,6 @@ export default function QscEntrepreneurStrategicReportPage({
       setDownloading(true);
 
       const element = reportRef.current;
-
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -345,8 +305,8 @@ export default function QscEntrepreneurStrategicReportPage({
       });
 
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
 
+      const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -366,90 +326,43 @@ export default function QscEntrepreneurStrategicReportPage({
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`qsc-entrepreneur-strategic-${token}.pdf`);
+      pdf.save(`qsc-leader-strategic-${token}.pdf`);
     } finally {
       setDownloading(false);
     }
   }
 
-  const result = payload?.results ?? null;
-  const profile = payload?.profile ?? null;
-  const persona = payload?.persona ?? null;
-  const taker = payload?.taker ?? null;
+  const result = data?.results ?? null;
+  const profile = data?.profile ?? null;
+  const taker = data?.taker ?? null;
 
-  if (loading && !result) {
-    return (
-      <div className="relative min-h-screen bg-[#020617] text-slate-50">
-        <AppBackground />
-        <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
-            Strategic Growth Report
-          </p>
-          <h1 className="mt-3 text-3xl font-bold">
-            Preparing your QSC Entrepreneur report…
-          </h1>
-          {apiVersion && (
-            <p className="text-xs text-slate-500">API: {apiVersion}</p>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  if (err || !result) {
-    return (
-      <div className="relative min-h-screen bg-[#020617] text-slate-50">
-        <AppBackground />
-        <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
-            Strategic Growth Report
-          </p>
-          <h1 className="text-3xl font-bold">Couldn&apos;t load report</h1>
-          <p className="text-sm text-slate-700">
-            We weren&apos;t able to generate your QSC Entrepreneur — Strategic
-            Growth Report.
-          </p>
-          <pre className="mt-2 rounded-xl border border-slate-300 bg-white p-3 text-xs text-slate-900 whitespace-pre-wrap">
-            {err || "No data"}
-          </pre>
-          {apiVersion && (
-            <p className="text-xs text-slate-500">API: {apiVersion}</p>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  const createdAt = new Date(result.created_at);
-  const personaName =
-    persona?.profile_label ||
-    profile?.profile_label ||
-    "Your Quantum Buyer Profile";
-
+  const createdAt = result?.created_at ? new Date(result.created_at) : null;
   const takerDisplayName = getFullName(taker);
 
-  // ✅ Snapshot URL (this is what we should call “Back to Snapshot”, NOT Download)
   const snapshotHref = tid
     ? `/qsc/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
     : `/qsc/${encodeURIComponent(token)}`;
 
-  const rawPersonalityPerc =
-    (result.personality_percentages ?? {}) as PersonalityPercMap;
-  const rawMindsetPerc = (result.mindset_percentages ?? {}) as MindsetPercMap;
+  const nextStepsHref =
+    (data?.link?.next_steps_url || data?.link?.redirect_url || "").trim() || null;
+
+  const personalityPercRaw =
+    (result?.personality_percentages ?? {}) as PersonalityPercMap;
+  const mindsetPercRaw = (result?.mindset_percentages ?? {}) as MindsetPercMap;
 
   const personalityPerc: PersonalityPercMap = {
-    FIRE: normalisePercent(rawPersonalityPerc.FIRE ?? 0),
-    FLOW: normalisePercent(rawPersonalityPerc.FLOW ?? 0),
-    FORM: normalisePercent(rawPersonalityPerc.FORM ?? 0),
-    FIELD: normalisePercent(rawPersonalityPerc.FIELD ?? 0),
+    FIRE: normalisePercent(personalityPercRaw.FIRE ?? 0),
+    FLOW: normalisePercent(personalityPercRaw.FLOW ?? 0),
+    FORM: normalisePercent(personalityPercRaw.FORM ?? 0),
+    FIELD: normalisePercent(personalityPercRaw.FIELD ?? 0),
   };
 
   const mindsetPerc: MindsetPercMap = {
-    ORIGIN: normalisePercent(rawMindsetPerc.ORIGIN ?? 0),
-    MOMENTUM: normalisePercent(rawMindsetPerc.MOMENTUM ?? 0),
-    VECTOR: normalisePercent(rawMindsetPerc.VECTOR ?? 0),
-    ORBIT: normalisePercent(rawMindsetPerc.ORBIT ?? 0),
-    QUANTUM: normalisePercent(rawMindsetPerc.QUANTUM ?? 0),
+    ORIGIN: normalisePercent(mindsetPercRaw.ORIGIN ?? 0),
+    MOMENTUM: normalisePercent(mindsetPercRaw.MOMENTUM ?? 0),
+    VECTOR: normalisePercent(mindsetPercRaw.VECTOR ?? 0),
+    ORBIT: normalisePercent(mindsetPercRaw.ORBIT ?? 0),
+    QUANTUM: normalisePercent(mindsetPercRaw.QUANTUM ?? 0),
   };
 
   const frequencyDonutData: FrequencyDonutDatum[] = ([
@@ -463,187 +376,211 @@ export default function QscEntrepreneurStrategicReportPage({
     value: personalityPerc[key] ?? 0,
   }));
 
-  const personalityKeys: PersonalityKey[] = ["FIRE", "FLOW", "FORM", "FIELD"];
-  const mindsetKeys: MindsetKey[] = [
-    "ORIGIN",
-    "MOMENTUM",
-    "VECTOR",
-    "ORBIT",
-    "QUANTUM",
-  ];
+  const effectivePrimaryPersonality =
+    result?.primary_personality ?? ("FIRE" as PersonalityKey);
+  const effectivePrimaryMindset =
+    result?.primary_mindset ?? ("ORIGIN" as MindsetKey);
 
-  const { primary: derivedPrimaryPersonality } = derivePrimarySecondary(
-    personalityPerc,
-    personalityKeys
-  );
+  const personaName =
+    profile?.profile_label ||
+    result?.combined_profile_code ||
+    "Your Quantum Leadership Profile";
 
-  const { primary: derivedPrimaryMindset } = derivePrimarySecondary(
-    mindsetPerc,
-    mindsetKeys
-  );
+  const templateByKey = useMemo(() => {
+    const out: Record<string, TemplateRow> = {};
+    for (const r of data?.report?.templates ?? []) out[r.section_key] = r;
+    return out;
+  }, [data?.report?.templates]);
 
-  const effectivePrimaryPersonality: PersonalityKey | null =
-    derivedPrimaryPersonality ?? result.primary_personality ?? null;
-  const effectivePrimaryMindset: MindsetKey | null =
-    derivedPrimaryMindset ?? result.primary_mindset ?? null;
+  const sectionByKey = useMemo(() => {
+    const out: Record<string, PersonaSectionRow> = {};
+    for (const r of data?.report?.sections ?? []) out[r.section_key] = r;
+    return out;
+  }, [data?.report?.sections]);
 
-  const primaryPersonalityLabel =
-    (effectivePrimaryPersonality &&
-      PERSONALITY_LABELS[effectivePrimaryPersonality]) ||
-    effectivePrimaryPersonality ||
-    "—";
+  const missing = useMemo(() => {
+    const required = [
+      "quantum_profile_summary",
+      "personality_layer",
+      "mindset_layer",
+      "combined_quantum_pattern",
+      "strategic_leadership_priorities",
+      "leadership_action_plan_30_day",
+      "leadership_roadmap",
+      "communication_and_decision_style",
+      "reflection_prompts",
+      "one_page_quantum_summary",
+    ];
+    return required.filter(
+      (k) => !contentToText(sectionByKey[k]?.content).trim()
+    );
+  }, [sectionByKey]);
 
-  const primaryMindsetLabel =
-    (effectivePrimaryMindset && MINDSET_LABELS[effectivePrimaryMindset]) ||
-    effectivePrimaryMindset ||
-    "—";
+  if (loading && !result) {
+    return (
+      <div className="relative min-h-screen bg-[#020617] text-slate-50">
+        <AppBackground />
+        <main className="relative z-10 mx-auto max-w-5xl px-4 py-12 space-y-4">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
+            Strategic Leadership Report
+          </p>
+          <h1 className="mt-3 text-3xl font-bold">
+            Preparing your QSC Leader report…
+          </h1>
+        </main>
+      </div>
+    );
+  }
 
-  const onePageStrengths = persona?.one_page_strengths || "—";
-  const onePageRisks = persona?.one_page_risks || "—";
-  const combinedStrengths = persona?.combined_strengths || "—";
-  const combinedRisks = persona?.combined_risks || "—";
-  const combinedLever = persona?.combined_big_lever || "—";
-  const emotionalStabilises = persona?.emotional_stabilises || "—";
-  const emotionalDestabilises = persona?.emotional_destabilises || "—";
-  const supportYourself = persona?.support_yourself || "—";
-
-  const strategic1 = persona?.strategic_priority_1 || "—";
-  const strategic2 = persona?.strategic_priority_2 || "—";
-  const strategic3 = persona?.strategic_priority_3 || "—";
+  if (err || !result) {
+    return (
+      <div className="relative min-h-screen bg-[#020617] text-slate-50">
+        <AppBackground />
+        <main className="relative z-10 mx-auto max-w-5xl px-4 py-12 space-y-4">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
+            Strategic Leadership Report
+          </p>
+          <h1 className="text-3xl font-bold">Couldn&apos;t load report</h1>
+          <pre className="mt-2 rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-xs text-slate-100 whitespace-pre-wrap">
+            {err || "No data"}
+          </pre>
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-300">
+    <div className="relative min-h-screen bg-[#020617] text-slate-50">
       <AppBackground />
+
       <main
         ref={reportRef}
-        className="mx-auto max-w-5xl px-4 py-10 md:py-12 space-y-10"
+        className="relative z-10 mx-auto max-w-5xl px-4 py-10 md:py-12 space-y-10"
       >
         <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-100">
-              Strategic Growth Report
+          <div className="space-y-2">
+            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
+              Strategic Leadership Report
             </p>
-            <h1 className="mt-3 text-3xl md:text-4xl font-bold tracking-tight">
-              QSC Entrepreneur — Strategic Growth Report
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              QSC Leader — Strategic Leadership Report
             </h1>
+
             {takerDisplayName && (
-              <p className="mt-1 text-sm text-slate-100">
-                For: <span className="font-semibold">{takerDisplayName}</span>
+              <p className="text-[15px] text-slate-300">
+                For:{" "}
+                <span className="font-semibold text-slate-50">
+                  {takerDisplayName}
+                </span>
               </p>
             )}
-            <p className="mt-2 text-sm text-slate-700 max-w-2xl">
-              Your personal emotional, strategic and scaling blueprint – based
-              on your Quantum buyer profile and current mindset stage.
-            </p>
+
+            {debug && (
+              <p className="text-[15px] text-slate-300 max-w-2xl">
+                This report is rendered from{" "}
+                <code className="text-slate-100">portal.qsc_leader_report_templates</code>{" "}
+                and{" "}
+                <code className="text-slate-100">portal.qsc_leader_report_sections</code>.
+              </p>
+            )}
+
+            {debug && data && (
+              <pre className="mt-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-[11px] text-slate-200 whitespace-pre-wrap">
+                {JSON.stringify(data.__debug ?? {}, null, 2)}
+              </pre>
+            )}
           </div>
 
-          <div className="flex flex-col items-end gap-2 text-xs text-slate-600">
+          <div className="flex flex-col items-end gap-2 text-xs text-slate-400">
             <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={handleDownloadPdf}
                 disabled={downloading}
-                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+                className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-900 disabled:opacity-60"
               >
                 {downloading ? "Preparing PDF…" : "Download PDF"}
               </button>
 
+              {nextStepsHref ? (
+                <a
+                  href={nextStepsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-950/70 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-900"
+                >
+                  Next Steps
+                </a>
+              ) : null}
             </div>
 
-            <span>
-              Created at{" "}
-              {createdAt.toLocaleString(undefined, {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
+            {createdAt && (
+              <span>
+                Created{" "}
+                {createdAt.toLocaleString(undefined, {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
           </div>
         </header>
 
-        {/* QUANTUM PROFILE HERO */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
-            Quantum profile
+        {debug && missing.length > 0 && data && (
+          <section className="rounded-3xl border border-rose-400/40 bg-rose-500/10 p-6">
+            <div className="text-sm font-semibold text-rose-100">
+              Missing content for persona {data.report.persona_code ?? "null"}
+            </div>
+            <ul className="mt-3 list-disc pl-5 text-xs text-rose-100/90 space-y-1">
+              {missing.map((k) => (
+                <li key={k}>
+                  <code className="text-rose-50">section:{k}</code>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-2 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            STRATEGIC LEADERSHIP REPORT
           </p>
           <h2 className="text-2xl font-semibold">{personaName}</h2>
-          <p className="text-sm text-slate-700 max-w-3xl">
-            This report gives you a clear understanding of who you are, how you
-            work, and what your business needs next. It is designed to be
-            simple, practical, and focused on helping you take confident action.
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-2 pt-4 border-t border-slate-200">
-            <div>
-              <h3 className="text-sm font-semibold mb-1">
-                Your Personality Layer
-              </h3>
-              <p className="text-sm text-slate-700">
-                How you naturally think, act and make decisions. This is your
-                emotional wiring and energetic pattern — it doesn&apos;t change
-                overnight, which is why it&apos;s such a powerful anchor.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-1">Your Mindset Layer</h3>
-              <p className="text-sm text-slate-700">
-                Where your business is right now and what stage of growth
-                you&apos;re in. These needs shift as you grow — which is why you
-                can&apos;t keep scaling with yesterday&apos;s strategy.
-              </p>
-            </div>
-          </div>
         </section>
 
-        {/* ONE-PAGE SUMMARY */}
-        <section className="rounded-3xl bg-[#f5eddc] border border-amber-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-amber-700">
-            One-page Quantum Profile
-          </p>
-          <h2 className="text-xl font-semibold uppercase text-amber-700">
-            Your at-a-glance growth profile
-          </h2>
-
-          <div className="grid gap-6 md:grid-cols-3 pt-4">
-            <div className="rounded-2xl bg-white/70 border border-amber-200 p-4 text-sm space-y-2">
-              <h3 className="font-semibold">Quantum Profile</h3>
-              <p className="font-medium">{personaName}</p>
-              <p className="text-slate-700">
-                Personality: {primaryPersonalityLabel}.
-                <br />
-                Mindset Stage: {primaryMindsetLabel}.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white/70 border border-amber-200 p-4 text-sm space-y-2">
-              <h3 className="font-semibold">Strengths</h3>
-              <p className="text-slate-700 whitespace-pre-line">
-                {onePageStrengths}
-              </p>
-              <h4 className="mt-2 font-semibold">Risks</h4>
-              <p className="text-slate-700 whitespace-pre-line">
-                {onePageRisks}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white/70 border border-amber-200 p-4 text-sm space-y-2">
-              <h3 className="font-semibold">Top strategic priorities</h3>
-              <ul className="mt-2 list-disc pl-4 text-slate-800 space-y-1">
-                <li>{strategic1}</li>
-                <li>{strategic2}</li>
-                <li>{strategic3}</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* FREQUENCY + MINDSET + MATRIX */}
         <section className="grid gap-6 md:grid-cols-2 items-start">
-          <div className="rounded-3xl bg-[#020617] text-slate-50 border border-slate-800 p-6 md:p-7 space-y-4">
-            <h2 className="text-lg font-semibold">Buyer Frequency Type</h2>
-            <p className="text-sm text-slate-300">
-              Your emotional & energetic style across Fire, Flow, Form and Field
-              in the way you buy and build.
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+              INTRODUCTION
+            </p>
+            {renderDocText(templateByKey["introduction"]?.content) ?? (
+              <div className="text-sm text-slate-500">
+                (No introduction template found)
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+              HOW TO USE THIS REPORT
+            </p>
+            {renderDocText(templateByKey["how_to_use"]?.content) ?? (
+              <div className="text-sm text-slate-500">
+                (No how_to_use template found)
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-2 items-start">
+          <div className="rounded-3xl bg-white text-slate-900 border border-slate-200 p-6 md:p-7 space-y-4">
+            <h2 className="text-lg font-semibold">Leadership Frequency Type</h2>
+            <p className="text-sm text-slate-600">
+              Your energetic style across Fire, Flow, Form and Field in how you
+              lead.
             </p>
 
             <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center">
@@ -656,19 +593,20 @@ export default function QscEntrepreneurStrategicReportPage({
                     key={d.key}
                     className="flex items-center justify-between gap-3"
                   >
-                    <span>{d.label}</span>
-                    <span className="tabular-nums">{Math.round(d.value)}%</span>
+                    <span className="text-slate-700">{d.label}</span>
+                    <span className="tabular-nums text-slate-900">
+                      {Math.round(d.value)}%
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl bg-[#020617] text-slate-50 border border-slate-800 p-6 md:p-7 space-y-4">
-            <h2 className="text-lg font-semibold">Quantum Mindset Levels</h2>
-            <p className="text-sm text-slate-300">
-              Where your focus and energy are distributed across the 5 Quantum
-              growth stages.
+          <div className="rounded-3xl bg-white text-slate-900 border border-slate-200 p-6 md:p-7 space-y-4">
+            <h2 className="text-lg font-semibold">Leadership Mindset Levels</h2>
+            <p className="text-sm text-slate-600">
+              Where your focus and energy sit across the 5 growth stages.
             </p>
 
             <div className="space-y-2 pt-2 text-xs">
@@ -679,12 +617,12 @@ export default function QscEntrepreneurStrategicReportPage({
                 return (
                   <div key={key} className="space-y-1">
                     <div className="flex justify-between">
-                      <span>{MINDSET_LABELS[key]}</span>
-                      <span className="tabular-nums">{pct}%</span>
+                      <span className="text-slate-700">{MINDSET_LABELS[key]}</span>
+                      <span className="tabular-nums text-slate-900">{pct}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-slate-900">
+                    <div className="h-2 rounded-full bg-slate-200">
                       <div
-                        className="h-2 rounded-full bg-emerald-400"
+                        className="h-2 rounded-full bg-emerald-500"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -695,20 +633,14 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
-            Buyer Persona Matrix
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            Leadership Persona Matrix
           </p>
           <h2 className="text-xl font-semibold">
-            Where your buyer frequency meets your mindset level
+            Where your leadership frequency meets your mindset level
           </h2>
-          <p className="text-sm text-slate-700">
-            Each cell represents a different Quantum buyer persona. Your primary
-            pattern is highlighted — this is where your emotional wiring and
-            current growth stage meet.
-          </p>
-
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <QscMatrix
               primaryPersonality={effectivePrimaryPersonality}
               primaryMindset={effectivePrimaryMindset}
@@ -716,114 +648,81 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* PERSONALITY LAYER */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-indigo-700">
-            Personality layer
+        <section className="rounded-3xl border border-amber-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-amber-700">
+            1. YOUR QUANTUM PROFILE SUMMARY
           </p>
-          <h2 className="text-xl font-semibold">
-            How you show up emotionally & behaviourally
-          </h2>
-
-          <div className="grid gap-6 md:grid-cols-3 pt-2 text-sm">
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">
-                Core pattern ({primaryPersonalityLabel})
-              </h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {combinedStrengths}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">What energises you</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {persona?.energisers || "—"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">What drains you</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {persona?.drains || "—"}
-              </p>
-            </div>
-          </div>
+          {renderDocText(sectionByKey["quantum_profile_summary"]?.content)}
         </section>
 
-        {/* COMBINED PATTERN */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-rose-700">
-            Combined pattern
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            2. YOUR PERSONALITY LAYER
           </p>
-          <h2 className="text-xl font-semibold">
-            {personaName} — what happens when your style meets your stage
-          </h2>
-
-          <div className="grid gap-6 md:grid-cols-3 pt-2 text-sm">
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">Strategic strengths</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {combinedStrengths}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">Growth risks & loops</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {combinedRisks}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">Your biggest lever</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {combinedLever}
-              </p>
-            </div>
-          </div>
+          {renderDocText(sectionByKey["personality_layer"]?.content)}
         </section>
 
-        {/* EMOTIONAL & OPERATIONAL SUPPORT */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-purple-700">
-            Emotional & operational alignment
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            3. YOUR MINDSET LAYER
           </p>
-          <h2 className="text-xl font-semibold">
-            How to support yourself inside this pattern
-          </h2>
-
-          <div className="grid gap-6 md:grid-cols-3 pt-2 text-sm">
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">What stabilises you</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {emotionalStabilises}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">What destabilises you</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {emotionalDestabilises}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-              <h3 className="font-semibold">Support yourself better</h3>
-              <p className="mt-1 text-slate-700 whitespace-pre-line">
-                {supportYourself}
-              </p>
-            </div>
-          </div>
+          {renderDocText(sectionByKey["mindset_layer"]?.content)}
         </section>
 
-        {/* STRATEGIC PRIORITIES */}
-        <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-orange-700">
-            Strategic priorities (next 90 days)
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            4. YOUR COMBINED QUANTUM PATTERN
           </p>
-          <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-700 whitespace-pre-line">
-            <li>{strategic1}</li>
-            <li>{strategic2}</li>
-            <li>{strategic3}</li>
-          </ol>
+          {renderDocText(sectionByKey["combined_quantum_pattern"]?.content)}
         </section>
 
-        <footer className="pt-4 pb-6 text-xs text-slate-500">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            5. YOUR STRATEGIC LEADERSHIP PRIORITIES
+          </p>
+          {renderDocText(
+            sectionByKey["strategic_leadership_priorities"]?.content
+          )}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            6. 30 DAY LEADERSHIP ACTION PLAN
+          </p>
+          {renderDocText(sectionByKey["leadership_action_plan_30_day"]?.content)}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            7. YOUR LEADERSHIP ROADMAP
+          </p>
+          {renderDocText(sectionByKey["leadership_roadmap"]?.content)}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            8. COMMUNICATION AND DECISION STYLE
+          </p>
+          {renderDocText(
+            sectionByKey["communication_and_decision_style"]?.content
+          )}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-slate-500">
+            9. REFLECTION PROMPTS
+          </p>
+          {renderDocText(sectionByKey["reflection_prompts"]?.content)}
+        </section>
+
+        <section className="rounded-3xl border border-amber-200 bg-white p-6 md:p-8 space-y-3 text-slate-900">
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-amber-700">
+            10. ONE PAGE QUANTUM SUMMARY
+          </p>
+          {renderDocText(sectionByKey["one_page_quantum_summary"]?.content)}
+        </section>
+
+        <footer className="pt-4 pb-6 text-xs text-slate-400">
           © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>

@@ -77,6 +77,14 @@ type PersonaSectionRow = {
   is_active: boolean;
 };
 
+type LinkMeta = {
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  next_steps_url?: string | null;
+  email_report?: boolean | null;
+};
+
 function supa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key =
@@ -123,20 +131,32 @@ function personalityToLetter(
   return null;
 }
 
-function mindsetKeyToLevel(m: string | null | undefined): number | null {
-  const x = String(m || "").trim().toUpperCase();
-  if (x === "ORIGIN") return 1;
-  if (x === "MOMENTUM") return 2;
-  if (x === "VECTOR") return 3;
-  if (x === "ORBIT") return 4;
-  if (x === "QUANTUM") return 5;
-  return null;
-}
-
 function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
 }
 
+async function loadLinkMetaByToken(
+  sb: ReturnType<typeof supa>,
+  token: string
+): Promise<LinkMeta | null> {
+  const { data, error } = await sb
+    .from("test_links")
+    .select(
+      "show_results, redirect_url, hidden_results_message, next_steps_url, email_report"
+    )
+    .eq("token", token)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as LinkMeta;
+}
+
+/**
+ * Resolve wrapper test_id -> canonical content test_id (LEADER)
+ * - Wrapper identified by tests.meta.wrapper === true
+ * - Uses meta.source_tests + meta.default_source_test
+ * - Picks by slug: leader => qsc-leaders
+ */
 async function resolveContentTestId(
   sb: ReturnType<typeof supa>,
   wrapperTestId: string,
@@ -201,16 +221,12 @@ async function resolveContentTestId(
     }
   }
 
-  if (defaultSource && isUuidLike(defaultSource)) {
-    return {
-      contentTestId: defaultSource,
-      resolvedBy: "meta.default_source_test",
-    };
-  }
-
   return { contentTestId: wrapperTestId, resolvedBy: "wrapper_no_sources" };
 }
 
+/**
+ * Resolve persona code A1..D5 using same strategy as result endpoint
+ */
 function resolvePersonaCode(args: {
   resultRow: QscResultsRow;
   profile: QscProfileRow | null;
@@ -242,7 +258,7 @@ function resolvePersonaCode(args: {
     typeof profile?.mindset_level === "number" &&
     Number.isFinite(profile.mindset_level)
       ? Number(profile.mindset_level)
-      : mindsetKeyToLevel(resultRow.primary_mindset);
+      : null;
 
   if (letter && level && level >= 1 && level <= 5) {
     const derived = `${letter}${level}`;
@@ -250,78 +266,6 @@ function resolvePersonaCode(args: {
   }
 
   return { personaCode: null, source: null };
-}
-
-async function fetchTemplatesByTestId(
-  sb: ReturnType<typeof supa>,
-  testId: string
-): Promise<TemplateRow[]> {
-  const { data, error } = await sb
-    .from("qsc_leader_report_templates")
-    .select("id, test_id, section_key, content, sort_order, is_active")
-    .eq("test_id", testId)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error || !Array.isArray(data)) return [];
-  return data.map((r: any) => ({
-    ...r,
-    content: safeJsonParse(r.content),
-  })) as TemplateRow[];
-}
-
-async function fetchTemplatesGlobal(
-  sb: ReturnType<typeof supa>
-): Promise<TemplateRow[]> {
-  const { data, error } = await sb
-    .from("qsc_leader_report_templates")
-    .select("id, test_id, section_key, content, sort_order, is_active")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error || !Array.isArray(data)) return [];
-  return data.map((r: any) => ({
-    ...r,
-    content: safeJsonParse(r.content),
-  })) as TemplateRow[];
-}
-
-async function fetchSectionsByTestIdAndPersona(
-  sb: ReturnType<typeof supa>,
-  testId: string,
-  personaCode: string
-): Promise<PersonaSectionRow[]> {
-  const { data, error } = await sb
-    .from("qsc_leader_report_sections")
-    .select("id, test_id, persona_code, section_key, content, sort_order, is_active")
-    .eq("test_id", testId)
-    .eq("persona_code", personaCode)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error || !Array.isArray(data)) return [];
-  return data.map((r: any) => ({
-    ...r,
-    content: safeJsonParse(r.content),
-  })) as PersonaSectionRow[];
-}
-
-async function fetchSectionsGlobalByPersona(
-  sb: ReturnType<typeof supa>,
-  personaCode: string
-): Promise<PersonaSectionRow[]> {
-  const { data, error } = await sb
-    .from("qsc_leader_report_sections")
-    .select("id, test_id, persona_code, section_key, content, sort_order, is_active")
-    .eq("persona_code", personaCode)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true });
-
-  if (error || !Array.isArray(data)) return [];
-  return data.map((r: any) => ({
-    ...r,
-    content: safeJsonParse(r.content),
-  })) as PersonaSectionRow[];
 }
 
 export async function GET(
@@ -565,91 +509,62 @@ export async function GET(
       if (data) profile = data as unknown as QscProfileRow;
     }
 
-    if (!profile) {
-      const combinedRaw = String(results.combined_profile_code || "").trim();
-      const directPersonaCode = looksLikePersonaCode(combinedRaw)
-        ? combinedRaw.toUpperCase()
-        : null;
-
-      if (directPersonaCode) {
-        const { data, error } = await sb
-          .from("qsc_profiles")
-          .select("id, personality_code, mindset_level, profile_code, profile_label")
-          .eq("profile_code", directPersonaCode)
-          .limit(1)
-          .maybeSingle();
-
-        if (!error && data) {
-          profile = data as unknown as QscProfileRow;
-        }
-      }
-    }
-
-    if (!profile) {
-      const letter = personalityToLetter(results.primary_personality);
-      const level = mindsetKeyToLevel(results.primary_mindset);
-
-      if (letter && level) {
-        const { data, error } = await sb
-          .from("qsc_profiles")
-          .select("id, personality_code, mindset_level, profile_code, profile_label")
-          .eq("personality_code", letter)
-          .eq("mindset_level", level)
-          .limit(1)
-          .maybeSingle();
-
-        if (!error && data) {
-          profile = data as unknown as QscProfileRow;
-        }
-      }
-    }
-
     const { personaCode, source: personaCodeSource } = resolvePersonaCode({
       resultRow: results,
       profile,
     });
 
-    let templates: TemplateRow[] = [];
-    let templateSource = "none";
+    const { data: templateRows, error: tplErr } = await sb
+      .from("qsc_leader_report_templates")
+      .select("id, test_id, section_key, content, sort_order, is_active")
+      .eq("test_id", contentTestId)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
 
-    templates = await fetchTemplatesByTestId(sb, contentTestId);
-    if (templates.length) {
-      templateSource = "content_test_id";
-    } else if (wrapperTestId !== contentTestId) {
-      templates = await fetchTemplatesByTestId(sb, wrapperTestId);
-      if (templates.length) {
-        templateSource = "wrapper_test_id";
-      }
+    if (tplErr) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `qsc_leader_report_templates load failed: ${tplErr.message}`,
+        },
+        { status: 500 }
+      );
     }
 
-    if (!templates.length) {
-      templates = await fetchTemplatesGlobal(sb);
-      if (templates.length) {
-        templateSource = "global";
-      }
-    }
-
-    let sections: PersonaSectionRow[] = [];
-    let sectionSource = "none";
-
+    let sectionRows: PersonaSectionRow[] = [];
     if (personaCode) {
-      sections = await fetchSectionsByTestIdAndPersona(sb, contentTestId, personaCode);
-      if (sections.length) {
-        sectionSource = "content_test_id+persona_code";
-      } else if (wrapperTestId !== contentTestId) {
-        sections = await fetchSectionsByTestIdAndPersona(sb, wrapperTestId, personaCode);
-        if (sections.length) {
-          sectionSource = "wrapper_test_id+persona_code";
-        }
+      const { data: secRows, error: secErr } = await sb
+        .from("qsc_leader_report_sections")
+        .select("id, test_id, persona_code, section_key, content, sort_order, is_active")
+        .eq("test_id", contentTestId)
+        .eq("persona_code", personaCode)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+
+      if (secErr) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `qsc_leader_report_sections load failed: ${secErr.message}`,
+          },
+          { status: 500 }
+        );
       }
 
-      if (!sections.length) {
-        sections = await fetchSectionsGlobalByPersona(sb, personaCode);
-        if (sections.length) {
-          sectionSource = "persona_code_global";
-        }
-      }
+      sectionRows = (secRows ?? []) as any;
     }
+
+    const templates = (templateRows ?? []).map((r: any) => ({
+      ...r,
+      content: safeJsonParse(r.content),
+    })) as TemplateRow[];
+
+    const sections = (sectionRows ?? []).map((r: any) => ({
+      ...r,
+      content: safeJsonParse(r.content),
+    })) as PersonaSectionRow[];
+
+    const link = await loadLinkMetaByToken(sb, tokenParam);
 
     return NextResponse.json(
       {
@@ -657,8 +572,9 @@ export async function GET(
         results,
         profile,
         taker,
+        link,
         report: {
-          test_id: templates[0]?.test_id || contentTestId,
+          test_id: contentTestId,
           persona_code: personaCode,
           templates,
           sections,
@@ -679,10 +595,6 @@ export async function GET(
           profile_mindset_level: profile?.mindset_level ?? null,
           template_count: templates.length,
           section_count: sections.length,
-          template_source: templateSource,
-          section_source: sectionSource,
-          personality_percentages: results.personality_percentages ?? null,
-          mindset_percentages: results.mindset_percentages ?? null,
         },
       },
       { status: 200 }
