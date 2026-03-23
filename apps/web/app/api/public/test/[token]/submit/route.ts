@@ -1,5 +1,4 @@
 // apps/web/app/api/public/test/[token]/submit/route.ts
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { calculateQscScores } from "@/lib/qsc-scoring";
@@ -36,6 +35,53 @@ function visSupa() {
   return createClient(url, key, { db: { schema: "visibility" } });
 }
 
+function isUuidLike(s: string) {
+  return /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(
+    String(s || "").trim()
+  );
+}
+
+function normalizeSlug(s: any) {
+  return String(s || "").trim().toLowerCase();
+}
+
+function parseMaybeJson<T = any>(value: any): T | null {
+  if (value == null) return null;
+  if (Array.isArray(value) || typeof value === "object") return value as T;
+  if (typeof value !== "string") return null;
+
+  const s = value.trim();
+  if (!s) return null;
+  if (!(s.startsWith("{") || s.startsWith("["))) return null;
+
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
+  }
+}
+
+function coerceProfileMapEntries(value: any): PMEntry[] {
+  const direct = parseMaybeJson<any>(value);
+  const arr = Array.isArray(direct)
+    ? direct
+    : Array.isArray((direct as any)?.profile_map)
+    ? (direct as any).profile_map
+    : Array.isArray((direct as any)?.weights)
+    ? (direct as any).weights
+    : Array.isArray((direct as any)?.map)
+    ? (direct as any).map
+    : [];
+
+  return arr
+    .map((entry: any) => ({
+      points: Number(entry?.points ?? 0),
+      profile: String(entry?.profile || "").trim(),
+    }))
+    .filter((entry) => Number.isFinite(Number(entry.points)) && !!entry.profile);
+}
+
+// Accept PROFILE_1..8 or P1..P8 → A/B/C/D; fallback if value already starts with A/B/C/D
 function profileCodeToFreq(code: string): AB | null {
   const s = String(code || "").trim().toUpperCase();
   let n: number | null = null;
@@ -55,9 +101,34 @@ function toZeroBasedSelected(row: any): number | null {
     const sel = row.value - 1;
     return sel >= 0 ? sel : null;
   }
-  if (typeof row.index === "number") return row.index;
-  if (typeof row.selected === "number") return row.selected;
-  if (typeof row.selected_index === "number") return row.selected_index;
+
+  if (typeof row?.value === "string" && row.value.trim() !== "") {
+    const n = Number(row.value);
+    if (Number.isFinite(n)) {
+      const sel = n - 1;
+      return sel >= 0 ? sel : null;
+    }
+  }
+
+  if (typeof row?.index === "number") return row.index;
+  if (typeof row?.selected === "number") return row.selected;
+  if (typeof row?.selected_index === "number") return row.selected_index;
+
+  if (typeof row?.index === "string" && row.index.trim() !== "") {
+    const n = Number(row.index);
+    if (Number.isFinite(n)) return n;
+  }
+
+  if (typeof row?.selected === "string" && row.selected.trim() !== "") {
+    const n = Number(row.selected);
+    if (Number.isFinite(n)) return n;
+  }
+
+  if (typeof row?.selected_index === "string" && row.selected_index.trim() !== "") {
+    const n = Number(row.selected_index);
+    if (Number.isFinite(n)) return n;
+  }
+
   if (row?.value && typeof row.value.index === "number") return row.value.index;
   return null;
 }
@@ -84,52 +155,55 @@ function getDefaultSupportEmail() {
   );
 }
 
-function personalityToLetter(v: string | null | undefined): "A" | "B" | "C" | "D" | null {
-  const s = String(v || "").trim().toUpperCase();
-  if (s === "A" || s === "B" || s === "C" || s === "D") return s as "A" | "B" | "C" | "D";
-  if (s === "FIRE") return "A";
-  if (s === "FLOW") return "B";
-  if (s === "FORM") return "C";
-  if (s === "FIELD") return "D";
-  return null;
-}
-
-function mindsetToLevel(v: string | null | undefined): 1 | 2 | 3 | 4 | 5 | null {
-  const s = String(v || "").trim().toUpperCase();
-  if (s === "ORIGIN") return 1;
-  if (s === "MOMENTUM") return 2;
-  if (s === "VECTOR") return 3;
-  if (s === "ORBIT") return 4;
-  if (s === "QUANTUM") return 5;
-  return null;
-}
-
-function deriveCombinedProfileCode(scoring: any): string | null {
-  const existing = String(scoring?.combinedProfileCode || "").trim();
-  if (existing) return existing;
-
-  const pp = String(scoring?.primaryPersonality || "").trim().toUpperCase();
-  const pm = String(scoring?.primaryMindset || "").trim().toUpperCase();
-  if (pp && pm) return `${pp}_${pm}`;
-
-  return null;
-}
-
 /**
  * Wrapper resolution:
- * If tests.meta.wrapper = true, use meta.default_source_test (or source_tests[0])
- * as the effective test ID to load questions/labels/scoring.
+ * - generic source_test_id/base_test_id/parent_test_id
+ * - QSC wrapper source_tests/default_source_test
  */
-function resolveEffectiveTestId(testRow: any): string {
+async function resolveEffectiveTestId(
+  sb: ReturnType<typeof supa>,
+  testRow: any
+): Promise<string> {
   const meta = testRow?.meta ?? {};
+
+  const genericSource =
+    typeof meta?.source_test_id === "string"
+      ? meta.source_test_id
+      : typeof meta?.base_test_id === "string"
+      ? meta.base_test_id
+      : typeof meta?.parent_test_id === "string"
+      ? meta.parent_test_id
+      : null;
+
+  if (genericSource && isUuidLike(genericSource)) return genericSource;
+
   const isWrapper = meta?.wrapper === true;
   if (!isWrapper) return testRow?.id;
 
-  const def = meta?.default_source_test;
-  if (typeof def === "string" && def.length > 10) return def;
+  const qscVariant = String(meta?.qsc_variant || meta?.variant || "").trim().toLowerCase();
+  const sourceTests: string[] = Array.isArray(meta?.source_tests) ? meta.source_tests : [];
+  const defaultSource =
+    typeof meta?.default_source_test === "string" ? meta.default_source_test : null;
 
-  const arr = meta?.source_tests;
-  if (Array.isArray(arr) && typeof arr[0] === "string") return arr[0];
+  if (sourceTests.length) {
+    const clean = sourceTests.filter((id) => isUuidLike(id));
+    if (clean.length) {
+      const { data: candidates } = await sb
+        .from("tests")
+        .select("id, slug")
+        .in("id", clean);
+
+      const list = Array.isArray(candidates) ? candidates : [];
+      const preferredSlug =
+        qscVariant === "leader" || qscVariant === "leaders" ? "qsc-leaders" : "qsc-core";
+
+      const preferred = list.find((t: any) => normalizeSlug(t.slug) === preferredSlug);
+      if (preferred?.id) return preferred.id;
+    }
+  }
+
+  if (defaultSource && isUuidLike(defaultSource)) return defaultSource;
+  if (sourceTests.length && isUuidLike(sourceTests[0])) return sourceTests[0];
 
   return testRow?.id;
 }
@@ -142,6 +216,9 @@ type LinkBehavior = {
   email_report: boolean;
 };
 
+/**
+ * Load link behavior flags.
+ */
 async function loadLinkBehavior(
   sb: ReturnType<typeof supa>,
   token: string
@@ -664,7 +741,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
 
     // ---------- Existing behaviour for all other tests ----------
-    const effectiveTestId = resolveEffectiveTestId(test);
+    const effectiveTestId = await resolveEffectiveTestId(sb, test);
 
     const slug: string = (test.slug as string) || "";
     const meta: any = test.meta || {};
@@ -708,7 +785,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
 
     const byId: Record<string, QuestionRow> = {};
-    for (const q of questions || []) byId[q.id] = q;
+    for (const q of questions || []) {
+      byId[q.id] = q;
+    }
 
     const { data: labels, error: labErr } = await sb
       .from("test_profile_labels")
@@ -745,12 +824,17 @@ export async function POST(req: Request, { params }: { params: { token: string }
       const row = answers[idx];
       const qid = row?.question_id || row?.qid || row?.id;
       const q: QuestionRow | undefined = qid ? byId[qid] : undefined;
-      if (!q || !Array.isArray(q.profile_map) || q.profile_map.length === 0) continue;
+      if (!q) continue;
+
+      const mapEntries = coerceProfileMapEntries(q.profile_map);
+      const fallbackEntries = coerceProfileMapEntries(q.weights);
+      const scoringEntries = mapEntries.length ? mapEntries : fallbackEntries;
+      if (!Array.isArray(scoringEntries) || scoringEntries.length === 0) continue;
 
       const sel = toZeroBasedSelected(row);
-      if (sel == null || sel < 0 || sel >= q.profile_map.length) continue;
+      if (sel == null || sel < 0 || sel >= scoringEntries.length) continue;
 
-      const entry = q.profile_map[sel] || {};
+      const entry = scoringEntries[sel] || {};
       const points = asNumber(entry.points, 0);
       let pcode = String(entry.profile || "").trim();
 
@@ -801,11 +885,19 @@ export async function POST(req: Request, { params }: { params: { token: string }
     // ---------------- QSC SCORING ----------------
     if (isQscTest) {
       try {
-        const questionsForScoring = (questions || []).map((q: any) => ({
-          id: q.id as string,
-          idx: (q.idx as number | null) ?? null,
-          profile_map: (q.profile_map ?? []) as any,
-        }));
+        const questionsForScoring = (questions || [])
+          .map((q: any) => {
+            const mapEntries = coerceProfileMapEntries(q.profile_map);
+            const fallbackEntries = coerceProfileMapEntries(q.weights);
+            const scoringEntries = mapEntries.length ? mapEntries : fallbackEntries;
+
+            return {
+              id: q.id as string,
+              idx: (q.idx as number | null) ?? null,
+              profile_map: scoringEntries as any,
+            };
+          })
+          .filter((q) => Array.isArray(q.profile_map) && q.profile_map.length > 0);
 
         const answersForScoring = answers
           .map((row: any) => {
@@ -815,42 +907,63 @@ export async function POST(req: Request, { params }: { params: { token: string }
           })
           .filter((a: any) => a.question_id && a.choice >= 0);
 
+        if (questionsForScoring.length === 0) {
+          throw new Error(`QSC scoring found no scoreable questions for effective_test_id=${effectiveTestId}`);
+        }
+
         if (answersForScoring.length === 0) {
-          throw new Error("QSC scoring failed: no valid answers were available for scoring.");
+          throw new Error("QSC scoring found no scoreable answers in submit payload");
         }
 
         const scoring = calculateQscScores(questionsForScoring, answersForScoring);
-        const combinedProfileCode = deriveCombinedProfileCode(scoring);
 
-        const hasPersonalityTotals = Object.keys(scoring.personalityTotals ?? {}).length > 0;
-        const hasMindsetTotals = Object.keys(scoring.mindsetTotals ?? {}).length > 0;
+        const personalityCount = Object.keys(scoring.personalityTotals || {}).length;
+        const mindsetCount = Object.keys(scoring.mindsetTotals || {}).length;
 
-        if (!hasPersonalityTotals || !hasMindsetTotals) {
+        if (personalityCount === 0 && mindsetCount === 0) {
           throw new Error(
             `QSC scoring produced empty totals. personality=${JSON.stringify(
-              scoring.personalityTotals ?? {}
-            )} mindset=${JSON.stringify(scoring.mindsetTotals ?? {})}`
+              scoring.personalityTotals || {}
+            )} mindset=${JSON.stringify(scoring.mindsetTotals || {})}`
           );
         }
 
-        const personality_code = personalityToLetter(scoring.primaryPersonality);
-        const mindset_level = mindsetToLevel(scoring.primaryMindset);
-
         let qscProfileId: string | null = null;
 
-        if (personality_code && mindset_level) {
-          const { data: qscProfileRow, error: qscProfileError } = await sb
-            .from("qsc_profiles")
-            .select("id")
-            .eq("personality_code", personality_code)
-            .eq("mindset_level", mindset_level)
-            .maybeSingle();
+        if (scoring.combinedProfileCode) {
+          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
 
-          if (qscProfileError) {
-            throw new Error(`QSC scoring failed during qsc_profiles lookup: ${qscProfileError.message}`);
+          const personalityMap: Record<string, string> = {
+            FIRE: "A",
+            FLOW: "B",
+            FORM: "C",
+            FIELD: "D",
+          };
+          const mindsetMap: Record<string, number> = {
+            ORIGIN: 1,
+            MOMENTUM: 2,
+            VECTOR: 3,
+            ORBIT: 4,
+            QUANTUM: 5,
+          };
+
+          const personality_code = personalityMap[personalityKey];
+          const mindset_level = mindsetMap[mindsetKey];
+
+          if (personality_code && mindset_level) {
+            const { data: qscProfileRow, error: qscProfileError } = await sb
+              .from("qsc_profiles")
+              .select("id")
+              .eq("personality_code", personality_code)
+              .eq("mindset_level", mindset_level)
+              .maybeSingle();
+
+            if (qscProfileError) {
+              throw new Error(`QSC profile lookup failed: ${qscProfileError.message}`);
+            }
+
+            qscProfileId = (qscProfileRow as any)?.id ?? null;
           }
-
-          qscProfileId = (qscProfileRow as any)?.id ?? null;
         }
 
         const qscPayload = {
@@ -858,56 +971,53 @@ export async function POST(req: Request, { params }: { params: { token: string }
           test_id: taker.test_id,
           token,
           audience: qscAudience,
-          personality_totals: scoring.personalityTotals ?? {},
-          personality_percentages: scoring.personalityPercentages ?? {},
-          mindset_totals: scoring.mindsetTotals ?? {},
-          mindset_percentages: scoring.mindsetPercentages ?? {},
-          primary_personality: scoring.primaryPersonality ?? null,
-          secondary_personality: scoring.secondaryPersonality ?? null,
-          primary_mindset: scoring.primaryMindset ?? null,
-          secondary_mindset: scoring.secondaryMindset ?? null,
-          combined_profile_code: combinedProfileCode,
+          personality_totals: scoring.personalityTotals,
+          personality_percentages: scoring.personalityPercentages,
+          mindset_totals: scoring.mindsetTotals,
+          mindset_percentages: scoring.mindsetPercentages,
+          primary_personality: scoring.primaryPersonality,
+          secondary_personality: scoring.secondaryPersonality,
+          primary_mindset: scoring.primaryMindset,
+          secondary_mindset: scoring.secondaryMindset,
+          combined_profile_code: scoring.combinedProfileCode,
           qsc_profile_id: qscProfileId,
         };
 
-        const { data: existingQscRow, error: existingQscErr } = await sb
+        const { data: existingQsc, error: existingErr } = await sb
           .from("qsc_results")
           .select("id")
           .eq("taker_id", taker.id)
+          .eq("test_id", taker.test_id)
+          .eq("token", token)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
-        if (existingQscErr) {
-          throw new Error(`QSC scoring failed during existing-row lookup: ${existingQscErr.message}`);
+        if (existingErr) {
+          throw new Error(`QSC existing row lookup failed: ${existingErr.message}`);
         }
 
-        if (existingQscRow?.id) {
-          const { error: updateErr } = await sb
+        if (existingQsc?.id) {
+          const { error: qscUpdateError } = await sb
             .from("qsc_results")
             .update(qscPayload)
-            .eq("id", existingQscRow.id);
+            .eq("id", existingQsc.id);
 
-          if (updateErr) {
-            throw new Error(`QSC scoring failed during update: ${updateErr.message}`);
+          if (qscUpdateError) {
+            throw new Error(`QSC scoring failed during update: ${qscUpdateError.message}`);
           }
         } else {
-          const { error: insertErr } = await sb
+          const { error: qscInsertError } = await sb
             .from("qsc_results")
-            .insert({
-              id: randomUUID(),
-              ...qscPayload,
-            });
+            .insert(qscPayload);
 
-          if (insertErr) {
-            throw new Error(`QSC scoring failed during insert: ${insertErr.message}`);
+          if (qscInsertError) {
+            throw new Error(`QSC scoring failed during insert: ${qscInsertError.message}`);
           }
         }
       } catch (e: any) {
-        console.error("QSC scoring failed", e);
         return NextResponse.json(
-          {
-            ok: false,
-            error: `QSC scoring failed: ${String(e?.message || e)}`,
-          },
+          { ok: false, error: `QSC scoring failed: ${String(e?.message || e)}` },
           { status: 500 }
         );
       }
@@ -951,7 +1061,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const { data: orgRow } = await sb
       .from("orgs")
       .select("id, slug, name, support_email, notification_email, website_url")
-      .eq("id", taker.org_id)
+      .eq("id",eq("id", taker.org_id)
       .maybeSingle();
 
     const orgName =
