@@ -121,6 +121,16 @@ function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
 }
 
+function applyAudienceFilter(q: any, audienceHint: Audience | null) {
+  if (audienceHint === "entrepreneur") {
+    return q.or("audience.eq.entrepreneur,audience.is.null");
+  }
+  if (audienceHint === "leader") {
+    return q.or("audience.eq.leader,audience.is.null");
+  }
+  return q;
+}
+
 async function loadLinkMetaByToken(
   sb: ReturnType<typeof supa>,
   token: string
@@ -175,7 +185,6 @@ async function resolveContentTestId(
       ? meta.default_source_test
       : null;
 
-  // ✅ Your wrappers often ONLY have default_source_test — handle that first.
   if (defaultSource && isUuidLike(defaultSource)) {
     return { contentTestId: defaultSource, resolvedBy: "meta.default_source_test" };
   }
@@ -268,6 +277,14 @@ export async function GET(
 
     const url = new URL(req.url);
     const tid = String(url.searchParams.get("tid") || "").trim();
+    const audRaw = String(url.searchParams.get("aud") || "")
+      .trim()
+      .toLowerCase();
+
+    const audienceHint: Audience | null =
+      audRaw === "entrepreneur" || audRaw === "leader"
+        ? (audRaw as Audience)
+        : null;
 
     const sb = supa();
 
@@ -299,11 +316,8 @@ export async function GET(
       | null = null;
 
     if (isUuidLike(tokenParam)) {
-      const { data, error } = await sb
-        .from("qsc_results")
-        .select(baseSelect)
-        .eq("id", tokenParam)
-        .maybeSingle();
+      const q = sb.from("qsc_results").select(baseSelect).eq("id", tokenParam);
+      const { data, error } = await applyAudienceFilter(q, audienceHint).maybeSingle();
 
       if (error) {
         return NextResponse.json(
@@ -319,11 +333,13 @@ export async function GET(
     }
 
     if (!resultRow && tid && isUuidLike(tid)) {
-      const { data, error } = await sb
+      const q = sb
         .from("qsc_results")
         .select(baseSelect)
         .eq("token", tokenParam)
-        .eq("taker_id", tid)
+        .eq("taker_id", tid);
+
+      const { data, error } = await applyAudienceFilter(q, audienceHint)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -342,10 +358,15 @@ export async function GET(
     }
 
     if (!resultRow) {
-      const { count, error: countErr } = await sb
+      const countQ = sb
         .from("qsc_results")
         .select("id", { count: "exact", head: true })
         .eq("token", tokenParam);
+
+      const { count, error: countErr } = await applyAudienceFilter(
+        countQ,
+        audienceHint
+      );
 
       if (countErr) {
         return NextResponse.json(
@@ -364,6 +385,7 @@ export async function GET(
             debug: {
               token: tokenParam,
               tid: tid || null,
+              aud: audienceHint,
               matches: c,
               hint:
                 "Pass ?tid=<test_takers.id> when loading this report to disambiguate shared tokens.",
@@ -374,10 +396,12 @@ export async function GET(
       }
 
       if (c === 1) {
-        const { data, error } = await sb
+        const q = sb
           .from("qsc_results")
           .select(baseSelect)
-          .eq("token", tokenParam)
+          .eq("token", tokenParam);
+
+        const { data, error } = await applyAudienceFilter(q, audienceHint)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -396,10 +420,12 @@ export async function GET(
       }
 
       if (!resultRow && c > 0) {
-        const { data, error } = await sb
+        const q = sb
           .from("qsc_results")
           .select(baseSelect)
-          .eq("token", tokenParam)
+          .eq("token", tokenParam);
+
+        const { data, error } = await applyAudienceFilter(q, audienceHint)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -423,7 +449,11 @@ export async function GET(
         {
           ok: false,
           error: "RESULT_NOT_FOUND",
-          debug: { token: tokenParam, tid: tid || null },
+          debug: {
+            token: tokenParam,
+            tid: tid || null,
+            aud: audienceHint,
+          },
         },
         { status: 404 }
       );
@@ -611,6 +641,7 @@ export async function GET(
         __debug: {
           token: tokenParam,
           tid: tid || null,
+          aud: audienceHint,
           resolved_by: resolvedBy,
           audience,
           combined_profile_code_raw: resultRow.combined_profile_code ?? null,
