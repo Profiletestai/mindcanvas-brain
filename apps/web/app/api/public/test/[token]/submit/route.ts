@@ -66,19 +66,19 @@ function coerceProfileMapEntries(value: any): PMEntry[] {
   const arr = Array.isArray(direct)
     ? direct
     : Array.isArray((direct as any)?.profile_map)
-    ? (direct as any).profile_map
-    : Array.isArray((direct as any)?.weights)
-    ? (direct as any).weights
-    : Array.isArray((direct as any)?.map)
-    ? (direct as any).map
-    : [];
+      ? (direct as any).profile_map
+      : Array.isArray((direct as any)?.weights)
+        ? (direct as any).weights
+        : Array.isArray((direct as any)?.map)
+          ? (direct as any).map
+          : [];
 
   return arr
     .map((entry: any) => ({
       points: Number(entry?.points ?? 0),
       profile: String(entry?.profile || "").trim(),
     }))
-    .filter((entry) => Number.isFinite(Number(entry.points)) && !!entry.profile);
+    .filter((entry: PMEntry) => Number.isFinite(Number(entry.points)) && !!entry.profile);
 }
 
 // Accept PROFILE_1..8 or P1..P8 → A/B/C/D; fallback if value already starts with A/B/C/D
@@ -170,17 +170,19 @@ async function resolveEffectiveTestId(
     typeof meta?.source_test_id === "string"
       ? meta.source_test_id
       : typeof meta?.base_test_id === "string"
-      ? meta.base_test_id
-      : typeof meta?.parent_test_id === "string"
-      ? meta.parent_test_id
-      : null;
+        ? meta.base_test_id
+        : typeof meta?.parent_test_id === "string"
+          ? meta.parent_test_id
+          : null;
 
   if (genericSource && isUuidLike(genericSource)) return genericSource;
 
   const isWrapper = meta?.wrapper === true;
   if (!isWrapper) return testRow?.id;
 
-  const qscVariant = String(meta?.qsc_variant || meta?.variant || "").trim().toLowerCase();
+  const qscVariant = String(meta?.qsc_variant || meta?.variant || "")
+    .trim()
+    .toLowerCase();
   const sourceTests: string[] = Array.isArray(meta?.source_tests) ? meta.source_tests : [];
   const defaultSource =
     typeof meta?.default_source_test === "string" ? meta.default_source_test : null;
@@ -1055,13 +1057,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
           ? qscPublicPath
           : reportPath
         : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
-        ? linkBehavior.redirect_url.trim()
-        : resultPath;
+          ? linkBehavior.redirect_url.trim()
+          : resultPath;
 
     const { data: orgRow } = await sb
       .from("orgs")
       .select("id, slug, name, support_email, notification_email, website_url")
-      .eq("id",eq("id", taker.org_id)
+      .eq("id", taker.org_id)
       .maybeSingle();
 
     const orgName =
