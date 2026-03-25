@@ -208,7 +208,9 @@ async function fetchJson<T = any>(url: string): Promise<T> {
 
 function flattenSectionParagraphs(section?: Section | null): string[] {
   const blocks = Array.isArray(section?.blocks) ? section!.blocks! : [];
-  return blocks.flatMap((b) => (Array.isArray(b?.paragraphs) ? b.paragraphs : [])).filter(Boolean);
+  return blocks
+    .flatMap((b) => (Array.isArray(b?.paragraphs) ? b.paragraphs : []))
+    .filter(Boolean);
 }
 
 function firstSummary(section?: Section | null): string {
@@ -256,16 +258,44 @@ function normalisePillars(mode: ScoringMode, raw: Record<string, number> | undef
   const src = raw || {};
   if (mode === "prime") {
     return [
-      { key: "visibility", label: "Visibility", value: clamp(safeNumber(src.visibility), 0, 100) },
-      { key: "trust", label: "Trust", value: clamp(safeNumber(src.trust), 0, 100) },
-      { key: "authority", label: "Authority", value: clamp(safeNumber(src.authority), 0, 100) },
-      { key: "dominance", label: "Dominance", value: clamp(safeNumber(src.dominance), 0, 100) },
+      {
+        key: "visibility",
+        label: "Visibility",
+        value: clamp(safeNumber(src.visibility), 0, 100),
+      },
+      {
+        key: "trust",
+        label: "Trust",
+        value: clamp(safeNumber(src.trust), 0, 100),
+      },
+      {
+        key: "authority",
+        label: "Authority",
+        value: clamp(safeNumber(src.authority), 0, 100),
+      },
+      {
+        key: "dominance",
+        label: "Dominance",
+        value: clamp(safeNumber(src.dominance), 0, 100),
+      },
     ];
   }
   return [
-    { key: "discoverability", label: "Discoverability", value: clamp(safeNumber(src.discoverability), 0, 100) },
-    { key: "trust", label: "Trust", value: clamp(safeNumber(src.trust), 0, 100) },
-    { key: "conversion", label: "Conversion", value: clamp(safeNumber(src.conversion), 0, 100) },
+    {
+      key: "discoverability",
+      label: "Discoverability",
+      value: clamp(safeNumber(src.discoverability), 0, 100),
+    },
+    {
+      key: "trust",
+      label: "Trust",
+      value: clamp(safeNumber(src.trust), 0, 100),
+    },
+    {
+      key: "conversion",
+      label: "Conversion",
+      value: clamp(safeNumber(src.conversion), 0, 100),
+    },
   ];
 }
 
@@ -648,8 +678,8 @@ function VerticalLadderRail({
                   background: isActive
                     ? `linear-gradient(90deg, ${tierColor}aa, rgba(255,255,255,0.10))`
                     : rowTier === tier
-                      ? "rgba(255,255,255,0.06)"
-                      : "rgba(255,255,255,0.03)",
+                    ? "rgba(255,255,255,0.06)"
+                    : "rgba(255,255,255,0.03)",
                   boxShadow: isActive ? `0 0 22px ${tierColor}66` : "none",
                 }}
               />
@@ -749,14 +779,20 @@ function InsightsCard({
   error?: string | null;
 }) {
   return (
-    <GlassCard title="AI coaching insights" subtitle="An additional interpretation layer built from your scored signals and narrative blocks.">
+    <GlassCard
+      title="AI coaching insights"
+      subtitle="An additional interpretation layer built from your scored signals and narrative blocks."
+    >
       {error ? (
         <div className="mt-2 text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
           Insights generation failed: {error}
         </div>
       ) : ai ? (
         <div className="mt-4 space-y-4">
-          <div className="rounded-2xl border p-4" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
+          <div
+            className="rounded-2xl border p-4"
+            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+          >
             <div className="text-sm font-semibold">Executive summary</div>
             <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.executive_summary}
@@ -764,7 +800,10 @@ function InsightsCard({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border p-4" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+            >
               <div className="text-sm font-semibold">Strengths</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.strengths?.map((s, i) => (
@@ -773,7 +812,10 @@ function InsightsCard({
               </ul>
             </div>
 
-            <div className="rounded-2xl border p-4" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+            >
               <div className="text-sm font-semibold">Friction</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.friction?.map((s, i) => (
@@ -783,7 +825,10 @@ function InsightsCard({
             </div>
           </div>
 
-          <div className="rounded-2xl border p-4" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
+          <div
+            className="rounded-2xl border p-4"
+            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+          >
             <div className="text-sm font-semibold">Strategic opportunity</div>
             <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.strategic_opportunity}
@@ -791,7 +836,10 @@ function InsightsCard({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border p-4" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+            >
               <div className="text-sm font-semibold">7-day plan</div>
               <ol className="mt-2 list-decimal pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.plan_7_days?.map((s, i) => (
@@ -800,7 +848,10 @@ function InsightsCard({
               </ol>
             </div>
 
-            <div className="rounded-2xl border p-4" style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}>
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+            >
               <div className="text-sm font-semibold">30-day plan</div>
               <ol className="mt-2 list-decimal pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
                 {ai.plan_30_days?.map((s, i) => (
@@ -849,13 +900,13 @@ export default function VisibilityReportClient({
     kbReport?.meta?.test_name ||
     (mode === "prime" ? "WhatsWhat Prime Visibility Ladder" : "Visibility Ladder");
 
-   const takerName =
-   fullName(portalMeta?.taker) !== "Your"
-    ? fullName(portalMeta?.taker)
-    : "Your Report";
+  const portalFullName = fullName(portalMeta?.taker);
+  const takerName = portalFullName !== "Your" ? portalFullName : "Your Report";
+
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
-  const tier: Tier = (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
+  const tier: Tier =
+    (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
   const level: number = Number(kbReport?.signals?.level ?? 1);
   const style: AB | null = (kbReport?.signals?.style as AB) || null;
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
@@ -921,11 +972,6 @@ export default function VisibilityReportClient({
   const validationStatus = safeString(kbReport?.signals?.validation_status);
   const overallPct = kbReport?.signals?.overall_pct ?? null;
 
-  const heroSummary =
-    firstSummary(secSnapshot) ||
-    firstSummary(secLevelMeaning) ||
-    heroTagline(mode, tier, level);
-
   const marketRealityLines = bulletify(secMarket, 3);
   const frictionLines = bulletify(secFriction, 3);
   const directionLines = bulletify(secOpportunity || secNextMove, 3);
@@ -970,7 +1016,10 @@ export default function VisibilityReportClient({
         }
       }
 
-      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(/[^\w\-]+/g, "_");
+      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
+        /[^\w\-]+/g,
+        "_"
+      );
       pdf.save(safeName);
     } catch (e: any) {
       console.error("[visibility] pdf export failed", e);
@@ -987,32 +1036,51 @@ export default function VisibilityReportClient({
         setErr(null);
 
         if (!token || (!tid && !sid)) {
-        throw new Error("Missing token and report locator (tid or sid required).");
+          throw new Error("Missing token and report locator (tid or sid required).");
         }
 
-        if (tid) {
-       const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}${
-       src ? `&src=${encodeURIComponent(src)}` : ""
-       }`;
+        const kbUrl = sid
+          ? `/api/public/visibility/${encodeURIComponent(token)}/report?sid=${encodeURIComponent(
+              sid
+            )}&audience=taker_report`
+          : `/api/public/visibility/${encodeURIComponent(
+              token
+            )}/report?tid=${encodeURIComponent(tid!)}&audience=taker_report`;
 
-        const portalRes = await fetchJson<PortalReportResponse>(portalUrl);
+        const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
-        setPortalMeta(portalRes?.data ?? null);
+        setKbReport(kbRes?.data ?? null);
+
+        if (tid) {
+          try {
+            const portalUrl = `/api/public/test/${encodeURIComponent(
+              token
+            )}/report?tid=${encodeURIComponent(tid)}${
+              src ? `&src=${encodeURIComponent(src)}` : ""
+            }`;
+
+            const portalRes = await fetchJson<PortalReportResponse>(portalUrl);
+            if (cancelled) return;
+            setPortalMeta(portalRes?.data ?? null);
+          } catch (portalErr) {
+            console.warn("[visibility] portal meta fetch failed", portalErr);
+            if (!cancelled) setPortalMeta(null);
+          }
         } else {
-        setPortalMeta(null);
-       }
+          setPortalMeta(null);
+        }
 
-      const kbUrl =
-       sid
-      ? `/api/public/visibility/${encodeURIComponent(token)}/report?sid=${encodeURIComponent(sid)}&audience=taker_report`
-      : `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid!)}&audience=taker_report`;
-
-      const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
-
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       } catch (e: any) {
         if (cancelled) return;
-        setErr(String(e?.message || e));
+        console.error("[visibility] report load failed", e);
+        setErr(
+          e instanceof Error
+            ? e.message
+            : typeof e === "string"
+            ? e
+            : JSON.stringify(e)
+        );
         setLoading(false);
       }
     })();
@@ -1025,7 +1093,7 @@ export default function VisibilityReportClient({
   if (loading) {
     return (
       <Shell>
-        <div className="mx-auto max-w-7xl p-6">
+        <div className="mx-auto max-w-[1400px] p-6">
           <div className="text-2xl font-semibold">Loading your report…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Visibility Ladder report.
@@ -1038,7 +1106,7 @@ export default function VisibilityReportClient({
   if (err || !kbReport) {
     return (
       <Shell>
-        <div className="mx-auto max-w-7xl p-6 space-y-4">
+        <div className="mx-auto max-w-[1400px] p-6 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
@@ -1079,7 +1147,6 @@ export default function VisibilityReportClient({
   return (
     <Shell>
       <div ref={reportRootRef} className="mx-auto max-w-[1400px] p-6 space-y-6">
-        {/* Header */}
         <GlassCard
           right={
             <div className="flex flex-wrap gap-2">
@@ -1163,7 +1230,6 @@ export default function VisibilityReportClient({
           </div>
         </GlassCard>
 
-        {/* Premium hero page */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-2">
             <VerticalLadderRail level={level} tier={tier} />
@@ -1173,7 +1239,10 @@ export default function VisibilityReportClient({
             <GlassCard className="h-full">
               <div className="flex flex-col gap-6">
                 <div>
-                  <div className="text-[15px] uppercase tracking-[0.22em]" style={{ color: BRAND.textFaint }}>
+                  <div
+                    className="text-[15px] uppercase tracking-[0.22em]"
+                    style={{ color: BRAND.textFaint }}
+                  >
                     {mode === "prime" ? "WhatsWhat Prime" : testName}
                   </div>
                   <div className="mt-3 text-[40px] font-semibold tracking-[0.06em] uppercase leading-none">
@@ -1192,10 +1261,16 @@ export default function VisibilityReportClient({
                   <div className="p-6">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <div className="text-[36px] font-semibold leading-none" style={{ color: tierColor }}>
+                        <div
+                          className="text-[36px] font-semibold leading-none"
+                          style={{ color: tierColor }}
+                        >
                           Level {level} — {tier}
                         </div>
-                        <div className="mt-3 text-[20px] leading-8" style={{ color: "rgba(255,255,255,0.92)" }}>
+                        <div
+                          className="mt-3 text-[20px] leading-8"
+                          style={{ color: "rgba(255,255,255,0.92)" }}
+                        >
                           {firstSummary(secSnapshot) || heroTagline(mode, tier, level)}
                         </div>
                       </div>
@@ -1207,21 +1282,28 @@ export default function VisibilityReportClient({
                           border: `1px solid rgba(255,255,255,0.12)`,
                         }}
                       >
-                        <div className="text-xs uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                        <div
+                          className="text-xs uppercase tracking-[0.18em]"
+                          style={{ color: BRAND.textFaint }}
+                        >
                           Status
                         </div>
-                        <div className="mt-1 text-base font-semibold">
-                          {readinessLabel(readiness)}
-                        </div>
+                        <div className="mt-1 text-base font-semibold">{readinessLabel(readiness)}</div>
                       </div>
                     </div>
 
                     <div className="mt-6 grid gap-4 md:grid-cols-2">
                       <div>
-                        <div className="text-xs uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                        <div
+                          className="text-xs uppercase tracking-[0.18em]"
+                          style={{ color: BRAND.textFaint }}
+                        >
                           Current position
                         </div>
-                        <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
+                        <div
+                          className="mt-2 text-sm leading-7"
+                          style={{ color: "rgba(255,255,255,0.86)" }}
+                        >
                           {firstParagraph(secLevelMeaning) ||
                             (mode === "prime"
                               ? "You have enough strategic visibility to be seen and considered — but your market position still needs strengthening."
@@ -1230,10 +1312,16 @@ export default function VisibilityReportClient({
                       </div>
 
                       <div>
-                        <div className="text-xs uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                        <div
+                          className="text-xs uppercase tracking-[0.18em]"
+                          style={{ color: BRAND.textFaint }}
+                        >
                           Tier range
                         </div>
-                        <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
+                        <div
+                          className="mt-2 text-sm leading-7"
+                          style={{ color: "rgba(255,255,255,0.86)" }}
+                        >
                           {tierRangeLabel(tier)}.{" "}
                           {mode === "prime"
                             ? "Movement inside the tier reflects how stable your current market position is."
@@ -1253,7 +1341,10 @@ export default function VisibilityReportClient({
                       >
                         Strong authority or dominance signals are present. Final leadership claims should still be interpreted carefully until external validation is confirmed.
                         {validationStatus ? (
-                          <span style={{ color: BRAND.textDim }}> ({validationStatus.replaceAll("_", " ")})</span>
+                          <span style={{ color: BRAND.textDim }}>
+                            {" "}
+                            ({validationStatus.replaceAll("_", " ")})
+                          </span>
                         ) : null}
                       </div>
                     ) : null}
@@ -1261,11 +1352,18 @@ export default function VisibilityReportClient({
                 </div>
 
                 <div>
-                  <div className="text-[13px] uppercase tracking-[0.22em]" style={{ color: BRAND.textFaint }}>
+                  <div
+                    className="text-[13px] uppercase tracking-[0.22em]"
+                    style={{ color: BRAND.textFaint }}
+                  >
                     {mode === "prime" ? "Prime structural breakdown" : "Visibility pillars"}
                   </div>
 
-                  <div className={`mt-4 grid gap-4 ${mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"}`}>
+                  <div
+                    className={`mt-4 grid gap-4 ${
+                      mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
+                    }`}
+                  >
                     {pillars.map((p) => {
                       const band = (bandSource as any)?.[p.key];
                       const color =
@@ -1330,12 +1428,17 @@ export default function VisibilityReportClient({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <GlassCard title={secOpportunity?.title || "Your strategic opportunity"}>
                 <div className="text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {firstSummary(secOpportunity) || "Your next growth comes from strengthening the right structural signal — not just doing more."}
+                  {firstSummary(secOpportunity) ||
+                    "Your next growth comes from strengthening the right structural signal — not just doing more."}
                 </div>
                 {paragraphSlice(secOpportunity, 4).length ? (
                   <div className="mt-4 space-y-3">
                     {paragraphSlice(secOpportunity, 4).map((line, idx) => (
-                      <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
+                      <div
+                        key={idx}
+                        className="flex gap-3 text-sm"
+                        style={{ color: "rgba(255,255,255,0.86)" }}
+                      >
                         <div style={{ color: BRAND.accent }}>↗</div>
                         <div>{line}</div>
                       </div>
@@ -1346,12 +1449,17 @@ export default function VisibilityReportClient({
 
               <GlassCard title={secNextMove?.title || "Your most effective next move"}>
                 <div className="text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {firstSummary(secNextMove) || "Do not increase random activity. Strengthen the structural signal that is most limiting momentum."}
+                  {firstSummary(secNextMove) ||
+                    "Do not increase random activity. Strengthen the structural signal that is most limiting momentum."}
                 </div>
                 {paragraphSlice(secNextMove, 4).length ? (
                   <div className="mt-4 space-y-3">
                     {paragraphSlice(secNextMove, 4).map((line, idx) => (
-                      <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
+                      <div
+                        key={idx}
+                        className="flex gap-3 text-sm"
+                        style={{ color: "rgba(255,255,255,0.86)" }}
+                      >
                         <div style={{ color: BRAND.accent }}>✓</div>
                         <div>{line}</div>
                       </div>
@@ -1364,7 +1472,7 @@ export default function VisibilityReportClient({
 
           <div className="xl:col-span-4 space-y-6">
             <TinyInfoCard
-              title={mode === "prime" ? "Market reality" : "Market reality"}
+              title="Market reality"
               lines={
                 marketRealityLines.length
                   ? marketRealityLines
@@ -1381,7 +1489,7 @@ export default function VisibilityReportClient({
             />
 
             <TinyInfoCard
-              title={mode === "prime" ? "Structural gap" : "Structural gap"}
+              title="Structural gap"
               lines={
                 frictionLines.length
                   ? frictionLines
@@ -1395,7 +1503,7 @@ export default function VisibilityReportClient({
             />
 
             <TinyInfoCard
-              title={mode === "prime" ? "Strategic direction" : "Strategic direction"}
+              title="Strategic direction"
               lines={
                 directionLines.length
                   ? directionLines
@@ -1418,7 +1526,10 @@ export default function VisibilityReportClient({
                   border: `1px solid ${BRAND.border}`,
                 }}
               >
-                <div className="text-[12px] font-semibold uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                <div
+                  className="text-[12px] font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: BRAND.textFaint }}
+                >
                   Behaviour style
                 </div>
                 <div className="mt-4 flex items-center justify-between">
@@ -1467,7 +1578,6 @@ export default function VisibilityReportClient({
           </div>
         </div>
 
-        {/* Intro + framework */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
             {secWelcome ? (
@@ -1510,10 +1620,7 @@ export default function VisibilityReportClient({
 
             {!introSections.length ? (
               <GlassCard title="Intro content">
-                <div
-                  className="text-sm"
-                  style={{ color: BRAND.textDim }}
-                >
+                <div className="text-sm" style={{ color: BRAND.textDim }}>
                   Intro sections are pending in the knowledge base.
                 </div>
                 <div className="mt-2 text-xs" style={{ color: BRAND.textFaint }}>
@@ -1524,7 +1631,6 @@ export default function VisibilityReportClient({
           </div>
         </div>
 
-        {/* Deeper narrative */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {secStrengths ? (
             <GlassCard title={secStrengths.title || "What is already working"}>
@@ -1552,14 +1658,21 @@ export default function VisibilityReportClient({
 
           {secPillars ? (
             <GlassCard
-              title={secPillars.title || (mode === "prime" ? "Your Prime pillars" : "Your visibility pillars")}
+              title={
+                secPillars.title ||
+                (mode === "prime" ? "Your Prime pillars" : "Your visibility pillars")
+              }
               subtitle={
                 mode === "prime"
                   ? "Visibility, Trust, Authority, and Dominance show how strong your market structure is."
                   : "Discoverability, Trust, and Conversion show where visibility is working and where it breaks down."
               }
             >
-              <div className={`mt-4 grid gap-4 ${mode === "prime" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+              <div
+                className={`mt-4 grid gap-4 ${
+                  mode === "prime" ? "md:grid-cols-2" : "md:grid-cols-3"
+                }`}
+              >
                 {pillars.map((p) => {
                   const band = (bandSource as any)?.[p.key];
                   const color =
@@ -1591,10 +1704,8 @@ export default function VisibilityReportClient({
           ) : null}
         </div>
 
-        {/* AI */}
         <InsightsCard ai={ai} error={aiError || null} />
 
-        {/* Remaining KB sections */}
         {remainingSections.length ? (
           <GlassCard title="Additional report sections">
             <div className="mt-4 space-y-6">
@@ -1607,7 +1718,6 @@ export default function VisibilityReportClient({
           </GlassCard>
         ) : null}
 
-        {/* Closing */}
         {secClosing ? (
           <GlassCard title={secClosing.title || "Closing"}>
             <SectionBlocks section={secClosing} />
