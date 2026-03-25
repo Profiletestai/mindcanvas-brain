@@ -824,10 +824,12 @@ function InsightsCard({
 export default function VisibilityReportClient({
   token,
   tid,
+  sid,
   src,
 }: {
   token: string;
-  tid: string;
+  tid?: string;
+  sid?: string;
   src?: string;
 }) {
   const reportRootRef = useRef<HTMLDivElement | null>(null);
@@ -847,7 +849,10 @@ export default function VisibilityReportClient({
     kbReport?.meta?.test_name ||
     (mode === "prime" ? "WhatsWhat Prime Visibility Ladder" : "Visibility Ladder");
 
-  const takerName = fullName(portalMeta?.taker);
+   const takerName =
+   fullName(portalMeta?.taker) !== "Your"
+    ? fullName(portalMeta?.taker)
+    : "Your Report";
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
   const tier: Tier = (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
@@ -981,22 +986,28 @@ export default function VisibilityReportClient({
         setLoading(true);
         setErr(null);
 
-        if (!token || !tid) {
-          throw new Error("Missing token or tid (required for report load).");
+        if (!token || (!tid && !sid)) {
+        throw new Error("Missing token and report locator (tid or sid required).");
         }
 
-        const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}${
-          src ? `&src=${encodeURIComponent(src)}` : ""
-        }`;
+        if (tid) {
+       const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}${
+       src ? `&src=${encodeURIComponent(src)}` : ""
+       }`;
 
         const portalRes = await fetchJson<PortalReportResponse>(portalUrl);
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
+        } else {
+        setPortalMeta(null);
+       }
 
-        const kbUrl = `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
-        const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
-        if (cancelled) return;
-        setKbReport(kbRes?.data ?? null);
+      const kbUrl =
+       sid
+      ? `/api/public/visibility/${encodeURIComponent(token)}/report?sid=${encodeURIComponent(sid)}&audience=taker_report`
+      : `/api/public/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid!)}&audience=taker_report`;
+
+      const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
 
         setLoading(false);
       } catch (e: any) {
@@ -1009,7 +1020,7 @@ export default function VisibilityReportClient({
     return () => {
       cancelled = true;
     };
-  }, [token, tid, src]);
+  }, [token, tid, sid, src]);
 
   if (loading) {
     return (
@@ -1037,7 +1048,8 @@ export default function VisibilityReportClient({
             style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BRAND.border}` }}
           >
             <div>token: {token}</div>
-            <div>tid: {tid}</div>
+            <div>tid: {tid || "—"}</div>
+            <div>sid: {sid || "—"}</div>
           </div>
           <Link href={`/t/${token}`} className="underline text-sm">
             Go back
