@@ -6,16 +6,70 @@ import { sendTemplatedEmail } from "@/lib/server/emailTemplates";
 import { getBaseUrl } from "@/lib/baseUrl";
 
 type AB = "A" | "B" | "C" | "D";
+type AnswerCode = "A" | "B" | "C" | "D" | "E";
 type Tier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type Readiness = "stabilise" | "ready_to_progress";
+type PrimePillar = "visibility" | "trust" | "authority" | "dominance";
+type SectionCode =
+  | "personality"
+  | "visibility"
+  | "trust"
+  | "authority"
+  | "dominance";
 
 type PMEntry = { points?: number; profile?: string };
-type QuestionRow = {
+
+type PortalQuestionRow = {
   id: string;
   idx?: number | string | null;
   profile_map?: PMEntry[] | null;
   weights?: any | null;
 };
+
+type VisQuestionRow = {
+  id: string;
+  idx: number;
+  code: string;
+  pillar: number;
+  section_code: SectionCode | null;
+  is_internal_only: boolean;
+  is_scored: boolean;
+};
+
+type VisOptionRow = {
+  question_id: string;
+  option_code: string;
+  scoring: VisScoring;
+  is_active: boolean;
+};
+
+type ScoringPersonality = {
+  type: "personality";
+  bucket: AB;
+  points: number;
+};
+
+type ScoringTier = {
+  type: "tier";
+  tier: Tier;
+};
+
+type ScoringPrime = {
+  type: "prime";
+  value?: number; // 0..4
+  pillar?: PrimePillar;
+  tier_weights?: Partial<Record<Tier, number>>;
+};
+
+type VisScoring = ScoringPersonality | ScoringTier | ScoringPrime;
+
+const TIERS: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
+const PRIME_PILLARS: PrimePillar[] = [
+  "visibility",
+  "trust",
+  "authority",
+  "dominance",
+];
 
 function supa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -78,7 +132,10 @@ function coerceProfileMapEntries(value: any): PMEntry[] {
       points: Number(entry?.points ?? 0),
       profile: String(entry?.profile || "").trim(),
     }))
-    .filter((entry: PMEntry) => Number.isFinite(Number(entry.points)) && !!entry.profile);
+    .filter(
+      (entry: PMEntry) =>
+        Number.isFinite(Number(entry.points)) && !!entry.profile
+    );
 }
 
 // Accept PROFILE_1..8 or P1..P8 → A/B/C/D; fallback if value already starts with A/B/C/D
@@ -124,7 +181,10 @@ function toZeroBasedSelected(row: any): number | null {
     if (Number.isFinite(n)) return n;
   }
 
-  if (typeof row?.selected_index === "string" && row.selected_index.trim() !== "") {
+  if (
+    typeof row?.selected_index === "string" &&
+    row.selected_index.trim() !== ""
+  ) {
     const n = Number(row.selected_index);
     if (Number.isFinite(n)) return n;
   }
@@ -183,9 +243,13 @@ async function resolveEffectiveTestId(
   const qscVariant = String(meta?.qsc_variant || meta?.variant || "")
     .trim()
     .toLowerCase();
-  const sourceTests: string[] = Array.isArray(meta?.source_tests) ? meta.source_tests : [];
+  const sourceTests: string[] = Array.isArray(meta?.source_tests)
+    ? meta.source_tests
+    : [];
   const defaultSource =
-    typeof meta?.default_source_test === "string" ? meta.default_source_test : null;
+    typeof meta?.default_source_test === "string"
+      ? meta.default_source_test
+      : null;
 
   if (sourceTests.length) {
     const clean = sourceTests.filter((id) => isUuidLike(id));
@@ -197,9 +261,13 @@ async function resolveEffectiveTestId(
 
       const list = Array.isArray(candidates) ? candidates : [];
       const preferredSlug =
-        qscVariant === "leader" || qscVariant === "leaders" ? "qsc-leaders" : "qsc-core";
+        qscVariant === "leader" || qscVariant === "leaders"
+          ? "qsc-leaders"
+          : "qsc-core";
 
-      const preferred = list.find((t: any) => normalizeSlug(t.slug) === preferredSlug);
+      const preferred = list.find(
+        (t: any) => normalizeSlug(t.slug) === preferredSlug
+      );
       if (preferred?.id) return preferred.id;
     }
   }
@@ -273,34 +341,206 @@ async function loadLinkBehavior(
   };
 }
 
-// -------- Visibility scoring helpers ----------
-type ScoringPersonality = { type: "personality"; bucket: AB; points: number };
-type ScoringTier = { type: "tier"; tier: Tier };
-type Scoring = ScoringPersonality | ScoringTier;
+/* ---------------- Visibility helpers ---------------- */
+
+function safeAB(v: any): AB | null {
+  return v === "A" || v === "B" || v === "C" || v === "D" ? v : null;
+}
+
+function safeAnswerCode(v: any): AnswerCode | null {
+  return v === "A" || v === "B" || v === "C" || v === "D" || v === "E"
+    ? v
+    : null;
+}
+
+function answerValue(code: AnswerCode): number {
+  switch (code) {
+    case "A":
+      return 0;
+    case "B":
+      return 1;
+    case "C":
+      return 2;
+    case "D":
+      return 3;
+    case "E":
+      return 4;
+  }
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function computeTierAndLevel(tierCounts: Record<Tier, number>, totalSignals: number) {
+function roundInt(n: number) {
+  return Math.round(n);
+}
+
+function emptyTierCounts(): Record<Tier, number> {
+  return {
+    Invisible: 0,
+    Emerging: 0,
+    Established: 0,
+    Magnetic: 0,
+  };
+}
+
+function emptyPersonalityPoints(): Record<AB, number> {
+  return { A: 0, B: 0, C: 0, D: 0 };
+}
+
+function emptyPrimePillarTotals(): Record<PrimePillar, number> {
+  return {
+    visibility: 0,
+    trust: 0,
+    authority: 0,
+    dominance: 0,
+  };
+}
+
+function emptyPrimePillarCounts(): Record<PrimePillar, number> {
+  return {
+    visibility: 0,
+    trust: 0,
+    authority: 0,
+    dominance: 0,
+  };
+}
+
+function isPrimeMode(
+  engineKey: string | null | undefined,
+  version: number | null | undefined
+) {
+  return (
+    String(engineKey || "").toLowerCase() === "visibility_prime_v1" ||
+    Number(version || 0) >= 2
+  );
+}
+
+function getPrimePillarFromQuestion(q: VisQuestionRow): PrimePillar | null {
+  if (q.section_code === "visibility") return "visibility";
+  if (q.section_code === "trust") return "trust";
+  if (q.section_code === "authority") return "authority";
+  if (q.section_code === "dominance") return "dominance";
+
+  const code = String(q.code || "").trim().toUpperCase();
+  if (/^V[1-5]$/.test(code)) return "visibility";
+  if (/^T[1-5]$/.test(code)) return "trust";
+  if (/^A[1-5]$/.test(code)) return "authority";
+  if (/^D[1-5]$/.test(code)) return "dominance";
+
+  return null;
+}
+
+function isPersonalityQuestion(q: VisQuestionRow): boolean {
+  if (q.section_code === "personality") return true;
+
+  const code = String(q.code || "").trim().toUpperCase();
+  if (/^P[1-8]$/.test(code)) return true;
+  if (/^Q[1-8]$/.test(code) && q.pillar === 1) return true;
+
+  return false;
+}
+
+function buildPrimeTierWeights(value: number): Record<Tier, number> {
+  const weights = emptyTierCounts();
+  switch (value) {
+    case 0:
+      weights.Invisible = 1;
+      break;
+    case 1:
+      weights.Invisible = 0.5;
+      weights.Emerging = 0.5;
+      break;
+    case 2:
+      weights.Emerging = 1;
+      break;
+    case 3:
+      weights.Established = 1;
+      break;
+    case 4:
+      weights.Magnetic = 1;
+      break;
+    default:
+      weights.Emerging = 1;
+      break;
+  }
+  return weights;
+}
+
+function normalizePersonalityScoring(raw: any): ScoringPersonality | null {
+  if (!raw || raw.type !== "personality") return null;
+  const bucket = safeAB(raw.bucket);
+  if (!bucket) return null;
+  return {
+    type: "personality",
+    bucket,
+    points: Number(raw.points) || 0,
+  };
+}
+
+function normalizeLegacyTierScoring(raw: any): ScoringTier | null {
+  if (!raw || raw.type !== "tier") return null;
+  if (!TIERS.includes(raw.tier)) return null;
+  return { type: "tier", tier: raw.tier };
+}
+
+function normalizePrimeScoring(
+  raw: any,
+  q: VisQuestionRow,
+  answerCode: AnswerCode
+) {
+  const pillar = getPrimePillarFromQuestion(q);
+  if (!pillar) return null;
+
+  const value =
+    raw?.type === "prime" && typeof raw?.value === "number"
+      ? clamp(Number(raw.value), 0, 4)
+      : answerValue(answerCode);
+
+  const tier_weights =
+    raw?.type === "prime" && raw?.tier_weights
+      ? {
+          Invisible: Number(raw.tier_weights?.Invisible || 0),
+          Emerging: Number(raw.tier_weights?.Emerging || 0),
+          Established: Number(raw.tier_weights?.Established || 0),
+          Magnetic: Number(raw.tier_weights?.Magnetic || 0),
+        }
+      : buildPrimeTierWeights(value);
+
+  return {
+    pillar:
+      raw?.type === "prime" && raw?.pillar
+        ? (raw.pillar as PrimePillar)
+        : pillar,
+    value,
+    tier_weights,
+  };
+}
+
+function computeTierAndLevel(
+  tierCounts: Record<Tier, number>,
+  totalSignals: number
+) {
   const tierRank: Record<Tier, number> = {
     Invisible: 1,
     Emerging: 2,
     Established: 3,
     Magnetic: 4,
   };
+
   const base: Record<Tier, number> = {
     Invisible: 0,
     Emerging: 5,
     Established: 10,
     Magnetic: 15,
   };
-  const tiers: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
 
   let dominant: Tier = "Invisible";
   let bestCount = -1;
   let bestRank = -1;
-  for (const t of tiers) {
+
+  for (const t of TIERS) {
     const c = tierCounts[t] ?? 0;
     const r = tierRank[t];
     if (c > bestCount || (c === bestCount && r > bestRank)) {
@@ -313,13 +553,15 @@ function computeTierAndLevel(tierCounts: Record<Tier, number>, totalSignals: num
   const support = tierCounts[dominant] ?? 0;
   const domRank = tierRank[dominant];
 
-  const above = tiers
-    .filter((t) => tierRank[t] > domRank)
-    .reduce((s, t) => s + (tierCounts[t] ?? 0), 0);
+  const above = TIERS.filter((t) => tierRank[t] > domRank).reduce(
+    (sum, t) => sum + (tierCounts[t] ?? 0),
+    0
+  );
 
-  const below = tiers
-    .filter((t) => tierRank[t] < domRank)
-    .reduce((s, t) => s + (tierCounts[t] ?? 0), 0);
+  const below = TIERS.filter((t) => tierRank[t] < domRank).reduce(
+    (sum, t) => sum + (tierCounts[t] ?? 0),
+    0
+  );
 
   const dominance = totalSignals ? (support + 0.5 * above) / totalSignals : 0;
   const tierLevel = clamp(Math.ceil(dominance * 5), 1, 5);
@@ -335,23 +577,194 @@ function computeReadiness(tierLevel: number, below: number): Readiness {
     ? "ready_to_progress"
     : "stabilise";
 }
-// -------- End visibility helpers ----------
+
+function computePersonalityPercent(
+  personalityPoints: Record<AB, number>
+): Record<AB, number> {
+  const total = Object.values(personalityPoints).reduce((sum, n) => sum + n, 0);
+  if (!total) return { A: 0, B: 0, C: 0, D: 0 };
+
+  return {
+    A: roundInt((personalityPoints.A / total) * 100),
+    B: roundInt((personalityPoints.B / total) * 100),
+    C: roundInt((personalityPoints.C / total) * 100),
+    D: roundInt((personalityPoints.D / total) * 100),
+  };
+}
+
+function computePrimePillarScores(
+  pillarTotals: Record<PrimePillar, number>,
+  pillarCounts: Record<PrimePillar, number>
+): Record<PrimePillar, number> {
+  const out = {
+    visibility: 0,
+    trust: 0,
+    authority: 0,
+    dominance: 0,
+  };
+
+  for (const pillar of PRIME_PILLARS) {
+    const total = pillarTotals[pillar] || 0;
+    const count = pillarCounts[pillar] || 0;
+    out[pillar] = count ? roundInt((total / (count * 4)) * 100) : 0;
+  }
+
+  return out;
+}
+
+function bandFromPct(pct: number) {
+  if (pct < 40) return "weak";
+  if (pct < 60) return "developing";
+  if (pct < 80) return "strong";
+  return "dominant";
+}
+
+function computePrimePillarBands(
+  pillarScores: Record<PrimePillar, number>
+) {
+  return {
+    visibility: bandFromPct(pillarScores.visibility),
+    trust: bandFromPct(pillarScores.trust),
+    authority: bandFromPct(pillarScores.authority),
+    dominance: bandFromPct(pillarScores.dominance),
+  };
+}
+
+function getWeakestStrongestPillar(
+  pillarScores: Record<PrimePillar, number>
+) {
+  let weakest: PrimePillar = "visibility";
+  let strongest: PrimePillar = "visibility";
+
+  for (const pillar of PRIME_PILLARS) {
+    if (pillarScores[pillar] < pillarScores[weakest]) weakest = pillar;
+    if (pillarScores[pillar] > pillarScores[strongest]) strongest = pillar;
+  }
+
+  return { weakest, strongest };
+}
+
+function computeBalancePattern(
+  pillarScores: Record<PrimePillar, number>
+) {
+  const values = PRIME_PILLARS.map((p) => pillarScores[p]);
+  const spread = Math.max(...values) - Math.min(...values);
+  const { strongest } = getWeakestStrongestPillar(pillarScores);
+
+  if (spread <= 15) return "balanced";
+  if (spread >= 35) return "volatile";
+  return `${strongest}_led`;
+}
+
+function computePrimePatternTags(
+  pillarScores: Record<PrimePillar, number>,
+  tier: Tier
+) {
+  const tags: string[] = [];
+  const values = PRIME_PILLARS.map((p) => pillarScores[p]);
+  const spread = Math.max(...values) - Math.min(...values);
+
+  if (spread <= 15) tags.push("balanced_profile");
+  if (pillarScores.visibility >= 60 && pillarScores.trust < 40) {
+    tags.push("visible_but_untrusted");
+  }
+  if (pillarScores.trust >= 60 && pillarScores.visibility < 40) {
+    tags.push("credible_but_hidden");
+  }
+  if (
+    pillarScores.visibility >= 60 &&
+    pillarScores.trust >= 60 &&
+    pillarScores.authority < 50
+  ) {
+    tags.push("authority_gap");
+  }
+  if (pillarScores.authority >= 60 && pillarScores.dominance < 50) {
+    tags.push("decision_friction");
+  }
+  if (pillarScores.authority >= 70 && pillarScores.dominance >= 70) {
+    tags.push("leadership_signal");
+  }
+  if (pillarScores.dominance >= 70 || tier === "Magnetic") {
+    tags.push("validation_required");
+  }
+
+  return [...new Set(tags)];
+}
+
+function computePrimeReadiness(
+  tier: Tier,
+  tierLevel: number,
+  pillarScores: Record<PrimePillar, number>
+): Readiness {
+  const minPillar = Math.min(
+    pillarScores.visibility,
+    pillarScores.trust,
+    pillarScores.authority,
+    pillarScores.dominance
+  );
+
+  if (tierLevel < 4) return "stabilise";
+
+  switch (tier) {
+    case "Invisible":
+      return pillarScores.visibility >= 35 && pillarScores.trust >= 30
+        ? "ready_to_progress"
+        : "stabilise";
+
+    case "Emerging":
+      return (
+        pillarScores.visibility >= 55 &&
+        pillarScores.trust >= 55 &&
+        pillarScores.authority >= 45 &&
+        minPillar >= 35
+      )
+        ? "ready_to_progress"
+        : "stabilise";
+
+    case "Established":
+      return (
+        pillarScores.visibility >= 70 &&
+        pillarScores.trust >= 70 &&
+        pillarScores.authority >= 70 &&
+        pillarScores.dominance >= 65 &&
+        minPillar >= 55
+      )
+        ? "ready_to_progress"
+        : "stabilise";
+
+    case "Magnetic":
+    default:
+      return "stabilise";
+  }
+}
+
+/* ---------------- End visibility helpers ---------------- */
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(req: Request, { params }: { params: { token: string } }) {
+export async function POST(
+  req: Request,
+  { params }: { params: { token: string } }
+) {
   try {
     const token = params.token?.trim();
     if (!token) {
-      return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Missing token" },
+        { status: 400 }
+      );
     }
 
     const body = (await req.json().catch(() => ({}))) as any;
-    const takerId: string | undefined = body.taker_id || body.takerId || body.tid;
+    const takerId: string | undefined =
+      body.taker_id || body.takerId || body.tid;
 
     if (!takerId) {
-      return NextResponse.json({ ok: false, error: "Missing taker_id" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Missing taker_id" },
+        { status: 400 }
+      );
     }
 
     const answers: any[] = Array.isArray(body.answers) ? body.answers : [];
@@ -369,7 +782,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .maybeSingle();
 
     if (takerErr || !taker) {
-      return NextResponse.json({ ok: false, error: "Taker not found for this token" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Taker not found for this token" },
+        { status: 404 }
+      );
     }
 
     const { data: test, error: testErr } = await sb
@@ -379,115 +795,238 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .maybeSingle();
 
     if (testErr || !test) {
-      return NextResponse.json({ ok: false, error: "Test not found for taker" }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: "Test not found for taker" },
+        { status: 500 }
+      );
     }
 
-    // ✅ VISIBILITY BRANCH
+    // ✅ VISIBILITY BRANCH (supports legacy + prime)
     const vis = visSupa();
     const { data: vTest, error: vTestErr } = await vis
       .from("tests")
-      .select("id")
+      .select("id, engine_key, version")
       .eq("portal_test_id", taker.test_id)
       .maybeSingle();
 
     if (vTestErr) {
       return NextResponse.json(
-        { ok: false, error: `Visibility test lookup failed: ${vTestErr.message}` },
+        {
+          ok: false,
+          error: `Visibility test lookup failed: ${vTestErr.message}`,
+        },
         { status: 500 }
       );
     }
 
     if (vTest?.id) {
-      const { data: vQs, error: vqErr } = await vis
+      const primeMode = isPrimeMode(vTest.engine_key, vTest.version);
+
+      const { data: vQsRaw, error: vqErr } = await vis
         .from("questions")
-        .select("id, code, idx, pillar")
+        .select(
+          "id, code, idx, pillar, section_code, is_internal_only, is_scored"
+        )
         .eq("test_id", vTest.id)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("idx", { ascending: true });
 
       if (vqErr) {
         return NextResponse.json(
-          { ok: false, error: `Visibility questions load failed: ${vqErr.message}` },
+          {
+            ok: false,
+            error: `Visibility questions load failed: ${vqErr.message}`,
+          },
           { status: 500 }
         );
       }
 
-      const qIds = (vQs ?? []).map((q: any) => q.id);
+      const vQs: VisQuestionRow[] = (vQsRaw || []).map((q: any) => ({
+        id: String(q.id),
+        code: String(q.code),
+        idx: Number(q.idx),
+        pillar: Number(q.pillar),
+        section_code: q.section_code ?? null,
+        is_internal_only: Boolean(q.is_internal_only),
+        is_scored: Boolean(q.is_scored),
+      }));
 
-      const { data: vOpts, error: voErr } = await vis
+      const qIds = vQs.map((q) => q.id);
+
+      const { data: vOptsRaw, error: voErr } = await vis
         .from("options")
-        .select("question_id, option_code, scoring")
+        .select("question_id, option_code, scoring, is_active")
         .in("question_id", qIds)
         .eq("is_active", true);
 
       if (voErr) {
         return NextResponse.json(
-          { ok: false, error: `Visibility options load failed: ${voErr.message}` },
+          {
+            ok: false,
+            error: `Visibility options load failed: ${voErr.message}`,
+          },
           { status: 500 }
         );
       }
 
-      const codeByQid = new Map<string, string>();
-      for (const q of vQs ?? []) codeByQid.set(q.id, String(q.code));
+      const vOpts: VisOptionRow[] = (vOptsRaw || []).map((o: any) => ({
+        question_id: String(o.question_id),
+        option_code: String(o.option_code),
+        scoring: o.scoring as VisScoring,
+        is_active: Boolean(o.is_active),
+      }));
 
-      const scoringMap: Record<string, Partial<Record<AB, Scoring>>> = {};
-      for (const o of vOpts ?? []) {
-        const ab = String(o.option_code).toUpperCase() as AB;
-        if (ab !== "A" && ab !== "B" && ab !== "C" && ab !== "D") continue;
-        scoringMap[o.question_id] = scoringMap[o.question_id] || {};
-        scoringMap[o.question_id]![ab] = o.scoring as Scoring;
+      const qById = new Map<string, VisQuestionRow>();
+      const qCodeById = new Map<string, string>();
+      for (const q of vQs) {
+        qById.set(q.id, q);
+        qCodeById.set(q.id, q.code);
       }
 
-      const personalityPoints: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
-      const tierCounts: Record<Tier, number> = {
-        Invisible: 0,
-        Emerging: 0,
-        Established: 0,
-        Magnetic: 0,
-      };
-      let ladderSignals = 0;
+      const scoringMap: Record<string, Partial<Record<AnswerCode, VisScoring>>> =
+        {};
+      for (const o of vOpts) {
+        const answerCode = safeAnswerCode(o.option_code);
+        if (!answerCode) continue;
+        scoringMap[o.question_id] = scoringMap[o.question_id] || {};
+        scoringMap[o.question_id]![answerCode] = o.scoring;
+      }
 
-      const storedAnswers: Record<string, AB> = {};
+      const personalityPoints = emptyPersonalityPoints();
+      const tierCounts = emptyTierCounts();
+      const primePillarTotals = emptyPrimePillarTotals();
+      const primePillarCounts = emptyPrimePillarCounts();
+
+      let ladderSignals = 0;
+      let answeredQuestions = 0;
+      let answeredPersonalityQuestions = 0;
+
+      const storedAnswers: Record<string, AnswerCode> = {};
 
       for (const row of answers) {
         const qid = row?.question_id || row?.qid || row?.id;
         if (!qid) continue;
 
+        const q = qById.get(String(qid));
+        if (!q) continue;
+
         const sel = toZeroBasedSelected(row);
-        if (sel == null || sel < 0 || sel > 3) continue;
+        if (sel == null || sel < 0 || sel > 4) continue;
 
-        const ab: AB = sel === 0 ? "A" : sel === 1 ? "B" : sel === 2 ? "C" : "D";
-        const qCode = codeByQid.get(qid);
-        if (qCode) storedAnswers[qCode] = ab;
+        const answerCode: AnswerCode =
+          sel === 0 ? "A" : sel === 1 ? "B" : sel === 2 ? "C" : sel === 3 ? "D" : "E";
 
-        const scoring = scoringMap[qid]?.[ab];
-        if (!scoring) continue;
+        answeredQuestions += 1;
+        storedAnswers[q.code] = answerCode;
 
-        if ((scoring as any).type === "personality") {
-          const s = scoring as ScoringPersonality;
-          personalityPoints[s.bucket] += Number(s.points || 0);
-        } else if ((scoring as any).type === "tier") {
-          const s = scoring as ScoringTier;
-          tierCounts[s.tier] += 1;
+        const rawScoring = scoringMap[q.id]?.[answerCode];
+
+        if (isPersonalityQuestion(q) || q.is_internal_only || q.is_scored === false) {
+          const personality = normalizePersonalityScoring(rawScoring);
+          if (personality) {
+            personalityPoints[personality.bucket] += Number(personality.points || 0);
+            answeredPersonalityQuestions += 1;
+          }
+          continue;
+        }
+
+        if (primeMode) {
+          const prime = normalizePrimeScoring(rawScoring, q, answerCode);
+          if (!prime) continue;
+
+          primePillarTotals[prime.pillar] += prime.value;
+          primePillarCounts[prime.pillar] += 1;
+
+          for (const tierKey of TIERS) {
+            tierCounts[tierKey] += Number(prime.tier_weights[tierKey] ?? 0);
+          }
+
+          ladderSignals += 1;
+          continue;
+        }
+
+        const legacyTier = normalizeLegacyTierScoring(rawScoring);
+        if (legacyTier) {
+          tierCounts[legacyTier.tier] += 1;
           ladderSignals += 1;
         }
       }
 
-      const types: AB[] = ["A", "B", "C", "D"];
-      let personality_type: AB = "A";
-      let best = -1;
-      for (const t of types) {
-        if (personalityPoints[t] > best) {
-          best = personalityPoints[t];
-          personality_type = t;
+      const personality_percent = computePersonalityPercent(personalityPoints);
+
+      let personality_type: AB | null = null;
+      const totalPersonalityPoints = Object.values(personalityPoints).reduce(
+        (sum, n) => sum + n,
+        0
+      );
+
+      if (totalPersonalityPoints > 0) {
+        let bestBucket: AB = "A";
+        let bestPoints = -1;
+        for (const bucket of ["A", "B", "C", "D"] as AB[]) {
+          if (personalityPoints[bucket] > bestPoints) {
+            bestPoints = personalityPoints[bucket];
+            bestBucket = bucket;
+          }
         }
+        personality_type = bestBucket;
       }
 
       const { tier, level, tierLevel, below, dominance, support, above } =
         computeTierAndLevel(tierCounts, ladderSignals);
 
-      const readiness = computeReadiness(tierLevel, below);
+      let readiness: Readiness = "stabilise";
+      let pillar_scores: Record<string, number> = {};
+      let pillar_bands: Record<string, string> = {};
+      let weakest_pillar: string | null = null;
+      let strongest_pillar: string | null = null;
+      let balance_pattern: string | null = null;
+      let pattern_tags: string[] = [];
+      let overall_pct: number | null = null;
+      let validation_required = false;
+      let validation_status: string | null = null;
 
-      const fullName = [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim();
+      if (primeMode) {
+        const primePillarScores = computePrimePillarScores(
+          primePillarTotals,
+          primePillarCounts
+        );
+        const primePillarBands = computePrimePillarBands(primePillarScores);
+        const { weakest, strongest } = getWeakestStrongestPillar(primePillarScores);
+
+        const totalPrimeValue = PRIME_PILLARS.reduce(
+          (sum, p) => sum + primePillarTotals[p],
+          0
+        );
+
+        overall_pct = ladderSignals
+          ? roundInt((totalPrimeValue / (ladderSignals * 4)) * 100)
+          : 0;
+
+        readiness = computePrimeReadiness(tier, tierLevel, primePillarScores);
+        balance_pattern = computeBalancePattern(primePillarScores);
+        pattern_tags = computePrimePatternTags(primePillarScores, tier);
+
+        validation_required =
+          primePillarScores.dominance >= 70 ||
+          (primePillarScores.authority >= 70 && tier === "Magnetic");
+
+        validation_status = validation_required
+          ? "self_report_validation_required"
+          : "self_report_only";
+
+        pillar_scores = primePillarScores;
+        pillar_bands = primePillarBands;
+        weakest_pillar = weakest;
+        strongest_pillar = strongest;
+      } else {
+        readiness = computeReadiness(tierLevel, below);
+      }
+
+      const fullName = [taker.first_name, taker.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
 
       const { data: sub, error: subErr } = await vis
         .from("submissions")
@@ -499,68 +1038,113 @@ export async function POST(req: Request, { params }: { params: { token: string }
           taker_name: fullName || null,
           taker_email: taker.email ?? null,
           answers: storedAnswers,
-          metadata: { taker_id: taker.id, portal_test_id: taker.test_id },
+          metadata: {
+            taker_id: taker.id,
+            portal_test_id: taker.test_id,
+            mode: primeMode ? "prime" : "legacy",
+          },
         })
         .select("id")
         .single();
 
       if (subErr || !sub?.id) {
         return NextResponse.json(
-          { ok: false, error: `Visibility submission insert failed: ${subErr?.message || "unknown"}` },
+          {
+            ok: false,
+            error: `Visibility submission insert failed: ${subErr?.message || "unknown"}`,
+          },
           { status: 500 }
         );
+      }
+
+      const resultInsert: any = {
+        submission_id: sub.id,
+        engine_key: primeMode ? "visibility_prime_v1" : "visibility_v1",
+        version: primeMode ? 2 : 1,
+        personality_type,
+        personality_points: personalityPoints,
+        personality_percent,
+        tier,
+        level,
+        tier_counts: tierCounts,
+        readiness,
+        computed: {
+          portal_test_id: taker.test_id,
+          visibility_test_id: vTest.id,
+          mode: primeMode ? "prime" : "legacy",
+          tier_level: tierLevel,
+          overall_pct,
+          ladder_question_count: ladderSignals,
+          personality_question_count: answeredPersonalityQuestions,
+          scoring_model: primeMode ? "prime_20q_v2" : "legacy_v1",
+          validation_required,
+          validation_status,
+        },
+        debug: {
+          answeredQuestions,
+          ladderSignals,
+          support,
+          above,
+          below,
+          dominance,
+          primePillarTotals: primeMode ? primePillarTotals : undefined,
+          primePillarCounts: primeMode ? primePillarCounts : undefined,
+        },
+      };
+
+      if (primeMode) {
+        resultInsert.pillar_scores = pillar_scores;
+        resultInsert.pillar_bands = pillar_bands;
+        resultInsert.weakest_pillar = weakest_pillar;
+        resultInsert.strongest_pillar = strongest_pillar;
+        resultInsert.balance_pattern = balance_pattern;
+        resultInsert.pattern_tags = pattern_tags;
       }
 
       const { data: resRow, error: resErr } = await vis
         .from("results")
-        .insert({
-          submission_id: sub.id,
-          engine_key: "visibility_v1",
-          version: 1,
-          personality_type,
-          personality_points: personalityPoints,
-          tier,
-          level,
-          tier_counts: tierCounts,
-          readiness,
-          computed: { tier_level: tierLevel },
-          debug: { ladderSignals, support, above, below, dominance },
-        })
-        .select("id")
+        .insert(resultInsert)
+        .select(
+          "id, engine_key, version, tier, level, readiness, personality_type, personality_percent, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, balance_pattern, pattern_tags, computed"
+        )
         .single();
 
       if (resErr || !resRow?.id) {
         return NextResponse.json(
-          { ok: false, error: `Visibility results insert failed: ${resErr?.message || "unknown"}` },
+          {
+            ok: false,
+            error: `Visibility results insert failed: ${resErr?.message || "unknown"}`,
+          },
           { status: 500 }
         );
       }
 
-      let pillarComputed: any = null;
-      try {
-        const { data: pillarRpc, error: pillarErr } = await vis.rpc(
-          "compute_pillar_signals_for_submission",
-          { p_submission_id: sub.id }
-        );
+      if (!primeMode) {
+        try {
+          const { data: pillarRpc, error: pillarErr } = await vis.rpc(
+            "compute_pillar_signals_for_submission",
+            { p_submission_id: sub.id }
+          );
 
-        if (!pillarErr && pillarRpc?.ok === true && pillarRpc?.computed) {
-          pillarComputed = pillarRpc.computed;
+          if (!pillarErr && pillarRpc?.ok === true && pillarRpc?.computed) {
+            const pillarComputed = pillarRpc.computed;
 
-          await vis
-            .from("results")
-            .update({
-              pillar_scores: pillarComputed.pillar_scores ?? {},
-              pillar_bands: pillarComputed.pillar_bands ?? {},
-              weakest_pillar: pillarComputed.weakest_pillar ?? null,
-              strongest_pillar: pillarComputed.strongest_pillar ?? null,
-              pattern_tags: Array.isArray(pillarComputed.pattern_tags)
-                ? pillarComputed.pattern_tags
-                : [],
-            })
-            .eq("id", resRow.id);
+            await vis
+              .from("results")
+              .update({
+                pillar_scores: pillarComputed.pillar_scores ?? {},
+                pillar_bands: pillarComputed.pillar_bands ?? {},
+                weakest_pillar: pillarComputed.weakest_pillar ?? null,
+                strongest_pillar: pillarComputed.strongest_pillar ?? null,
+                pattern_tags: Array.isArray(pillarComputed.pattern_tags)
+                  ? pillarComputed.pattern_tags
+                  : [],
+              })
+              .eq("id", resRow.id);
+          }
+        } catch (e) {
+          console.warn("[visibility submit] legacy pillar compute failed", e);
         }
-      } catch (e) {
-        console.warn("[visibility submit] pillar compute failed", e);
       }
 
       const totals = {
@@ -570,19 +1154,25 @@ export async function POST(req: Request, { params }: { params: { token: string }
           readiness,
           personality_type,
           personality_points: personalityPoints,
+          personality_percent,
           tier_counts: tierCounts,
-          pillar_scores: pillarComputed?.pillar_scores ?? undefined,
-          pillar_bands: pillarComputed?.pillar_bands ?? undefined,
-          weakest_pillar: pillarComputed?.weakest_pillar ?? undefined,
-          strongest_pillar: pillarComputed?.strongest_pillar ?? undefined,
-          pattern_tags: pillarComputed?.pattern_tags ?? undefined,
+          pillar_scores,
+          pillar_bands,
+          weakest_pillar,
+          strongest_pillar,
+          balance_pattern,
+          pattern_tags,
+          overall_pct,
+          validation_required,
+          validation_status,
         },
         meta: {
-          engine: "visibility_v1",
+          engine: primeMode ? "visibility_prime_v1" : "visibility_v1",
           portal_test_id: taker.test_id,
           visibility_test_id: vTest.id,
           submission_id: sub.id,
           result_id: resRow.id,
+          mode: primeMode ? "prime" : "legacy",
         },
       };
 
@@ -602,7 +1192,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
       if (sub2Err) {
         return NextResponse.json(
-          { ok: false, error: `Portal submission insert failed: ${sub2Err.message}` },
+          {
+            ok: false,
+            error: `Portal submission insert failed: ${sub2Err.message}`,
+          },
           { status: 500 }
         );
       }
@@ -622,7 +1215,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
       const reportPath = `/t/${encodeURIComponent(token)}/visibility/report?tid=${encodeURIComponent(
         taker.id
-      )}`;
+      )}&sid=${encodeURIComponent(sub.id)}`;
 
       const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(
         taker.id
@@ -647,7 +1240,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
         .maybeSingle();
 
       const orgName =
-        String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() || "MindCanvas";
+        String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() ||
+        "MindCanvas";
 
       const supportEmail =
         normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
@@ -679,7 +1273,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
       let ownerNotification: any = null;
       try {
         const sentTo =
-          normalizeEmail((orgRow as any)?.notification_email) || getDefaultInternalEmail();
+          normalizeEmail((orgRow as any)?.notification_email) ||
+          getDefaultInternalEmail();
 
         if (normalizeEmail(sentTo)) {
           const internalReportLink = `${origin}/portal/${(orgRow as any)?.slug}/database/${taker.id}`;
@@ -705,24 +1300,26 @@ export async function POST(req: Request, { params }: { params: { token: string }
           });
 
           if (!ownerNotification?.ok) {
-            console.error("[visibility submit] test_owner_notification failed", ownerNotification);
+            console.error(
+              "[visibility submit] test_owner_notification failed",
+              ownerNotification
+            );
           }
         }
       } catch (e) {
         console.error("[visibility submit] owner notification unexpected error", e);
       }
 
+      const redirectPath =
+        linkBehavior.show_results === true
+          ? reportPath
+          : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
+            ? linkBehavior.redirect_url.trim()
+            : reportPath;
+
       return NextResponse.json({
         ok: true,
         totals,
-        show_results: false,
-        showResults: false,
-        redirect: reportPath,
-        redirect_url: reportPath,
-        redirectUrl: reportPath,
-        next_steps_url: reportPath,
-        nextStepsUrl: reportPath,
-        link_meta: { next_steps_url: reportPath },
         link: {
           show_results: linkBehavior.show_results,
           redirect_url: linkBehavior.redirect_url,
@@ -730,12 +1327,16 @@ export async function POST(req: Request, { params }: { params: { token: string }
           next_steps_url: linkBehavior.next_steps_url,
           email_report: linkBehavior.email_report,
         },
+        redirect: redirectPath,
+        redirect_url: redirectPath,
         result_url: baseResultUrl,
         report_url: baseReportUrl,
         visibility: {
           submission_id: sub.id,
           result_id: resRow.id,
           visibility_test_id: vTest.id,
+          engine_key: resRow.engine_key,
+          version: resRow.version,
         },
         owner_notification: ownerNotification,
         taker_email: takerEmailResult,
@@ -748,7 +1349,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const slug: string = (test.slug as string) || "";
     const meta: any = test.meta || {};
     const frameworkType: string =
-      (meta?.frameworkType as string) || (meta?.frameworktype as string) || "";
+      (meta?.frameworkType as string) ||
+      (meta?.frameworktype as string) ||
+      "";
     const kind: string = (meta?.kind as string) || "";
     const resultType: string =
       (meta?.resultType as string) || (meta?.resulttype as string) || "";
@@ -760,7 +1363,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const kindLower = kind.toLowerCase();
     const resultTypeLower = resultType.toLowerCase();
     const qscVariantLower = qscVariant.toLowerCase();
-    const testFamilyLower = String(meta?.test_family || meta?.testFamily || "").toLowerCase();
+    const testFamilyLower = String(
+      meta?.test_family || meta?.testFamily || ""
+    ).toLowerCase();
 
     const isQscTest =
       slugLower.startsWith("qsc-") ||
@@ -773,7 +1378,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
     const isQscEntrepreneur =
       isQscTest && (qscVariantLower === "entrepreneur" || slugLower.includes("core"));
 
-    const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur ? "entrepreneur" : "leader";
+    const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur
+      ? "entrepreneur"
+      : "leader";
 
     const { data: questions, error: qErr } = await sb
       .from("test_questions")
@@ -783,10 +1390,13 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .order("created_at", { ascending: true });
 
     if (qErr) {
-      return NextResponse.json({ ok: false, error: `Questions load failed: ${qErr.message}` }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: `Questions load failed: ${qErr.message}` },
+        { status: 500 }
+      );
     }
 
-    const byId: Record<string, QuestionRow> = {};
+    const byId: Record<string, PortalQuestionRow> = {};
     for (const q of questions || []) {
       byId[q.id] = q;
     }
@@ -797,7 +1407,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .eq("test_id", effectiveTestId);
 
     if (labErr) {
-      return NextResponse.json({ ok: false, error: `Labels load failed: ${labErr.message}` }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: `Labels load failed: ${labErr.message}` },
+        { status: 500 }
+      );
     }
 
     const nameToCode = new Map<string, string>();
@@ -825,7 +1438,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
     for (let idx = 0; idx < answers.length; idx++) {
       const row = answers[idx];
       const qid = row?.question_id || row?.qid || row?.id;
-      const q: QuestionRow | undefined = qid ? byId[qid] : undefined;
+      const q: PortalQuestionRow | undefined = qid ? byId[qid] : undefined;
       if (!q) continue;
 
       const mapEntries = coerceProfileMapEntries(q.profile_map);
@@ -853,9 +1466,17 @@ export async function POST(req: Request, { params }: { params: { token: string }
     }
 
     const totals = {
-      frequencies: { A: freqTotals.A, B: freqTotals.B, C: freqTotals.C, D: freqTotals.D },
+      frequencies: {
+        A: freqTotals.A,
+        B: freqTotals.B,
+        C: freqTotals.C,
+        D: freqTotals.D,
+      },
       profiles: profileTotals,
-      meta: { wrapper_test_id: taker.test_id, effective_test_id: effectiveTestId },
+      meta: {
+        wrapper_test_id: taker.test_id,
+        effective_test_id: effectiveTestId,
+      },
     };
 
     const { error: subErr } = await sb.from("test_submissions").insert({
@@ -873,7 +1494,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
     });
 
     if (subErr) {
-      return NextResponse.json({ ok: false, error: `Submission insert failed: ${subErr.message}` }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: `Submission insert failed: ${subErr.message}` },
+        { status: 500 }
+      );
     }
 
     const { error: upErr } = await sb
@@ -881,7 +1505,10 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .upsert({ taker_id: taker.id, totals }, { onConflict: "taker_id" });
 
     if (upErr) {
-      return NextResponse.json({ ok: false, error: `Results upsert failed: ${upErr.message}` }, { status: 500 });
+      return NextResponse.json(
+        { ok: false, error: `Results upsert failed: ${upErr.message}` },
+        { status: 500 }
+      );
     }
 
     // ---------------- QSC SCORING ----------------
@@ -899,7 +1526,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
               profile_map: scoringEntries as any,
             };
           })
-          .filter((q) => Array.isArray(q.profile_map) && q.profile_map.length > 0);
+          .filter(
+            (q) => Array.isArray(q.profile_map) && q.profile_map.length > 0
+          );
 
         const answersForScoring = answers
           .map((row: any) => {
@@ -910,16 +1539,23 @@ export async function POST(req: Request, { params }: { params: { token: string }
           .filter((a: any) => a.question_id && a.choice >= 0);
 
         if (questionsForScoring.length === 0) {
-          throw new Error(`QSC scoring found no scoreable questions for effective_test_id=${effectiveTestId}`);
+          throw new Error(
+            `QSC scoring found no scoreable questions for effective_test_id=${effectiveTestId}`
+          );
         }
 
         if (answersForScoring.length === 0) {
           throw new Error("QSC scoring found no scoreable answers in submit payload");
         }
 
-        const scoring = calculateQscScores(questionsForScoring, answersForScoring);
+        const scoring = calculateQscScores(
+          questionsForScoring,
+          answersForScoring
+        );
 
-        const personalityCount = Object.keys(scoring.personalityTotals || {}).length;
+        const personalityCount = Object.keys(
+          scoring.personalityTotals || {}
+        ).length;
         const mindsetCount = Object.keys(scoring.mindsetTotals || {}).length;
 
         if (personalityCount === 0 && mindsetCount === 0) {
@@ -933,7 +1569,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
         let qscProfileId: string | null = null;
 
         if (scoring.combinedProfileCode) {
-          const [personalityKey, mindsetKey] = scoring.combinedProfileCode.split("_");
+          const [personalityKey, mindsetKey] =
+            scoring.combinedProfileCode.split("_");
 
           const personalityMap: Record<string, string> = {
             FIRE: "A",
@@ -961,7 +1598,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
               .maybeSingle();
 
             if (qscProfileError) {
-              throw new Error(`QSC profile lookup failed: ${qscProfileError.message}`);
+              throw new Error(
+                `QSC profile lookup failed: ${qscProfileError.message}`
+              );
             }
 
             qscProfileId = (qscProfileRow as any)?.id ?? null;
@@ -996,7 +1635,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
           .maybeSingle();
 
         if (existingErr) {
-          throw new Error(`QSC existing row lookup failed: ${existingErr.message}`);
+          throw new Error(
+            `QSC existing row lookup failed: ${existingErr.message}`
+          );
         }
 
         if (existingQsc?.id) {
@@ -1006,7 +1647,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
             .eq("id", existingQsc.id);
 
           if (qscUpdateError) {
-            throw new Error(`QSC scoring failed during update: ${qscUpdateError.message}`);
+            throw new Error(
+              `QSC scoring failed during update: ${qscUpdateError.message}`
+            );
           }
         } else {
           const { error: qscInsertError } = await sb
@@ -1014,7 +1657,9 @@ export async function POST(req: Request, { params }: { params: { token: string }
             .insert(qscPayload);
 
           if (qscInsertError) {
-            throw new Error(`QSC scoring failed during insert: ${qscInsertError.message}`);
+            throw new Error(
+              `QSC scoring failed during insert: ${qscInsertError.message}`
+            );
           }
         }
       } catch (e: any) {
@@ -1028,14 +1673,22 @@ export async function POST(req: Request, { params }: { params: { token: string }
 
     const origin = getBaseUrl();
 
-    const reportPath = `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(taker.id)}`;
-    const resultPath = `/t/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(taker.id)}`;
+    const reportPath = `/t/${encodeURIComponent(
+      token
+    )}/report?tid=${encodeURIComponent(taker.id)}`;
+    const resultPath = `/t/${encodeURIComponent(
+      token
+    )}/result?tid=${encodeURIComponent(taker.id)}`;
 
     const baseReportUrl = `${origin}${reportPath}`;
     const baseResultUrl = `${origin}${resultPath}`;
 
-    const qscGrowthPath = `/qsc/${encodeURIComponent(token)}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
-    const qscLeaderPath = `/qsc/${encodeURIComponent(token)}/leader?tid=${encodeURIComponent(taker.id)}`;
+    const qscGrowthPath = `/qsc/${encodeURIComponent(
+      token
+    )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
+    const qscLeaderPath = `/qsc/${encodeURIComponent(
+      token
+    )}/leader?tid=${encodeURIComponent(taker.id)}`;
 
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
@@ -1067,10 +1720,12 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .maybeSingle();
 
     const orgName =
-      String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() || "MindCanvas";
+      String((orgRow as any)?.name || (orgRow as any)?.slug || "").trim() ||
+      "MindCanvas";
 
     const supportEmail =
-      normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
+      normalizeEmail((orgRow as any)?.support_email) ||
+      getDefaultSupportEmail();
 
     let takerEmailResult: any = null;
     try {
@@ -1099,7 +1754,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
     let ownerNotification: any = null;
     try {
       const sentTo =
-        normalizeEmail((orgRow as any)?.notification_email) || getDefaultInternalEmail();
+        normalizeEmail((orgRow as any)?.notification_email) ||
+        getDefaultInternalEmail();
 
       const firstName = (taker as any).first_name || "";
       const lastName = (taker as any).last_name || "";
