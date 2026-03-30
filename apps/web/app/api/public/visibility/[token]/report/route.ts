@@ -1,10 +1,11 @@
 // apps/web/app/api/public/visibility/[token]/report/route.ts
-// apps/web/app/api/public/visibility/[token]/report/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type PrimePillar = "visibility" | "trust" | "authority" | "dominance";
 
 function getKey() {
   return (
@@ -39,16 +40,25 @@ function safeString(x: any) {
   return typeof x === "string" ? x.trim() : "";
 }
 
-function defaultTitles(key: string) {
-  const m: Record<string, string> = {
-    // ✅ intro keys
+function safeNumber(x: any, fallback = 0) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function isPrimeMode(engineKey: string | null | undefined, version: number | null | undefined) {
+  return (
+    String(engineKey || "").toLowerCase() === "visibility_prime_v1" ||
+    Number(version || 0) >= 2
+  );
+}
+
+function defaultTitles(key: string, mode: "legacy" | "prime") {
+  const legacy: Record<string, string> = {
     welcome: "A Personal Welcome From Bogdan Stan",
     how_to_use: "How To Use This Report",
     understanding: "Understanding the Visibility Ladder",
     tiers_levels: "Explanation of tiers and levels",
     behaviour_profiles: "Explanation of behaviour profiles",
-
-    // ✅ existing keys
     framework_foundation: "Framework foundation",
     snapshot: "Your visibility snapshot",
     pillars: "Your visibility pillars",
@@ -61,7 +71,27 @@ function defaultTitles(key: string) {
     possible_next: "What becomes possible next",
     closing: "Turning insight into strategy",
   };
-  return m[key] || key;
+
+  const prime: Record<string, string> = {
+    welcome: "A Personal Welcome From Bogdan Stan",
+    how_to_use: "How To Use This Report",
+    understanding: "Understanding the WhatsWhat Prime Ladder",
+    tiers_levels: "How tiers and levels work",
+    framework_foundation: "The Prime framework",
+    snapshot: "Your Prime visibility snapshot",
+    pillars: "Your Prime visibility pillars",
+    level_meaning: "What your current level means",
+    strengths: "What is already working",
+    friction: "Where strategic friction exists",
+    market_experience: "How the market is likely experiencing your business",
+    opportunity: "Your strategic Prime opportunity",
+    next_move: "Your most effective next move",
+    possible_next: "What becomes possible next",
+    closing: "Turning insight into momentum",
+  };
+
+  const map = mode === "prime" ? prime : legacy;
+  return map[key] || key;
 }
 
 async function callRpc<T>(sb: any, fn: string, args: any): Promise<T> {
@@ -76,14 +106,85 @@ function hasPillarSignals(result: any) {
   const wp = result?.weakest_pillar;
   const sp = result?.strongest_pillar;
 
+  const knownKeys = [
+    "discoverability",
+    "trust",
+    "conversion",
+    "visibility",
+    "authority",
+    "dominance",
+  ];
+
   const okScores =
     ps &&
     typeof ps === "object" &&
-    (Object.keys(ps).length > 0 ||
-      ["discoverability", "trust", "conversion"].some((k) => ps?.[k] != null));
+    (Object.keys(ps).length > 0 || knownKeys.some((k) => ps?.[k] != null));
 
   const okBands = pb && typeof pb === "object" && Object.keys(pb).length > 0;
   return Boolean(okScores || okBands || wp || sp);
+}
+
+function cachedMissingIntroOrEmptyBlocks(
+  cached: any,
+  mode: "legacy" | "prime",
+  audience: string
+) {
+  if (audience !== "taker_report") return false;
+
+  const want =
+    mode === "prime"
+      ? ["welcome", "how_to_use", "understanding", "tiers_levels"]
+      : [
+          "welcome",
+          "how_to_use",
+          "understanding",
+          "tiers_levels",
+          "behaviour_profiles",
+        ];
+
+  const secs = Array.isArray(cached?.sections) ? cached.sections : [];
+  const byKey = new Map<string, any>();
+  for (const s of secs) byKey.set(String(s?.key || ""), s);
+
+  for (const k of want) {
+    const s = byKey.get(k);
+    if (!s) return true;
+    const blocks = Array.isArray(s?.blocks) ? s.blocks : [];
+    if (blocks.length === 0) return true;
+  }
+
+  return false;
+}
+
+function cachedNeedsPrimeRefresh(cached: any, audience: string) {
+  if (audience !== "taker_report") return false;
+
+  const signals = cached?.signals || {};
+  const graphs = cached?.graphs || {};
+  const sections = Array.isArray(cached?.sections) ? cached.sections : [];
+
+  const hasPrimePillars =
+    signals?.pillar_scores &&
+    typeof signals.pillar_scores === "object" &&
+    signals.pillar_scores.visibility != null &&
+    signals.pillar_scores.trust != null &&
+    signals.pillar_scores.authority != null &&
+    signals.pillar_scores.dominance != null;
+
+  const hasLegacyProfileSection = sections.some(
+    (s: any) => String(s?.key || "") === "behaviour_profiles"
+  );
+
+  const exposesPersonalityGraph =
+    graphs?.personality_points &&
+    typeof graphs.personality_points === "object" &&
+    Object.keys(graphs.personality_points).length > 0;
+
+  if (!hasPrimePillars) return true;
+  if (hasLegacyProfileSection) return true;
+  if (exposesPersonalityGraph) return true;
+
+  return false;
 }
 
 /* ---------------- AI (OpenAI Responses API) ---------------- */
@@ -111,7 +212,6 @@ function openaiModel() {
     process.env.OPENAI_MODEL ||
     "gpt-4.1-mini";
 
-  // Guardrail: if someone accidentally put the API key into a model env var
   if (typeof m === "string" && m.trim().toLowerCase().startsWith("sk-")) {
     return "gpt-4.1-mini";
   }
@@ -181,8 +281,11 @@ function buildAiPrompt(input: {
   signals: any;
   graphs: any;
   sections: any[];
+  mode: "legacy" | "prime";
+  audience: string;
 }) {
-  const { orgName, testName, takerName, signals, graphs, sections } = input;
+  const { orgName, testName, takerName, signals, graphs, sections, mode, audience } =
+    input;
 
   const baseNarrative = (sections || [])
     .map((s) => {
@@ -199,6 +302,16 @@ function buildAiPrompt(input: {
     .join("\n\n")
     .slice(0, 9000);
 
+  const extraRules =
+    mode === "prime" && audience === "taker_report"
+      ? [
+          "This is the Prime model.",
+          "Prime public pillars are Visibility, Trust, Authority, and Dominance.",
+          "Do not treat personality/behaviour style as part of the public scoring explanation.",
+          "If strong dominance/authority appears, avoid overstating validation; keep claims grounded in the provided signals.",
+        ].join(" ")
+      : "Use the provided scoring model and signals as-is.";
+
   return [
     {
       role: "system",
@@ -206,6 +319,7 @@ function buildAiPrompt(input: {
         "You are an expert business positioning strategist and report writer.",
         "Write in plain, confident language. No fluff. No hype.",
         "Do not invent facts. Only use the provided signals + narrative.",
+        extraRules,
         "Output MUST match the provided JSON schema exactly.",
       ].join(" "),
     },
@@ -217,6 +331,8 @@ function buildAiPrompt(input: {
         `Org: ${orgName || "—"}`,
         `Test: ${testName}`,
         `Participant: ${takerName || "—"}`,
+        `Mode: ${mode}`,
+        `Audience: ${audience}`,
         "",
         `Signals JSON: ${JSON.stringify(signals)}`,
         `Graphs JSON: ${JSON.stringify(graphs)}`,
@@ -267,6 +383,8 @@ async function generateAiInsights(payload: {
   signals: any;
   graphs: any;
   sections: any[];
+  mode: "legacy" | "prime";
+  audience: string;
 }): Promise<AiInsights> {
   const key = openaiKey();
   if (!key) throw new Error("Missing OPENAI_API_KEY");
@@ -274,7 +392,6 @@ async function generateAiInsights(payload: {
   const model = openaiModel();
   const messages = buildAiPrompt(payload);
 
-  // Structured output in Responses API uses `text.format`
   const body = {
     model,
     input: messages,
@@ -325,31 +442,29 @@ function isBadAiCache(row: any): boolean {
   return false;
 }
 
-/**
- * ✅ Stronger intro validation:
- * Treat as "missing" if:
- * - section key isn't present, OR
- * - section exists but blocks are empty (KB row missing/inactive)
- */
-function cachedMissingIntroOrEmptyBlocks(cached: any) {
-  const want = ["welcome", "how_to_use", "understanding", "tiers_levels", "behaviour_profiles"];
-  const secs = Array.isArray(cached?.sections) ? cached.sections : [];
+function normalizePrimePillarScores(raw: any) {
+  return {
+    visibility: safeNumber(raw?.visibility),
+    trust: safeNumber(raw?.trust),
+    authority: safeNumber(raw?.authority),
+    dominance: safeNumber(raw?.dominance),
+  };
+}
 
-  const byKey = new Map<string, any>();
-  for (const s of secs) byKey.set(String(s?.key || ""), s);
-
-  for (const k of want) {
-    const s = byKey.get(k);
-    if (!s) return true;
-    const blocks = Array.isArray(s?.blocks) ? s.blocks : [];
-    if (blocks.length === 0) return true;
-  }
-  return false;
+function normalizeLegacyPillarScores(raw: any) {
+  return {
+    discoverability: safeNumber(raw?.discoverability),
+    trust: safeNumber(raw?.trust),
+    conversion: safeNumber(raw?.conversion),
+  };
 }
 
 /* ---------------- Route ---------------- */
 
-export async function GET(req: NextRequest, ctx: { params: { token: string } }) {
+export async function GET(
+  req: NextRequest,
+  ctx: { params: { token: string } }
+) {
   try {
     const token = safeString(ctx.params?.token);
     const tid = safeString(req.nextUrl.searchParams.get("tid"));
@@ -357,21 +472,24 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     const audience =
       safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
-    if (!token)
+    if (!token) {
       return NextResponse.json(
         { ok: false, error: "Missing token" },
         { status: 400 }
       );
-    if (!tid && !sid)
+    }
+
+    if (!tid && !sid) {
       return NextResponse.json(
         { ok: false, error: "Missing tid or sid" },
         { status: 400 }
       );
+    }
 
     const sb = portal();
     const vis = visibility();
 
-    // 0) Load taker (required for tid public route)
+    // 0) Optional taker load (used when tid is present)
     let taker: any = null;
     if (tid) {
       const { data: takerRow, error: takerErr } = await sb
@@ -382,21 +500,43 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         .maybeSingle();
 
       if (takerErr) throw new Error(takerErr.message);
-      if (!takerRow)
+      if (!takerRow) {
         return NextResponse.json(
           { ok: false, error: "Taker not found for this token" },
           { status: 404 }
         );
+      }
       taker = takerRow;
     }
 
-    // 1) Resolve submission_id
+    // 1) Resolve submission row
     let submissionId: string | null = sid || null;
+    let submissionRow: any = null;
 
-    if (!submissionId) {
+    if (submissionId) {
+      const { data, error } = await vis
+        .from("submissions")
+        .select(
+          "id, org_id, test_id, test_link_id, token, taker_email, taker_name, metadata, created_at"
+        )
+        .eq("id", submissionId)
+        .eq("token", token)
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      if (!data) {
+        return NextResponse.json(
+          { ok: false, error: "Submission not found for this token" },
+          { status: 404 }
+        );
+      }
+      submissionRow = data;
+    } else {
       const { data: subs, error: subsErr } = await vis
         .from("submissions")
-        .select("id, created_at, token, taker_email, taker_name, metadata")
+        .select(
+          "id, org_id, test_id, test_link_id, token, taker_email, taker_name, metadata, created_at"
+        )
         .eq("token", token)
         .order("created_at", { ascending: false })
         .limit(80);
@@ -426,36 +566,49 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
             null
           : null;
 
-      const picked = byMeta || byEmail || byName;
+      const picked = byMeta || byEmail || byName || (subs || [])[0] || null;
+
       if (!picked?.id) {
         return NextResponse.json(
-          { ok: false, error: "No visibility submission found for this token/taker yet." },
+          {
+            ok: false,
+            error: "No visibility submission found for this token/taker yet.",
+          },
           { status: 404 }
         );
       }
 
       submissionId = String(picked.id);
+      submissionRow = picked;
     }
 
-    // 2) Load latest results
+    // 2) Load latest result
     let { data: result, error: resErr } = await vis
       .from("results")
       .select(
-        "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, pattern_tags"
+        "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, personality_percent, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, balance_pattern, pattern_tags, computed, debug"
       )
       .eq("submission_id", submissionId)
       .order("created_at", { ascending: false })
       .maybeSingle();
 
     if (resErr) throw new Error(resErr.message);
-    if (!result)
+    if (!result) {
       return NextResponse.json(
         { ok: false, error: "Visibility results not found." },
         { status: 404 }
       );
+    }
 
-    // 3) Ensure pillar signals exist (compute via RPC if missing)
-    if (!hasPillarSignals(result)) {
+    const engineKey = String(result.engine_key || "visibility_v1");
+    const version = Number(result.version || 1);
+    const mode: "legacy" | "prime" = isPrimeMode(engineKey, version)
+      ? "prime"
+      : "legacy";
+
+    // 3) Ensure pillar signals exist for legacy only.
+    // Prime results should already be computed by submit route.
+    if (mode === "legacy" && !hasPillarSignals(result)) {
       try {
         const pillarRpc = await callRpc<any>(
           vis,
@@ -482,7 +635,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
           const reread = await vis
             .from("results")
             .select(
-              "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, pattern_tags"
+              "id, created_at, engine_key, version, tier, level, readiness, personality_type, personality_points, personality_percent, tier_counts, pillar_scores, pillar_bands, weakest_pillar, strongest_pillar, balance_pattern, pattern_tags, computed, debug"
             )
             .eq("id", result.id)
             .maybeSingle();
@@ -490,12 +643,9 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
           if (!reread.error && reread.data) result = reread.data;
         }
       } catch (e) {
-        console.warn("[visibility report] pillar RPC failed", e);
+        console.warn("[visibility report] legacy pillar RPC failed", e);
       }
     }
-
-    const engineKey = String(result.engine_key || "visibility_v1");
-    const version = Number(result.version || 1);
 
     // 4) Cache lookup
     let cached = await callRpc<any>(vis, "get_generated_report", {
@@ -505,47 +655,137 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       p_version: version,
     });
 
-    // ✅ If cached report exists but is missing intro keys OR intro blocks, rebuild
-    if (cached && audience === "taker_report" && cachedMissingIntroOrEmptyBlocks(cached)) {
-      cached = null;
+    if (cached) {
+      if (cachedMissingIntroOrEmptyBlocks(cached, mode, audience)) {
+        cached = null;
+      } else if (mode === "prime" && cachedNeedsPrimeRefresh(cached, audience)) {
+        cached = null;
+      }
     }
 
-    // deterministic builder
     const buildDeterministic = async () => {
-      const signals = {
-        tier: result.tier,
-        level: Number(result.level ?? 0),
-        style: result.personality_type,
-        readiness: result.readiness,
+      const orgId =
+        taker?.org_id ||
+        submissionRow?.org_id ||
+        null;
 
-        pillar_scores: result.pillar_scores || {},
-        pillar_band: result.pillar_bands || {},
-        weakest_pillar: result.weakest_pillar ?? null,
-        strongest_pillar: result.strongest_pillar ?? null,
-        pattern_tags: result.pattern_tags || [],
-      };
+      const portalTestId =
+        taker?.test_id ||
+        submissionRow?.metadata?.portal_test_id ||
+        result?.computed?.portal_test_id ||
+        null;
 
-      const sectionKeys = [
-        // ✅ Intro sections first
-        "welcome",
-        "how_to_use",
-        "understanding",
-        "tiers_levels",
-        "behaviour_profiles",
+      const orgRowResp = orgId
+        ? await sb
+            .from("orgs")
+            .select("id, slug, name, logo_url")
+            .eq("id", orgId)
+            .maybeSingle()
+        : { data: null as any };
 
-        // ✅ Then dynamic narrative
-        "framework_foundation",
-        "snapshot",
-        "pillars",
-        "level_meaning",
-        "strengths",
-        "friction",
-        "market_experience",
-        "opportunity",
-        "next_move",
-        "possible_next",
-        "closing",
-      ];
+      const testRowResp = portalTestId
+        ? await sb
+            .from("tests")
+            .select("id, name, slug")
+            .eq("id", portalTestId)
+            .maybeSingle()
+        : { data: null as any };
+
+      const orgRow = orgRowResp.data || null;
+      const testRow = testRowResp.data || null;
+
+      const orgName = orgRow?.name || orgRow?.slug || null;
+      const testName =
+        testRow?.name ||
+        (mode === "prime"
+          ? "WhatsWhat Prime Visibility Ladder"
+          : "Visibility Ladder");
+
+      const takerName =
+        [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
+        safeString(submissionRow?.taker_name) ||
+        null;
+
+      const isPrimePublic = mode === "prime" && audience === "taker_report";
+
+      const primePillarScores =
+        mode === "prime" ? normalizePrimePillarScores(result?.pillar_scores) : null;
+
+      const legacyPillarScores =
+        mode === "legacy" ? normalizeLegacyPillarScores(result?.pillar_scores) : null;
+
+      const signals =
+        mode === "prime"
+          ? {
+              mode,
+              pillar_model: "prime",
+              public_profile_model: isPrimePublic ? "hidden" : "visible",
+              tier: result.tier,
+              level: Number(result.level ?? 0),
+              readiness: result.readiness,
+              pillar_scores: primePillarScores,
+              pillar_bands: result.pillar_bands || {},
+              weakest_pillar: result.weakest_pillar ?? null,
+              strongest_pillar: result.strongest_pillar ?? null,
+              balance_pattern: result.balance_pattern ?? null,
+              pattern_tags: result.pattern_tags || [],
+              overall_pct: result?.computed?.overall_pct ?? null,
+              validation_required: Boolean(result?.computed?.validation_required),
+              validation_status: safeString(result?.computed?.validation_status) || null,
+              ladder_question_count:
+                safeNumber(result?.computed?.ladder_question_count) || 20,
+            }
+          : {
+              mode,
+              pillar_model: "legacy",
+              tier: result.tier,
+              level: Number(result.level ?? 0),
+              style: result.personality_type,
+              readiness: result.readiness,
+              pillar_scores: legacyPillarScores,
+              pillar_bands: result.pillar_bands || {},
+              weakest_pillar: result.weakest_pillar ?? null,
+              strongest_pillar: result.strongest_pillar ?? null,
+              pattern_tags: result.pattern_tags || [],
+            };
+
+      const sectionKeys =
+        isPrimePublic
+          ? [
+              "welcome",
+              "how_to_use",
+              "understanding",
+              "tiers_levels",
+              "framework_foundation",
+              "snapshot",
+              "pillars",
+              "level_meaning",
+              "strengths",
+              "friction",
+              "market_experience",
+              "opportunity",
+              "next_move",
+              "possible_next",
+              "closing",
+            ]
+          : [
+              "welcome",
+              "how_to_use",
+              "understanding",
+              "tiers_levels",
+              "behaviour_profiles",
+              "framework_foundation",
+              "snapshot",
+              "pillars",
+              "level_meaning",
+              "strengths",
+              "friction",
+              "market_experience",
+              "opportunity",
+              "next_move",
+              "possible_next",
+              "closing",
+            ];
 
       const sections: any[] = [];
       const selectedBlocks: any[] = [];
@@ -553,7 +793,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
       for (const key of sectionKeys) {
         let blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
           p_section_key: key,
-          p_audience: "taker_report", // ✅ lock to taker KB audience (prevents surprises)
+          p_audience: audience,
           p_signals: signals,
           p_limit: 6,
         });
@@ -561,7 +801,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         if (!blocks || blocks.length === 0) {
           blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
             p_section_key: key,
-            p_audience: "taker_report",
+            p_audience: audience,
             p_signals: {},
             p_limit: 6,
           });
@@ -571,12 +811,13 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
         sections.push({
           key,
-          title: contentBlocks?.[0]?.title || defaultTitles(key),
+          title: contentBlocks?.[0]?.title || defaultTitles(key, mode),
           blocks: contentBlocks,
         });
 
         selectedBlocks.push(
-          (blocks || []).map((b: any) => ({
+          ...(blocks || []).map((b: any) => ({
+            section_key: key,
             id: b.id,
             match_score: b.match_score,
             priority: b.priority,
@@ -585,36 +826,44 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         );
       }
 
-      const graphs = {
-        tier_counts: result.tier_counts || {},
-        personality_points: result.personality_points || {},
-        ladder: { tier: result.tier, level: Number(result.level ?? 0) },
-        pillars: result.pillar_scores || {},
-        pillar_band: result.pillar_bands || {},
+      const graphs =
+        mode === "prime"
+          ? {
+              pillar_model: "prime",
+              tier_counts: result.tier_counts || {},
+              ladder: {
+                tier: result.tier,
+                level: Number(result.level ?? 0),
+              },
+              pillars: primePillarScores || {},
+              pillar_bands: result.pillar_bands || {},
+              personality_points: null,
+            }
+          : {
+              pillar_model: "legacy",
+              tier_counts: result.tier_counts || {},
+              personality_points: result.personality_points || {},
+              ladder: {
+                tier: result.tier,
+                level: Number(result.level ?? 0),
+              },
+              pillars: legacyPillarScores || {},
+              pillar_bands: result.pillar_bands || {},
+            };
+
+      return {
+        orgRow,
+        orgName,
+        testName,
+        takerName,
+        signals,
+        graphs,
+        sections,
+        selectedBlocks,
       };
-
-      const { data: orgRow } = await sb
-        .from("orgs")
-        .select("id, slug, name, logo_url")
-        .eq("id", taker.org_id)
-        .maybeSingle();
-
-      const { data: testRow } = await sb
-        .from("tests")
-        .select("id, name, slug")
-        .eq("id", taker.test_id)
-        .maybeSingle();
-
-      const orgName = (orgRow as any)?.name || (orgRow as any)?.slug || null;
-      const testName = (testRow as any)?.name || "Visibility Ladder";
-      const takerName =
-        [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
-        null;
-
-      return { signals, graphs, sections, selectedBlocks, orgRow, orgName, testName, takerName };
     };
 
-    // 5) Cache miss → build report + AI
+    // 5) Cache miss → deterministic + optional AI
     if (!cached) {
       const det = await buildDeterministic();
 
@@ -645,6 +894,8 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
               signals: det.signals,
               graphs: det.graphs,
               sections: det.sections,
+              mode,
+              audience,
             });
 
             ai = aiOut;
@@ -662,10 +913,11 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
               audience: "taker_report_ai",
               meta: {
                 org_name: det.orgName,
-                org_logo_url: (det.orgRow as any)?.logo_url || null,
+                org_logo_url: det.orgRow?.logo_url || null,
                 test_name: det.testName,
                 generated_at: ai_meta.generated_at,
                 mode: "ai",
+                scoring_mode: mode,
               },
               ai: aiOut,
               ai_meta,
@@ -697,10 +949,11 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
         audience,
         meta: {
           org_name: det.orgName,
-          org_logo_url: (det.orgRow as any)?.logo_url || null,
+          org_logo_url: det.orgRow?.logo_url || null,
           test_name: det.testName,
           generated_at: new Date().toISOString(),
           mode: "deterministic",
+          scoring_mode: mode,
         },
         signals: det.signals,
         graphs: det.graphs,
@@ -729,6 +982,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
             engine_key: engineKey,
             version,
             audience,
+            scoring_mode: mode,
           },
         },
         { status: 200 }
@@ -745,6 +999,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
           engine_key: engineKey,
           version,
           audience,
+          scoring_mode: mode,
         },
       },
       { status: 200 }
