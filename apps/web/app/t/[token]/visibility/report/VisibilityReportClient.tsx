@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-// lazy-load heavy libs for PDF export
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
@@ -134,8 +133,6 @@ type PortalReportResponse = {
   error?: string;
 };
 
-/* ---------------- helpers ---------------- */
-
 function safeText(x: any): string {
   if (typeof x === "string") return x;
   if (Array.isArray(x)) return x.map(String).join(" ");
@@ -258,44 +255,16 @@ function normalisePillars(mode: ScoringMode, raw: Record<string, number> | undef
   const src = raw || {};
   if (mode === "prime") {
     return [
-      {
-        key: "visibility",
-        label: "Visibility",
-        value: clamp(safeNumber(src.visibility), 0, 100),
-      },
-      {
-        key: "trust",
-        label: "Trust",
-        value: clamp(safeNumber(src.trust), 0, 100),
-      },
-      {
-        key: "authority",
-        label: "Authority",
-        value: clamp(safeNumber(src.authority), 0, 100),
-      },
-      {
-        key: "dominance",
-        label: "Dominance",
-        value: clamp(safeNumber(src.dominance), 0, 100),
-      },
+      { key: "visibility", label: "Visibility", value: clamp(safeNumber(src.visibility), 0, 100) },
+      { key: "trust", label: "Trust", value: clamp(safeNumber(src.trust), 0, 100) },
+      { key: "authority", label: "Authority", value: clamp(safeNumber(src.authority), 0, 100) },
+      { key: "dominance", label: "Dominance", value: clamp(safeNumber(src.dominance), 0, 100) },
     ];
   }
   return [
-    {
-      key: "discoverability",
-      label: "Discoverability",
-      value: clamp(safeNumber(src.discoverability), 0, 100),
-    },
-    {
-      key: "trust",
-      label: "Trust",
-      value: clamp(safeNumber(src.trust), 0, 100),
-    },
-    {
-      key: "conversion",
-      label: "Conversion",
-      value: clamp(safeNumber(src.conversion), 0, 100),
-    },
+    { key: "discoverability", label: "Discoverability", value: clamp(safeNumber(src.discoverability), 0, 100) },
+    { key: "trust", label: "Trust", value: clamp(safeNumber(src.trust), 0, 100) },
+    { key: "conversion", label: "Conversion", value: clamp(safeNumber(src.conversion), 0, 100) },
   ];
 }
 
@@ -309,20 +278,6 @@ function pillarBandLabel(raw?: string | null) {
   return raw || "—";
 }
 
-function heroTagline(mode: ScoringMode, tier?: Tier | null, level?: number | null) {
-  if (!tier || !level) return "Your current strategic visibility position.";
-  if (mode === "prime") {
-    if (tier === "Invisible") return `Level ${level} — Invisible. Under-recognised. Under-trusted.`;
-    if (tier === "Emerging") return `Level ${level} — Emerging. Visible. Building traction.`;
-    if (tier === "Established") return `Level ${level} — Established. Recognised. Respected.`;
-    return `Level ${level} — Magnetic. Leading. Referenced. Chosen.`;
-  }
-  if (tier === "Invisible") return `Level ${level} — Invisible. Not yet reliably found.`;
-  if (tier === "Emerging") return `Level ${level} — Emerging. Visible. Not yet consistently chosen.`;
-  if (tier === "Established") return `Level ${level} — Established. Trusted. Commercially stronger.`;
-  return `Level ${level} — Magnetic. The obvious choice in the market.`;
-}
-
 function tierRangeLabel(tier: Tier) {
   if (tier === "Invisible") return "Levels 1–5";
   if (tier === "Emerging") return "Levels 6–10";
@@ -330,16 +285,13 @@ function tierRangeLabel(tier: Tier) {
   return "Levels 16–20";
 }
 
-/* ---------------- Brand palette ---------------- */
-
 const BRAND = {
   bg: "#07152F",
   bgSoft: "#0B1E43",
   accent: "#E9B95B",
-  accentSoft: "rgba(233,185,91,0.18)",
   textDim: "rgba(255,255,255,0.75)",
   textFaint: "rgba(255,255,255,0.55)",
-  border: "rgba(255,255,255,0.12)",
+  border: "rgba(255,255,255,0.10)",
 
   tier: {
     Invisible: "#94A3B8",
@@ -369,8 +321,6 @@ const BRAND = {
   } as Record<string, string>,
 };
 
-/* ---------------- Layout atoms ---------------- */
-
 const Shell = ({ children }: { children: ReactNode }) => (
   <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
     <div className="pointer-events-none fixed inset-0">
@@ -378,18 +328,18 @@ const Shell = ({ children }: { children: ReactNode }) => (
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(1200px 680px at 18% 8%, rgba(79,179,255,0.16), transparent 58%)," +
-            "radial-gradient(900px 520px at 82% 18%, rgba(233,185,91,0.12), transparent 52%)," +
-            "radial-gradient(900px 540px at 50% 92%, rgba(139,92,246,0.10), transparent 58%)",
+            "radial-gradient(1000px 600px at 18% 8%, rgba(79,179,255,0.10), transparent 58%)," +
+            "radial-gradient(760px 460px at 82% 18%, rgba(233,185,91,0.08), transparent 52%)," +
+            "radial-gradient(760px 460px at 50% 92%, rgba(139,92,246,0.06), transparent 58%)",
         }}
       />
       <div
-        className="absolute inset-0 opacity-20"
+        className="absolute inset-0 opacity-10"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)," +
-            "linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
+            "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)," +
+            "linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
         }}
       />
     </div>
@@ -412,20 +362,20 @@ function GlassCard({
 }) {
   return (
     <div
-      className={`rounded-[28px] p-[1px] ${className}`}
+      className={`rounded-[24px] p-[1px] ${className}`}
       style={{
         background:
-          "linear-gradient(135deg, rgba(233,185,91,0.20), rgba(79,179,255,0.14), rgba(255,255,255,0.06))",
-        boxShadow: "0 24px 70px rgba(0,0,0,0.42)",
+          "linear-gradient(135deg, rgba(233,185,91,0.12), rgba(79,179,255,0.10), rgba(255,255,255,0.04))",
+        boxShadow: "0 14px 38px rgba(0,0,0,0.30)",
       }}
     >
       <div
-        className="rounded-[27px] p-6"
+        className="rounded-[23px] p-5 md:p-6"
         style={{
           background:
-            "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025))",
+            "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
           border: `1px solid ${BRAND.border}`,
-          backdropFilter: "blur(10px)",
+          backdropFilter: "blur(8px)",
         }}
       >
         {(title || subtitle || right) && (
@@ -464,7 +414,7 @@ function PrimaryButton({
   const style = {
     background: BRAND.accent,
     color: "#081529",
-    boxShadow: "0 10px 30px rgba(233,185,91,0.30)",
+    boxShadow: "0 10px 24px rgba(233,185,91,0.26)",
   } as any;
 
   if (href) {
@@ -518,11 +468,11 @@ function SecondaryButton({
 function Kicker({ children }: { children: ReactNode }) {
   return (
     <div
-      className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+      className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.20em]"
       style={{
-        background: "rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.05)",
         border: `1px solid ${BRAND.border}`,
-        color: "rgba(255,255,255,0.78)",
+        color: "rgba(255,255,255,0.76)",
       }}
     >
       {children}
@@ -541,20 +491,20 @@ function TinyInfoCard({
 }) {
   return (
     <div
-      className="rounded-[24px] p-5 h-full"
+      className="rounded-[20px] p-5 h-full"
       style={{
-        background: "rgba(0,0,0,0.16)",
+        background: "rgba(0,0,0,0.14)",
         border: `1px solid ${BRAND.border}`,
       }}
     >
       <div
-        className="text-[12px] font-semibold uppercase tracking-[0.18em]"
+        className="text-[12px] font-semibold uppercase tracking-[0.16em]"
         style={{ color: accent || "rgba(255,255,255,0.90)" }}
       >
         {title}
       </div>
 
-      <div className="mt-4 space-y-3 text-sm leading-6" style={{ color: "rgba(255,255,255,0.86)" }}>
+      <div className="mt-4 space-y-3 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
         {lines.length ? (
           lines.map((line, idx) => (
             <div key={idx} className="flex gap-3">
@@ -587,26 +537,25 @@ function PillarTile({
 }) {
   return (
     <div
-      className="rounded-[22px] p-4"
+      className="rounded-[18px] p-4"
       style={{
-        background: "rgba(255,255,255,0.035)",
-        border: `1px solid ${isWeakest || isStrongest ? "rgba(255,255,255,0.20)" : BRAND.border}`,
-        boxShadow: isWeakest || isStrongest ? `0 0 18px ${color}25` : "none",
+        background: "rgba(255,255,255,0.03)",
+        border: `1px solid ${isWeakest || isStrongest ? "rgba(255,255,255,0.18)" : BRAND.border}`,
       }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="text-sm font-semibold uppercase tracking-[0.10em]">{label}</div>
+        <div className="text-sm font-semibold uppercase tracking-[0.08em]">{label}</div>
         {isStrongest ? (
           <div
-            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
-            style={{ background: `${color}22`, color }}
+            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.10em]"
+            style={{ background: `${color}20`, color }}
           >
             Strongest
           </div>
         ) : isWeakest ? (
           <div
-            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
-            style={{ background: `${color}22`, color }}
+            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.10em]"
+            style={{ background: `${color}20`, color }}
           >
             Weakest
           </div>
@@ -614,7 +563,7 @@ function PillarTile({
       </div>
 
       <div className="mt-3 flex items-end justify-between gap-3">
-        <div className="text-3xl font-semibold" style={{ color }}>
+        <div className="text-2xl font-semibold" style={{ color }}>
           {value}%
         </div>
         <div className="text-sm" style={{ color: BRAND.textDim }}>
@@ -630,8 +579,7 @@ function PillarTile({
           className="h-full rounded-full"
           style={{
             width: `${clamp(value, 0, 100)}%`,
-            background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.20))`,
-            boxShadow: `0 0 18px ${color}66`,
+            background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.18))`,
           }}
         />
       </div>
@@ -652,13 +600,13 @@ function VerticalLadderRail({
 
   return (
     <div
-      className="rounded-[30px] p-4 h-full"
+      className="rounded-[24px] p-4 h-full"
       style={{
-        background: "rgba(0,0,0,0.20)",
+        background: "rgba(0,0,0,0.16)",
         border: `1px solid ${BRAND.border}`,
       }}
     >
-      <div className="text-[11px] uppercase tracking-[0.20em]" style={{ color: BRAND.textFaint }}>
+      <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
         Ladder
       </div>
 
@@ -666,26 +614,26 @@ function VerticalLadderRail({
         {rows.map((n) => {
           const isActive = n === active;
           const rowTier = tierBand(n);
+
           return (
             <div key={n} className="flex items-center gap-3">
-              <div className="w-10 text-[11px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+              <div className="w-9 text-[11px]" style={{ color: "rgba(255,255,255,0.50)" }}>
                 {n}
               </div>
               <div
                 className="flex-1 h-5 rounded-full border"
                 style={{
-                  borderColor: isActive ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.08)",
+                  borderColor: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
                   background: isActive
-                    ? `linear-gradient(90deg, ${tierColor}aa, rgba(255,255,255,0.10))`
+                    ? `linear-gradient(90deg, ${tierColor}bb, rgba(255,255,255,0.10))`
                     : rowTier === tier
-                    ? "rgba(255,255,255,0.06)"
-                    : "rgba(255,255,255,0.03)",
-                  boxShadow: isActive ? `0 0 22px ${tierColor}66` : "none",
+                      ? "rgba(255,255,255,0.05)"
+                      : "rgba(255,255,255,0.025)",
                 }}
               />
               <div
                 className="w-9 text-center text-[11px] font-semibold"
-                style={{ color: isActive ? tierColor : "rgba(255,255,255,0.45)" }}
+                style={{ color: isActive ? tierColor : "rgba(255,255,255,0.40)" }}
               >
                 {isActive ? n : ""}
               </div>
@@ -721,7 +669,7 @@ function SectionBlocks({ section }: { section: Section }) {
   const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
 
   return (
-    <div className="mt-4 space-y-5">
+    <div className="mt-4 space-y-4">
       {blocks.map((b, idx) => {
         const bt = safeString(b?.title);
         const showBlockTitle = bt && bt.toLowerCase() !== title.toLowerCase();
@@ -734,8 +682,8 @@ function SectionBlocks({ section }: { section: Section }) {
             key={idx}
             className="rounded-2xl p-5 border"
             style={{
-              borderColor: "rgba(255,255,255,0.12)",
-              background: "rgba(0,0,0,0.14)",
+              borderColor: "rgba(255,255,255,0.10)",
+              background: "rgba(0,0,0,0.12)",
             }}
           >
             {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
@@ -744,8 +692,8 @@ function SectionBlocks({ section }: { section: Section }) {
               <div
                 className="mt-3 rounded-xl border px-4 py-3 text-sm"
                 style={{
-                  borderColor: "rgba(255,255,255,0.12)",
-                  background: "rgba(255,255,255,0.04)",
+                  borderColor: "rgba(255,255,255,0.10)",
+                  background: "rgba(255,255,255,0.035)",
                 }}
               >
                 <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
@@ -753,7 +701,7 @@ function SectionBlocks({ section }: { section: Section }) {
               </div>
             ) : null}
 
-            <div className="mt-4 space-y-3 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
+            <div className="mt-4 space-y-3 text-[15px] leading-8" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ps.map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
@@ -791,7 +739,7 @@ function InsightsCard({
         <div className="mt-4 space-y-4">
           <div
             className="rounded-2xl border p-4"
-            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
           >
             <div className="text-sm font-semibold">Executive summary</div>
             <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -802,7 +750,7 @@ function InsightsCard({
           <div className="grid gap-4 md:grid-cols-2">
             <div
               className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
             >
               <div className="text-sm font-semibold">Strengths</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -814,7 +762,7 @@ function InsightsCard({
 
             <div
               className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
             >
               <div className="text-sm font-semibold">Friction</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -827,37 +775,11 @@ function InsightsCard({
 
           <div
             className="rounded-2xl border p-4"
-            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
+            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
           >
             <div className="text-sm font-semibold">Strategic opportunity</div>
             <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
               {ai.strategic_opportunity}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
-            >
-              <div className="text-sm font-semibold">7-day plan</div>
-              <ol className="mt-2 list-decimal pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
-                {ai.plan_7_days?.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </div>
-
-            <div
-              className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.14)" }}
-            >
-              <div className="text-sm font-semibold">30-day plan</div>
-              <ol className="mt-2 list-decimal pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
-                {ai.plan_30_days?.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
             </div>
           </div>
         </div>
@@ -869,8 +791,6 @@ function InsightsCard({
     </GlassCard>
   );
 }
-
-/* ---------------- Main ---------------- */
 
 export default function VisibilityReportClient({
   token,
@@ -912,9 +832,6 @@ export default function VisibilityReportClient({
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
   const reportDate = formatDate(kbReport?.meta?.generated_at);
 
-  const tierColor = BRAND.tier[tier];
-  const styleColor = style ? BRAND.ab[style] : "rgba(255,255,255,0.85)";
-
   const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
   const sectionByKey = useMemo(() => {
     const m = new Map<string, Section>();
@@ -930,8 +847,6 @@ export default function VisibilityReportClient({
   const introSections = introKeys
     .map((k) => sectionByKey.get(k))
     .filter(Boolean) as Section[];
-
-  const missingIntroKeys = introKeys.filter((k) => !sectionByKey.get(k));
 
   const secWelcome = sectionByKey.get("welcome") || null;
   const secHowToUse = sectionByKey.get("how_to_use") || null;
@@ -1075,11 +990,7 @@ export default function VisibilityReportClient({
         if (cancelled) return;
         console.error("[visibility] report load failed", e);
         setErr(
-          e instanceof Error
-            ? e.message
-            : typeof e === "string"
-            ? e
-            : JSON.stringify(e)
+          e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e)
         );
         setLoading(false);
       }
@@ -1093,7 +1004,7 @@ export default function VisibilityReportClient({
   if (loading) {
     return (
       <Shell>
-        <div className="mx-auto max-w-[1400px] p-6">
+        <div className="mx-auto max-w-[1380px] p-6">
           <div className="text-2xl font-semibold">Loading your report…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Visibility Ladder report.
@@ -1106,7 +1017,7 @@ export default function VisibilityReportClient({
   if (err || !kbReport) {
     return (
       <Shell>
-        <div className="mx-auto max-w-[1400px] p-6 space-y-4">
+        <div className="mx-auto max-w-[1380px] p-6 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
@@ -1146,7 +1057,7 @@ export default function VisibilityReportClient({
 
   return (
     <Shell>
-      <div ref={reportRootRef} className="mx-auto max-w-[1400px] p-6 space-y-6">
+      <div ref={reportRootRef} className="mx-auto max-w-[1380px] p-5 md:p-6 space-y-6">
         <GlassCard
           right={
             <div className="flex flex-wrap gap-2">
@@ -1178,11 +1089,11 @@ export default function VisibilityReportClient({
               )}
 
               <div>
-                <div className="text-[34px] font-semibold tracking-[0.14em] uppercase leading-none">
+                <div className="text-[28px] md:text-[34px] font-semibold tracking-[0.12em] uppercase leading-none">
                   Visibility Ladder™
                 </div>
                 <div
-                  className="mt-2 text-[14px] uppercase tracking-[0.24em]"
+                  className="mt-2 text-[13px] md:text-[14px] uppercase tracking-[0.22em]"
                   style={{ color: BRAND.textDim }}
                 >
                   Strategic Visibility Assessment
@@ -1194,10 +1105,10 @@ export default function VisibilityReportClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0 lg:min-w-[540px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0 lg:min-w-[520px]">
               <div
                 className="rounded-2xl p-4"
-                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.16)" }}
+                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.14)" }}
               >
                 <div className="text-xs" style={{ color: BRAND.textFaint }}>
                   Prepared for
@@ -1207,7 +1118,7 @@ export default function VisibilityReportClient({
 
               <div
                 className="rounded-2xl p-4"
-                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.16)" }}
+                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.14)" }}
               >
                 <div className="text-xs" style={{ color: BRAND.textFaint }}>
                   Date
@@ -1217,7 +1128,7 @@ export default function VisibilityReportClient({
 
               <div
                 className="rounded-2xl p-4"
-                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.16)" }}
+                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.14)" }}
               >
                 <div className="text-xs" style={{ color: BRAND.textFaint }}>
                   Framework
@@ -1236,54 +1147,58 @@ export default function VisibilityReportClient({
           </div>
 
           <div className="xl:col-span-6 space-y-6">
-            <GlassCard className="h-full">
-              <div className="flex flex-col gap-6">
+            <GlassCard>
+              <div className="flex flex-col gap-5">
                 <div>
                   <div
-                    className="text-[15px] uppercase tracking-[0.22em]"
+                    className="text-[14px] uppercase tracking-[0.18em]"
                     style={{ color: BRAND.textFaint }}
                   >
-                    {mode === "prime" ? "WhatsWhat Prime" : testName}
+                    {mode === "prime" ? "WhatsWhat Prime Visibility Ladder" : testName}
                   </div>
-                  <div className="mt-3 text-[40px] font-semibold tracking-[0.06em] uppercase leading-none">
+                  <div className="mt-3 text-[30px] md:text-[40px] font-semibold tracking-[0.04em] uppercase leading-none">
                     {safeString(takerName)}
                   </div>
                 </div>
 
                 <div
-                  className="rounded-[26px] overflow-hidden"
+                  className="rounded-[22px] overflow-hidden"
                   style={{
                     border: `1px solid ${BRAND.border}`,
                     background:
-                      "linear-gradient(90deg, rgba(233,185,91,0.18), rgba(255,255,255,0.04))",
+                      "linear-gradient(90deg, rgba(233,185,91,0.14), rgba(255,255,255,0.04))",
                   }}
                 >
-                  <div className="p-6">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
+                  <div className="p-5 md:p-6">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="max-w-[620px]">
                         <div
-                          className="text-[36px] font-semibold leading-none"
-                          style={{ color: tierColor }}
+                          className="text-[30px] md:text-[40px] font-semibold leading-none"
+                          style={{ color: BRAND.tier[tier] }}
                         >
                           Level {level} — {tier}
                         </div>
+
                         <div
-                          className="mt-3 text-[20px] leading-8"
+                          className="mt-3 text-[16px] md:text-[18px] leading-8"
                           style={{ color: "rgba(255,255,255,0.92)" }}
                         >
-                          {firstSummary(secSnapshot) || heroTagline(mode, tier, level)}
+                          {firstSummary(secSnapshot) ||
+                            (mode === "prime"
+                              ? `You are currently in the ${tier} tier.`
+                              : `You are currently in the ${tier} tier.`)}
                         </div>
                       </div>
 
                       <div
-                        className="rounded-2xl px-4 py-3 self-start"
+                        className="rounded-2xl px-4 py-3 self-start min-w-[130px]"
                         style={{
-                          background: "rgba(0,0,0,0.18)",
-                          border: `1px solid rgba(255,255,255,0.12)`,
+                          background: "rgba(0,0,0,0.16)",
+                          border: `1px solid rgba(255,255,255,0.10)`,
                         }}
                       >
                         <div
-                          className="text-xs uppercase tracking-[0.18em]"
+                          className="text-[11px] uppercase tracking-[0.16em]"
                           style={{ color: BRAND.textFaint }}
                         >
                           Status
@@ -1292,10 +1207,10 @@ export default function VisibilityReportClient({
                       </div>
                     </div>
 
-                    <div className="mt-6 grid gap-4 md:grid-cols-2">
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
                       <div>
                         <div
-                          className="text-xs uppercase tracking-[0.18em]"
+                          className="text-[11px] uppercase tracking-[0.16em]"
                           style={{ color: BRAND.textFaint }}
                         >
                           Current position
@@ -1306,14 +1221,14 @@ export default function VisibilityReportClient({
                         >
                           {firstParagraph(secLevelMeaning) ||
                             (mode === "prime"
-                              ? "You have enough strategic visibility to be seen and considered — but your market position still needs strengthening."
-                              : "Your market can find you, but your position is not yet strong enough to make you the default choice.")}
+                              ? "You are visible in market terms, but this level is about strengthening structural consistency."
+                              : "You have reached a visible level, but consistency is still what determines growth.")}
                         </div>
                       </div>
 
                       <div>
                         <div
-                          className="text-xs uppercase tracking-[0.18em]"
+                          className="text-[11px] uppercase tracking-[0.16em]"
                           style={{ color: BRAND.textFaint }}
                         >
                           Tier range
@@ -1324,26 +1239,25 @@ export default function VisibilityReportClient({
                         >
                           {tierRangeLabel(tier)}.{" "}
                           {mode === "prime"
-                            ? "Movement inside the tier reflects how stable your current market position is."
-                            : "Movement inside the tier reflects how stable your current visibility signals are."}
+                            ? "Movement inside the tier reflects how stable your market position is."
+                            : "Movement inside the tier reflects how stable your visibility signals are."}
                         </div>
                       </div>
                     </div>
 
                     {mode === "prime" && validationRequired ? (
                       <div
-                        className="mt-5 rounded-2xl px-4 py-3 text-sm"
+                        className="mt-4 rounded-2xl px-4 py-3 text-sm"
                         style={{
-                          background: "rgba(233,185,91,0.10)",
-                          border: "1px solid rgba(233,185,91,0.28)",
+                          background: "rgba(233,185,91,0.08)",
+                          border: "1px solid rgba(233,185,91,0.22)",
                           color: "rgba(255,255,255,0.92)",
                         }}
                       >
                         Strong authority or dominance signals are present. Final leadership claims should still be interpreted carefully until external validation is confirmed.
                         {validationStatus ? (
                           <span style={{ color: BRAND.textDim }}>
-                            {" "}
-                            ({validationStatus.replaceAll("_", " ")})
+                            {" "}({validationStatus.replaceAll("_", " ")})
                           </span>
                         ) : null}
                       </div>
@@ -1353,7 +1267,7 @@ export default function VisibilityReportClient({
 
                 <div>
                   <div
-                    className="text-[13px] uppercase tracking-[0.22em]"
+                    className="text-[12px] uppercase tracking-[0.18em]"
                     style={{ color: BRAND.textFaint }}
                   >
                     {mode === "prime" ? "Prime structural breakdown" : "Visibility pillars"}
@@ -1370,6 +1284,7 @@ export default function VisibilityReportClient({
                         mode === "prime"
                           ? BRAND.primePillars[p.key] || BRAND.accent
                           : BRAND.legacyPillars[p.key] || BRAND.accent;
+
                       return (
                         <PillarTile
                           key={p.key}
@@ -1387,9 +1302,9 @@ export default function VisibilityReportClient({
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <div
                       className="rounded-2xl p-4"
-                      style={{ background: "rgba(0,0,0,0.16)", border: `1px solid ${BRAND.border}` }}
+                      style={{ background: "rgba(0,0,0,0.14)", border: `1px solid ${BRAND.border}` }}
                     >
-                      <div className="text-xs uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
                         Weakest signal
                       </div>
                       <div className="mt-2 text-base font-semibold">
@@ -1399,9 +1314,9 @@ export default function VisibilityReportClient({
 
                     <div
                       className="rounded-2xl p-4"
-                      style={{ background: "rgba(0,0,0,0.16)", border: `1px solid ${BRAND.border}` }}
+                      style={{ background: "rgba(0,0,0,0.14)", border: `1px solid ${BRAND.border}` }}
                     >
-                      <div className="text-xs uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
                         Strongest signal
                       </div>
                       <div className="mt-2 text-base font-semibold">
@@ -1411,9 +1326,9 @@ export default function VisibilityReportClient({
 
                     <div
                       className="rounded-2xl p-4"
-                      style={{ background: "rgba(0,0,0,0.16)", border: `1px solid ${BRAND.border}` }}
+                      style={{ background: "rgba(0,0,0,0.14)", border: `1px solid ${BRAND.border}` }}
                     >
-                      <div className="text-xs uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+                      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
                         Overall score
                       </div>
                       <div className="mt-2 text-base font-semibold">
@@ -1431,14 +1346,11 @@ export default function VisibilityReportClient({
                   {firstSummary(secOpportunity) ||
                     "Your next growth comes from strengthening the right structural signal — not just doing more."}
                 </div>
+
                 {paragraphSlice(secOpportunity, 4).length ? (
                   <div className="mt-4 space-y-3">
                     {paragraphSlice(secOpportunity, 4).map((line, idx) => (
-                      <div
-                        key={idx}
-                        className="flex gap-3 text-sm"
-                        style={{ color: "rgba(255,255,255,0.86)" }}
-                      >
+                      <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
                         <div style={{ color: BRAND.accent }}>↗</div>
                         <div>{line}</div>
                       </div>
@@ -1452,14 +1364,11 @@ export default function VisibilityReportClient({
                   {firstSummary(secNextMove) ||
                     "Do not increase random activity. Strengthen the structural signal that is most limiting momentum."}
                 </div>
+
                 {paragraphSlice(secNextMove, 4).length ? (
                   <div className="mt-4 space-y-3">
                     {paragraphSlice(secNextMove, 4).map((line, idx) => (
-                      <div
-                        key={idx}
-                        className="flex gap-3 text-sm"
-                        style={{ color: "rgba(255,255,255,0.86)" }}
-                      >
+                      <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
                         <div style={{ color: BRAND.accent }}>✓</div>
                         <div>{line}</div>
                       </div>
@@ -1477,15 +1386,11 @@ export default function VisibilityReportClient({
                 marketRealityLines.length
                   ? marketRealityLines
                   : [
-                      mode === "prime"
-                        ? "Your business is visible in the market."
-                        : "Your business is visible.",
-                      mode === "prime"
-                        ? "But the position is not yet strong enough to make you the default choice."
-                        : "But it is not yet the clear choice.",
+                      "Your business is visible in the market.",
+                      "But the position is not yet strong enough to make you the default choice.",
                     ]
               }
-              accent={tierColor}
+              accent={BRAND.tier[tier]}
             />
 
             <TinyInfoCard
@@ -1508,9 +1413,7 @@ export default function VisibilityReportClient({
                 directionLines.length
                   ? directionLines
                   : [
-                      mode === "prime"
-                        ? "Do not chase more activity for its own sake."
-                        : "Do not chase more visibility for its own sake.",
+                      "Do not chase more activity for its own sake.",
                       "Use your next move to strengthen structural confidence.",
                       "That is how you progress tiers more cleanly.",
                     ]
@@ -1520,16 +1423,13 @@ export default function VisibilityReportClient({
 
             {mode === "legacy" && style ? (
               <div
-                className="rounded-[24px] p-5"
+                className="rounded-[20px] p-5"
                 style={{
-                  background: "rgba(0,0,0,0.16)",
+                  background: "rgba(0,0,0,0.14)",
                   border: `1px solid ${BRAND.border}`,
                 }}
               >
-                <div
-                  className="text-[12px] font-semibold uppercase tracking-[0.18em]"
-                  style={{ color: BRAND.textFaint }}
-                >
+                <div className="text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
                   Behaviour style
                 </div>
                 <div className="mt-4 flex items-center justify-between">
@@ -1537,42 +1437,14 @@ export default function VisibilityReportClient({
                   <div
                     className="h-10 w-10 rounded-full flex items-center justify-center font-semibold"
                     style={{
-                      background: `${styleColor}22`,
-                      color: styleColor,
-                      border: `1px solid ${styleColor}55`,
+                      background: `${BRAND.ab[style]}22`,
+                      color: BRAND.ab[style],
+                      border: `1px solid ${BRAND.ab[style]}55`,
                     }}
                   >
                     {style}
                   </div>
                 </div>
-
-                {kbReport?.graphs?.personality_points ? (
-                  <div className="mt-4 space-y-2">
-                    {(["A", "B", "C", "D"] as AB[]).map((k) => {
-                      const value = safeNumber((kbReport?.graphs?.personality_points as any)?.[k]);
-                      return (
-                        <div key={k}>
-                          <div className="flex items-center justify-between text-sm">
-                            <div>{k}</div>
-                            <div style={{ color: BRAND.textDim }}>{value}</div>
-                          </div>
-                          <div
-                            className="mt-1 h-2 rounded-full overflow-hidden"
-                            style={{ background: "rgba(255,255,255,0.08)" }}
-                          >
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${clamp(value * 10, 0, 100)}%`,
-                                background: `linear-gradient(90deg, ${BRAND.ab[k]}, rgba(255,255,255,0.18))`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
               </div>
             ) : null}
           </div>
@@ -1617,17 +1489,6 @@ export default function VisibilityReportClient({
                 <SectionBlocks section={secBehaviourProfiles} />
               </GlassCard>
             ) : null}
-
-            {!introSections.length ? (
-              <GlassCard title="Intro content">
-                <div className="text-sm" style={{ color: BRAND.textDim }}>
-                  Intro sections are pending in the knowledge base.
-                </div>
-                <div className="mt-2 text-xs" style={{ color: BRAND.textFaint }}>
-                  Missing KB section keys: {missingIntroKeys.join(", ") || "none"}
-                </div>
-              </GlassCard>
-            ) : null}
           </div>
         </div>
 
@@ -1668,17 +1529,14 @@ export default function VisibilityReportClient({
                   : "Discoverability, Trust, and Conversion show where visibility is working and where it breaks down."
               }
             >
-              <div
-                className={`mt-4 grid gap-4 ${
-                  mode === "prime" ? "md:grid-cols-2" : "md:grid-cols-3"
-                }`}
-              >
+              <div className={`mt-4 grid gap-4 ${mode === "prime" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
                 {pillars.map((p) => {
                   const band = (bandSource as any)?.[p.key];
                   const color =
                     mode === "prime"
                       ? BRAND.primePillars[p.key] || BRAND.accent
                       : BRAND.legacyPillars[p.key] || BRAND.accent;
+
                   return (
                     <PillarTile
                       key={p.key}
