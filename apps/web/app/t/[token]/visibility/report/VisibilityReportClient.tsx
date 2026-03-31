@@ -641,12 +641,12 @@ function PrimeLadderCard({
         Ladder position
       </div>
 
-      <div className="mt-4 grid grid-cols-[28px_1fr] gap-3 items-stretch">
+      <div className="mt-4 grid grid-cols-[30px_1fr] gap-3 items-stretch">
         <div className="flex flex-col gap-1">
           {bands.map((band) => (
             <div
               key={band.name}
-              className="flex-1 rounded-xl flex items-center justify-center text-[10px] font-semibold"
+              className="relative flex-1 rounded-xl flex items-center justify-center text-[10px] font-semibold overflow-visible"
               style={{
                 background: `${band.color}22`,
                 color: band.color,
@@ -655,7 +655,15 @@ function PrimeLadderCard({
                 transform: "rotate(180deg)",
               }}
             >
-              {band.name}
+              <span>{band.name}</span>
+
+              <div
+                className="absolute -right-[6px] top-1/2 -translate-y-1/2 h-[56%] w-[10px] rounded-r-full"
+                style={{
+                  background: `${band.color}33`,
+                  boxShadow: `0 0 10px ${band.color}22`,
+                }}
+              />
             </div>
           ))}
         </div>
@@ -666,24 +674,44 @@ function PrimeLadderCard({
             const band = bandForLevel(n);
 
             return (
-              <div key={n} className="flex items-center gap-2">
+              <div key={n} className="relative flex items-center gap-2 overflow-visible">
                 <div
-                  className="relative flex-1 h-7 rounded-lg border text-[11px] flex items-center justify-center overflow-hidden"
+                  className="relative flex-1 h-7 rounded-lg border text-[11px] flex items-center justify-center overflow-visible"
                   style={{
-                    borderColor: isActive ? `${band.color}99` : "rgba(255,255,255,0.10)",
+                    borderColor: isActive ? `${band.color}aa` : "rgba(255,255,255,0.10)",
                     background: isActive
-                      ? `linear-gradient(90deg, ${band.color}cc, rgba(255,255,255,0.10))`
+                      ? `linear-gradient(90deg, ${band.color}dd, rgba(255,255,255,0.10))`
                       : "rgba(255,255,255,0.03)",
                     color: isActive ? "#081424" : "rgba(255,255,255,0.72)",
-                    boxShadow: isActive ? `0 0 16px ${band.color}44` : "none",
+                    boxShadow: isActive ? `0 0 18px ${band.color}44` : "none",
                   }}
                 >
                   {!isActive ? (
                     <span
-                      className="absolute right-0 top-0 h-full w-[4px]"
+                      className="absolute right-0 top-0 h-full w-[4px] rounded-r-lg"
                       style={{ background: `${band.color}66` }}
                     />
-                  ) : null}
+                  ) : (
+                    <>
+                      <span
+                        className="absolute -right-[12px] top-1/2 -translate-y-1/2 h-[26px] w-[16px] rounded-r-full"
+                        style={{
+                          background: `linear-gradient(90deg, ${band.color}ee, ${band.color}aa)`,
+                          boxShadow: `0 0 16px ${band.color}55`,
+                          borderTop: `1px solid ${band.color}55`,
+                          borderRight: `1px solid ${band.color}55`,
+                          borderBottom: `1px solid ${band.color}55`,
+                        }}
+                      />
+                      <span
+                        className="absolute -right-[3px] top-1/2 -translate-y-1/2 h-[12px] w-[5px] rounded-r-full"
+                        style={{
+                          background: "rgba(255,255,255,0.16)",
+                        }}
+                      />
+                    </>
+                  )}
+
                   {n}
                 </div>
               </div>

@@ -7,6 +7,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
 import { getBaseUrl } from "@/lib/baseUrl";
+import {
+  buildProfileExtendedReport,
+  type BehaviourStyle,
+  type Readiness,
+  type VisibilityTier,
+} from "@/lib/visibility/profileExtendedReport";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +132,62 @@ function prettyReadiness(r?: string | null) {
   if (t === "ready_to_progress") return "Ready to progress";
   if (t === "stabilise") return "Stabilise";
   return t || "—";
+}
+
+function asVisibilityTier(value?: string | null): VisibilityTier | null {
+  const v = String(value || "").trim();
+  if (
+    v === "Invisible" ||
+    v === "Emerging" ||
+    v === "Established" ||
+    v === "Magnetic"
+  ) {
+    return v;
+  }
+  return null;
+}
+
+function asBehaviourStyle(value?: string | null): BehaviourStyle | null {
+  const v = String(value || "").trim().toUpperCase();
+  if (v === "A" || v === "B" || v === "C" || v === "D") return v;
+  return null;
+}
+
+function asReadiness(value?: string | null): Readiness | null {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "stabilise" || v === "ready_to_progress") return v;
+  return null;
+}
+
+function asNumber(value: any): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizePillarScores(raw: any): {
+  discoverability?: number | null;
+  trust?: number | null;
+  conversion?: number | null;
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const discoverability = asNumber(raw.discoverability);
+  const trust = asNumber(raw.trust);
+  const conversion = asNumber(raw.conversion);
+
+  if (
+    discoverability == null &&
+    trust == null &&
+    conversion == null
+  ) {
+    return null;
+  }
+
+  return {
+    discoverability,
+    trust,
+    conversion,
+  };
 }
 
 export default async function TakerDetail({
@@ -462,6 +524,64 @@ export default async function TakerDetail({
     takerId: taker.id,
   });
 
+  // ✅ Build Profile Extended Report for internal portal view only
+  const visibilityTier = asVisibilityTier(
+    visibilitySnapshot?.signals?.tier ??
+      totalsRaw?.visibility?.tier ??
+      totalsRaw?.tier ??
+      totalsRaw?.computed?.tier ??
+      null
+  );
+
+  const visibilityLevel =
+    asNumber(
+      visibilitySnapshot?.signals?.level ??
+        totalsRaw?.visibility?.level ??
+        totalsRaw?.level ??
+        totalsRaw?.computed?.level ??
+        totalsRaw?.computed?.tier_level ??
+        null
+    ) ?? 0;
+
+  const visibilityStyle = asBehaviourStyle(
+    visibilitySnapshot?.signals?.style ??
+      visibilitySnapshot?.signals?.behaviour_style ??
+      totalsRaw?.visibility?.style ??
+      totalsRaw?.visibility?.behaviour_style ??
+      totalsRaw?.behaviour_style ??
+      totalsRaw?.computed?.behaviour_style ??
+      totalsRaw?.computed?.style ??
+      null
+  );
+
+  const visibilityReadiness = asReadiness(
+    visibilitySnapshot?.signals?.readiness ??
+      totalsRaw?.visibility?.readiness ??
+      totalsRaw?.readiness ??
+      totalsRaw?.computed?.readiness ??
+      null
+  );
+
+  const visibilityPillarScores = normalizePillarScores(
+    visibilitySnapshot?.signals?.pillar_scores ??
+      visibilitySnapshot?.pillar_scores ??
+      totalsRaw?.pillar_scores ??
+      totalsRaw?.visibility?.pillar_scores ??
+      totalsRaw?.computed?.pillar_scores ??
+      null
+  );
+
+  const profileExtendedReport =
+    isVisibility && visibilityTier && visibilityLevel > 0 && visibilityStyle
+      ? await buildProfileExtendedReport({
+          tier: visibilityTier,
+          level: visibilityLevel,
+          behaviour_style: visibilityStyle,
+          readiness: visibilityReadiness,
+          pillar_scores: visibilityPillarScores,
+        })
+      : null;
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
@@ -651,6 +771,68 @@ export default async function TakerDetail({
             )}
         </section>
       )}
+
+      {/* ✅ Profile Extended Report (Portal-only / internal) */}
+      {profileExtendedReport?.sections?.length ? (
+        <section className="rounded-xl border p-4 bg-white space-y-4">
+          <div>
+            <h2 className="font-medium">Profile Extended Report</h2>
+            <p className="text-sm text-gray-500">
+              Internal profile layer built from Visibility Ladder KB blocks
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            {profileExtendedReport.sections.map((section) => (
+              <div
+                key={section.section_key}
+                className="rounded-xl border border-slate-200 bg-slate-50/50 p-4"
+              >
+                {section.heading ? (
+                  <h3 className="text-base font-semibold text-slate-900">
+                    {section.heading}
+                  </h3>
+                ) : null}
+
+                {section.subheading ? (
+                  <p className="mt-1 text-sm text-slate-500">
+                    {section.subheading}
+                  </p>
+                ) : null}
+
+                <div className="mt-4 space-y-4">
+                  {section.blocks.map((block, index) => (
+                    <div
+                      key={`${section.section_key}-${index}`}
+                      className="rounded-lg border border-slate-100 bg-white p-4"
+                    >
+                      {block.heading ? (
+                        <h4 className="text-sm font-semibold text-slate-900">
+                          {block.heading}
+                        </h4>
+                      ) : null}
+
+                      {block.summary ? (
+                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                          {block.summary}
+                        </p>
+                      ) : null}
+
+                      {Array.isArray(block.bullets) && block.bullets.length > 0 ? (
+                        <ul className="mt-3 list-disc pl-5 space-y-1 text-sm leading-6 text-slate-700">
+                          {block.bullets.map((item: string, i: number) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Latest Result */}
       <section className="rounded-xl border p-4 bg-white space-y-4">
