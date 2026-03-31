@@ -230,10 +230,10 @@ function paragraphSlice(section?: Section | null, count = 3): string[] {
 }
 
 function bulletify(section?: Section | null, count = 3): string[] {
-  const paras = flattenSectionParagraphs(section)
+  return flattenSectionParagraphs(section)
     .map((p) => safeString(p))
-    .filter(Boolean);
-  return paras.slice(0, count);
+    .filter(Boolean)
+    .slice(0, count);
 }
 
 function nicePillarLabel(key: string, mode: ScoringMode) {
@@ -286,6 +286,10 @@ function tierRangeLabel(tier: Tier) {
   return "Levels 16–20";
 }
 
+function makeSectionId(key: string) {
+  return `section-${key.replace(/[^a-z0-9_-]/gi, "-").toLowerCase()}`;
+}
+
 function sanitizeSectionForPrime(section?: Section | null): Section | null {
   if (!section) return null;
 
@@ -316,37 +320,39 @@ function sanitizeSectionForPrime(section?: Section | null): Section | null {
 }
 
 const BRAND = {
-  bg: "#07152F",
-  accent: "#E9B95B",
+  bg: "#071832",
+  bgSoft: "#0B244B",
+  accent: "#43DFC7",
+  accent2: "#6C63FF",
   textDim: "rgba(255,255,255,0.75)",
   textFaint: "rgba(255,255,255,0.55)",
   border: "rgba(255,255,255,0.10)",
 
   tier: {
-    Invisible: "#94A3B8",
-    Emerging: "#E9B95B",
-    Established: "#38E1C6",
-    Magnetic: "#8B5CF6",
+    Invisible: "#DDE7F2",
+    Emerging: "#4F7DFF",
+    Established: "#43DFC7",
+    Magnetic: "#9A63FF",
   } as Record<Tier, string>,
 
   ab: {
-    A: "#38E1C6",
+    A: "#43DFC7",
     B: "#4FB3FF",
-    C: "#F59E0B",
-    D: "#EF4444",
+    C: "#F2BE5C",
+    D: "#EF6C63",
   } as Record<AB, string>,
 
   legacyPillars: {
     discoverability: "#4FB3FF",
-    trust: "#38E1C6",
-    conversion: "#E9B95B",
+    trust: "#43DFC7",
+    conversion: "#F2BE5C",
   } as Record<string, string>,
 
   primePillars: {
     visibility: "#4FB3FF",
-    trust: "#38E1C6",
-    authority: "#E9B95B",
-    dominance: "#8B5CF6",
+    trust: "#43DFC7",
+    authority: "#43DFC7",
+    dominance: "#9A63FF",
   } as Record<string, string>,
 };
 
@@ -357,9 +363,9 @@ const Shell = ({ children }: { children: ReactNode }) => (
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(900px 520px at 18% 8%, rgba(79,179,255,0.09), transparent 58%)," +
-            "radial-gradient(700px 420px at 82% 18%, rgba(233,185,91,0.07), transparent 52%)," +
-            "radial-gradient(700px 420px at 50% 92%, rgba(139,92,246,0.05), transparent 58%)",
+            "radial-gradient(900px 520px at 18% 8%, rgba(79,125,255,0.10), transparent 58%)," +
+            "radial-gradient(700px 420px at 82% 18%, rgba(67,223,199,0.07), transparent 52%)," +
+            "radial-gradient(700px 420px at 50% 92%, rgba(154,99,255,0.06), transparent 58%)",
         }}
       />
       <div
@@ -394,7 +400,7 @@ function GlassCard({
       className={`rounded-[22px] p-[1px] ${className}`}
       style={{
         background:
-          "linear-gradient(135deg, rgba(233,185,91,0.10), rgba(79,179,255,0.08), rgba(255,255,255,0.04))",
+          "linear-gradient(135deg, rgba(79,125,255,0.12), rgba(67,223,199,0.08), rgba(255,255,255,0.04))",
         boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
       }}
     >
@@ -440,9 +446,9 @@ function PrimaryButton({
     "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition " +
     (disabled ? "opacity-60 cursor-not-allowed" : "hover:opacity-95");
   const style = {
-    background: BRAND.accent,
-    color: "#081529",
-    boxShadow: "0 8px 20px rgba(233,185,91,0.24)",
+    background: `linear-gradient(90deg, ${BRAND.accent}, ${BRAND.accent2})`,
+    color: "#061425",
+    boxShadow: "0 8px 20px rgba(67,223,199,0.20)",
   } as any;
 
   if (href) {
@@ -553,24 +559,18 @@ function PillarTile({
   value,
   band,
   color,
-  isWeakest,
-  isStrongest,
 }: {
   label: string;
   value: number;
   band?: string;
   color: string;
-  isWeakest?: boolean;
-  isStrongest?: boolean;
 }) {
   return (
     <div
       className="rounded-[18px] p-4"
       style={{
         background: "rgba(255,255,255,0.03)",
-        border: `1px solid ${
-          isWeakest ? "rgba(79,179,255,0.22)" : isStrongest ? "rgba(139,92,246,0.22)" : BRAND.border
-        }`,
+        border: `1px solid ${BRAND.border}`,
       }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.10em]">{label}</div>
@@ -600,16 +600,22 @@ function PillarTile({
   );
 }
 
-function VerticalLadderRail({
+function PrimeLadderCard({
   level,
   tier,
 }: {
   level: number;
   tier: Tier;
 }) {
-  const rows = Array.from({ length: 20 }, (_, i) => 20 - i);
   const active = clamp(level || 1, 1, 20);
-  const tierColor = BRAND.tier[tier];
+  const rows = Array.from({ length: 20 }, (_, i) => 20 - i);
+
+  const bandConfig = [
+    { name: "Magnetic", from: 16, to: 20, color: BRAND.tier.Magnetic },
+    { name: "Established", from: 11, to: 15, color: BRAND.tier.Established },
+    { name: "Emerging", from: 6, to: 10, color: BRAND.tier.Emerging },
+    { name: "Invisible", from: 1, to: 5, color: BRAND.tier.Invisible },
+  ];
 
   return (
     <div
@@ -620,64 +626,121 @@ function VerticalLadderRail({
       }}
     >
       <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
-        Ladder
+        Ladder position
       </div>
 
-      <div className="mt-4 space-y-1.5">
-        {rows.map((n) => {
-          const isActive = n === active;
-          const rowTier = tierBand(n);
-
-          return (
-            <div key={n} className="flex items-center gap-3">
-              <div className="w-8 text-[11px]" style={{ color: "rgba(255,255,255,0.50)" }}>
-                {n}
-              </div>
-              <div
-                className="flex-1 h-5 rounded-full border"
-                style={{
-                  borderColor: isActive ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)",
-                  background: isActive
-                    ? `linear-gradient(90deg, ${tierColor}bb, rgba(255,255,255,0.10))`
-                    : rowTier === tier
-                      ? "rgba(255,255,255,0.05)"
-                      : "rgba(255,255,255,0.02)",
-                }}
-              />
-              <div
-                className="w-8 text-center text-[11px] font-semibold"
-                style={{ color: isActive ? tierColor : "rgba(255,255,255,0.40)" }}
-              >
-                {isActive ? n : ""}
-              </div>
+      <div className="mt-4 grid grid-cols-[28px_1fr] gap-3 items-stretch">
+        <div className="flex flex-col gap-1">
+          {bandConfig.map((band) => (
+            <div
+              key={band.name}
+              className="flex-1 rounded-xl flex items-center justify-center text-[10px] font-semibold"
+              style={{
+                background: `${band.color}22`,
+                color: band.color,
+                writingMode: "vertical-rl",
+                textOrientation: "mixed",
+                transform: "rotate(180deg)",
+              }}
+            >
+              {band.name}
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        <div className="space-y-1.5">
+          {rows.map((n) => {
+            const isActive = n === active;
+            const band = tierBand(n);
+            const color = BRAND.tier[band];
+
+            return (
+              <div key={n} className="flex items-center gap-2">
+                <div
+                  className="flex-1 h-7 rounded-lg border text-[11px] flex items-center justify-center"
+                  style={{
+                    borderColor: isActive ? `${color}99` : "rgba(255,255,255,0.10)",
+                    background: isActive
+                      ? `linear-gradient(90deg, ${color}bb, rgba(255,255,255,0.06))`
+                      : "rgba(255,255,255,0.03)",
+                    color: isActive ? "#081424" : "rgba(255,255,255,0.72)",
+                    boxShadow: isActive ? `0 0 14px ${color}44` : "none",
+                  }}
+                >
+                  {n}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mt-5 space-y-2 text-xs" style={{ color: BRAND.textDim }}>
-        <div className="flex items-center justify-between">
-          <span>Invisible</span>
-          <span>1–5</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Emerging</span>
-          <span>6–10</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Established</span>
-          <span>11–15</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Magnetic</span>
-          <span>16–20</span>
-        </div>
+        {bandConfig.map((band) => (
+          <div key={band.name} className="flex items-center justify-between">
+            <span>{band.name}</span>
+            <span>
+              {band.from}–{band.to}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function SectionBlocks({ section }: { section: Section }) {
+function SectionIndex({
+  items,
+  nextStepsUrl,
+  onDownloadPdf,
+}: {
+  items: Array<{ key: string; label: string }>;
+  nextStepsUrl?: string | null;
+  onDownloadPdf: () => void;
+}) {
+  return (
+    <div
+      className="rounded-[22px] p-4"
+      style={{
+        background: "rgba(0,0,0,0.14)",
+        border: `1px solid ${BRAND.border}`,
+      }}
+    >
+      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
+        Report index
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        {items.map((item, idx) => (
+          <a
+            key={item.key}
+            href={`#${makeSectionId(item.key)}`}
+            className="rounded-xl px-3 py-2 text-sm transition hover:bg-white/5"
+            style={{
+              border: `1px solid ${BRAND.border}`,
+              color: "rgba(255,255,255,0.86)",
+            }}
+          >
+            <span style={{ color: BRAND.textFaint }}>{idx + 1}.</span> {item.label}
+          </a>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        <SecondaryButton onClick={onDownloadPdf}>Download PDF</SecondaryButton>
+        {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton> : null}
+      </div>
+    </div>
+  );
+}
+
+function SectionBlocks({
+  section,
+  hideSummaryBox = false,
+}: {
+  section: Section;
+  hideSummaryBox?: boolean;
+}) {
   const title = safeString(section?.title) || safeString(section?.key);
   const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
 
@@ -701,7 +764,7 @@ function SectionBlocks({ section }: { section: Section }) {
           >
             {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
 
-            {short ? (
+            {short && !hideSummaryBox ? (
               <div
                 className="mt-3 rounded-xl border px-4 py-3 text-sm"
                 style={{
@@ -732,7 +795,7 @@ function SectionBlocks({ section }: { section: Section }) {
   );
 }
 
-function InsightsCard({
+function CoachingInsightsCard({
   ai,
   error,
 }: {
@@ -741,7 +804,7 @@ function InsightsCard({
 }) {
   return (
     <GlassCard
-      title="AI coaching insights"
+      title="Coaching insights"
       subtitle="An additional interpretation layer built from your scored signals and narrative blocks."
     >
       {error ? (
@@ -836,7 +899,9 @@ export default function VisibilityReportClient({
   const portalFullName = fullName(portalMeta?.taker);
   const takerName = portalFullName !== "Your" ? portalFullName : "Your Report";
 
-  const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
+  const nextStepsUrl = safeString(
+    portalMeta?.link?.next_steps_url || portalMeta?.link?.redirect_url || ""
+  );
 
   const tier: Tier =
     (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
@@ -926,6 +991,19 @@ export default function VisibilityReportClient({
     .filter((s) => !renderedKeys.has(s.key))
     .map((s) => (mode === "prime" ? sanitizeSectionForPrime(s) : s))
     .filter(Boolean) as Section[];
+
+  const indexItems = [
+    secWelcome ? { key: "welcome", label: secWelcome.title || "Welcome" } : null,
+    secHowToUse ? { key: "how_to_use", label: secHowToUse.title || "How to use this report" } : null,
+    secUnderstanding ? { key: "understanding", label: secUnderstanding.title || "Understanding the framework" } : null,
+    secTiers ? { key: "tiers_levels", label: secTiers.title || "How tiers and levels work" } : null,
+    secFramework ? { key: "framework_foundation", label: secFramework.title || "Framework foundation" } : null,
+    secStrengths ? { key: "strengths", label: secStrengths.title || "What is already working" } : null,
+    secFriction ? { key: "friction", label: secFriction.title || "Where friction exists" } : null,
+    secPillars ? { key: "pillars", label: secPillars.title || "Your pillars" } : null,
+    secPossibleNext ? { key: "possible_next", label: secPossibleNext.title || "What becomes possible next" } : null,
+    secClosing ? { key: "closing", label: secClosing.title || "Closing" } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string }>;
 
   async function downloadPdf() {
     try {
@@ -1040,7 +1118,7 @@ export default function VisibilityReportClient({
   if (loading) {
     return (
       <Shell>
-        <div className="mx-auto max-w-[1380px] p-6">
+        <div className="mx-auto max-w-[1440px] p-6">
           <div className="text-2xl font-semibold">Loading your report…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Visibility Ladder report.
@@ -1053,7 +1131,7 @@ export default function VisibilityReportClient({
   if (err || !kbReport) {
     return (
       <Shell>
-        <div className="mx-auto max-w-[1380px] p-6 space-y-4">
+        <div className="mx-auto max-w-[1440px] p-6 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
@@ -1076,7 +1154,7 @@ export default function VisibilityReportClient({
 
   return (
     <Shell>
-      <div ref={reportRootRef} className="mx-auto max-w-[1380px] p-5 md:p-6 space-y-8">
+      <div ref={reportRootRef} className="mx-auto max-w-[1440px] p-5 md:p-6 space-y-8">
         {/* PAGE 1 */}
         <div data-pdf-page="true" className="space-y-6">
           <GlassCard
@@ -1163,11 +1241,16 @@ export default function VisibilityReportClient({
           </GlassCard>
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            <div className="xl:col-span-2">
-              <VerticalLadderRail level={level} tier={tier} />
+            <div className="xl:col-span-3 space-y-6">
+              <PrimeLadderCard level={level} tier={tier} />
+              <SectionIndex
+                items={indexItems}
+                nextStepsUrl={nextStepsUrl}
+                onDownloadPdf={downloadPdf}
+              />
             </div>
 
-            <div className="xl:col-span-10 space-y-6">
+            <div className="xl:col-span-9 space-y-6">
               <GlassCard>
                 <div className="flex flex-col gap-5">
                   <div>
@@ -1187,7 +1270,7 @@ export default function VisibilityReportClient({
                     style={{
                       border: `1px solid ${BRAND.border}`,
                       background:
-                        "linear-gradient(90deg, rgba(233,185,91,0.12), rgba(255,255,255,0.03))",
+                        "linear-gradient(90deg, rgba(79,125,255,0.12), rgba(255,255,255,0.03))",
                     }}
                   >
                     <div className="p-5 md:p-6">
@@ -1263,8 +1346,8 @@ export default function VisibilityReportClient({
                         <div
                           className="mt-4 rounded-2xl px-4 py-3 text-sm"
                           style={{
-                            background: "rgba(233,185,91,0.08)",
-                            border: "1px solid rgba(233,185,91,0.22)",
+                            background: "rgba(154,99,255,0.10)",
+                            border: "1px solid rgba(154,99,255,0.22)",
                             color: "rgba(255,255,255,0.92)",
                           }}
                         >
@@ -1306,8 +1389,6 @@ export default function VisibilityReportClient({
                             value={p.value}
                             band={band}
                             color={color}
-                            isWeakest={safeString(p.key).toLowerCase() === weakest.toLowerCase()}
-                            isStrongest={safeString(p.key).toLowerCase() === strongest.toLowerCase()}
                           />
                         );
                       })}
@@ -1382,7 +1463,7 @@ export default function VisibilityReportClient({
                     <div className="mt-4 space-y-3">
                       {opportunityLines.map((line, idx) => (
                         <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
-                          <div style={{ color: BRAND.accent }}>↗</div>
+                          <div style={{ color: BRAND.accent2 }}>↗</div>
                           <div>{line}</div>
                         </div>
                       ))}
@@ -1416,41 +1497,53 @@ export default function VisibilityReportClient({
         <div data-pdf-page="true" className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
           <div className="xl:col-span-2 space-y-6">
             {secWelcome ? (
-              <GlassCard title={secWelcome.title || "Welcome"}>
-                <SectionBlocks section={secWelcome} />
-              </GlassCard>
+              <div id={makeSectionId("welcome")}>
+                <GlassCard title={secWelcome.title || "Welcome"}>
+                  <SectionBlocks section={secWelcome} />
+                </GlassCard>
+              </div>
             ) : null}
 
             {secFramework ? (
-              <GlassCard title={secFramework.title || "Framework foundation"}>
-                <SectionBlocks section={secFramework} />
-              </GlassCard>
+              <div id={makeSectionId("framework_foundation")}>
+                <GlassCard title={secFramework.title || "Framework foundation"}>
+                  <SectionBlocks section={secFramework} />
+                </GlassCard>
+              </div>
             ) : null}
 
             {secHowToUse ? (
-              <GlassCard title={secHowToUse.title || "How to use this report"}>
-                <SectionBlocks section={secHowToUse} />
-              </GlassCard>
+              <div id={makeSectionId("how_to_use")}>
+                <GlassCard title={secHowToUse.title || "How to use this report"}>
+                  <SectionBlocks section={secHowToUse} />
+                </GlassCard>
+              </div>
             ) : null}
           </div>
 
           <div className="space-y-6">
             {secUnderstanding ? (
-              <GlassCard title={secUnderstanding.title || "Understanding the framework"}>
-                <SectionBlocks section={secUnderstanding} />
-              </GlassCard>
+              <div id={makeSectionId("understanding")}>
+                <GlassCard title={secUnderstanding.title || "Understanding the framework"}>
+                  <SectionBlocks section={secUnderstanding} hideSummaryBox />
+                </GlassCard>
+              </div>
             ) : null}
 
             {secTiers ? (
-              <GlassCard title={secTiers.title || "How tiers and levels work"}>
-                <SectionBlocks section={secTiers} />
-              </GlassCard>
+              <div id={makeSectionId("tiers_levels")}>
+                <GlassCard title={secTiers.title || "How tiers and levels work"}>
+                  <SectionBlocks section={secTiers} hideSummaryBox />
+                </GlassCard>
+              </div>
             ) : null}
 
             {mode === "legacy" && secBehaviourProfiles ? (
-              <GlassCard title={secBehaviourProfiles.title || "Behaviour profiles"}>
-                <SectionBlocks section={secBehaviourProfiles} />
-              </GlassCard>
+              <div id={makeSectionId("behaviour_profiles")}>
+                <GlassCard title={secBehaviourProfiles.title || "Behaviour profiles"}>
+                  <SectionBlocks section={secBehaviourProfiles} />
+                </GlassCard>
+              </div>
             ) : null}
           </div>
         </div>
@@ -1458,81 +1551,91 @@ export default function VisibilityReportClient({
         {/* PAGE 3 */}
         <div data-pdf-page="true" className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           {secStrengths ? (
-            <GlassCard title={secStrengths.title || "What is already working"}>
-              <SectionBlocks section={secStrengths} />
-            </GlassCard>
+            <div id={makeSectionId("strengths")}>
+              <GlassCard title={secStrengths.title || "What is already working"}>
+                <SectionBlocks section={secStrengths} />
+              </GlassCard>
+            </div>
           ) : null}
 
           {secFriction ? (
-            <GlassCard title={secFriction.title || "Where visibility friction exists"}>
-              <SectionBlocks section={secFriction} />
-            </GlassCard>
+            <div id={makeSectionId("friction")}>
+              <GlassCard title={secFriction.title || "Where visibility friction exists"}>
+                <SectionBlocks section={secFriction} />
+              </GlassCard>
+            </div>
           ) : null}
 
           {secMarket ? (
-            <GlassCard title={secMarket.title || "How the market is likely experiencing your business"}>
-              <SectionBlocks section={secMarket} />
-            </GlassCard>
+            <div id={makeSectionId("market_experience")}>
+              <GlassCard title={secMarket.title || "How the market is likely experiencing your business"}>
+                <SectionBlocks section={secMarket} />
+              </GlassCard>
+            </div>
           ) : null}
 
           {secLevelMeaning ? (
-            <GlassCard title={secLevelMeaning.title || "What your current level means"}>
-              <SectionBlocks section={secLevelMeaning} />
-            </GlassCard>
+            <div id={makeSectionId("level_meaning")}>
+              <GlassCard title={secLevelMeaning.title || "What your current level means"}>
+                <SectionBlocks section={secLevelMeaning} />
+              </GlassCard>
+            </div>
           ) : null}
         </div>
 
         {/* PAGE 4 */}
         <div data-pdf-page="true" className="space-y-6">
           {secPillars ? (
-            <GlassCard
-              title={
-                secPillars.title ||
-                (mode === "prime" ? "Your Prime pillars" : "Your visibility pillars")
-              }
-              subtitle={
-                mode === "prime"
-                  ? "Visibility, Trust, Authority, and Dominance show how strong your market structure is."
-                  : "Discoverability, Trust, and Conversion show where visibility is working and where it breaks down."
-              }
-            >
-              <div
-                className={`mt-4 grid gap-4 ${
-                  mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
-                }`}
+            <div id={makeSectionId("pillars")}>
+              <GlassCard
+                title={
+                  secPillars.title ||
+                  (mode === "prime" ? "Your Prime pillars" : "Your visibility pillars")
+                }
+                subtitle={
+                  mode === "prime"
+                    ? "Visibility, Trust, Authority, and Dominance show how strong your market structure is."
+                    : "Discoverability, Trust, and Conversion show where visibility is working and where it breaks down."
+                }
               >
-                {pillars.map((p) => {
-                  const band = (bandSource as any)?.[p.key];
-                  const color =
-                    mode === "prime"
-                      ? BRAND.primePillars[p.key] || BRAND.accent
-                      : BRAND.legacyPillars[p.key] || BRAND.accent;
+                <div
+                  className={`mt-4 grid gap-4 ${
+                    mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
+                  }`}
+                >
+                  {pillars.map((p) => {
+                    const band = (bandSource as any)?.[p.key];
+                    const color =
+                      mode === "prime"
+                        ? BRAND.primePillars[p.key] || BRAND.accent
+                        : BRAND.legacyPillars[p.key] || BRAND.accent;
 
-                  return (
-                    <PillarTile
-                      key={p.key}
-                      label={p.label}
-                      value={p.value}
-                      band={band}
-                      color={color}
-                      isWeakest={safeString(p.key).toLowerCase() === weakest.toLowerCase()}
-                      isStrongest={safeString(p.key).toLowerCase() === strongest.toLowerCase()}
-                    />
-                  );
-                })}
-              </div>
+                    return (
+                      <PillarTile
+                        key={p.key}
+                        label={p.label}
+                        value={p.value}
+                        band={band}
+                        color={color}
+                      />
+                    );
+                  })}
+                </div>
 
-              {secPillars ? <SectionBlocks section={secPillars} /> : null}
-            </GlassCard>
+                <SectionBlocks section={secPillars} />
+              </GlassCard>
+            </div>
           ) : null}
 
           {secPossibleNext ? (
-            <GlassCard title={secPossibleNext.title || "What becomes possible next"}>
-              <SectionBlocks section={secPossibleNext} />
-            </GlassCard>
+            <div id={makeSectionId("possible_next")}>
+              <GlassCard title={secPossibleNext.title || "What becomes possible next"}>
+                <SectionBlocks section={secPossibleNext} />
+              </GlassCard>
+            </div>
           ) : null}
 
-          <InsightsCard ai={ai} error={aiError || null} />
+          <CoachingInsightsCard ai={ai} error={aiError || null} />
         </div>
 
         {/* PAGE 5 */}
@@ -1550,9 +1653,11 @@ export default function VisibilityReportClient({
           ) : null}
 
           {secClosing ? (
-            <GlassCard title={secClosing.title || "Turning insight into strategy"}>
-              <SectionBlocks section={secClosing} />
-            </GlassCard>
+            <div id={makeSectionId("closing")}>
+              <GlassCard title={secClosing.title || "Turning insight into strategy"}>
+                <SectionBlocks section={secClosing} />
+              </GlassCard>
+            </div>
           ) : null}
 
           <div className="text-xs px-1" style={{ color: BRAND.textFaint }}>
