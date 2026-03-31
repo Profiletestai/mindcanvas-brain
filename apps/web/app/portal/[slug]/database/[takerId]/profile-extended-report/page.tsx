@@ -4,10 +4,10 @@ import "server-only";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import ProfileExtendedReportClient from "./ProfileExtendedReportClient";
 import { buildProfileExtendedReport } from "@/lib/visibility/profileExtendedReport";
 
 type VisibilityInputs = {
@@ -16,6 +16,19 @@ type VisibilityInputs = {
   behaviour_style?: string | null;
   readiness?: string | null;
   pillar_scores?: Record<string, number> | null;
+};
+
+type ReportBlock = {
+  title?: string;
+  short_summary?: string;
+  paragraphs?: string[];
+  transition?: string;
+};
+
+type ReportSection = {
+  key: string;
+  title?: string;
+  blocks?: ReportBlock[];
 };
 
 function getKey() {
@@ -129,7 +142,6 @@ async function loadVisibilityInputs(
 ): Promise<VisibilityInputs | null> {
   const portal = portalSb();
 
-  // Primary source: existing internal snapshot endpoint
   try {
     const baseUrl = await getBaseUrlFromHeaders();
     const h = await headers();
@@ -141,9 +153,7 @@ async function loadVisibilityInputs(
 
     const res = await fetch(snapshotUrl, {
       method: "GET",
-      headers: {
-        cookie,
-      },
+      headers: { cookie },
       cache: "no-store",
     });
 
@@ -159,7 +169,6 @@ async function loadVisibilityInputs(
     );
   }
 
-  // Fallback source: stored totals
   const { data: testResult, error } = await portal
     .from("test_results")
     .select("totals")
@@ -174,27 +183,58 @@ async function loadVisibilityInputs(
   return normaliseTotalsPayload(testResult?.totals);
 }
 
-function titleFromKey(key: string) {
-  const map: Record<string, string> = {
-    result_interpretation_scripts: "Result Interpretation",
-    level_progression_roadmap: "Level Progression Roadmap",
-    visibility_signal_framework: "Visibility Signal Framework",
-    visibility_audit_layer: "Visibility Audit Layer",
-  };
-  return map[key] || key.replace(/_/g, " ");
+function normaliseSections(rawReport: any): ReportSection[] {
+  const raw = rawReport?.sections;
+
+  if (Array.isArray(raw)) {
+    return raw.map((s: any, idx: number) => ({
+      key: safeString(s?.key) || `section_${idx + 1}`,
+      title: safeString(s?.title) || undefined,
+      blocks: Array.isArray(s?.blocks)
+        ? s.blocks.map((b: any) => ({
+            title: safeString(b?.title) || undefined,
+            short_summary: safeString(b?.short_summary) || undefined,
+            paragraphs: Array.isArray(b?.paragraphs)
+              ? b.paragraphs.map((p: any) => String(p))
+              : [],
+            transition: safeString(b?.transition) || undefined,
+          }))
+        : [],
+    }));
+  }
+
+  if (raw && typeof raw === "object") {
+    return Object.entries(raw).map(([key, value]: [string, any]) => ({
+      key,
+      title: safeString(value?.title) || undefined,
+      blocks: Array.isArray(value?.blocks)
+        ? value.blocks.map((b: any) => ({
+            title: safeString(b?.title) || undefined,
+            short_summary: safeString(b?.short_summary) || undefined,
+            paragraphs: Array.isArray(b?.paragraphs)
+              ? b.paragraphs.map((p: any) => String(p))
+              : [],
+            transition: safeString(b?.transition) || undefined,
+          }))
+        : [],
+    }));
+  }
+
+  return [];
 }
 
 export default async function ProfileExtendedReportPage({
   params,
 }: {
-  params: { slug: string; takerId: string };
+  params: Promise<{ slug: string; takerId: string }>;
 }) {
+  const { slug, takerId } = await params;
   const portal = portalSb();
 
   const { data: org, error: orgErr } = await portal
     .from("orgs")
     .select("id, slug, name")
-    .eq("slug", params.slug)
+    .eq("slug", slug)
     .maybeSingle();
 
   if (orgErr || !org) notFound();
@@ -204,7 +244,7 @@ export default async function ProfileExtendedReportPage({
     .select(
       "id, org_id, test_id, first_name, last_name, email, company, role_title"
     )
-    .eq("id", params.takerId)
+    .eq("id", takerId)
     .eq("org_id", org.id)
     .maybeSingle();
 
@@ -216,34 +256,13 @@ export default async function ProfileExtendedReportPage({
     .eq("id", taker.test_id)
     .maybeSingle();
 
-  const visibilityInputs = await loadVisibilityInputs(params.slug, params.takerId);
+  const visibilityInputs = await loadVisibilityInputs(slug, takerId);
 
   if (!visibilityInputs) {
-    return (
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-6">
-          <Link
-            href={`/portal/${params.slug}/database/${params.takerId}`}
-            className="text-sm text-slate-600 hover:text-slate-900"
-          >
-            ← Back to test taker profile
-          </Link>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-          <h1 className="text-xl font-semibold text-slate-900">
-            Profile Extended Report
-          </h1>
-          <p className="mt-3 text-sm text-slate-700">
-            We could not find the Visibility result inputs needed to build this
-            report.
-          </p>
-        </div>
-      </div>
-    );
+    notFound();
   }
 
-  const report = await buildProfileExtendedReport({
+  const rawReport = await buildProfileExtendedReport({
     tier: visibilityInputs.tier,
     level: visibilityInputs.level,
     behaviour_style: visibilityInputs.behaviour_style ?? null,
@@ -252,216 +271,24 @@ export default async function ProfileExtendedReportPage({
     pillar_scores: visibilityInputs.pillar_scores ?? null,
   } as any);
 
+  const sections = normaliseSections(rawReport);
+
   const fullName =
     [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() ||
     "Unknown test taker";
 
-  const sections = Array.isArray((report as any)?.sections)
-    ? (report as any).sections
-    : [];
-  const signals = (report as any)?.signals || {};
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <Link
-              href={`/portal/${params.slug}/database/${params.takerId}`}
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              ← Back to test taker profile
-            </Link>
-            <h1 className="mt-3 text-3xl font-semibold text-slate-900">
-              Profile Extended Report
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Internal visibility interpretation layer for {fullName}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Test taker
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {fullName}
-            </div>
-            <div className="mt-1 text-sm text-slate-600">
-              {taker.email || "—"}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Organisation
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {org.name || org.slug}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Assessment
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {test?.name || "Visibility Ladder"}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Tier / Level
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {visibilityInputs.tier} • Level {visibilityInputs.level}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              Style / Readiness
-            </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {visibilityInputs.behaviour_style || "—"}
-              {visibilityInputs.readiness
-                ? ` • ${visibilityInputs.readiness}`
-                : ""}
-            </div>
-          </div>
-        </div>
-
-        {visibilityInputs.pillar_scores &&
-        Object.keys(visibilityInputs.pillar_scores).length > 0 ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Pillar Scores
-            </h2>
-            <div className="mt-4 grid gap-4 md:grid-cols-4">
-              {Object.entries(visibilityInputs.pillar_scores).map(
-                ([key, value]) => (
-                  <div
-                    key={key}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      {key.replace(/_/g, " ")}
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-slate-900">
-                      {safeNumber(value)}%
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Matched Report Signals
-          </h2>
-          <pre className="mt-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">
-{JSON.stringify(
-  {
-    tier: visibilityInputs.tier,
-    level: visibilityInputs.level,
-    behaviour_style: visibilityInputs.behaviour_style,
-    readiness: visibilityInputs.readiness,
-    pillar_scores: visibilityInputs.pillar_scores,
-    helper_signals: signals,
-  },
-  null,
-  2
-)}
-          </pre>
-        </div>
-
-        <div className="mt-6 space-y-6">
-          {sections.length ? (
-            sections.map((section: any, index: number) => {
-              const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
-
-              return (
-                <section
-                  key={section?.key || index}
-                  className="rounded-2xl border border-slate-200 bg-white p-6"
-                >
-                  <div className="mb-4">
-                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Section {index + 1}
-                    </div>
-                    <h2 className="mt-1 text-xl font-semibold text-slate-900">
-                      {section?.title ||
-                        titleFromKey(section?.key || `section_${index + 1}`)}
-                    </h2>
-                  </div>
-
-                  <div className="space-y-5">
-                    {blocks.map((block: any, blockIndex: number) => {
-                      const paragraphs = Array.isArray(block?.paragraphs)
-                        ? block.paragraphs
-                        : [];
-                      const shortSummary = safeString(block?.short_summary);
-                      const blockTitle = safeString(block?.title);
-                      const transition = safeString(block?.transition);
-
-                      return (
-                        <div
-                          key={`${section?.key || index}-${blockIndex}`}
-                          className="rounded-xl border border-slate-200 bg-slate-50 p-5"
-                        >
-                          {blockTitle ? (
-                            <h3 className="text-base font-semibold text-slate-900">
-                              {blockTitle}
-                            </h3>
-                          ) : null}
-
-                          {shortSummary ? (
-                            <div className="mt-3 rounded-lg bg-white p-4 text-sm text-slate-700">
-                              <span className="font-medium text-slate-900">
-                                In short:
-                              </span>{" "}
-                              {shortSummary}
-                            </div>
-                          ) : null}
-
-                          {paragraphs.length ? (
-                            <div className="mt-4 space-y-4 text-sm leading-7 text-slate-700">
-                              {paragraphs.map((p: string, pIndex: number) => (
-                                <p key={pIndex}>{p}</p>
-                              ))}
-                            </div>
-                          ) : null}
-
-                          {transition ? (
-                            <div className="mt-4 text-xs italic text-slate-500">
-                              {transition}
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })
-          ) : (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-              <h2 className="text-lg font-semibold text-slate-900">
-                No extended report sections found
-              </h2>
-              <p className="mt-3 text-sm text-slate-700">
-                The helper ran, but no matching KB blocks were returned for this
-                test taker.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <ProfileExtendedReportClient
+      orgSlug={slug}
+      takerId={takerId}
+      orgName={org.name || org.slug}
+      testName={test?.name || "Visibility Ladder"}
+      takerName={fullName}
+      takerEmail={taker.email || ""}
+      company={taker.company || ""}
+      roleTitle={taker.role_title || ""}
+      inputs={visibilityInputs}
+      sections={sections}
+    />
   );
 }

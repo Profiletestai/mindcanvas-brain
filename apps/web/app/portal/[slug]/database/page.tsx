@@ -24,6 +24,7 @@ type Row = {
   company: string;
   testName: string;
   testPurpose: string;
+  testStatus: "Completed" | "Incomplete";
   created: string;
 };
 
@@ -122,7 +123,7 @@ export default async function DatabasePage({
     let takerQuery = sb
       .from("test_takers")
       .select(
-        "id, first_name, last_name, email, company, created_at, test_id, link_token",
+        "id, first_name, last_name, email, company, created_at, test_id, link_token, status",
         { count: "exact" },
       )
       .eq("org_id", org.id)
@@ -181,6 +182,10 @@ export default async function DatabasePage({
         company: t.company || "—",
         testName: testNameById.get(t.test_id) || "—",
         testPurpose,
+        testStatus:
+          String(t.status || "").toLowerCase() === "completed"
+            ? "Completed"
+            : "Incomplete",
         created: t.created_at
           ? new Date(t.created_at as any).toISOString().slice(0, 10)
           : "—",
@@ -312,6 +317,9 @@ export default async function DatabasePage({
                   Test name / purpose
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Test status
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Created
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -334,6 +342,17 @@ export default async function DatabasePage({
                   <td className="px-4 py-2">{r.company}</td>
                   <td className="px-4 py-2">{r.testName}</td>
                   <td className="px-4 py-2">{r.testPurpose}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={
+                        r.testStatus === "Completed"
+                          ? "inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
+                          : "inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700"
+                      }
+                    >
+                      {r.testStatus}
+                    </span>
+                  </td>
                   <td className="whitespace-nowrap px-4 py-2">{r.created}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-col gap-1">
@@ -358,7 +377,7 @@ export default async function DatabasePage({
                 <tr>
                   <td
                     className="px-4 py-6 text-center text-slate-500"
-                    colSpan={7}
+                    colSpan={8}
                   >
                     No test takers found.
                   </td>
