@@ -13,6 +13,8 @@ type VisibilityInputs = {
   behaviour_style?: string | null;
   readiness?: string | null;
   pillar_scores?: Record<string, number> | null;
+  tier_counts?: Record<string, number> | null;
+  personality_points?: Record<string, number> | null;
 };
 
 type ReportBlock = {
@@ -54,11 +56,151 @@ function sectionId(key: string) {
 
 function colourForTier(tier: string) {
   const t = safeString(tier).toLowerCase();
-  if (t === "invisible") return "bg-slate-500";
-  if (t === "emerging") return "bg-blue-500";
-  if (t === "established") return "bg-teal-500";
-  if (t === "magnetic") return "bg-violet-500";
-  return "bg-slate-500";
+  if (t === "invisible") return "#64748b";
+  if (t === "emerging") return "#3b82f6";
+  if (t === "established") return "#14b8a6";
+  if (t === "magnetic") return "#8b5cf6";
+  return "#64748b";
+}
+
+function normalisedPillars(scores?: Record<string, number> | null) {
+  const s = scores || {};
+  return Object.entries(s).map(([key, value]) => ({
+    key,
+    label: key.replace(/_/g, " "),
+    value: Math.max(0, Math.min(100, safeNumber(value))),
+  }));
+}
+
+function tierRows(level: number) {
+  return Array.from({ length: 20 }, (_, i) => 20 - i).map((n) => ({
+    level: n,
+    active: n === level,
+    tier:
+      n <= 5
+        ? "Invisible"
+        : n <= 10
+          ? "Emerging"
+          : n <= 15
+            ? "Established"
+            : "Magnetic",
+  }));
+}
+
+function TierLadderGraph({ tier, level }: { tier: string; level: number }) {
+  const rows = tierRows(level);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Ladder Position
+      </div>
+
+      <div className="mt-4 space-y-1">
+        {rows.map((row) => {
+          const color = colourForTier(row.tier);
+          return (
+            <div key={row.level} className="flex items-center gap-3">
+              <div className="w-8 text-xs text-slate-500">{row.level}</div>
+              <div
+                className="relative h-6 flex-1 rounded-full border"
+                style={{
+                  borderColor: row.active ? color : "#e2e8f0",
+                  background: row.active ? `${color}22` : "#ffffff",
+                }}
+              >
+                <div
+                  className="absolute inset-y-0 right-0 w-1 rounded-r-full"
+                  style={{ background: row.active ? color : "#cbd5e1" }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4 text-sm text-slate-700">
+        <span className="font-semibold" style={{ color: colourForTier(tier) }}>
+          {tier}
+        </span>{" "}
+        • Level {level}
+      </div>
+    </div>
+  );
+}
+
+function PillarGraph({ scores }: { scores?: Record<string, number> | null }) {
+  const pillars = normalisedPillars(scores);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Pillar Scores
+      </div>
+
+      {pillars.length ? (
+        <div className="mt-4 space-y-4">
+          {pillars.map((pillar) => (
+            <div key={pillar.key}>
+              <div className="mb-1 flex items-center justify-between text-sm text-slate-700">
+                <span className="capitalize">{pillar.label}</span>
+                <span className="font-medium">{pillar.value}%</span>
+              </div>
+              <div className="h-3 rounded-full bg-slate-200">
+                <div
+                  className="h-3 rounded-full bg-slate-900"
+                  style={{ width: `${pillar.value}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 text-sm text-slate-500">
+          No pillar scores available.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TierCountsGraph({ counts }: { counts?: Record<string, number> | null }) {
+  const c = counts || {};
+  const items = [
+    { key: "Invisible", label: "Invisible", value: safeNumber(c.Invisible) },
+    { key: "Emerging", label: "Emerging", value: safeNumber(c.Emerging) },
+    { key: "Established", label: "Established", value: safeNumber(c.Established) },
+    { key: "Magnetic", label: "Magnetic", value: safeNumber(c.Magnetic) },
+  ];
+  const max = Math.max(...items.map((i) => i.value), 1);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Tier Distribution
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {items.map((item) => (
+          <div key={item.key}>
+            <div className="mb-1 flex items-center justify-between text-sm text-slate-700">
+              <span>{item.label}</span>
+              <span>{item.value}</span>
+            </div>
+            <div className="h-3 rounded-full bg-slate-200">
+              <div
+                className="h-3 rounded-full"
+                style={{
+                  width: `${(item.value / max) * 100}%`,
+                  background: colourForTier(item.key),
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ProfileExtendedReportClient(props: {
@@ -203,9 +345,8 @@ export default function ProfileExtendedReportClient(props: {
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <span
-                      className={`inline-block h-3 w-3 rounded-full ${colourForTier(
-                        props.inputs.tier
-                      )}`}
+                      className="inline-block h-3 w-3 rounded-full"
+                      style={{ background: colourForTier(props.inputs.tier) }}
                     />
                     <span className="text-sm font-semibold text-slate-900">
                       {props.inputs.tier}
@@ -290,6 +431,15 @@ export default function ProfileExtendedReportClient(props: {
             </aside>
 
             <main className="space-y-6">
+              <section className="grid gap-6 xl:grid-cols-3">
+                <TierLadderGraph
+                  tier={props.inputs.tier}
+                  level={props.inputs.level}
+                />
+                <PillarGraph scores={props.inputs.pillar_scores} />
+                <TierCountsGraph counts={props.inputs.tier_counts} />
+              </section>
+
               {props.sections.length ? (
                 props.sections.map((section, index) => (
                   <section

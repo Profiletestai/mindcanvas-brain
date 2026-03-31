@@ -205,8 +205,8 @@ export default async function TakerDetail({
   const profilesSource: any[] = Array.isArray(framework?.profiles)
     ? framework.profiles
     : Array.isArray(meta?.profiles)
-    ? meta.profiles
-    : [];
+      ? meta.profiles
+      : [];
 
   const profiles: Array<{ name: string; code?: string; frequency?: string }> =
     profilesSource.map((p: any) => ({
@@ -218,8 +218,8 @@ export default async function TakerDetail({
   const freqSource: any[] = Array.isArray(framework?.frequencies)
     ? framework.frequencies
     : Array.isArray(meta?.frequencies)
-    ? meta.frequencies
-    : [];
+      ? meta.frequencies
+      : [];
 
   const freqLabels: Record<string, string> = freqSource.length
     ? Object.fromEntries(
@@ -506,6 +506,8 @@ export default async function TakerDetail({
               {profileExtendedReportUrl ? (
                 <Link
                   href={profileExtendedReportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-50 hover:bg-slate-800"
                 >
                   Generate Profile Extended Report

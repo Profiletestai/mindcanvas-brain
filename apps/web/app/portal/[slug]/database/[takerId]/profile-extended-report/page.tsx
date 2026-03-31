@@ -16,6 +16,8 @@ type VisibilityInputs = {
   behaviour_style?: string | null;
   readiness?: string | null;
   pillar_scores?: Record<string, number> | null;
+  tier_counts?: Record<string, number> | null;
+  personality_points?: Record<string, number> | null;
 };
 
 type ReportBlock = {
@@ -96,6 +98,8 @@ function normaliseSnapshotPayload(payload: any): VisibilityInputs | null {
       ) || null;
     const readiness = safeString(obj.readiness) || null;
     const pillar_scores = normaliseObject(obj.pillar_scores);
+    const tier_counts = normaliseObject(obj.tier_counts);
+    const personality_points = normaliseObject(obj.personality_points);
 
     if (tier && level > 0) {
       return {
@@ -104,6 +108,10 @@ function normaliseSnapshotPayload(payload: any): VisibilityInputs | null {
         behaviour_style,
         readiness,
         pillar_scores: Object.keys(pillar_scores).length ? pillar_scores : null,
+        tier_counts: Object.keys(tier_counts).length ? tier_counts : null,
+        personality_points: Object.keys(personality_points).length
+          ? personality_points
+          : null,
       };
     }
   }
@@ -124,6 +132,8 @@ function normaliseTotalsPayload(totals: any): VisibilityInputs | null {
     ) || null;
   const readiness = safeString(root.readiness) || null;
   const pillar_scores = normaliseObject(root.pillar_scores);
+  const tier_counts = normaliseObject(root.tier_counts);
+  const personality_points = normaliseObject(root.personality_points);
 
   if (!tier || level <= 0) return null;
 
@@ -133,6 +143,10 @@ function normaliseTotalsPayload(totals: any): VisibilityInputs | null {
     behaviour_style,
     readiness,
     pillar_scores: Object.keys(pillar_scores).length ? pillar_scores : null,
+    tier_counts: Object.keys(tier_counts).length ? tier_counts : null,
+    personality_points: Object.keys(personality_points).length
+      ? personality_points
+      : null,
   };
 }
 
@@ -184,7 +198,11 @@ async function loadVisibilityInputs(
 }
 
 function normaliseSections(rawReport: any): ReportSection[] {
-  const raw = rawReport?.sections;
+  const raw =
+    rawReport?.sections ??
+    rawReport?.report_sections ??
+    rawReport?.content ??
+    rawReport;
 
   if (Array.isArray(raw)) {
     return raw.map((s: any, idx: number) => ({
