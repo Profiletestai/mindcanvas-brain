@@ -17,21 +17,17 @@ type Signals = {
   mode?: ScoringMode;
   pillar_model?: "legacy" | "prime";
   public_profile_model?: "hidden" | "visible";
-
   tier?: Tier;
   level?: number;
   style?: AB;
   readiness?: Readiness;
-
   pillar_scores?: Record<string, number>;
   pillar_bands?: Record<string, string>;
   pillar_band?: Record<string, string>;
-
   weakest_pillar?: string | null;
   strongest_pillar?: string | null;
   balance_pattern?: string | null;
   pattern_tags?: string[];
-
   overall_pct?: number | null;
   validation_required?: boolean;
   validation_status?: string | null;
@@ -80,7 +76,6 @@ type VisibilityKbReport = {
   engine_key?: string;
   version?: number;
   audience?: string;
-
   meta?: {
     org_name?: string | null;
     org_logo_url?: string | null;
@@ -90,11 +85,9 @@ type VisibilityKbReport = {
     ai_error?: string;
     scoring_mode?: ScoringMode;
   };
-
   signals?: Signals;
   graphs?: Graphs;
   sections?: Section[];
-
   ai?: AiInsights | null;
   ai_meta?: any;
 };
@@ -204,14 +197,14 @@ async function fetchJson<T = any>(url: string): Promise<T> {
 }
 
 function flattenSectionParagraphs(section?: Section | null): string[] {
-  const blocks = Array.isArray(section?.blocks) ? section!.blocks! : [];
+  const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
   return blocks
     .flatMap((b) => (Array.isArray(b?.paragraphs) ? b.paragraphs : []))
     .filter(Boolean);
 }
 
 function firstSummary(section?: Section | null): string {
-  const blocks = Array.isArray(section?.blocks) ? section!.blocks! : [];
+  const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
   for (const b of blocks) {
     const s = safeString(b?.short_summary);
     if (s) return s;
@@ -319,9 +312,12 @@ function sanitizeSectionForPrime(section?: Section | null): Section | null {
   return { ...section, blocks };
 }
 
+function isExternalUrl(href?: string) {
+  return /^https?:\/\//i.test(safeString(href));
+}
+
 const BRAND = {
   bg: "#071832",
-  bgSoft: "#0B244B",
   accent: "#43DFC7",
   accent2: "#6C63FF",
   textDim: "rgba(255,255,255,0.75)",
@@ -349,7 +345,7 @@ const BRAND = {
   } as Record<string, string>,
 
   primePillars: {
-    visibility: "#4FB3FF",
+    visibility: "#4F7DFF",
     trust: "#43DFC7",
     authority: "#43DFC7",
     dominance: "#9A63FF",
@@ -452,12 +448,20 @@ function PrimaryButton({
   } as any;
 
   if (href) {
+    const external = isExternalUrl(href);
     return (
-      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
+      <a
+        className={cls}
+        style={style}
+        href={href}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+      >
         {children}
       </a>
     );
   }
+
   return (
     <button className={cls} style={style} onClick={onClick} disabled={disabled}>
       {children}
@@ -486,12 +490,20 @@ function SecondaryButton({
   } as any;
 
   if (href) {
+    const external = isExternalUrl(href);
     return (
-      <a className={cls} style={style} href={href} target="_blank" rel="noopener noreferrer">
+      <a
+        className={cls}
+        style={style}
+        href={href}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noopener noreferrer" : undefined}
+      >
         {children}
       </a>
     );
   }
+
   return (
     <button className={cls} style={style} onClick={onClick} disabled={disabled}>
       {children}
@@ -602,20 +614,20 @@ function PillarTile({
 
 function PrimeLadderCard({
   level,
-  tier,
 }: {
   level: number;
-  tier: Tier;
 }) {
   const active = clamp(level || 1, 1, 20);
   const rows = Array.from({ length: 20 }, (_, i) => 20 - i);
 
-  const bandConfig = [
+  const bands = [
     { name: "Magnetic", from: 16, to: 20, color: BRAND.tier.Magnetic },
     { name: "Established", from: 11, to: 15, color: BRAND.tier.Established },
     { name: "Emerging", from: 6, to: 10, color: BRAND.tier.Emerging },
     { name: "Invisible", from: 1, to: 5, color: BRAND.tier.Invisible },
   ];
+
+  const bandForLevel = (n: number) => bands.find((b) => n >= b.from && n <= b.to)!;
 
   return (
     <div
@@ -631,7 +643,7 @@ function PrimeLadderCard({
 
       <div className="mt-4 grid grid-cols-[28px_1fr] gap-3 items-stretch">
         <div className="flex flex-col gap-1">
-          {bandConfig.map((band) => (
+          {bands.map((band) => (
             <div
               key={band.name}
               className="flex-1 rounded-xl flex items-center justify-center text-[10px] font-semibold"
@@ -651,22 +663,27 @@ function PrimeLadderCard({
         <div className="space-y-1.5">
           {rows.map((n) => {
             const isActive = n === active;
-            const band = tierBand(n);
-            const color = BRAND.tier[band];
+            const band = bandForLevel(n);
 
             return (
               <div key={n} className="flex items-center gap-2">
                 <div
-                  className="flex-1 h-7 rounded-lg border text-[11px] flex items-center justify-center"
+                  className="relative flex-1 h-7 rounded-lg border text-[11px] flex items-center justify-center overflow-hidden"
                   style={{
-                    borderColor: isActive ? `${color}99` : "rgba(255,255,255,0.10)",
+                    borderColor: isActive ? `${band.color}99` : "rgba(255,255,255,0.10)",
                     background: isActive
-                      ? `linear-gradient(90deg, ${color}bb, rgba(255,255,255,0.06))`
+                      ? `linear-gradient(90deg, ${band.color}cc, rgba(255,255,255,0.10))`
                       : "rgba(255,255,255,0.03)",
                     color: isActive ? "#081424" : "rgba(255,255,255,0.72)",
-                    boxShadow: isActive ? `0 0 14px ${color}44` : "none",
+                    boxShadow: isActive ? `0 0 16px ${band.color}44` : "none",
                   }}
                 >
+                  {!isActive ? (
+                    <span
+                      className="absolute right-0 top-0 h-full w-[4px]"
+                      style={{ background: `${band.color}66` }}
+                    />
+                  ) : null}
                   {n}
                 </div>
               </div>
@@ -676,7 +693,7 @@ function PrimeLadderCard({
       </div>
 
       <div className="mt-5 space-y-2 text-xs" style={{ color: BRAND.textDim }}>
-        {bandConfig.map((band) => (
+        {bands.map((band) => (
           <div key={band.name} className="flex items-center justify-between">
             <span>{band.name}</span>
             <span>
@@ -691,11 +708,11 @@ function PrimeLadderCard({
 
 function SectionIndex({
   items,
-  nextStepsUrl,
+  nextStepsHref,
   onDownloadPdf,
 }: {
   items: Array<{ key: string; label: string }>;
-  nextStepsUrl?: string | null;
+  nextStepsHref: string;
   onDownloadPdf: () => void;
 }) {
   return (
@@ -728,7 +745,119 @@ function SectionIndex({
 
       <div className="mt-4 flex flex-col gap-2">
         <SecondaryButton onClick={onDownloadPdf}>Download PDF</SecondaryButton>
-        {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton> : null}
+        <PrimaryButton href={nextStepsHref}>Next steps</PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+function SignalGraphCard({
+  tier,
+  level,
+  overallPct,
+  pillars,
+  weakest,
+  strongest,
+  mode,
+}: {
+  tier: Tier;
+  level: number;
+  overallPct: number | null;
+  pillars: Array<{ key: string; label: string; value: number }>;
+  weakest: string;
+  strongest: string;
+  mode: ScoringMode;
+}) {
+  return (
+    <div
+      className="rounded-[20px] p-5 h-full"
+      style={{
+        background: "rgba(0,0,0,0.12)",
+        border: `1px solid ${BRAND.border}`,
+      }}
+    >
+      <div
+        className="text-[12px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: BRAND.accent2 }}
+      >
+        Signal graph
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <div
+          className="rounded-xl p-3"
+          style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${BRAND.border}` }}
+        >
+          <div className="text-[11px]" style={{ color: BRAND.textFaint }}>
+            Tier
+          </div>
+          <div className="mt-1 text-sm font-semibold" style={{ color: BRAND.tier[tier] }}>
+            {tier}
+          </div>
+        </div>
+
+        <div
+          className="rounded-xl p-3"
+          style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${BRAND.border}` }}
+        >
+          <div className="text-[11px]" style={{ color: BRAND.textFaint }}>
+            Level
+          </div>
+          <div className="mt-1 text-sm font-semibold">{level}</div>
+        </div>
+
+        <div
+          className="rounded-xl p-3"
+          style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${BRAND.border}` }}
+        >
+          <div className="text-[11px]" style={{ color: BRAND.textFaint }}>
+            Overall
+          </div>
+          <div className="mt-1 text-sm font-semibold">{overallPct != null ? `${overallPct}%` : "—"}</div>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {pillars.map((p) => {
+          const color =
+            mode === "prime"
+              ? BRAND.primePillars[p.key] || BRAND.accent
+              : BRAND.legacyPillars[p.key] || BRAND.accent;
+
+          return (
+            <div key={p.key}>
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  {p.label}
+                  {safeString(p.key).toLowerCase() === weakest.toLowerCase() ? (
+                    <span className="ml-2 text-xs" style={{ color: BRAND.textFaint }}>
+                      weakest
+                    </span>
+                  ) : null}
+                  {safeString(p.key).toLowerCase() === strongest.toLowerCase() ? (
+                    <span className="ml-2 text-xs" style={{ color: BRAND.textFaint }}>
+                      strongest
+                    </span>
+                  ) : null}
+                </div>
+                <div>{p.value}%</div>
+              </div>
+
+              <div
+                className="mt-2 h-2 rounded-full overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.08)" }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${p.value}%`,
+                    background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.16))`,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -899,16 +1028,6 @@ export default function VisibilityReportClient({
   const portalFullName = fullName(portalMeta?.taker);
   const takerName = portalFullName !== "Your" ? portalFullName : "Your Report";
 
-  const nextStepsUrl = safeString(
-    portalMeta?.link?.next_steps_url || portalMeta?.link?.redirect_url || ""
-  );
-
-  const tier: Tier =
-    (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
-  const level: number = Number(kbReport?.signals?.level ?? 1);
-  const readiness = kbReport?.signals?.readiness as Readiness | undefined;
-  const reportDate = formatDate(kbReport?.meta?.generated_at);
-
   const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
   const rawSectionByKey = useMemo(() => {
     const m = new Map<string, Section>();
@@ -927,7 +1046,6 @@ export default function VisibilityReportClient({
   const secUnderstanding = getSection("understanding");
   const secTiers = getSection("tiers_levels");
   const secBehaviourProfiles = mode === "legacy" ? getSection("behaviour_profiles") : null;
-
   const secFramework = getSection("framework_foundation");
   const secSnapshot = getSection("snapshot");
   const secPillars = getSection("pillars");
@@ -939,6 +1057,26 @@ export default function VisibilityReportClient({
   const secNextMove = getSection("next_move");
   const secPossibleNext = getSection("possible_next");
   const secClosing = getSection("closing");
+
+  const nextStepsFallback = secPossibleNext
+    ? `#${makeSectionId("possible_next")}`
+    : secClosing
+      ? `#${makeSectionId("closing")}`
+      : "#top";
+
+  const nextStepsHref =
+    safeString(
+      portalMeta?.link?.next_steps_url ||
+        portalMeta?.link?.redirect_url ||
+        portalMeta?.link?.meta?.next_steps_url ||
+        ""
+    ) || nextStepsFallback;
+
+  const tier: Tier =
+    (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
+  const level: number = Number(kbReport?.signals?.level ?? 1);
+  const readiness = kbReport?.signals?.readiness as Readiness | undefined;
+  const reportDate = formatDate(kbReport?.meta?.generated_at);
 
   const pillarSource =
     (kbReport?.graphs?.pillars as Record<string, number>) ||
@@ -956,7 +1094,6 @@ export default function VisibilityReportClient({
 
   const weakest = safeString(kbReport?.signals?.weakest_pillar || "");
   const strongest = safeString(kbReport?.signals?.strongest_pillar || "");
-
   const validationRequired = Boolean(kbReport?.signals?.validation_required);
   const validationStatus = safeString(kbReport?.signals?.validation_status);
   const overallPct = kbReport?.signals?.overall_pct ?? null;
@@ -1154,14 +1291,14 @@ export default function VisibilityReportClient({
 
   return (
     <Shell>
-      <div ref={reportRootRef} className="mx-auto max-w-[1440px] p-5 md:p-6 space-y-8">
+      <div id="top" ref={reportRootRef} className="mx-auto max-w-[1440px] p-5 md:p-6 space-y-8">
         {/* PAGE 1 */}
         <div data-pdf-page="true" className="space-y-6">
           <GlassCard
             right={
               <div className="flex flex-wrap gap-2">
                 <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
-                {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton> : null}
+                <PrimaryButton href={nextStepsHref}>Next steps</PrimaryButton>
               </div>
             }
           >
@@ -1242,10 +1379,10 @@ export default function VisibilityReportClient({
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             <div className="xl:col-span-3 space-y-6">
-              <PrimeLadderCard level={level} tier={tier} />
+              <PrimeLadderCard level={level} />
               <SectionIndex
                 items={indexItems}
-                nextStepsUrl={nextStepsUrl}
+                nextStepsHref={nextStepsHref}
                 onDownloadPdf={downloadPdf}
               />
             </div>
@@ -1574,13 +1711,15 @@ export default function VisibilityReportClient({
             </div>
           ) : null}
 
-          {secLevelMeaning ? (
-            <div id={makeSectionId("level_meaning")}>
-              <GlassCard title={secLevelMeaning.title || "What your current level means"}>
-                <SectionBlocks section={secLevelMeaning} />
-              </GlassCard>
-            </div>
-          ) : null}
+          <SignalGraphCard
+            tier={tier}
+            level={level}
+            overallPct={overallPct}
+            pillars={pillars}
+            weakest={weakest}
+            strongest={strongest}
+            mode={mode}
+          />
         </div>
 
         {/* PAGE 4 */}
