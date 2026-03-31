@@ -7,12 +7,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
 import { getBaseUrl } from "@/lib/baseUrl";
-import {
-  buildProfileExtendedReport,
-  type BehaviourStyle,
-  type Readiness,
-  type VisibilityTier,
-} from "@/lib/visibility/profileExtendedReport";
 
 export const dynamic = "force-dynamic";
 
@@ -134,62 +128,6 @@ function prettyReadiness(r?: string | null) {
   return t || "—";
 }
 
-function asVisibilityTier(value?: string | null): VisibilityTier | null {
-  const v = String(value || "").trim();
-  if (
-    v === "Invisible" ||
-    v === "Emerging" ||
-    v === "Established" ||
-    v === "Magnetic"
-  ) {
-    return v;
-  }
-  return null;
-}
-
-function asBehaviourStyle(value?: string | null): BehaviourStyle | null {
-  const v = String(value || "").trim().toUpperCase();
-  if (v === "A" || v === "B" || v === "C" || v === "D") return v;
-  return null;
-}
-
-function asReadiness(value?: string | null): Readiness | null {
-  const v = String(value || "").trim().toLowerCase();
-  if (v === "stabilise" || v === "ready_to_progress") return v;
-  return null;
-}
-
-function asNumber(value: any): number | null {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function normalizePillarScores(raw: any): {
-  discoverability?: number | null;
-  trust?: number | null;
-  conversion?: number | null;
-} | null {
-  if (!raw || typeof raw !== "object") return null;
-
-  const discoverability = asNumber(raw.discoverability);
-  const trust = asNumber(raw.trust);
-  const conversion = asNumber(raw.conversion);
-
-  if (
-    discoverability == null &&
-    trust == null &&
-    conversion == null
-  ) {
-    return null;
-  }
-
-  return {
-    discoverability,
-    trust,
-    conversion,
-  };
-}
-
 export default async function TakerDetail({
   params,
 }: {
@@ -205,7 +143,6 @@ export default async function TakerDetail({
     .maybeSingle();
   if (!org) return notFound();
 
-  // NOTE: do not org-filter taker here; we validate access below (supports wrapper org setups)
   const { data: taker } = await sb
     .from("test_takers")
     .select(
@@ -216,9 +153,6 @@ export default async function TakerDetail({
 
   if (!taker) return notFound();
 
-  // ✅ Access check:
-  // 1) allow if taker belongs to this org
-  // 2) otherwise allow if taker has ANY submission for a test whose tests.org_id == this org
   let allowed = taker.org_id === org.id;
 
   if (!allowed) {
@@ -261,12 +195,10 @@ export default async function TakerDetail({
   const latest = (results ?? [])[0] || null;
   const totalsRaw = parseTotals(latest?.totals);
 
-  // ✅ Detect Visibility engine totals (from your submit route)
   const isVisibility =
     Boolean(totalsRaw?.visibility) ||
     String(totalsRaw?.meta?.engine || "").toLowerCase().includes("visibility");
 
-  // ----- Meta + framework lookup ------------------------------------------
   const meta: any = (test?.meta as any) ?? {};
   const framework: any = meta?.framework || meta || {};
 
@@ -298,7 +230,6 @@ export default async function TakerDetail({
       )
     : { A: "A", B: "B", C: "C", D: "D" };
 
-  // --- Build frequency and profile score maps (raw points) ----------------
   let profileScores: Record<string, number> = {};
   let frequencyScores: Record<string, number> = {};
 
@@ -307,7 +238,6 @@ export default async function TakerDetail({
     typeof totalsRaw === "object" &&
     ("frequencies" in totalsRaw || "profiles" in totalsRaw)
   ) {
-    // New structured shape: { frequencies: {...}, profiles: {...} }
     const tr: any = totalsRaw;
 
     if (tr.frequencies && typeof tr.frequencies === "object") {
@@ -343,7 +273,6 @@ export default async function TakerDetail({
       }
     }
   } else {
-    // Legacy flat totals
     const keys = Object.keys(totalsRaw || {});
     const isFreqTotals =
       keys.length &&
@@ -357,7 +286,6 @@ export default async function TakerDetail({
         ])
       );
     } else {
-      // Assume these are profile scores keyed by profile name
       profileScores = Object.fromEntries(
         Object.entries(totalsRaw).map(([k, v]) => [String(k), Number(v) || 0])
       );
@@ -377,12 +305,10 @@ export default async function TakerDetail({
     }
   }
 
-  // --- Percentages for display (0–100) ------------------------------------
   const freqPct = asPercentMap(frequencyScores);
   const profilePct = asPercentMap(profileScores);
   const topProfile = sortDesc(profileScores)[0] as [string, number] | undefined;
 
-  // --- Decimals for coach summary (0–1) -----------------------------------
   const freqDec = asDecimalMap(frequencyScores);
   const profileDec = asDecimalMap(profileScores);
 
@@ -441,7 +367,6 @@ export default async function TakerDetail({
   const fullName =
     [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
 
-  // Build top 3 profiles for cards (using percentage profile mix)
   const sortedProfilePct = sortDesc(profilePct);
   const topThreeProfiles = sortedProfilePct.slice(0, 3).map(([name, pct]) => {
     const pMeta = profiles.find((p) => p.name === name);
@@ -451,7 +376,6 @@ export default async function TakerDetail({
 
   const labels = ["Primary profile", "Secondary", "Tertiary"];
 
-  // --- QSC URLs (Portal-only Snapshot + Portal-only Extended + Public Strategic) ---
   const isQsc =
     test?.slug === "qsc-core" ||
     test?.slug === "qsc-leaders" ||
@@ -462,7 +386,6 @@ export default async function TakerDetail({
   let qscExtendedUrl: string | null = null;
   let qscStrategicUrl: string | null = null;
 
-  // Determine QSC audience server-side so we build correct URLs (leader vs entrepreneur)
   let qscAudience: QscAudience | null = null;
 
   if (isQsc && taker.link_token) {
@@ -498,13 +421,11 @@ export default async function TakerDetail({
     qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
-  // --- Main report URL (what "Open test-taker report" should open) ----------
   let reportUrl: string | null = null;
 
   if (isQsc) {
     reportUrl = qscStrategicUrl;
   } else if (isVisibility && taker.link_token) {
-    // ✅ Visibility should open the bespoke visibility report
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
     )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
@@ -518,68 +439,18 @@ export default async function TakerDetail({
 
   const freqDefs: any[] = freqSource || [];
 
-  // ✅ Load internal visibility snapshot (Option B2 endpoint)
   const visibilitySnapshot = await fetchVisibilityInternalSnapshot({
     orgSlug: slug,
     takerId: taker.id,
   });
 
-  // ✅ Build Profile Extended Report for internal portal view only
-  const visibilityTier = asVisibilityTier(
-    visibilitySnapshot?.signals?.tier ??
-      totalsRaw?.visibility?.tier ??
-      totalsRaw?.tier ??
-      totalsRaw?.computed?.tier ??
-      null
-  );
-
-  const visibilityLevel =
-    asNumber(
-      visibilitySnapshot?.signals?.level ??
-        totalsRaw?.visibility?.level ??
-        totalsRaw?.level ??
-        totalsRaw?.computed?.level ??
-        totalsRaw?.computed?.tier_level ??
-        null
-    ) ?? 0;
-
-  const visibilityStyle = asBehaviourStyle(
-    visibilitySnapshot?.signals?.style ??
-      visibilitySnapshot?.signals?.behaviour_style ??
-      totalsRaw?.visibility?.style ??
-      totalsRaw?.visibility?.behaviour_style ??
-      totalsRaw?.behaviour_style ??
-      totalsRaw?.computed?.behaviour_style ??
-      totalsRaw?.computed?.style ??
-      null
-  );
-
-  const visibilityReadiness = asReadiness(
-    visibilitySnapshot?.signals?.readiness ??
-      totalsRaw?.visibility?.readiness ??
-      totalsRaw?.readiness ??
-      totalsRaw?.computed?.readiness ??
-      null
-  );
-
-  const visibilityPillarScores = normalizePillarScores(
-    visibilitySnapshot?.signals?.pillar_scores ??
-      visibilitySnapshot?.pillar_scores ??
-      totalsRaw?.pillar_scores ??
-      totalsRaw?.visibility?.pillar_scores ??
-      totalsRaw?.computed?.pillar_scores ??
-      null
-  );
-
-  const profileExtendedReport =
-    isVisibility && visibilityTier && visibilityLevel > 0 && visibilityStyle
-      ? await buildProfileExtendedReport({
-          tier: visibilityTier,
-          level: visibilityLevel,
-          behaviour_style: visibilityStyle,
-          readiness: visibilityReadiness,
-          pillar_scores: visibilityPillarScores,
-        })
+  const profileExtendedReportUrl =
+    isVisibility && latest?.id
+      ? `/portal/${encodeURIComponent(
+          slug
+        )}/database/${encodeURIComponent(
+          taker.id
+        )}/profile-extended-report`
       : null;
 
   return (
@@ -597,7 +468,6 @@ export default async function TakerDetail({
         </Link>
       </header>
 
-      {/* Contact */}
       <section className="rounded-xl border p-4 bg-white">
         <h2 className="font-medium mb-3">Contact</h2>
         <dl className="grid grid-cols-3 gap-2 text-sm">
@@ -622,7 +492,6 @@ export default async function TakerDetail({
         </dl>
       </section>
 
-      {/* ✅ Visibility Snapshot Panel (Portal-only) */}
       {visibilitySnapshot && (
         <section className="rounded-xl border p-4 bg-white space-y-3">
           <div className="flex items-center justify-between">
@@ -633,18 +502,29 @@ export default async function TakerDetail({
               </p>
             </div>
 
-            {taker.link_token && (
-              <Link
-                href={`/t/${encodeURIComponent(
-                  taker.link_token
-                )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
-              >
-                Open Visibility Report
-              </Link>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {profileExtendedReportUrl ? (
+                <Link
+                  href={profileExtendedReportUrl}
+                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-50 hover:bg-slate-800"
+                >
+                  Generate Profile Extended Report
+                </Link>
+              ) : null}
+
+              {taker.link_token && (
+                <Link
+                  href={`/t/${encodeURIComponent(
+                    taker.link_token
+                  )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
+                >
+                  Open Visibility Report
+                </Link>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
@@ -772,69 +652,6 @@ export default async function TakerDetail({
         </section>
       )}
 
-      {/* ✅ Profile Extended Report (Portal-only / internal) */}
-      {profileExtendedReport?.sections?.length ? (
-        <section className="rounded-xl border p-4 bg-white space-y-4">
-          <div>
-            <h2 className="font-medium">Profile Extended Report</h2>
-            <p className="text-sm text-gray-500">
-              Internal profile layer built from Visibility Ladder KB blocks
-            </p>
-          </div>
-
-          <div className="space-y-5">
-            {profileExtendedReport.sections.map((section) => (
-              <div
-                key={section.section_key}
-                className="rounded-xl border border-slate-200 bg-slate-50/50 p-4"
-              >
-                {section.heading ? (
-                  <h3 className="text-base font-semibold text-slate-900">
-                    {section.heading}
-                  </h3>
-                ) : null}
-
-                {section.subheading ? (
-                  <p className="mt-1 text-sm text-slate-500">
-                    {section.subheading}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 space-y-4">
-                  {section.blocks.map((block, index) => (
-                    <div
-                      key={`${section.section_key}-${index}`}
-                      className="rounded-lg border border-slate-100 bg-white p-4"
-                    >
-                      {block.heading ? (
-                        <h4 className="text-sm font-semibold text-slate-900">
-                          {block.heading}
-                        </h4>
-                      ) : null}
-
-                      {block.summary ? (
-                        <p className="mt-2 text-sm leading-6 text-slate-700">
-                          {block.summary}
-                        </p>
-                      ) : null}
-
-                      {Array.isArray(block.bullets) && block.bullets.length > 0 ? (
-                        <ul className="mt-3 list-disc pl-5 space-y-1 text-sm leading-6 text-slate-700">
-                          {block.bullets.map((item: string, i: number) => (
-                            <li key={i}>{item}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Latest Result */}
       <section className="rounded-xl border p-4 bg-white space-y-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
@@ -871,7 +688,6 @@ export default async function TakerDetail({
           </div>
         </div>
 
-        {/* ✅ QSC buttons now open in a new tab */}
         {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
           <div className="flex flex-wrap gap-2 pt-2">
             {qscSnapshotUrl && (
@@ -950,7 +766,6 @@ export default async function TakerDetail({
           )}
         </div>
 
-        {/* Primary / Secondary / Tertiary cards for coaches */}
         {topThreeProfiles.length > 0 && (
           <div className="grid gap-4 md:grid-cols-3 pt-4">
             {topThreeProfiles.map((p, idx) => (
