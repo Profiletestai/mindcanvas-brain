@@ -261,6 +261,7 @@ function normalisePillars(mode: ScoringMode, raw: Record<string, number> | undef
       { key: "dominance", label: "Dominance", value: clamp(safeNumber(src.dominance), 0, 100) },
     ];
   }
+
   return [
     { key: "discoverability", label: "Discoverability", value: clamp(safeNumber(src.discoverability), 0, 100) },
     { key: "trust", label: "Trust", value: clamp(safeNumber(src.trust), 0, 100) },
@@ -285,9 +286,37 @@ function tierRangeLabel(tier: Tier) {
   return "Levels 16–20";
 }
 
+function sanitizeSectionForPrime(section?: Section | null): Section | null {
+  if (!section) return null;
+
+  const banned = [
+    "discoverability",
+    "conversion",
+    "behaviour profile",
+    "behaviour profiles",
+    "behavior profile",
+    "behavior profiles",
+  ];
+
+  const blocks = (section.blocks || []).filter((block) => {
+    const text = [
+      safeString(block.title),
+      safeString(block.short_summary),
+      ...(block.paragraphs || []).map((p) => safeString(p)),
+      safeString(block.transition),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return !banned.some((b) => text.includes(b));
+  });
+
+  if (!blocks.length) return null;
+  return { ...section, blocks };
+}
+
 const BRAND = {
   bg: "#07152F",
-  bgSoft: "#0B1E43",
   accent: "#E9B95B",
   textDim: "rgba(255,255,255,0.75)",
   textFaint: "rgba(255,255,255,0.55)",
@@ -328,9 +357,9 @@ const Shell = ({ children }: { children: ReactNode }) => (
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(1000px 600px at 18% 8%, rgba(79,179,255,0.10), transparent 58%)," +
-            "radial-gradient(760px 460px at 82% 18%, rgba(233,185,91,0.08), transparent 52%)," +
-            "radial-gradient(760px 460px at 50% 92%, rgba(139,92,246,0.06), transparent 58%)",
+            "radial-gradient(900px 520px at 18% 8%, rgba(79,179,255,0.09), transparent 58%)," +
+            "radial-gradient(700px 420px at 82% 18%, rgba(233,185,91,0.07), transparent 52%)," +
+            "radial-gradient(700px 420px at 50% 92%, rgba(139,92,246,0.05), transparent 58%)",
         }}
       />
       <div
@@ -339,7 +368,7 @@ const Shell = ({ children }: { children: ReactNode }) => (
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)," +
             "linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
+          backgroundSize: "72px 72px",
         }}
       />
     </div>
@@ -362,20 +391,19 @@ function GlassCard({
 }) {
   return (
     <div
-      className={`rounded-[24px] p-[1px] ${className}`}
+      className={`rounded-[22px] p-[1px] ${className}`}
       style={{
         background:
-          "linear-gradient(135deg, rgba(233,185,91,0.12), rgba(79,179,255,0.10), rgba(255,255,255,0.04))",
-        boxShadow: "0 14px 38px rgba(0,0,0,0.30)",
+          "linear-gradient(135deg, rgba(233,185,91,0.10), rgba(79,179,255,0.08), rgba(255,255,255,0.04))",
+        boxShadow: "0 12px 30px rgba(0,0,0,0.24)",
       }}
     >
       <div
-        className="rounded-[23px] p-5 md:p-6"
+        className="rounded-[21px] p-5 md:p-6"
         style={{
           background:
             "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
           border: `1px solid ${BRAND.border}`,
-          backdropFilter: "blur(8px)",
         }}
       >
         {(title || subtitle || right) && (
@@ -414,7 +442,7 @@ function PrimaryButton({
   const style = {
     background: BRAND.accent,
     color: "#081529",
-    boxShadow: "0 10px 24px rgba(233,185,91,0.26)",
+    boxShadow: "0 8px 20px rgba(233,185,91,0.24)",
   } as any;
 
   if (href) {
@@ -447,7 +475,7 @@ function SecondaryButton({
     (disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-white/5");
   const style = {
     borderColor: "rgba(255,255,255,0.18)",
-    background: "rgba(0,0,0,0.18)",
+    background: "rgba(0,0,0,0.16)",
     color: "white",
   } as any;
 
@@ -468,7 +496,7 @@ function SecondaryButton({
 function Kicker({ children }: { children: ReactNode }) {
   return (
     <div
-      className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.20em]"
+      className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
       style={{
         background: "rgba(255,255,255,0.05)",
         border: `1px solid ${BRAND.border}`,
@@ -493,12 +521,12 @@ function TinyInfoCard({
     <div
       className="rounded-[20px] p-5 h-full"
       style={{
-        background: "rgba(0,0,0,0.14)",
+        background: "rgba(0,0,0,0.12)",
         border: `1px solid ${BRAND.border}`,
       }}
     >
       <div
-        className="text-[12px] font-semibold uppercase tracking-[0.16em]"
+        className="text-[12px] font-semibold uppercase tracking-[0.14em]"
         style={{ color: accent || "rgba(255,255,255,0.90)" }}
       >
         {title}
@@ -540,33 +568,18 @@ function PillarTile({
       className="rounded-[18px] p-4"
       style={{
         background: "rgba(255,255,255,0.03)",
-        border: `1px solid ${isWeakest || isStrongest ? "rgba(255,255,255,0.18)" : BRAND.border}`,
+        border: `1px solid ${
+          isWeakest ? "rgba(79,179,255,0.22)" : isStrongest ? "rgba(139,92,246,0.22)" : BRAND.border
+        }`,
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-sm font-semibold uppercase tracking-[0.08em]">{label}</div>
-        {isStrongest ? (
-          <div
-            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.10em]"
-            style={{ background: `${color}20`, color }}
-          >
-            Strongest
-          </div>
-        ) : isWeakest ? (
-          <div
-            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.10em]"
-            style={{ background: `${color}20`, color }}
-          >
-            Weakest
-          </div>
-        ) : null}
-      </div>
+      <div className="text-[12px] font-semibold uppercase tracking-[0.10em]">{label}</div>
 
       <div className="mt-3 flex items-end justify-between gap-3">
-        <div className="text-2xl font-semibold" style={{ color }}>
+        <div className="text-[20px] md:text-[22px] font-semibold" style={{ color }}>
           {value}%
         </div>
-        <div className="text-sm" style={{ color: BRAND.textDim }}>
+        <div className="text-[14px]" style={{ color: BRAND.textDim }}>
           {pillarBandLabel(band)}
         </div>
       </div>
@@ -579,7 +592,7 @@ function PillarTile({
           className="h-full rounded-full"
           style={{
             width: `${clamp(value, 0, 100)}%`,
-            background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.18))`,
+            background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.16))`,
           }}
         />
       </div>
@@ -600,13 +613,13 @@ function VerticalLadderRail({
 
   return (
     <div
-      className="rounded-[24px] p-4 h-full"
+      className="rounded-[22px] p-4"
       style={{
-        background: "rgba(0,0,0,0.16)",
+        background: "rgba(0,0,0,0.14)",
         border: `1px solid ${BRAND.border}`,
       }}
     >
-      <div className="text-[11px] uppercase tracking-[0.18em]" style={{ color: BRAND.textFaint }}>
+      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
         Ladder
       </div>
 
@@ -617,22 +630,22 @@ function VerticalLadderRail({
 
           return (
             <div key={n} className="flex items-center gap-3">
-              <div className="w-9 text-[11px]" style={{ color: "rgba(255,255,255,0.50)" }}>
+              <div className="w-8 text-[11px]" style={{ color: "rgba(255,255,255,0.50)" }}>
                 {n}
               </div>
               <div
                 className="flex-1 h-5 rounded-full border"
                 style={{
-                  borderColor: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
+                  borderColor: isActive ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.08)",
                   background: isActive
                     ? `linear-gradient(90deg, ${tierColor}bb, rgba(255,255,255,0.10))`
                     : rowTier === tier
                       ? "rgba(255,255,255,0.05)"
-                      : "rgba(255,255,255,0.025)",
+                      : "rgba(255,255,255,0.02)",
                 }}
               />
               <div
-                className="w-9 text-center text-[11px] font-semibold"
+                className="w-8 text-center text-[11px] font-semibold"
                 style={{ color: isActive ? tierColor : "rgba(255,255,255,0.40)" }}
               >
                 {isActive ? n : ""}
@@ -683,7 +696,7 @@ function SectionBlocks({ section }: { section: Section }) {
             className="rounded-2xl p-5 border"
             style={{
               borderColor: "rgba(255,255,255,0.10)",
-              background: "rgba(0,0,0,0.12)",
+              background: "rgba(0,0,0,0.10)",
             }}
           >
             {showBlockTitle ? <div className="text-base font-semibold">{bt}</div> : null}
@@ -693,7 +706,7 @@ function SectionBlocks({ section }: { section: Section }) {
                 className="mt-3 rounded-xl border px-4 py-3 text-sm"
                 style={{
                   borderColor: "rgba(255,255,255,0.10)",
-                  background: "rgba(255,255,255,0.035)",
+                  background: "rgba(255,255,255,0.03)",
                 }}
               >
                 <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
@@ -739,7 +752,7 @@ function InsightsCard({
         <div className="mt-4 space-y-4">
           <div
             className="rounded-2xl border p-4"
-            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
+            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.10)" }}
           >
             <div className="text-sm font-semibold">Executive summary</div>
             <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -750,7 +763,7 @@ function InsightsCard({
           <div className="grid gap-4 md:grid-cols-2">
             <div
               className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.10)" }}
             >
               <div className="text-sm font-semibold">Strengths</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -762,7 +775,7 @@ function InsightsCard({
 
             <div
               className="rounded-2xl border p-4"
-              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
+              style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.10)" }}
             >
               <div className="text-sm font-semibold">Friction</div>
               <ul className="mt-2 list-disc pl-5 text-sm space-y-2" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -775,7 +788,7 @@ function InsightsCard({
 
           <div
             className="rounded-2xl border p-4"
-            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.12)" }}
+            style={{ borderColor: BRAND.border, background: "rgba(0,0,0,0.10)" }}
           >
             <div className="text-sm font-semibold">Strategic opportunity</div>
             <div className="mt-2 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
@@ -828,43 +841,39 @@ export default function VisibilityReportClient({
   const tier: Tier =
     (kbReport?.signals?.tier as Tier) || tierBand(Number(kbReport?.signals?.level ?? 1));
   const level: number = Number(kbReport?.signals?.level ?? 1);
-  const style: AB | null = (kbReport?.signals?.style as AB) || null;
   const readiness = kbReport?.signals?.readiness as Readiness | undefined;
   const reportDate = formatDate(kbReport?.meta?.generated_at);
 
   const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
-  const sectionByKey = useMemo(() => {
+  const rawSectionByKey = useMemo(() => {
     const m = new Map<string, Section>();
     sections.forEach((s) => m.set(s.key, s));
     return m;
   }, [sections]);
 
-  const introKeys =
-    mode === "prime"
-      ? ["welcome", "how_to_use", "understanding", "tiers_levels"]
-      : ["welcome", "how_to_use", "understanding", "tiers_levels", "behaviour_profiles"];
+  const getSection = (key: string): Section | null => {
+    const section = rawSectionByKey.get(key) || null;
+    if (mode === "prime") return sanitizeSectionForPrime(section);
+    return section;
+  };
 
-  const introSections = introKeys
-    .map((k) => sectionByKey.get(k))
-    .filter(Boolean) as Section[];
+  const secWelcome = getSection("welcome");
+  const secHowToUse = getSection("how_to_use");
+  const secUnderstanding = getSection("understanding");
+  const secTiers = getSection("tiers_levels");
+  const secBehaviourProfiles = mode === "legacy" ? getSection("behaviour_profiles") : null;
 
-  const secWelcome = sectionByKey.get("welcome") || null;
-  const secHowToUse = sectionByKey.get("how_to_use") || null;
-  const secUnderstanding = sectionByKey.get("understanding") || null;
-  const secTiers = sectionByKey.get("tiers_levels") || null;
-  const secBehaviourProfiles = sectionByKey.get("behaviour_profiles") || null;
-
-  const secFramework = sectionByKey.get("framework_foundation") || null;
-  const secSnapshot = sectionByKey.get("snapshot") || null;
-  const secPillars = sectionByKey.get("pillars") || null;
-  const secLevelMeaning = sectionByKey.get("level_meaning") || null;
-  const secStrengths = sectionByKey.get("strengths") || null;
-  const secFriction = sectionByKey.get("friction") || null;
-  const secMarket = sectionByKey.get("market_experience") || null;
-  const secOpportunity = sectionByKey.get("opportunity") || null;
-  const secNextMove = sectionByKey.get("next_move") || null;
-  const secPossibleNext = sectionByKey.get("possible_next") || null;
-  const secClosing = sectionByKey.get("closing") || null;
+  const secFramework = getSection("framework_foundation");
+  const secSnapshot = getSection("snapshot");
+  const secPillars = getSection("pillars");
+  const secLevelMeaning = getSection("level_meaning");
+  const secStrengths = getSection("strengths");
+  const secFriction = getSection("friction");
+  const secMarket = getSection("market_experience");
+  const secOpportunity = getSection("opportunity");
+  const secNextMove = getSection("next_move");
+  const secPossibleNext = getSection("possible_next");
+  const secClosing = getSection("closing");
 
   const pillarSource =
     (kbReport?.graphs?.pillars as Record<string, number>) ||
@@ -888,47 +897,74 @@ export default function VisibilityReportClient({
   const overallPct = kbReport?.signals?.overall_pct ?? null;
 
   const marketRealityLines = bulletify(secMarket, 3);
-  const frictionLines = bulletify(secFriction, 3);
-  const directionLines = bulletify(secOpportunity || secNextMove, 3);
+  const opportunityLines = paragraphSlice(secOpportunity, 3);
+  const nextMoveLines = paragraphSlice(secNextMove, 4);
 
   const ai = kbReport?.ai ?? null;
   const aiError = safeString(kbReport?.meta?.ai_error);
 
+  const renderedKeys = new Set<string>([
+    "welcome",
+    "how_to_use",
+    "understanding",
+    "tiers_levels",
+    "behaviour_profiles",
+    "framework_foundation",
+    "snapshot",
+    "pillars",
+    "level_meaning",
+    "strengths",
+    "friction",
+    "market_experience",
+    "opportunity",
+    "next_move",
+    "possible_next",
+    "closing",
+  ]);
+
+  const remainingSections = sections
+    .filter((s) => !renderedKeys.has(s.key))
+    .map((s) => (mode === "prime" ? sanitizeSectionForPrime(s) : s))
+    .filter(Boolean) as Section[];
+
   async function downloadPdf() {
     try {
-      const node = reportRootRef.current;
-      if (!node) return;
+      const root = reportRootRef.current;
+      if (!root) return;
+
+      const pages = Array.from(
+        root.querySelectorAll<HTMLElement>("[data-pdf-page='true']")
+      );
+
+      if (!pages.length) return;
 
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
         html2canvasPromise(),
         jsPdfPromise(),
       ]);
 
-      const canvas = await html2canvas(node, {
-        backgroundColor: BRAND.bg,
-        scale: 2,
-        useCORS: true,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new JsPDF("p", "pt", "a4");
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
 
-      let y = 0;
-      let remaining = imgHeight;
+        const canvas = await html2canvas(page, {
+          backgroundColor: BRAND.bg,
+          scale: 2,
+          useCORS: true,
+        });
 
-      while (remaining > 0) {
-        pdf.addImage(imgData, "PNG", 0, y, imgWidth, imgHeight);
-        remaining -= pageHeight;
-        if (remaining > 0) {
-          pdf.addPage();
-          y -= pageHeight;
-        }
+        const imgData = canvas.toDataURL("image/png");
+        const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+        const imgWidth = canvas.width * ratio;
+        const imgHeight = canvas.height * ratio;
+        const x = (pageWidth - imgWidth) / 2;
+        const y = (pageHeight - imgHeight) / 2;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
       }
 
       const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
@@ -1038,419 +1074,346 @@ export default function VisibilityReportClient({
     );
   }
 
-  const usedKeys = new Set<string>([
-    ...introKeys,
-    "framework_foundation",
-    "snapshot",
-    "pillars",
-    "level_meaning",
-    "strengths",
-    "friction",
-    "market_experience",
-    "opportunity",
-    "next_move",
-    "possible_next",
-    "closing",
-  ]);
-
-  const remainingSections = sections.filter((s) => !usedKeys.has(s.key));
-
   return (
     <Shell>
-      <div ref={reportRootRef} className="mx-auto max-w-[1380px] p-5 md:p-6 space-y-6">
-        <GlassCard
-          right={
-            <div className="flex flex-wrap gap-2">
-              <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
-              {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton> : null}
-            </div>
-          }
-        >
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex gap-4 items-start">
-              {orgLogoUrl ? (
-                <img
-                  src={orgLogoUrl}
-                  alt={orgName}
-                  className="h-14 w-14 rounded-2xl object-cover"
-                  style={{ border: `1px solid ${BRAND.border}` }}
-                  onError={(e: any) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <div
-                  className="h-14 w-14 rounded-2xl"
-                  style={{
-                    border: `1px solid ${BRAND.border}`,
-                    background: "rgba(255,255,255,0.06)",
-                  }}
-                />
-              )}
-
-              <div>
-                <div className="text-[28px] md:text-[34px] font-semibold tracking-[0.12em] uppercase leading-none">
-                  Visibility Ladder™
-                </div>
-                <div
-                  className="mt-2 text-[13px] md:text-[14px] uppercase tracking-[0.22em]"
-                  style={{ color: BRAND.textDim }}
-                >
-                  Strategic Visibility Assessment
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Kicker>{mode === "prime" ? "WhatsWhat Prime" : "Visibility Ladder"}</Kicker>
-                  <Kicker>{orgName}</Kicker>
-                </div>
+      <div ref={reportRootRef} className="mx-auto max-w-[1380px] p-5 md:p-6 space-y-8">
+        {/* PAGE 1 */}
+        <div data-pdf-page="true" className="space-y-6">
+          <GlassCard
+            right={
+              <div className="flex flex-wrap gap-2">
+                <SecondaryButton onClick={downloadPdf}>Download PDF</SecondaryButton>
+                {nextStepsUrl ? <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton> : null}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0 lg:min-w-[520px]">
-              <div
-                className="rounded-2xl p-4"
-                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-xs" style={{ color: BRAND.textFaint }}>
-                  Prepared for
-                </div>
-                <div className="mt-2 text-sm font-semibold">{takerName}</div>
-              </div>
-
-              <div
-                className="rounded-2xl p-4"
-                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-xs" style={{ color: BRAND.textFaint }}>
-                  Date
-                </div>
-                <div className="mt-2 text-sm font-semibold">{reportDate || formatDate(null)}</div>
-              </div>
-
-              <div
-                className="rounded-2xl p-4"
-                style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.14)" }}
-              >
-                <div className="text-xs" style={{ color: BRAND.textFaint }}>
-                  Framework
-                </div>
-                <div className="mt-2 text-sm font-semibold">
-                  {mode === "prime" ? "WhatsWhat Prime" : "Bogdan Stan"}
-                </div>
-              </div>
-            </div>
-          </div>
-        </GlassCard>
-
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          <div className="xl:col-span-2">
-            <VerticalLadderRail level={level} tier={tier} />
-          </div>
-
-          <div className="xl:col-span-6 space-y-6">
-            <GlassCard>
-              <div className="flex flex-col gap-5">
-                <div>
+            }
+          >
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex gap-4 items-start">
+                {orgLogoUrl ? (
+                  <img
+                    src={orgLogoUrl}
+                    alt={orgName}
+                    className="h-14 w-14 rounded-2xl object-cover"
+                    style={{ border: `1px solid ${BRAND.border}` }}
+                    onError={(e: any) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
                   <div
-                    className="text-[14px] uppercase tracking-[0.18em]"
-                    style={{ color: BRAND.textFaint }}
-                  >
-                    {mode === "prime" ? "WhatsWhat Prime Visibility Ladder" : testName}
-                  </div>
-                  <div className="mt-3 text-[30px] md:text-[40px] font-semibold tracking-[0.04em] uppercase leading-none">
-                    {safeString(takerName)}
-                  </div>
-                </div>
-
-                <div
-                  className="rounded-[22px] overflow-hidden"
-                  style={{
-                    border: `1px solid ${BRAND.border}`,
-                    background:
-                      "linear-gradient(90deg, rgba(233,185,91,0.14), rgba(255,255,255,0.04))",
-                  }}
-                >
-                  <div className="p-5 md:p-6">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="max-w-[620px]">
-                        <div
-                          className="text-[30px] md:text-[40px] font-semibold leading-none"
-                          style={{ color: BRAND.tier[tier] }}
-                        >
-                          Level {level} — {tier}
-                        </div>
-
-                        <div
-                          className="mt-3 text-[16px] md:text-[18px] leading-8"
-                          style={{ color: "rgba(255,255,255,0.92)" }}
-                        >
-                          {firstSummary(secSnapshot) ||
-                            (mode === "prime"
-                              ? `You are currently in the ${tier} tier.`
-                              : `You are currently in the ${tier} tier.`)}
-                        </div>
-                      </div>
-
-                      <div
-                        className="rounded-2xl px-4 py-3 self-start min-w-[130px]"
-                        style={{
-                          background: "rgba(0,0,0,0.16)",
-                          border: `1px solid rgba(255,255,255,0.10)`,
-                        }}
-                      >
-                        <div
-                          className="text-[11px] uppercase tracking-[0.16em]"
-                          style={{ color: BRAND.textFaint }}
-                        >
-                          Status
-                        </div>
-                        <div className="mt-1 text-base font-semibold">{readinessLabel(readiness)}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-4 md:grid-cols-2">
-                      <div>
-                        <div
-                          className="text-[11px] uppercase tracking-[0.16em]"
-                          style={{ color: BRAND.textFaint }}
-                        >
-                          Current position
-                        </div>
-                        <div
-                          className="mt-2 text-sm leading-7"
-                          style={{ color: "rgba(255,255,255,0.86)" }}
-                        >
-                          {firstParagraph(secLevelMeaning) ||
-                            (mode === "prime"
-                              ? "You are visible in market terms, but this level is about strengthening structural consistency."
-                              : "You have reached a visible level, but consistency is still what determines growth.")}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div
-                          className="text-[11px] uppercase tracking-[0.16em]"
-                          style={{ color: BRAND.textFaint }}
-                        >
-                          Tier range
-                        </div>
-                        <div
-                          className="mt-2 text-sm leading-7"
-                          style={{ color: "rgba(255,255,255,0.86)" }}
-                        >
-                          {tierRangeLabel(tier)}.{" "}
-                          {mode === "prime"
-                            ? "Movement inside the tier reflects how stable your market position is."
-                            : "Movement inside the tier reflects how stable your visibility signals are."}
-                        </div>
-                      </div>
-                    </div>
-
-                    {mode === "prime" && validationRequired ? (
-                      <div
-                        className="mt-4 rounded-2xl px-4 py-3 text-sm"
-                        style={{
-                          background: "rgba(233,185,91,0.08)",
-                          border: "1px solid rgba(233,185,91,0.22)",
-                          color: "rgba(255,255,255,0.92)",
-                        }}
-                      >
-                        Strong authority or dominance signals are present. Final leadership claims should still be interpreted carefully until external validation is confirmed.
-                        {validationStatus ? (
-                          <span style={{ color: BRAND.textDim }}>
-                            {" "}({validationStatus.replaceAll("_", " ")})
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div>
-                  <div
-                    className="text-[12px] uppercase tracking-[0.18em]"
-                    style={{ color: BRAND.textFaint }}
-                  >
-                    {mode === "prime" ? "Prime structural breakdown" : "Visibility pillars"}
-                  </div>
-
-                  <div
-                    className={`mt-4 grid gap-4 ${
-                      mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
-                    }`}
-                  >
-                    {pillars.map((p) => {
-                      const band = (bandSource as any)?.[p.key];
-                      const color =
-                        mode === "prime"
-                          ? BRAND.primePillars[p.key] || BRAND.accent
-                          : BRAND.legacyPillars[p.key] || BRAND.accent;
-
-                      return (
-                        <PillarTile
-                          key={p.key}
-                          label={p.label}
-                          value={p.value}
-                          band={band}
-                          color={color}
-                          isWeakest={safeString(p.key).toLowerCase() === weakest.toLowerCase()}
-                          isStrongest={safeString(p.key).toLowerCase() === strongest.toLowerCase()}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
-                    <div
-                      className="rounded-2xl p-4"
-                      style={{ background: "rgba(0,0,0,0.14)", border: `1px solid ${BRAND.border}` }}
-                    >
-                      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
-                        Weakest signal
-                      </div>
-                      <div className="mt-2 text-base font-semibold">
-                        {weakest ? nicePillarLabel(weakest, mode) : "—"}
-                      </div>
-                    </div>
-
-                    <div
-                      className="rounded-2xl p-4"
-                      style={{ background: "rgba(0,0,0,0.14)", border: `1px solid ${BRAND.border}` }}
-                    >
-                      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
-                        Strongest signal
-                      </div>
-                      <div className="mt-2 text-base font-semibold">
-                        {strongest ? nicePillarLabel(strongest, mode) : "—"}
-                      </div>
-                    </div>
-
-                    <div
-                      className="rounded-2xl p-4"
-                      style={{ background: "rgba(0,0,0,0.14)", border: `1px solid ${BRAND.border}` }}
-                    >
-                      <div className="text-[11px] uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
-                        Overall score
-                      </div>
-                      <div className="mt-2 text-base font-semibold">
-                        {overallPct != null ? `${overallPct}%` : "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </GlassCard>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <GlassCard title={secOpportunity?.title || "Your strategic opportunity"}>
-                <div className="text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {firstSummary(secOpportunity) ||
-                    "Your next growth comes from strengthening the right structural signal — not just doing more."}
-                </div>
-
-                {paragraphSlice(secOpportunity, 4).length ? (
-                  <div className="mt-4 space-y-3">
-                    {paragraphSlice(secOpportunity, 4).map((line, idx) => (
-                      <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
-                        <div style={{ color: BRAND.accent }}>↗</div>
-                        <div>{line}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </GlassCard>
-
-              <GlassCard title={secNextMove?.title || "Your most effective next move"}>
-                <div className="text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
-                  {firstSummary(secNextMove) ||
-                    "Do not increase random activity. Strengthen the structural signal that is most limiting momentum."}
-                </div>
-
-                {paragraphSlice(secNextMove, 4).length ? (
-                  <div className="mt-4 space-y-3">
-                    {paragraphSlice(secNextMove, 4).map((line, idx) => (
-                      <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
-                        <div style={{ color: BRAND.accent }}>✓</div>
-                        <div>{line}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </GlassCard>
-            </div>
-          </div>
-
-          <div className="xl:col-span-4 space-y-6">
-            <TinyInfoCard
-              title="Market reality"
-              lines={
-                marketRealityLines.length
-                  ? marketRealityLines
-                  : [
-                      "Your business is visible in the market.",
-                      "But the position is not yet strong enough to make you the default choice.",
-                    ]
-              }
-              accent={BRAND.tier[tier]}
-            />
-
-            <TinyInfoCard
-              title="Structural gap"
-              lines={
-                frictionLines.length
-                  ? frictionLines
-                  : [
-                      `Your weakest signal is ${weakest ? nicePillarLabel(weakest, mode) : "still developing"}.`,
-                      "That is where market confidence is most likely slowing down.",
-                      "Strengthening that signal should become the near-term priority.",
-                    ]
-              }
-              accent={BRAND.accent}
-            />
-
-            <TinyInfoCard
-              title="Strategic direction"
-              lines={
-                directionLines.length
-                  ? directionLines
-                  : [
-                      "Do not chase more activity for its own sake.",
-                      "Use your next move to strengthen structural confidence.",
-                      "That is how you progress tiers more cleanly.",
-                    ]
-              }
-              accent={BRAND.accent}
-            />
-
-            {mode === "legacy" && style ? (
-              <div
-                className="rounded-[20px] p-5"
-                style={{
-                  background: "rgba(0,0,0,0.14)",
-                  border: `1px solid ${BRAND.border}`,
-                }}
-              >
-                <div className="text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: BRAND.textFaint }}>
-                  Behaviour style
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="text-base font-semibold">Style {style}</div>
-                  <div
-                    className="h-10 w-10 rounded-full flex items-center justify-center font-semibold"
+                    className="h-14 w-14 rounded-2xl"
                     style={{
-                      background: `${BRAND.ab[style]}22`,
-                      color: BRAND.ab[style],
-                      border: `1px solid ${BRAND.ab[style]}55`,
+                      border: `1px solid ${BRAND.border}`,
+                      background: "rgba(255,255,255,0.06)",
+                    }}
+                  />
+                )}
+
+                <div>
+                  <div className="text-[28px] md:text-[34px] font-semibold tracking-[0.12em] uppercase leading-none">
+                    Visibility Ladder™
+                  </div>
+                  <div
+                    className="mt-2 text-[13px] md:text-[14px] uppercase tracking-[0.20em]"
+                    style={{ color: BRAND.textDim }}
+                  >
+                    Strategic Visibility Assessment
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Kicker>{mode === "prime" ? "WhatsWhat Prime" : "Visibility Ladder"}</Kicker>
+                    <Kicker>{orgName}</Kicker>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0 lg:min-w-[520px]">
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.12)" }}
+                >
+                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                    Prepared for
+                  </div>
+                  <div className="mt-2 text-sm font-semibold">{takerName}</div>
+                </div>
+
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.12)" }}
+                >
+                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                    Date
+                  </div>
+                  <div className="mt-2 text-sm font-semibold">{reportDate || formatDate(null)}</div>
+                </div>
+
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ border: `1px solid ${BRAND.border}`, background: "rgba(0,0,0,0.12)" }}
+                >
+                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                    Framework
+                  </div>
+                  <div className="mt-2 text-sm font-semibold">
+                    {mode === "prime" ? "WhatsWhat Prime" : "Bogdan Stan"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <div className="xl:col-span-2">
+              <VerticalLadderRail level={level} tier={tier} />
+            </div>
+
+            <div className="xl:col-span-10 space-y-6">
+              <GlassCard>
+                <div className="flex flex-col gap-5">
+                  <div>
+                    <div
+                      className="text-[14px] uppercase tracking-[0.16em]"
+                      style={{ color: BRAND.textFaint }}
+                    >
+                      {mode === "prime" ? "WhatsWhat Prime Visibility Ladder" : testName}
+                    </div>
+                    <div className="mt-3 text-[30px] md:text-[40px] font-semibold tracking-[0.03em] uppercase leading-none">
+                      {safeString(takerName)}
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-[20px] overflow-hidden"
+                    style={{
+                      border: `1px solid ${BRAND.border}`,
+                      background:
+                        "linear-gradient(90deg, rgba(233,185,91,0.12), rgba(255,255,255,0.03))",
                     }}
                   >
-                    {style}
+                    <div className="p-5 md:p-6">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="max-w-[640px]">
+                          <div
+                            className="text-[30px] md:text-[40px] font-semibold leading-none"
+                            style={{ color: BRAND.tier[tier] }}
+                          >
+                            Level {level} — {tier}
+                          </div>
+
+                          <div
+                            className="mt-3 text-[16px] md:text-[18px] leading-8"
+                            style={{ color: "rgba(255,255,255,0.92)" }}
+                          >
+                            {firstSummary(secSnapshot) ||
+                              `You are currently in the ${tier} tier.`}
+                          </div>
+                        </div>
+
+                        <div
+                          className="rounded-2xl px-4 py-3 self-start min-w-[130px]"
+                          style={{
+                            background: "rgba(0,0,0,0.14)",
+                            border: `1px solid rgba(255,255,255,0.10)`,
+                          }}
+                        >
+                          <div
+                            className="text-[11px] uppercase tracking-[0.14em]"
+                            style={{ color: BRAND.textFaint }}
+                          >
+                            Status
+                          </div>
+                          <div className="mt-1 text-base font-semibold">{readinessLabel(readiness)}</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <div
+                            className="text-[11px] uppercase tracking-[0.14em]"
+                            style={{ color: BRAND.textFaint }}
+                          >
+                            Current position
+                          </div>
+                          <div
+                            className="mt-2 text-sm leading-7"
+                            style={{ color: "rgba(255,255,255,0.86)" }}
+                          >
+                            {firstParagraph(secLevelMeaning) ||
+                              "You are visible in market terms, but this level is about strengthening structural consistency."}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div
+                            className="text-[11px] uppercase tracking-[0.14em]"
+                            style={{ color: BRAND.textFaint }}
+                          >
+                            Tier range
+                          </div>
+                          <div
+                            className="mt-2 text-sm leading-7"
+                            style={{ color: "rgba(255,255,255,0.86)" }}
+                          >
+                            {tierRangeLabel(tier)}. Movement inside the tier reflects how stable your market position is.
+                          </div>
+                        </div>
+                      </div>
+
+                      {mode === "prime" && validationRequired ? (
+                        <div
+                          className="mt-4 rounded-2xl px-4 py-3 text-sm"
+                          style={{
+                            background: "rgba(233,185,91,0.08)",
+                            border: "1px solid rgba(233,185,91,0.22)",
+                            color: "rgba(255,255,255,0.92)",
+                          }}
+                        >
+                          Strong authority or dominance signals are present. Final leadership claims should still be interpreted carefully until external validation is confirmed.
+                          {validationStatus ? (
+                            <span style={{ color: BRAND.textDim }}>
+                              {" "}({validationStatus.replaceAll("_", " ")})
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      className="text-[12px] uppercase tracking-[0.16em]"
+                      style={{ color: BRAND.textFaint }}
+                    >
+                      {mode === "prime" ? "Prime structural breakdown" : "Visibility pillars"}
+                    </div>
+
+                    <div
+                      className={`mt-4 grid gap-4 ${
+                        mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
+                      }`}
+                    >
+                      {pillars.map((p) => {
+                        const band = (bandSource as any)?.[p.key];
+                        const color =
+                          mode === "prime"
+                            ? BRAND.primePillars[p.key] || BRAND.accent
+                            : BRAND.legacyPillars[p.key] || BRAND.accent;
+
+                        return (
+                          <PillarTile
+                            key={p.key}
+                            label={p.label}
+                            value={p.value}
+                            band={band}
+                            color={color}
+                            isWeakest={safeString(p.key).toLowerCase() === weakest.toLowerCase()}
+                            isStrongest={safeString(p.key).toLowerCase() === strongest.toLowerCase()}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <div
+                        className="rounded-2xl p-4"
+                        style={{ background: "rgba(0,0,0,0.12)", border: `1px solid ${BRAND.border}` }}
+                      >
+                        <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: BRAND.textFaint }}>
+                          Weakest signal
+                        </div>
+                        <div className="mt-2 text-base font-semibold">
+                          {weakest ? nicePillarLabel(weakest, mode) : "—"}
+                        </div>
+                      </div>
+
+                      <div
+                        className="rounded-2xl p-4"
+                        style={{ background: "rgba(0,0,0,0.12)", border: `1px solid ${BRAND.border}` }}
+                      >
+                        <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: BRAND.textFaint }}>
+                          Strongest signal
+                        </div>
+                        <div className="mt-2 text-base font-semibold">
+                          {strongest ? nicePillarLabel(strongest, mode) : "—"}
+                        </div>
+                      </div>
+
+                      <div
+                        className="rounded-2xl p-4"
+                        style={{ background: "rgba(0,0,0,0.12)", border: `1px solid ${BRAND.border}` }}
+                      >
+                        <div className="text-[11px] uppercase tracking-[0.14em]" style={{ color: BRAND.textFaint }}>
+                          Overall score
+                        </div>
+                        <div className="mt-2 text-base font-semibold">
+                          {overallPct != null ? `${overallPct}%` : "—"}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </GlassCard>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <GlassCard title="Market reality">
+                  <div className="space-y-3 text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
+                    {(marketRealityLines.length
+                      ? marketRealityLines
+                      : [
+                          "Your market forms impressions quickly from what it can find, trust, and act on.",
+                          "When one pillar lags, the overall experience becomes predictable in the wrong way.",
+                        ]
+                    ).map((line, idx) => (
+                      <div key={idx} className="flex gap-3">
+                        <div style={{ color: BRAND.accent }}>+</div>
+                        <div>{line}</div>
+                      </div>
+                    ))}
+                  </div>
+                </GlassCard>
+
+                <GlassCard title={secOpportunity?.title || "Your strategic visibility opportunity"}>
+                  <div className="text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
+                    {firstSummary(secOpportunity) ||
+                      "The highest-leverage move is to strengthen the part of your system that is currently limiting momentum."}
+                  </div>
+
+                  {opportunityLines.length ? (
+                    <div className="mt-4 space-y-3">
+                      {opportunityLines.map((line, idx) => (
+                        <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
+                          <div style={{ color: BRAND.accent }}>↗</div>
+                          <div>{line}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </GlassCard>
+
+                <GlassCard title={secNextMove?.title || "Your most effective next move"}>
+                  <div className="text-sm leading-7" style={{ color: "rgba(255,255,255,0.86)" }}>
+                    {firstSummary(secNextMove) ||
+                      "Stabilise the weakest pillar first so results become more predictable."}
+                  </div>
+
+                  {nextMoveLines.length ? (
+                    <div className="mt-4 space-y-3">
+                      {nextMoveLines.map((line, idx) => (
+                        <div key={idx} className="flex gap-3 text-sm" style={{ color: "rgba(255,255,255,0.86)" }}>
+                          <div style={{ color: BRAND.accent }}>✓</div>
+                          <div>{line}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </GlassCard>
               </div>
-            ) : null}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* PAGE 2 */}
+        <div data-pdf-page="true" className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
           <div className="xl:col-span-2 space-y-6">
             {secWelcome ? (
               <GlassCard title={secWelcome.title || "Welcome"}>
@@ -1492,7 +1455,8 @@ export default function VisibilityReportClient({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* PAGE 3 */}
+        <div data-pdf-page="true" className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           {secStrengths ? (
             <GlassCard title={secStrengths.title || "What is already working"}>
               <SectionBlocks section={secStrengths} />
@@ -1500,13 +1464,13 @@ export default function VisibilityReportClient({
           ) : null}
 
           {secFriction ? (
-            <GlassCard title={secFriction.title || "Where friction exists"}>
+            <GlassCard title={secFriction.title || "Where visibility friction exists"}>
               <SectionBlocks section={secFriction} />
             </GlassCard>
           ) : null}
 
           {secMarket ? (
-            <GlassCard title={secMarket.title || "How the market is experiencing you"}>
+            <GlassCard title={secMarket.title || "How the market is likely experiencing your business"}>
               <SectionBlocks section={secMarket} />
             </GlassCard>
           ) : null}
@@ -1516,7 +1480,10 @@ export default function VisibilityReportClient({
               <SectionBlocks section={secLevelMeaning} />
             </GlassCard>
           ) : null}
+        </div>
 
+        {/* PAGE 4 */}
+        <div data-pdf-page="true" className="space-y-6">
           {secPillars ? (
             <GlassCard
               title={
@@ -1529,7 +1496,11 @@ export default function VisibilityReportClient({
                   : "Discoverability, Trust, and Conversion show where visibility is working and where it breaks down."
               }
             >
-              <div className={`mt-4 grid gap-4 ${mode === "prime" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+              <div
+                className={`mt-4 grid gap-4 ${
+                  mode === "prime" ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
+                }`}
+              >
                 {pillars.map((p) => {
                   const band = (bandSource as any)?.[p.key];
                   const color =
@@ -1551,7 +1522,7 @@ export default function VisibilityReportClient({
                 })}
               </div>
 
-              <SectionBlocks section={secPillars} />
+              {secPillars ? <SectionBlocks section={secPillars} /> : null}
             </GlassCard>
           ) : null}
 
@@ -1560,30 +1531,33 @@ export default function VisibilityReportClient({
               <SectionBlocks section={secPossibleNext} />
             </GlassCard>
           ) : null}
+
+          <InsightsCard ai={ai} error={aiError || null} />
         </div>
 
-        <InsightsCard ai={ai} error={aiError || null} />
+        {/* PAGE 5 */}
+        <div data-pdf-page="true" className="space-y-6">
+          {remainingSections.length ? (
+            <GlassCard title="Additional report sections">
+              <div className="mt-4 space-y-6">
+                {remainingSections.map((s) => (
+                  <GlassCard key={s.key} title={s.title || s.key}>
+                    <SectionBlocks section={s} />
+                  </GlassCard>
+                ))}
+              </div>
+            </GlassCard>
+          ) : null}
 
-        {remainingSections.length ? (
-          <GlassCard title="Additional report sections">
-            <div className="mt-4 space-y-6">
-              {remainingSections.map((s) => (
-                <GlassCard key={s.key} title={s.title || s.key}>
-                  <SectionBlocks section={s} />
-                </GlassCard>
-              ))}
-            </div>
-          </GlassCard>
-        ) : null}
+          {secClosing ? (
+            <GlassCard title={secClosing.title || "Turning insight into strategy"}>
+              <SectionBlocks section={secClosing} />
+            </GlassCard>
+          ) : null}
 
-        {secClosing ? (
-          <GlassCard title={secClosing.title || "Closing"}>
-            <SectionBlocks section={secClosing} />
-          </GlassCard>
-        ) : null}
-
-        <div className="text-xs px-1" style={{ color: BRAND.textFaint }}>
-          engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1} • mode: {mode}
+          <div className="text-xs px-1" style={{ color: BRAND.textFaint }}>
+            engine: {safeString(kbReport.engine_key || "visibility_v1")} • v{kbReport.version ?? 1} • mode: {mode}
+          </div>
         </div>
       </div>
     </Shell>
