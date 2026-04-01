@@ -12,7 +12,8 @@ export default function VisibilityReportPage({
   searchParams: { tid?: string; src?: string };
 }) {
   const token = String(params?.token || "").trim();
-  const tid = typeof searchParams?.tid === "string" ? searchParams.tid.trim() : "";
+  const tid =
+    typeof searchParams?.tid === "string" ? searchParams.tid.trim() : "";
   const src =
     typeof searchParams?.src === "string" && searchParams.src.trim()
       ? searchParams.src.trim()
