@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type PrimePillar = "visibility" | "trust" | "authority" | "dominance";
+type ReportVariant = "full" | "lite";
 
 function getKey() {
   return (
@@ -45,11 +46,30 @@ function safeNumber(x: any, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function isPrimeMode(engineKey: string | null | undefined, version: number | null | undefined) {
+function isPrimeMode(
+  engineKey: string | null | undefined,
+  version: number | null | undefined
+) {
   return (
     String(engineKey || "").toLowerCase() === "visibility_prime_v1" ||
     Number(version || 0) >= 2
   );
+}
+
+function normalizeReportVariant(v: any): ReportVariant {
+  return String(v || "").trim().toLowerCase() === "lite" ? "lite" : "full";
+}
+
+function resolveReportAudience(
+  requestedAudience: string,
+  reportVariant: ReportVariant
+) {
+  if (requestedAudience !== "taker_report") return requestedAudience;
+  return reportVariant === "lite" ? "taker_report_lite" : "taker_report";
+}
+
+function resolveAiAudience(effectiveAudience: string) {
+  return `${effectiveAudience}_ai`;
 }
 
 function defaultTitles(key: string, mode: "legacy" | "prime") {
@@ -283,9 +303,19 @@ function buildAiPrompt(input: {
   sections: any[];
   mode: "legacy" | "prime";
   audience: string;
+  reportVariant: ReportVariant;
 }) {
-  const { orgName, testName, takerName, signals, graphs, sections, mode, audience } =
-    input;
+  const {
+    orgName,
+    testName,
+    takerName,
+    signals,
+    graphs,
+    sections,
+    mode,
+    audience,
+    reportVariant,
+  } = input;
 
   const baseNarrative = (sections || [])
     .map((s) => {
@@ -312,6 +342,11 @@ function buildAiPrompt(input: {
         ].join(" ")
       : "Use the provided scoring model and signals as-is.";
 
+  const variantRules =
+    reportVariant === "lite"
+      ? "This is a lite lead-generation report. Keep the output concise, commercially useful, and high-value without exhausting every detail."
+      : "This is the full report. Provide fuller interpretation and progression guidance.";
+
   return [
     {
       role: "system",
@@ -320,6 +355,7 @@ function buildAiPrompt(input: {
         "Write in plain, confident language. No fluff. No hype.",
         "Do not invent facts. Only use the provided signals + narrative.",
         extraRules,
+        variantRules,
         "Output MUST match the provided JSON schema exactly.",
       ].join(" "),
     },
@@ -333,6 +369,7 @@ function buildAiPrompt(input: {
         `Participant: ${takerName || "—"}`,
         `Mode: ${mode}`,
         `Audience: ${audience}`,
+        `Report variant: ${reportVariant}`,
         "",
         `Signals JSON: ${JSON.stringify(signals)}`,
         `Graphs JSON: ${JSON.stringify(graphs)}`,
@@ -385,6 +422,7 @@ async function generateAiInsights(payload: {
   sections: any[];
   mode: "legacy" | "prime";
   audience: string;
+  reportVariant: ReportVariant;
 }): Promise<AiInsights> {
   const key = openaiKey();
   if (!key) throw new Error("Missing OPENAI_API_KEY");
@@ -469,7 +507,7 @@ export async function GET(
     const token = safeString(ctx.params?.token);
     const tid = safeString(req.nextUrl.searchParams.get("tid"));
     const sid = safeString(req.nextUrl.searchParams.get("sid"));
-    const audience =
+    const requestedAudience =
       safeString(req.nextUrl.searchParams.get("audience")) || "taker_report";
 
     if (!token) {
@@ -488,6 +526,14 @@ export async function GET(
 
     const sb = portal();
     const vis = visibility();
+
+    const { data: linkRow, error: linkErr } = await sb
+      .from("test_links")
+      .select("id, test_id, meta, next_steps_url")
+      .eq("token", token)
+      .maybeSingle();
+
+    if (linkErr) throw new Error(linkErr.message);
 
     // 0) Optional taker load (used when tid is present)
     let taker: any = null;
@@ -606,8 +652,40 @@ export async function GET(
       ? "prime"
       : "legacy";
 
+    const portalTestId =
+      taker?.test_id ||
+      submissionRow?.metadata?.portal_test_id ||
+      result?.computed?.portal_test_id ||
+      linkRow?.test_id ||
+      null;
+
+    const testRowResp = portalTestId
+      ? await sb
+          .from("tests")
+          .select("id, name, slug, meta")
+          .eq("id", portalTestId)
+          .maybeSingle()
+      : { data: null as any, error: null as any };
+
+    if (testRowResp.error) throw new Error(testRowResp.error.message);
+
+    const portalTest = testRowResp.data || null;
+
+    const reportVariant = normalizeReportVariant(
+      linkRow?.meta?.report_variant || portalTest?.meta?.report_variant
+    );
+
+    const effectiveAudience = resolveReportAudience(
+      requestedAudience,
+      reportVariant
+    );
+    const aiAudience = resolveAiAudience(effectiveAudience);
+    const isLiteReport =
+      requestedAudience === "taker_report" && reportVariant === "lite";
+    const kbAudience =
+      requestedAudience === "taker_report" ? "taker_report" : effectiveAudience;
+
     // 3) Ensure pillar signals exist for legacy only.
-    // Prime results should already be computed by submit route.
     if (mode === "legacy" && !hasPillarSignals(result)) {
       try {
         const pillarRpc = await callRpc<any>(
@@ -650,30 +728,21 @@ export async function GET(
     // 4) Cache lookup
     let cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
-      p_audience: audience,
+      p_audience: effectiveAudience,
       p_engine_key: engineKey,
       p_version: version,
     });
 
     if (cached) {
-      if (cachedMissingIntroOrEmptyBlocks(cached, mode, audience)) {
+      if (cachedMissingIntroOrEmptyBlocks(cached, mode, effectiveAudience)) {
         cached = null;
-      } else if (mode === "prime" && cachedNeedsPrimeRefresh(cached, audience)) {
+      } else if (mode === "prime" && cachedNeedsPrimeRefresh(cached, effectiveAudience)) {
         cached = null;
       }
     }
 
     const buildDeterministic = async () => {
-      const orgId =
-        taker?.org_id ||
-        submissionRow?.org_id ||
-        null;
-
-      const portalTestId =
-        taker?.test_id ||
-        submissionRow?.metadata?.portal_test_id ||
-        result?.computed?.portal_test_id ||
-        null;
+      const orgId = taker?.org_id || submissionRow?.org_id || null;
 
       const orgRowResp = orgId
         ? await sb
@@ -683,16 +752,8 @@ export async function GET(
             .maybeSingle()
         : { data: null as any };
 
-      const testRowResp = portalTestId
-        ? await sb
-            .from("tests")
-            .select("id, name, slug")
-            .eq("id", portalTestId)
-            .maybeSingle()
-        : { data: null as any };
-
       const orgRow = orgRowResp.data || null;
-      const testRow = testRowResp.data || null;
+      const testRow = portalTest || null;
 
       const orgName = orgRow?.name || orgRow?.slug || null;
       const testName =
@@ -706,7 +767,7 @@ export async function GET(
         safeString(submissionRow?.taker_name) ||
         null;
 
-      const isPrimePublic = mode === "prime" && audience === "taker_report";
+      const isPrimePublic = mode === "prime" && requestedAudience === "taker_report";
 
       const primePillarScores =
         mode === "prime" ? normalizePrimePillarScores(result?.pillar_scores) : null;
@@ -751,41 +812,61 @@ export async function GET(
 
       const sectionKeys =
         isPrimePublic
-          ? [
-              "welcome",
-              "how_to_use",
-              "understanding",
-              "tiers_levels",
-              "framework_foundation",
-              "snapshot",
-              "pillars",
-              "level_meaning",
-              "strengths",
-              "friction",
-              "market_experience",
-              "opportunity",
-              "next_move",
-              "possible_next",
-              "closing",
-            ]
-          : [
-              "welcome",
-              "how_to_use",
-              "understanding",
-              "tiers_levels",
-              "behaviour_profiles",
-              "framework_foundation",
-              "snapshot",
-              "pillars",
-              "level_meaning",
-              "strengths",
-              "friction",
-              "market_experience",
-              "opportunity",
-              "next_move",
-              "possible_next",
-              "closing",
-            ];
+          ? isLiteReport
+            ? [
+                "snapshot",
+                "pillars",
+                "level_meaning",
+                "market_experience",
+                "opportunity",
+                "next_move",
+                "closing",
+              ]
+            : [
+                "welcome",
+                "how_to_use",
+                "understanding",
+                "tiers_levels",
+                "framework_foundation",
+                "snapshot",
+                "pillars",
+                "level_meaning",
+                "strengths",
+                "friction",
+                "market_experience",
+                "opportunity",
+                "next_move",
+                "possible_next",
+                "closing",
+              ]
+          : isLiteReport
+            ? [
+                "snapshot",
+                "pillars",
+                "level_meaning",
+                "market_experience",
+                "opportunity",
+                "next_move",
+                "closing",
+              ]
+            : [
+                "welcome",
+                "how_to_use",
+                "understanding",
+                "tiers_levels",
+                "behaviour_profiles",
+                "framework_foundation",
+                "snapshot",
+                "pillars",
+                "level_meaning",
+                "strengths",
+                "friction",
+                "market_experience",
+                "opportunity",
+                "next_move",
+                "possible_next",
+                "closing",
+              ];
 
       const sections: any[] = [];
       const selectedBlocks: any[] = [];
@@ -793,7 +874,7 @@ export async function GET(
       for (const key of sectionKeys) {
         let blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
           p_section_key: key,
-          p_audience: audience,
+          p_audience: kbAudience,
           p_signals: signals,
           p_limit: 6,
         });
@@ -801,7 +882,7 @@ export async function GET(
         if (!blocks || blocks.length === 0) {
           blocks = await callRpc<any[]>(vis, "kb_select_blocks", {
             p_section_key: key,
-            p_audience: audience,
+            p_audience: kbAudience,
             p_signals: {},
             p_limit: 6,
           });
@@ -876,7 +957,7 @@ export async function GET(
         try {
           const cachedAi = await callRpc<any>(vis, "get_generated_report", {
             p_submission_id: submissionId,
-            p_audience: "taker_report_ai",
+            p_audience: aiAudience,
             p_engine_key: engineKey,
             p_version: version,
           });
@@ -895,7 +976,8 @@ export async function GET(
               graphs: det.graphs,
               sections: det.sections,
               mode,
-              audience,
+              audience: effectiveAudience,
+              reportVariant,
             });
 
             ai = aiOut;
@@ -910,7 +992,7 @@ export async function GET(
               submission_id: submissionId,
               engine_key: engineKey,
               version,
-              audience: "taker_report_ai",
+              audience: aiAudience,
               meta: {
                 org_name: det.orgName,
                 org_logo_url: det.orgRow?.logo_url || null,
@@ -918,6 +1000,7 @@ export async function GET(
                 generated_at: ai_meta.generated_at,
                 mode: "ai",
                 scoring_mode: mode,
+                report_variant: reportVariant,
               },
               ai: aiOut,
               ai_meta,
@@ -925,7 +1008,7 @@ export async function GET(
 
             await callRpc<any>(vis, "upsert_generated_report", {
               p_submission_id: submissionId,
-              p_audience: "taker_report_ai",
+              p_audience: aiAudience,
               p_report_json: aiCacheJson,
               p_signals: det.signals,
               p_selected_blocks: [],
@@ -946,7 +1029,7 @@ export async function GET(
         submission_id: submissionId,
         engine_key: engineKey,
         version,
-        audience,
+        audience: effectiveAudience,
         meta: {
           org_name: det.orgName,
           org_logo_url: det.orgRow?.logo_url || null,
@@ -954,6 +1037,7 @@ export async function GET(
           generated_at: new Date().toISOString(),
           mode: "deterministic",
           scoring_mode: mode,
+          report_variant: reportVariant,
         },
         signals: det.signals,
         graphs: det.graphs,
@@ -964,7 +1048,7 @@ export async function GET(
 
       await callRpc<any>(vis, "upsert_generated_report", {
         p_submission_id: submissionId,
-        p_audience: audience,
+        p_audience: effectiveAudience,
         p_report_json: reportJson,
         p_signals: det.signals,
         p_selected_blocks: det.selectedBlocks,
@@ -981,8 +1065,9 @@ export async function GET(
             submission_id: submissionId,
             engine_key: engineKey,
             version,
-            audience,
+            audience: effectiveAudience,
             scoring_mode: mode,
+            report_variant: reportVariant,
           },
         },
         { status: 200 }
@@ -998,8 +1083,9 @@ export async function GET(
           submission_id: submissionId,
           engine_key: engineKey,
           version,
-          audience,
+          audience: effectiveAudience,
           scoring_mode: mode,
+          report_variant: reportVariant,
         },
       },
       { status: 200 }
