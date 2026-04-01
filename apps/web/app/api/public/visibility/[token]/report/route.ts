@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type PrimePillar = "visibility" | "trust" | "authority" | "dominance";
-type ReportVariant = "full" | "lite";
+type ReportVariant = "lite" | "full";
 
 function getKey() {
   return (
@@ -46,10 +46,7 @@ function safeNumber(x: any, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function isPrimeMode(
-  engineKey: string | null | undefined,
-  version: number | null | undefined
-) {
+function isPrimeMode(engineKey: string | null | undefined, version: number | null | undefined) {
   return (
     String(engineKey || "").toLowerCase() === "visibility_prime_v1" ||
     Number(version || 0) >= 2
@@ -207,7 +204,23 @@ function cachedNeedsPrimeRefresh(cached: any, audience: string) {
   return false;
 }
 
-/* ---------------- AI (OpenAI Responses API) ---------------- */
+function cachedNeedsVariantRefresh(
+  cached: any,
+  reportVariant: ReportVariant,
+  effectiveAudience: string
+) {
+  if (!cached || typeof cached !== "object") return true;
+
+  const cachedVariant = normalizeReportVariant(cached?.meta?.report_variant);
+  const cachedAudience = safeString(cached?.audience);
+
+  if (cachedVariant !== reportVariant) return true;
+  if (cachedAudience && cachedAudience !== effectiveAudience) return true;
+
+  return false;
+}
+
+/* ---------------- AI ---------------- */
 
 type AiInsights = {
   executive_summary: string;
@@ -535,7 +548,6 @@ export async function GET(
 
     if (linkErr) throw new Error(linkErr.message);
 
-    // 0) Optional taker load (used when tid is present)
     let taker: any = null;
     if (tid) {
       const { data: takerRow, error: takerErr } = await sb
@@ -555,7 +567,6 @@ export async function GET(
       taker = takerRow;
     }
 
-    // 1) Resolve submission row
     let submissionId: string | null = sid || null;
     let submissionRow: any = null;
 
@@ -628,7 +639,6 @@ export async function GET(
       submissionRow = picked;
     }
 
-    // 2) Load latest result
     let { data: result, error: resErr } = await vis
       .from("results")
       .select(
@@ -685,7 +695,6 @@ export async function GET(
     const kbAudience =
       requestedAudience === "taker_report" ? "taker_report" : effectiveAudience;
 
-    // 3) Ensure pillar signals exist for legacy only.
     if (mode === "legacy" && !hasPillarSignals(result)) {
       try {
         const pillarRpc = await callRpc<any>(
@@ -725,7 +734,6 @@ export async function GET(
       }
     }
 
-    // 4) Cache lookup
     let cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: effectiveAudience,
@@ -734,7 +742,9 @@ export async function GET(
     });
 
     if (cached) {
-      if (cachedMissingIntroOrEmptyBlocks(cached, mode, effectiveAudience)) {
+      if (cachedNeedsVariantRefresh(cached, reportVariant, effectiveAudience)) {
+        cached = null;
+      } else if (cachedMissingIntroOrEmptyBlocks(cached, mode, effectiveAudience)) {
         cached = null;
       } else if (mode === "prime" && cachedNeedsPrimeRefresh(cached, effectiveAudience)) {
         cached = null;
@@ -944,7 +954,6 @@ export async function GET(
       };
     };
 
-    // 5) Cache miss → deterministic + optional AI
     if (!cached) {
       const det = await buildDeterministic();
 
@@ -962,7 +971,11 @@ export async function GET(
             p_version: version,
           });
 
-          if (cachedAi && !isBadAiCache(cachedAi)) {
+          if (
+            cachedAi &&
+            !isBadAiCache(cachedAi) &&
+            !cachedNeedsVariantRefresh(cachedAi, reportVariant, aiAudience)
+          ) {
             ai = cachedAi.ai as AiInsights;
             ai_meta.cached = true;
             ai_meta.model = cachedAi?.ai_meta?.model || null;
