@@ -42,6 +42,15 @@ export type NormalizedReportBlock = {
   transition?: string | null;
 };
 
+export type PresenterNote = {
+  section_key: string;
+  title: string;
+  cue: string;
+  emphasise: string[];
+  avoid: string[];
+  transition_line?: string | null;
+};
+
 export type AssembledReportSection = {
   key: string;
   title: string | null;
@@ -57,6 +66,7 @@ export type AssembledProfileExtendedReport = {
   audience: "profile_extended_report";
   input: ProfileExtendedReportInput;
   sections: AssembledReportSection[];
+  presenter_notes: PresenterNote[];
 };
 
 const FINAL_SECTION_TITLES: Record<string, string> = {
@@ -68,13 +78,6 @@ const FINAL_SECTION_TITLES: Record<string, string> = {
   strategic_priority_now: "Strategic priority now",
   progression_roadmap: "Progression roadmap",
 };
-
-const SOURCE_SECTION_KEYS = [
-  "result_interpretation_scripts",
-  "level_progression_roadmap",
-  "visibility_signal_framework",
-  "visibility_audit_layer",
-] as const;
 
 type TierGuide = {
   diagnosis: string;
@@ -947,10 +950,22 @@ function buildNarrativeSections(
     ),
   };
 
-  section2.blocks = dedupeBlocks([...section2.blocks, ...supplemental.result_interpretation_scripts]);
-  section3.blocks = dedupeBlocks([...section3.blocks, ...supplemental.level_progression_roadmap]);
-  section4.blocks = dedupeBlocks([...section4.blocks, ...supplemental.visibility_signal_framework]);
-  section5.blocks = dedupeBlocks([...section5.blocks, ...supplemental.visibility_audit_layer]);
+  section2.blocks = dedupeBlocks([
+    ...section2.blocks,
+    ...supplemental.result_interpretation_scripts,
+  ]);
+  section3.blocks = dedupeBlocks([
+    ...section3.blocks,
+    ...supplemental.level_progression_roadmap,
+  ]);
+  section4.blocks = dedupeBlocks([
+    ...section4.blocks,
+    ...supplemental.visibility_signal_framework,
+  ]);
+  section5.blocks = dedupeBlocks([
+    ...section5.blocks,
+    ...supplemental.visibility_audit_layer,
+  ]);
 
   return [
     section1,
@@ -963,16 +978,154 @@ function buildNarrativeSections(
   ];
 }
 
+function buildPresenterNotes(
+  input: ProfileExtendedReportInput
+): PresenterNote[] {
+  const tierGuide = TIER_GUIDE[input.tier];
+  const levelGuide = LEVEL_GUIDE[input.level];
+  const styleGuide = STYLE_GUIDE[input.behaviour_style];
+  const progressionGuide = PROGRESSION_LANGUAGE[input.tier];
+  const { strongest, weakest } = strongestWeakestPillars(input.pillar_scores);
+
+  const strongestLabel = strongest ? pillarLabel(strongest) : null;
+  const weakestLabel = weakest ? pillarLabel(weakest) : null;
+
+  return [
+    {
+      section_key: "result_at_a_glance",
+      title: "Presenter note",
+      cue:
+        "Frame the result as a stage of visibility maturity, not as a personal or business failure.",
+      emphasise: [
+        `Tier gives the stage; level ${input.level} gives how stable that stage currently is.`,
+        `Readiness is a pacing signal: ${readinessLabel(input.readiness)}.`,
+        `Keep the tone calm, specific, and practical.`,
+      ],
+      avoid: [
+        "Do not dramatise the result.",
+        "Do not imply the business lacks capability.",
+      ],
+      transition_line:
+        "What this result really tells us is not whether the business is good or bad — it tells us what visibility problem needs solving next.",
+    },
+    {
+      section_key: "what_this_tier_means",
+      title: "Presenter note",
+      cue:
+        "Explain what the market is likely seeing right now, and why effort alone may not have been moving the business forward.",
+      emphasise: [
+        tierGuide.diagnosis,
+        `Strategic task: ${tierGuide.strategic_focus}.`,
+      ],
+      avoid: [
+        "Do not make the client feel behind or broken.",
+        "Do not frame this as a motivation issue.",
+      ],
+      transition_line:
+        "So this section helps us separate activity from the actual visibility problem underneath it.",
+    },
+    {
+      section_key: "your_level_nuance",
+      title: "Presenter note",
+      cue:
+        "Use the level as the precision layer inside the wider tier.",
+      emphasise: [
+        `Level ${input.level} means: ${levelGuide.meaning}.`,
+        `Typical position: ${levelGuide.typical_position}`,
+        `Immediate focus: ${levelGuide.immediate_focus}`,
+      ],
+      avoid: [
+        "Do not treat all businesses in the same tier as if they need the same next step.",
+      ],
+      transition_line:
+        "The tier tells us the stage. The level tells us how developed that stage currently is.",
+    },
+    {
+      section_key: "pillars_and_signals",
+      title: "Presenter note",
+      cue:
+        "Use pillar percentages as interpretive clues, not as isolated verdicts.",
+      emphasise: [
+        strongestLabel
+          ? `${strongestLabel} is the strongest current signal.`
+          : "Identify the strongest visible signal.",
+        weakestLabel
+          ? `${weakestLabel} is the main limiting signal right now.`
+          : "Identify the weakest signal carefully.",
+        "Read the pillar pattern together with the tier and level.",
+      ],
+      avoid: [
+        "Do not create alarm around a low pillar score.",
+        "Do not treat percentages as a judgment of business quality.",
+      ],
+      transition_line:
+        "The pillar scores help us see where the signal system is already strong and where progress is still being held back.",
+    },
+    {
+      section_key: "your_behaviour_style",
+      title: "Presenter note",
+      cue:
+        "Use behaviour style to personalise the delivery path, not to label the founder.",
+      emphasise: [
+        `Natural strengths: ${styleGuide.natural_strengths}`,
+        `Main risk: ${styleGuide.main_risk}`,
+        `At the ${input.tier} stage, the most sustainable behaviour-led focus is: ${styleGuide.tier_strategy[input.tier]}`,
+      ],
+      avoid: [
+        "Do not present behaviour style as fixed identity.",
+        "Do not imply one style is better than another.",
+      ],
+      transition_line:
+        "This is the part that explains why two businesses at the same stage may still need different implementation paths.",
+    },
+    {
+      section_key: "strategic_priority_now",
+      title: "Presenter note",
+      cue:
+        "Use the tier to choose the right strategic problem, then use style to shape how it should be implemented.",
+      emphasise: [
+        `Best-fit focus now: ${tierGuide.strategic_focus}`,
+        `What does not help yet: ${tierGuide.not_yet.join(", ")}`,
+      ],
+      avoid: [
+        "Do not give the client ten priorities at once.",
+        "Do not recommend scaling tactics before the right signal problem is solved.",
+      ],
+      transition_line:
+        "The goal now is not to do more everywhere. It is to strengthen the part of the system that will unlock the next stage.",
+    },
+    {
+      section_key: "progression_roadmap",
+      title: "Presenter note",
+      cue:
+        "Always connect the current stage to the next milestone. Explain movement, not just diagnosis.",
+      emphasise: [
+        `Next milestone: ${progressionGuide.next_milestone}`,
+        progressionGuide.language,
+        `Progression cue: ${tierGuide.progression_cue}`,
+      ],
+      avoid: [
+        "Do not leave the client with only a diagnosis.",
+        "Do not make progression sound like a generic growth target.",
+      ],
+      transition_line:
+        "What we want to leave the client with is a clear sense of what stronger signals look like next.",
+    },
+  ];
+}
+
 export function assembleProfileExtendedReport(
   rows: KbBlockRow[],
   input: ProfileExtendedReportInput
 ): AssembledProfileExtendedReport {
   const sections = buildNarrativeSections(rows, input);
+  const presenter_notes = buildPresenterNotes(input);
 
   return {
     audience: "profile_extended_report",
     input,
     sections,
+    presenter_notes,
   };
 }
 
