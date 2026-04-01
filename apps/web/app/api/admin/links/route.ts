@@ -5,16 +5,23 @@ import { createClient } from "@/lib/server/supabaseAdmin";
 
 export const runtime = "nodejs";
 
+type ReportVariant = "lite" | "full";
+
+function normalizeReportVariant(v: any): ReportVariant {
+  return String(v || "").trim().toLowerCase() === "lite" ? "lite" : "full";
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const orgId = searchParams.get("orgId");
-    if (!orgId)
+
+    if (!orgId) {
       return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
+    }
 
     const sb = createClient().schema("portal");
 
-    // 1) Recent links for this org
     const { data: links, error: linkErr } = await sb
       .from("test_links")
       .select(
@@ -34,18 +41,19 @@ export async function GET(req: Request) {
           "next_steps_url",
           "use_count",
           "max_uses",
+          "meta",
         ].join(",")
       )
       .eq("org_id", orgId)
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (linkErr)
+    if (linkErr) {
       return NextResponse.json({ error: linkErr.message }, { status: 500 });
+    }
 
     const safeLinks = links ?? [];
 
-    // 2) Fetch actual test names
     const testIds = Array.from(
       new Set(safeLinks.map((r: any) => r.test_id).filter(Boolean))
     );
@@ -57,16 +65,15 @@ export async function GET(req: Request) {
         .select("id, name")
         .in("id", testIds);
 
-      if (testErr)
+      if (testErr) {
         return NextResponse.json({ error: testErr.message }, { status: 500 });
+      }
 
       for (const t of tests ?? []) {
         nameById[t.id] = t.name ?? "Untitled test";
       }
     }
 
-    // 3) ✅ Compute Uses from actual submissions (authoritative)
-    // token is unique, so counting by link_token is safe
     const tokens = safeLinks.map((r: any) => r.token).filter(Boolean);
     const usesByToken: Record<string, number> = {};
 
@@ -76,8 +83,9 @@ export async function GET(req: Request) {
         .select("id, link_token")
         .in("link_token", tokens);
 
-      if (subsErr)
+      if (subsErr) {
         return NextResponse.json({ error: subsErr.message }, { status: 500 });
+      }
 
       for (const s of subs ?? []) {
         const t = (s as any).link_token;
@@ -86,7 +94,6 @@ export async function GET(req: Request) {
       }
     }
 
-    // 4) Shape response (use computed uses first, fallback to stored use_count)
     const rows = safeLinks.map((r: any) => ({
       id: r.id,
       token: r.token,
@@ -106,7 +113,6 @@ export async function GET(req: Request) {
       redirect_url: r.redirect_url || null,
       next_steps_url: r.next_steps_url || null,
 
-      // ✅ this is what your UI column shows
       use_count:
         typeof usesByToken[r.token] === "number"
           ? usesByToken[r.token]
@@ -115,6 +121,8 @@ export async function GET(req: Request) {
           : 0,
 
       max_uses: r.max_uses ?? null,
+
+      report_variant: normalizeReportVariant(r?.meta?.report_variant),
     }));
 
     return NextResponse.json(rows);
@@ -125,4 +133,3 @@ export async function GET(req: Request) {
     );
   }
 }
-

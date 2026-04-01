@@ -11,6 +11,8 @@ type Test = {
   is_active?: boolean | null;
 };
 
+type ReportVariant = "lite" | "full";
+
 type LinkRow = {
   id: string;
   token: string;
@@ -19,21 +21,20 @@ type LinkRow = {
   is_active: boolean | null;
   expires_at: string | null;
 
-  // NEW (from API)
   test_id: string | null;
-  test_name: string; // actual test name (portal.tests.name)
-  link_name: string | null; // saved purpose/name on link (portal.test_links.name)
+  test_name: string;
+  link_name: string | null;
 
   contact_owner: string | null;
   email_report: boolean;
 
-  // NEW
   redirect_url: string | null;
   next_steps_url: string | null;
 
-  // NEW
   use_count: number;
   max_uses: number | null;
+
+  report_variant?: ReportVariant | null;
 };
 
 export default function LinksClient(props: {
@@ -53,16 +54,14 @@ export default function LinksClient(props: {
   const [emailReport, setEmailReport] = useState(true);
   const [expiresAt, setExpiresAt] = useState<string>("");
 
-  // Email via OneSignal (optional)
   const [recipientEmail, setRecipientEmail] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
 
-  // When results are hidden
   const [redirectUrl, setRedirectUrl] = useState("");
   const [hiddenResultsMessage, setHiddenResultsMessage] = useState("");
-
-  // Always required
   const [nextStepsUrl, setNextStepsUrl] = useState("");
+
+  const [reportVariant, setReportVariant] = useState<ReportVariant>("full");
 
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -70,7 +69,6 @@ export default function LinksClient(props: {
 
   const baseUrl = getBaseUrl();
 
-  // fetch helpers (uncached)
   const fetchJSON = async (url: string) => {
     const r = await fetch(`${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`);
     const j = await r.json();
@@ -78,7 +76,6 @@ export default function LinksClient(props: {
     return j;
   };
 
-  // Fetch tests
   useEffect(() => {
     fetchJSON(`/api/admin/tests?orgId=${orgId}`)
       .then((d) => setTests(Array.isArray(d) ? d : []))
@@ -89,7 +86,6 @@ export default function LinksClient(props: {
       });
   }, [orgId]);
 
-  // Fetch recent links
   const refreshLinks = () => {
     setLoadingLinks(true);
     fetchJSON(`/api/admin/links?orgId=${orgId}`)
@@ -101,15 +97,12 @@ export default function LinksClient(props: {
       })
       .finally(() => setLoadingLinks(false));
   };
+
   useEffect(refreshLinks, [orgId]);
 
-  // ✅ Public link (full page)
   const fullLink = (token: string) => `${baseUrl}/t/${token}`;
-
-  // ✅ Embed link (block only)
   const embedLink = (token: string) => `${baseUrl}/t/${token}/embed`;
 
-  // ✅ Embed code now uses /embed (and nicer iframe styling)
   const embedCode = (token: string) =>
     `<iframe src="${embedLink(token)}" style="width:100%;height:900px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
 
@@ -152,19 +145,34 @@ export default function LinksClient(props: {
     }
   };
 
+  const resetForm = () => {
+    setTestId("");
+    setTestDisplayName("");
+    setContactOwner("");
+    setShowResults(true);
+    setEmailReport(true);
+    setExpiresAt("");
+    setRecipientEmail("");
+    setSendEmail(false);
+    setRedirectUrl("");
+    setHiddenResultsMessage("");
+    setNextStepsUrl("");
+    setReportVariant("full");
+  };
+
   const generate = async () => {
     setLoading(true);
     setStatus(null);
 
     const uuidRe =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     if (!uuidRe.test(testId)) {
       setStatus("Please select a valid test (missing ID). Try reselecting.");
       setLoading(false);
       return;
     }
 
-    // REQUIRED RULES
     if (!isValidUrl(nextStepsUrl)) {
       setStatus("Next steps URL is required.");
       setLoading(false);
@@ -197,6 +205,8 @@ export default function LinksClient(props: {
           redirectUrl: !showResults ? redirectUrl.trim() : null,
           nextStepsUrl: nextStepsUrl.trim(),
           expiresAt: expiresAt || null,
+          reportVariant,
+          report_variant: reportVariant,
         }),
       });
 
@@ -247,9 +257,9 @@ export default function LinksClient(props: {
       }
 
       setStatus(message);
-
       await new Promise((r) => setTimeout(r, 500));
       refreshLinks();
+      resetForm();
     } catch (e: any) {
       setStatus(e?.message || "Error creating link");
       console.error("create-link error", e);
@@ -288,7 +298,6 @@ export default function LinksClient(props: {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-      {/* LEFT: Generate form */}
       <div>
         <div className="mb-3">
           <h2 className="text-lg font-semibold">Generate Test Link</h2>
@@ -367,6 +376,46 @@ export default function LinksClient(props: {
             </span>
           </label>
 
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-2 block font-medium text-sm">Report version</div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setReportVariant("lite")}
+                className={`rounded-lg border px-3 py-3 text-left text-sm transition ${
+                  reportVariant === "lite"
+                    ? "border-sky-500 bg-sky-50 text-sky-900"
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="font-medium">Lite report</div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Best for lead generation and first-touch assessments.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReportVariant("full")}
+                className={`rounded-lg border px-3 py-3 text-left text-sm transition ${
+                  reportVariant === "full"
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="font-medium">Full report</div>
+                <div className="mt-1 text-xs opacity-80">
+                  Premium strategic interpretation and full roadmap.
+                </div>
+              </button>
+            </div>
+
+            <p className="mt-2 text-xs text-gray-500">
+              This controls which report version the test taker receives after completing the test.
+            </p>
+          </div>
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -404,6 +453,12 @@ export default function LinksClient(props: {
               This is always required and will be saved as the next-step destination for this link.
             </span>
           </label>
+
+          {reportVariant === "lite" && !nextStepsUrl.trim() && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Lite reports work best with a next steps URL so people can upgrade, book, or buy the full report.
+            </div>
+          )}
 
           {!showResults && (
             <label className="block text-sm">
@@ -466,7 +521,6 @@ export default function LinksClient(props: {
         </div>
       </div>
 
-      {/* RIGHT: Recent links */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recent links — {orgName}</h2>
@@ -489,6 +543,7 @@ export default function LinksClient(props: {
                   Test name / Test purpose
                 </th>
                 <th className="px-3 py-2 text-left font-medium">Test</th>
+                <th className="px-3 py-2 text-left font-medium">Report</th>
                 <th className="px-3 py-2 text-left font-medium">Uses</th>
                 <th className="px-3 py-2 text-left font-medium">Created</th>
                 <th className="px-3 py-2 text-left font-medium">Results</th>
@@ -503,7 +558,7 @@ export default function LinksClient(props: {
             <tbody>
               {links.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-6 text-center text-gray-500">
+                  <td colSpan={11} className="py-6 text-center text-gray-500">
                     No links yet.
                   </td>
                 </tr>
@@ -518,6 +573,9 @@ export default function LinksClient(props: {
 
                 const redirectOrNext =
                   (r.show_results ? r.next_steps_url : r.redirect_url) || "";
+
+                const variant: ReportVariant =
+                  r.report_variant === "lite" ? "lite" : "full";
 
                 return (
                   <tr key={r.id} className={`${rowBg} border-t`}>
@@ -534,6 +592,18 @@ export default function LinksClient(props: {
 
                     <td className="px-3 py-2 align-top">
                       <div className="text-sm text-gray-900">{r.test_name || "—"}</div>
+                    </td>
+
+                    <td className="px-3 py-2 align-top">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                          variant === "lite"
+                            ? "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                            : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200"
+                        }`}
+                      >
+                        {variant === "lite" ? "Lite" : "Full"}
+                      </span>
                     </td>
 
                     <td className="px-3 py-2 align-top">
@@ -572,7 +642,7 @@ export default function LinksClient(props: {
                         <span className="text-gray-400">—</span>
                       )}
                       {redirectOrNext ? (
-                        <div className="mt-1 text-xs text-gray-500 truncate max-w-[220px]">
+                        <div className="mt-1 max-w-[220px] truncate text-xs text-gray-500">
                           {redirectOrNext}
                         </div>
                       ) : null}
