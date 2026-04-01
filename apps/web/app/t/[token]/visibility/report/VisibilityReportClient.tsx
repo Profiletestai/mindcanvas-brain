@@ -1083,6 +1083,21 @@ export default function VisibilityReportClient({
   if (loading) {
     return (
       <Shell>
+        <div
+  style={{
+    position: "fixed",
+    top: 8,
+    right: 8,
+    zIndex: 9999,
+    background: "red",
+    color: "white",
+    padding: "8px 12px",
+    fontWeight: 700,
+    borderRadius: 8,
+  }}
+>
+  BUILD CHECK 27 MAR
+</div>
         <div className="mx-auto max-w-6xl p-6">
           <div className="text-2xl font-semibold">Loading your report…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
