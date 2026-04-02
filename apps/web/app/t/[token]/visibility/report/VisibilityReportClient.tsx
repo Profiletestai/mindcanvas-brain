@@ -351,26 +351,24 @@ function InnerPanel({
   );
 }
 
-function PageFrame({
+function ReportPage({
   children,
-  className = "",
   id,
 }: {
   children: ReactNode;
-  className?: string;
   id?: string;
 }) {
   return (
-    <div
+    <section
       id={id}
       data-pdf-page="true"
-      className={`rounded-[26px] ${className}`}
+      className="block w-full"
       style={{
         pageBreakAfter: "always",
       }}
     >
-      {children}
-    </div>
+      <div className="min-h-[1120px] flex flex-col justify-start">{children}</div>
+    </section>
   );
 }
 
@@ -1152,7 +1150,9 @@ function CoachingInsights({
       <InnerPanel className="mt-3 p-4">
         <div className="text-[14px] font-semibold">Strategic opportunity</div>
         <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {ai?.strategic_opportunity || fallbackOpportunity || "Clarify the highest-impact next move and focus effort where it will create the greatest lift."}
+          {ai?.strategic_opportunity ||
+            fallbackOpportunity ||
+            "Clarify the highest-impact next move and focus effort where it will create the greatest lift."}
         </div>
       </InnerPanel>
     </OuterCard>
@@ -1340,7 +1340,6 @@ export default function VisibilityReportClient({
 
       const pdf = new JsPDF("p", "pt", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
 
       for (let i = 0; i < pageNodes.length; i += 1) {
         const pageNode = pageNodes[i];
@@ -1357,23 +1356,7 @@ export default function VisibilityReportClient({
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
         if (i > 0) pdf.addPage();
-
-        if (imgHeight <= pageHeight) {
-          pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
-        } else {
-          let heightLeft = imgHeight;
-          let position = 0;
-
-          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
-
-          while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-          }
-        }
+        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
       }
 
       const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
@@ -1430,10 +1413,9 @@ export default function VisibilityReportClient({
     <Shell>
       <div
         ref={reportRootRef}
-        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-6"
+        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-10"
       >
-        {/* PAGE 1 */}
-        <PageFrame>
+        <ReportPage>
           <div className="space-y-4">
             <HeaderCard
               orgLogoUrl={orgLogoUrl}
@@ -1443,7 +1425,7 @@ export default function VisibilityReportClient({
               onDownload={downloadPdf}
             />
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
               <div className="self-start">
                 <LadderSidebar
                   tier={tier}
@@ -1469,7 +1451,7 @@ export default function VisibilityReportClient({
                   overallPct={overallPct}
                 />
 
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
                   <SummaryCard
                     title="Market reality"
                     content={
@@ -1503,11 +1485,10 @@ export default function VisibilityReportClient({
               </div>
             </div>
           </div>
-        </PageFrame>
+        </ReportPage>
 
-        {/* PAGE 2 */}
-        <PageFrame>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)]">
+        <ReportPage>
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)] items-start">
             <div className="space-y-4">
               <TextSection
                 id="welcome"
@@ -1529,11 +1510,10 @@ export default function VisibilityReportClient({
               />
             </div>
           </div>
-        </PageFrame>
+        </ReportPage>
 
-        {/* PAGE 3 */}
-        <PageFrame>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)]">
+        <ReportPage>
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] items-start">
             <div className="space-y-4">
               <TextSection
                 id="working"
@@ -1546,7 +1526,7 @@ export default function VisibilityReportClient({
               />
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 self-start">
               <TextSection
                 id="friction"
                 title="Where visibility friction exists"
@@ -1562,20 +1542,18 @@ export default function VisibilityReportClient({
               />
             </div>
           </div>
-        </PageFrame>
+        </ReportPage>
 
-        {/* PAGE 4 */}
-        <PageFrame>
+        <ReportPage>
           <CoachingInsights
             ai={kbReport.ai}
             fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
             fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
             fallbackOpportunity={sectionSummary(secOpportunity)}
           />
-        </PageFrame>
+        </ReportPage>
 
-        {/* PAGE 5 */}
-        <PageFrame>
+        <ReportPage>
           <OuterCard id="closing" className="p-4 md:p-5">
             <SectionTitle
               title={secClosing?.title || "Turning insight into strategy"}
@@ -1609,7 +1587,7 @@ export default function VisibilityReportClient({
               {safeString(kbReport?.meta?.scoring_mode || "prime")}
             </div>
           </OuterCard>
-        </PageFrame>
+        </ReportPage>
       </div>
     </Shell>
   );
