@@ -268,20 +268,6 @@ function sectionSummary(section?: Section | null): string {
   return "";
 }
 
-function sectionParagraphs(section?: Section | null): string[] {
-  if (!section) return [];
-  const out: string[] = [];
-  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-  for (const block of blocks) {
-    const paras = Array.isArray(block.paragraphs) ? block.paragraphs : [];
-    for (const p of paras) {
-      const s = safeString(p);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
 function sectionBullets(section?: Section | null): string[] {
   if (!section) return [];
   const out: string[] = [];
@@ -303,10 +289,10 @@ function firstItems(arr: string[], count: number): string[] {
 function buildTierCounts(raw: Record<string, number> | undefined | null, dominantTier: Tier) {
   const source = raw || {};
   const out: Record<Tier, number> = {
-    Invisible: safeNumber(source?.Invisible, 0),
-    Emerging: safeNumber(source?.Emerging, 0),
-    Established: safeNumber(source?.Established, 0),
-    Magnetic: safeNumber(source?.Magnetic, 0),
+    Invisible: safeNumber((source as any)?.Invisible, 0),
+    Emerging: safeNumber((source as any)?.Emerging, 0),
+    Established: safeNumber((source as any)?.Established, 0),
+    Magnetic: safeNumber((source as any)?.Magnetic, 0),
   };
 
   const total = out.Invisible + out.Emerging + out.Established + out.Magnetic;
@@ -324,7 +310,8 @@ function realityForTier(tier: Tier) {
   switch (tier) {
     case "Invisible":
       return {
-        intro: "Your business is beginning to appear, but the market still experiences inconsistency and uncertainty.",
+        intro:
+          "Your business is beginning to appear, but the market still experiences inconsistency and uncertainty.",
         marketCan: [
           "Occasionally notice your presence",
           "See early signs of value",
@@ -338,7 +325,8 @@ function realityForTier(tier: Tier) {
       };
     case "Emerging":
       return {
-        intro: "Your business is visible and gaining notice, but it is not yet the obvious choice in the market.",
+        intro:
+          "Your business is visible and gaining notice, but it is not yet the obvious choice in the market.",
         marketCan: [
           "Find you more consistently",
           "Understand your offer more clearly",
@@ -352,12 +340,9 @@ function realityForTier(tier: Tier) {
       };
     case "Established":
       return {
-        intro: "Your business is recognised and trusted enough to create stronger confidence, but there is still room to deepen authority.",
-        marketCan: [
-          "Find you",
-          "Understand what you do",
-          "Recognise your value",
-        ],
+        intro:
+          "Your business is recognised and trusted enough to create stronger confidence, but there is still room to deepen authority.",
+        marketCan: ["Find you", "Understand what you do", "Recognise your value"],
         caution: [
           "You are not always the obvious choice",
           "Trust may still require reassurance",
@@ -367,7 +352,8 @@ function realityForTier(tier: Tier) {
     case "Magnetic":
     default:
       return {
-        intro: "Your business carries strong market pull. Visibility, trust, and authority are working together at a high level.",
+        intro:
+          "Your business carries strong market pull. Visibility, trust, and authority are working together at a high level.",
         marketCan: [
           "Recognise you quickly",
           "Trust your position with confidence",
@@ -596,7 +582,6 @@ function HeaderCard({
 
           <div className="mt-4 flex flex-wrap gap-2">
             <Chip>WhatsWhat Prime</Chip>
-            <Chip>Results Snapshot</Chip>
           </div>
         </div>
 
@@ -643,13 +628,11 @@ function LadderSidebar({
   level,
   nextStepsUrl,
   onDownload,
-  reportIndex,
 }: {
   tier: Tier;
   level: number;
   nextStepsUrl?: string;
   onDownload: () => void;
-  reportIndex: Array<{ id: string; label: string }>;
 }) {
   const levels = Array.from({ length: 20 }, (_, i) => 20 - i);
   const groups: Array<{
@@ -771,30 +754,7 @@ function LadderSidebar({
       </OuterCard>
 
       <OuterCard className="p-3.5">
-        <div
-          className="text-[10px] uppercase tracking-[0.24em]"
-          style={{ color: BRAND.textFaint }}
-        >
-          Snapshot Index
-        </div>
-
-        <div className="mt-3 space-y-1.5">
-          {reportIndex.map((item, idx) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              className="block rounded-xl border px-3 py-2.5 text-[12px] leading-5 hover:bg-white/5"
-              style={{
-                borderColor: BRAND.borderSoft,
-                background: "rgba(8,22,43,0.24)",
-              }}
-            >
-              {idx + 1}. {item.label}
-            </a>
-          ))}
-        </div>
-
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           <TopButton onClick={onDownload}>Download PDF</TopButton>
           {nextStepsUrl ? (
             <TopButton href={nextStepsUrl} variant="gradient">
@@ -826,9 +786,7 @@ function LitePositionCard({
     <OuterCard className="p-4 md:p-5">
       <div className="text-[16px] md:text-[18px] font-semibold">
         You are currently positioned at:{" "}
-        <span style={{ color: BRAND.tier[tier] }}>
-          Level {level}
-        </span>{" "}
+        <span style={{ color: BRAND.tier[tier] }}>Level {level}</span>{" "}
         <span style={{ color: BRAND.textDim }}>{tier} Tier</span>
       </div>
 
@@ -1214,12 +1172,6 @@ export default function VisibilityLiteReportClient({
     sectionSummary(secOpportunity) ||
     "Strengthen the most important weak signal so your market response becomes more consistent and predictable.";
 
-  const reportIndex = [
-    { id: "ladder-position", label: "Ladder position" },
-    { id: "visibility-snapshot", label: "Visibility snapshot" },
-    { id: "results-snapshot", label: "Results snapshot" },
-  ];
-
   async function downloadPdf() {
     try {
       const root = reportRootRef.current;
@@ -1329,31 +1281,32 @@ export default function VisibilityLiteReportClient({
                 level={level}
                 nextStepsUrl={nextStepsUrl}
                 onDownload={downloadPdf}
-                reportIndex={reportIndex}
               />
             </div>
 
-            <LitePositionCard
-              tier={tier}
-              level={level}
-              readiness={readiness}
-              intro={reality.intro}
-              marketCan={reality.marketCan}
-              caution={reality.caution}
-            />
+            <div className="space-y-4">
+              <LitePositionCard
+                tier={tier}
+                level={level}
+                readiness={readiness}
+                intro={reality.intro}
+                marketCan={reality.marketCan}
+                caution={reality.caution}
+              />
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] items-stretch">
+                <DistributionChart tierCounts={tierCounts} />
+                <SnapshotSummaryCard
+                  tier={tier}
+                  level={level}
+                  summary={snapshotSummary}
+                />
+              </div>
+            </div>
           </div>
         </ReportPage>
 
         <ReportPage id="visibility-snapshot">
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] items-start">
-            <DistributionChart tierCounts={tierCounts} />
-            <SnapshotSummaryCard
-              tier={tier}
-              level={level}
-              summary={snapshotSummary}
-            />
-          </div>
-
           <PillarSnapshot pillars={pillars} />
         </ReportPage>
 
