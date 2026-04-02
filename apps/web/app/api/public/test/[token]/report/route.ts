@@ -52,7 +52,6 @@ type LinkMeta = {
   org_slug: string | null;
   test_name: string | null;
 
-  // org display fields for header
   org_name?: string | null;
   org_logo_url?: string | null;
 
@@ -210,7 +209,12 @@ function coerceMapEntries(x: any): MapEntry[] {
   }
 
   if (x && typeof x === "object") {
-    const maybe = (x as any)?.profile_map || (x as any)?.weights || (x as any)?.map || (x as any)?.options || null;
+    const maybe =
+      (x as any)?.profile_map ||
+      (x as any)?.weights ||
+      (x as any)?.map ||
+      (x as any)?.options ||
+      null;
     if (Array.isArray(maybe)) return coerceMapEntries(maybe);
   }
 
@@ -294,14 +298,15 @@ function readSavedTotals(totals: any) {
   };
 }
 
+/**
+ * Portal viewer should ignore redirect behavior, but should still receive
+ * next_steps_url so the report can render the CTA button.
+ */
 function sanitizeLinkMetaForPortal(linkMeta: any) {
   const link = linkMeta && typeof linkMeta === "object" ? { ...linkMeta } : {};
 
   if ("redirect_url" in link) link.redirect_url = null;
   if ("redirectUrl" in link) link.redirectUrl = null;
-
-  if ("next_steps_url" in link) link.next_steps_url = null;
-  if ("nextStepsUrl" in link) link.nextStepsUrl = null;
 
   if ("show_results" in link) link.show_results = true;
   if ("showResults" in link) link.showResults = true;
@@ -309,8 +314,9 @@ function sanitizeLinkMetaForPortal(linkMeta: any) {
   if (link?.meta && typeof link.meta === "object") {
     const m = { ...link.meta };
     if ("redirect_url" in m) m.redirect_url = null;
-    if ("next_steps_url" in m) m.next_steps_url = null;
+    if ("redirectUrl" in m) m.redirectUrl = null;
     if ("show_results" in m) m.show_results = true;
+    if ("showResults" in m) m.showResults = true;
     link.meta = m;
   }
 
@@ -318,7 +324,9 @@ function sanitizeLinkMetaForPortal(linkMeta: any) {
 }
 
 function isUuidLike(s: string) {
-  return /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(String(s || "").trim());
+  return /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(
+    String(s || "").trim()
+  );
 }
 
 // --- Supabase client (admin) ---
@@ -339,7 +347,7 @@ function sbAdmin() {
   });
 }
 
-// ✅ Resolve org/test for a token (org from test_links.org_id – correct for wrapper/shared tests)
+// ✅ Resolve org/test for a token
 async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
   const sb = sbAdmin();
 
@@ -364,7 +372,7 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
         org_id,
         slug
       )
-    `,
+    `
     )
     .eq("token", token)
     .limit(1)
@@ -399,7 +407,7 @@ async function resolveLinkMeta(token: string): Promise<LinkMeta | null> {
 
 async function fetchLatestSubmission(
   taker_id: string,
-  token: string,
+  token: string
 ): Promise<{ row: SubmissionRow | null; matched: "token" | "null" | "none" }> {
   const sb = sbAdmin();
 
@@ -485,7 +493,9 @@ async function fetchDbLabels(test_id: string): Promise<{
       ? (profRes.data as any[]).map((r) => ({
           code: String(r.profile_code || "").toUpperCase(),
           name: String(r.profile_name || ""),
-          frequency_code: (r.frequency_code ? (String(r.frequency_code).toUpperCase() as AB) : null),
+          frequency_code: r.frequency_code
+            ? (String(r.frequency_code).toUpperCase() as AB)
+            : null,
         }))
       : [];
 
@@ -506,7 +516,12 @@ async function fetchTestRow(test_id: string): Promise<TestRow | null> {
 
 async function fetchTakerRow(taker_id: string): Promise<TakerRow | null> {
   const sb = sbAdmin();
-  const q = await sb.from("test_takers").select("id, first_name, last_name").eq("id", taker_id).maybeSingle();
+  const q = await sb
+    .from("test_takers")
+    .select("id, first_name, last_name")
+    .eq("id", taker_id)
+    .maybeSingle();
+
   if (q.error || !q.data) return null;
   return q.data as TakerRow;
 }
@@ -533,7 +548,8 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
   const meta = (testMeta || {}) as any;
 
   const key = typeof meta.report_framework_key === "string" ? meta.report_framework_key.trim() : "";
-  const bucketOverride = typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
+  const bucketOverride =
+    typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
 
   if (key) {
     const bucket = bucketOverride || "framework";
@@ -541,7 +557,8 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
       use: true as const,
       bucket,
       path: key,
-      version: typeof meta.report_framework_version === "string" ? meta.report_framework_version : null,
+      version:
+        typeof meta.report_framework_version === "string" ? meta.report_framework_version : null,
       source: "meta.report_framework_key" as const,
     };
   }
@@ -559,7 +576,13 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
     };
   }
 
-  return { use: false as const, bucket: "", path: "", version: null as any, source: "none" as const };
+  return {
+    use: false as const,
+    bucket: "",
+    path: "",
+    version: null as any,
+    source: "none" as const,
+  };
 }
 
 // ---------- report_blocks + layout templates ----------
@@ -588,14 +611,19 @@ async function fetchLayoutSections(layoutId: string | null | undefined): Promise
   return sections
     .map((s: any) => ({
       key: String(s?.key || "").trim(),
-      scope: (String(s?.scope || "global").trim().toLowerCase() === "profile" ? "profile" : "global") as
-        | "global"
-        | "profile",
+      scope:
+        (String(s?.scope || "global").trim().toLowerCase() === "profile"
+          ? "profile"
+          : "global") as "global" | "profile",
     }))
     .filter((s) => !!s.key);
 }
 
-async function fetchBlocksForKeys(opts: { keys: string[]; entity_type: "global" | "profile"; entity_code: string }) {
+async function fetchBlocksForKeys(opts: {
+  keys: string[];
+  entity_type: "global" | "profile";
+  entity_code: string;
+}) {
   const sb = sbAdmin();
   const keys = opts.keys.filter(Boolean);
   if (keys.length === 0) return new Map<string, BlockRow>();
@@ -666,7 +694,9 @@ async function fetchFrameworkBlocksForKeys(opts: {
 
   let q = sb
     .from("framework_content_blocks")
-    .select("block_key, entity_type, entity_code, version, status, content_json, created_at, updated_at")
+    .select(
+      "block_key, entity_type, entity_code, version, status, content_json, created_at, updated_at"
+    )
     .eq("framework_id", opts.framework_id)
     .eq("entity_type", opts.entity_type)
     .eq("status", "active")
@@ -718,7 +748,11 @@ function replaceTokensDeep<T>(x: T, ctx: Record<string, string>): T {
 
 function contentJsonToSection(content_json: any, fallbackTitle?: string): { title?: string; blocks: ReportSectionBlock[] } {
   const cj = content_json && typeof content_json === "object" ? content_json : {};
-  if (Array.isArray(cj.blocks)) return { title: safeText(cj.title) || fallbackTitle, blocks: cj.blocks as ReportSectionBlock[] };
+  if (Array.isArray(cj.blocks))
+    return {
+      title: safeText(cj.title) || fallbackTitle,
+      blocks: cj.blocks as ReportSectionBlock[],
+    };
 
   const blocks: ReportSectionBlock[] = [];
   const core = safeText((cj as any).core_identity || "").trim();
@@ -745,13 +779,19 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
 
     let answerText = "";
     if (String(q.type || "").toLowerCase() === "text") {
-      answerText = safeText((a as any)?.text) || safeText((a as any)?.value) || safeText((a as any)?.answer) || "";
+      answerText =
+        safeText((a as any)?.text) ||
+        safeText((a as any)?.value) ||
+        safeText((a as any)?.answer) ||
+        "";
     } else {
       const opts = Array.isArray(q.options) ? q.options : [];
       const sel = selectedIndex(a);
       const picked = (opts as any[])[sel];
       answerText = safeText(picked);
-      if (!answerText && (a as any) != null) answerText = safeText((a as any)?.value ?? (a as any)?.selected ?? "");
+      if (!answerText && (a as any) != null) {
+        answerText = safeText((a as any)?.value ?? (a as any)?.selected ?? "");
+      }
     }
 
     const line = `${captureKey}: ${answerText || "—"}`;
@@ -763,7 +803,10 @@ function buildSegmentationSection(qualQs: QualQuestionRow[], answers: AnswerShap
   return {
     id: "segmentation-responses",
     title: "Your responses",
-    blocks: [{ type: "p", text: "These are the answers you provided to the initial questions." }, { type: "ul", items: rows }],
+    blocks: [
+      { type: "p", text: "These are the answers you provided to the initial questions." },
+      { type: "ul", items: rows },
+    ],
   };
 }
 
@@ -778,8 +821,8 @@ function resolveSourceTestIdFromMeta(meta: any): string | null {
     typeof m.default_source_test === "string"
       ? m.default_source_test
       : typeof m.source_test_id === "string"
-        ? m.source_test_id
-        : null;
+      ? m.source_test_id
+      : null;
 
   if (direct && isUuidLike(direct)) return direct;
 
@@ -847,10 +890,14 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const src = (searchParams.get("src") || "").trim().toLowerCase();
     const isPortalViewer = src === "portal";
 
-    if (!takerId) return NextResponse.json({ ok: false, error: "Missing tid" }, { status: 400 });
+    if (!takerId) {
+      return NextResponse.json({ ok: false, error: "Missing tid" }, { status: 400 });
+    }
 
     const meta = await resolveLinkMeta(token);
-    if (!meta) return NextResponse.json({ ok: false, error: "Invalid or expired link" }, { status: 404 });
+    if (!meta) {
+      return NextResponse.json({ ok: false, error: "Invalid or expired link" }, { status: 404 });
+    }
 
     const wrapperTestRow = await fetchTestRow(meta.test_id);
     const wrapperTestMeta = (wrapperTestRow?.meta || {}) as TestMeta;
@@ -858,7 +905,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const subRes = await fetchLatestSubmission(takerId, token);
     const sub = subRes.row;
     if (!sub) {
-      return NextResponse.json({ ok: false, error: "Submission not found for this taker/token." }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Submission not found for this taker/token." },
+        { status: 404 }
+      );
     }
 
     const savedRead = readSavedTotals(sub.totals);
@@ -879,9 +929,11 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     const frameworkId =
       (typeof wrapperTestMeta?.framework_id === "string" && wrapperTestMeta.framework_id.trim()) ||
-      (typeof (wrapperTestMeta as any)?.frameworkId === "string" && (wrapperTestMeta as any).frameworkId.trim()) ||
+      (typeof (wrapperTestMeta as any)?.frameworkId === "string" &&
+        (wrapperTestMeta as any).frameworkId.trim()) ||
       (typeof effectiveTestMeta?.framework_id === "string" && effectiveTestMeta.framework_id.trim()) ||
-      (typeof (effectiveTestMeta as any)?.frameworkId === "string" && (effectiveTestMeta as any).frameworkId.trim()) ||
+      (typeof (effectiveTestMeta as any)?.frameworkId === "string" &&
+        (effectiveTestMeta as any).frameworkId.trim()) ||
       "";
 
     const storageChoice = (() => {
@@ -908,7 +960,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     const useBlocksEngine = !isOperatingFrame && reportEngine === "native_v2_blocks";
 
-    const orgSlug = String(meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach").trim();
+    const orgSlug = String(
+      meta.org_slug || testMeta?.orgSlug || process.env.DEFAULT_ORG_SLUG || "competency-coach"
+    ).trim();
 
     let fw: any = await loadFrameworkBySlug(orgSlug);
     let frameworkSource: "filesystem" | "storage" | "blocks" | "framework_blocks" = "filesystem";
@@ -919,13 +973,15 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         fw = storageFw;
         frameworkSource = useBlocksEngine ? "blocks" : "storage";
       } else {
-        console.log("Storage framework missing; falling back to filesystem", { bucket: storageChoice.bucket, path: storageChoice.path });
+        console.log("Storage framework missing; falling back to filesystem", {
+          bucket: storageChoice.bucket,
+          path: storageChoice.path,
+        });
       }
     }
 
     const look = buildLookups(fw);
 
-    // ✅ use EFFECTIVE source test for labels / questions / qual blocks
     const dbLabels = await fetchDbLabels(effectiveTestId);
     const qmap = await fetchQuestionMaps(effectiveTestId);
     const qualQs = await fetchQualQuestions(effectiveTestId);
@@ -953,15 +1009,20 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
     const comp = computeFromAnswers(sub.answers_json, qmap);
 
-    const freqTotals: Record<AB, number> = savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
-    const profileTotals: Record<string, number> = savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
+    const freqTotals: Record<AB, number> =
+      savedRead.freqSum > 0 ? savedRead.freqTotals : comp.freqTotals;
+    const profileTotals: Record<string, number> =
+      savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
 
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
-    const top_freq = (Object.entries(freqTotals) as [AB, number][]).sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
+    const top_freq =
+      (Object.entries(freqTotals) as [AB, number][])
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
-    const top_profile_entry = Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
+    const top_profile_entry =
+      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
     const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
 
     const top_profile_name =
@@ -978,13 +1039,17 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const topFreqName = frequency_labels.find((f) => f.code === top_freq)?.name || top_freq;
 
     const tokenCtx: Record<string, string> = {
-      TEST_NAME: meta.test_name || wrapperTestRow?.name || effectiveTestRow?.name || testMeta?.test || "Profile Test",
+      TEST_NAME:
+        meta.test_name ||
+        wrapperTestRow?.name ||
+        effectiveTestRow?.name ||
+        testMeta?.test ||
+        "Profile Test",
       ORG_SLUG: orgSlug,
       PRIMARY_FREQ_NAME: topFreqName,
       PRIMARY_PROFILE_NAME: top_profile_name,
       SECONDARY_PROFILE_NAME: secondary,
       TERTIARY_PROFILE_NAME: tertiary,
-
       PROFILE_IMAGE_PRIMARY: "",
       PROFILE_IMAGE_SECONDARY: "",
       PROFILE_IMAGE_TERTIARY: "",
@@ -995,14 +1060,30 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     if (useBlocksEngine) {
       if (frameworkId) {
         const fwRow = await fetchFrameworkById(frameworkId);
-        const structure = fwRow?.structure_json && typeof fwRow.structure_json === "object" ? fwRow.structure_json : {};
+        const structure =
+          fwRow?.structure_json && typeof fwRow.structure_json === "object"
+            ? fwRow.structure_json
+            : {};
         const sec = structure?.sections && typeof structure.sections === "object" ? structure.sections : {};
 
         const globalKeys: string[] = Array.isArray(sec?.global) ? sec.global.map(String) : [];
         const profileKeys: string[] = Array.isArray(sec?.profile) ? sec.profile.map(String) : [];
 
-        const fallbackGlobal = ["global.cover", "global.welcome_letter", "global.how_to_use", "global.lead_introduction", "global.cta_next_steps"];
-        const fallbackProfile = ["profile.identity", "profile.strengths", "profile.development_areas", "profile.communication_style", "profile.reflection_questions", "profile.collaboration"];
+        const fallbackGlobal = [
+          "global.cover",
+          "global.welcome_letter",
+          "global.how_to_use",
+          "global.lead_introduction",
+          "global.cta_next_steps",
+        ];
+        const fallbackProfile = [
+          "profile.identity",
+          "profile.strengths",
+          "profile.development_areas",
+          "profile.communication_style",
+          "profile.reflection_questions",
+          "profile.collaboration",
+        ];
 
         const gKeys = globalKeys.length ? globalKeys : fallbackGlobal;
         const pKeys = profileKeys.length ? profileKeys : fallbackProfile;
@@ -1034,7 +1115,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           const sectionObj: ReportSection = {
             id: key,
             title: safeText((merged as any)?.title) || undefined,
-            blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
+            blocks: Array.isArray((merged as any)?.blocks)
+              ? ((merged as any).blocks as ReportSectionBlock[])
+              : [],
           };
 
           if (GLOBAL_POST_PROFILE_KEYS.has(key)) postProfile.push(sectionObj);
@@ -1049,8 +1132,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             key === "profile.identity"
               ? top_profile_name
               : key.startsWith("profile.")
-                ? titleCaseWords(key.replace("profile.", "").replaceAll("_", " "))
-                : undefined;
+              ? titleCaseWords(key.replace("profile.", "").replaceAll("_", " "))
+              : undefined;
 
           const built = contentJsonToSection(content, defaultTitle);
           const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
@@ -1058,7 +1141,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           profile.push({
             id: key,
             title: safeText((merged as any)?.title) || defaultTitle,
-            blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
+            blocks: Array.isArray((merged as any)?.blocks)
+              ? ((merged as any).blocks as ReportSectionBlock[])
+              : [],
           });
         }
 
@@ -1086,14 +1171,25 @@ export async function GET(req: Request, { params }: { params: { token: string } 
 
         frameworkSource = "framework_blocks";
       } else {
-        const layoutId = wrapperTestRow?.report_layout_template_id || effectiveTestRow?.report_layout_template_id || null;
+        const layoutId =
+          wrapperTestRow?.report_layout_template_id ||
+          effectiveTestRow?.report_layout_template_id ||
+          null;
         const layoutSections = await fetchLayoutSections(layoutId);
 
         const globalKeys = layoutSections.filter((s) => s.scope === "global").map((s) => s.key);
         const profileKeys = layoutSections.filter((s) => s.scope === "profile").map((s) => s.key);
 
-        const globalBlocks = await fetchBlocksForKeys({ keys: globalKeys, entity_type: "global", entity_code: "GLOBAL" });
-        const profileBlocks = await fetchBlocksForKeys({ keys: profileKeys, entity_type: "profile", entity_code: top_profile_code });
+        const globalBlocks = await fetchBlocksForKeys({
+          keys: globalKeys,
+          entity_type: "global",
+          entity_code: "GLOBAL",
+        });
+        const profileBlocks = await fetchBlocksForKeys({
+          keys: profileKeys,
+          entity_type: "profile",
+          entity_code: top_profile_code,
+        });
 
         const common: ReportSection[] = [];
         const profile: ReportSection[] = [];
@@ -1112,7 +1208,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             const sectionObj: ReportSection = {
               id: key,
               title: safeText((merged as any)?.title) || undefined,
-              blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
+              blocks: Array.isArray((merged as any)?.blocks)
+                ? ((merged as any).blocks as ReportSectionBlock[])
+                : [],
             };
 
             if (GLOBAL_POST_PROFILE_KEYS.has(key)) postProfile.push(sectionObj);
@@ -1125,8 +1223,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
               key === "profile.identity"
                 ? top_profile_name
                 : key.startsWith("profile.")
-                  ? titleCaseWords(key.replace("profile.", "").replaceAll("_", " "))
-                  : undefined;
+                ? titleCaseWords(key.replace("profile.", "").replaceAll("_", " "))
+                : undefined;
 
             const built = contentJsonToSection(content, defaultTitle);
             const merged = replaceTokensDeep({ title: built.title, blocks: built.blocks }, tokenCtx);
@@ -1134,7 +1232,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
             profile.push({
               id: key,
               title: safeText((merged as any)?.title) || defaultTitle,
-              blocks: Array.isArray((merged as any)?.blocks) ? ((merged as any).blocks as ReportSectionBlock[]) : [],
+              blocks: Array.isArray((merged as any)?.blocks)
+                ? ((merged as any).blocks as ReportSectionBlock[])
+                : [],
             });
           }
         }
@@ -1170,7 +1270,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const isLead = slugLower.includes("lead") || nameLower.includes("lead");
     const allowRedirectInPortal = isOperatingFrame || isLead;
 
-    const linkMeta = isPortalViewer && !allowRedirectInPortal ? sanitizeLinkMetaForPortal(rawLinkMeta) : rawLinkMeta;
+    const linkMeta =
+      isPortalViewer && !allowRedirectInPortal
+        ? sanitizeLinkMetaForPortal(rawLinkMeta)
+        : rawLinkMeta;
 
     return NextResponse.json({
       ok: true,
@@ -1178,7 +1281,12 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         org_slug: orgSlug,
         org_name: meta.org_name || null,
         org_logo_url: meta.org_logo_url || null,
-        test_name: meta.test_name || wrapperTestRow?.name || effectiveTestRow?.name || testMeta?.test || "Profile Test",
+        test_name:
+          meta.test_name ||
+          wrapperTestRow?.name ||
+          effectiveTestRow?.name ||
+          testMeta?.test ||
+          "Profile Test",
 
         taker: {
           id: takerId,
@@ -1226,7 +1334,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           saved_effective_test_id: savedRead.effective_test_id || null,
         },
 
-        version: useBlocksEngine ? "portal-native-v2-blocks+effective_test_resolution" : "portal-v1",
+        version: useBlocksEngine
+          ? "portal-native-v2-blocks+effective_test_resolution"
+          : "portal-v1",
       },
     });
   } catch (e: any) {
