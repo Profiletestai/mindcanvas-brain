@@ -1,54 +1,45 @@
 // apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
-// apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Cell,
-} from "recharts";
 
-// lazy-load heavy libs for PDF export
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
-type AB = "A" | "B" | "C" | "D";
 type Tier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type Readiness = "stabilise" | "ready_to_progress";
 
 type Signals = {
   tier?: Tier;
   level?: number;
-  style?: AB;
+  style?: string;
   readiness?: Readiness;
-
   pillar_scores?: Record<string, number>;
   pillar_band?: Record<string, string>;
+  pillar_bands?: Record<string, string>;
   weakest_pillar?: string | null;
   strongest_pillar?: string | null;
   pattern_tags?: string[];
+  overall_pct?: number | null;
 };
 
 type Graphs = {
   tier_counts?: Record<string, number>;
-  personality_points?: Record<string, number>;
+  personality_points?: Record<string, number> | null;
   ladder?: { tier?: Tier; level?: number };
   pillars?: Record<string, number>;
   pillar_band?: Record<string, string>;
+  pillar_bands?: Record<string, string>;
+  pillar_model?: string;
 };
 
 type ContentBlock = {
   title?: string;
   short_summary?: string;
   paragraphs?: string[];
+  bullets?: string[];
   transition?: string;
 };
 
@@ -77,7 +68,6 @@ type VisibilityKbReport = {
   engine_key?: string;
   version?: number;
   audience?: string;
-
   meta?: {
     org_name?: string | null;
     org_logo_url?: string | null;
@@ -85,12 +75,11 @@ type VisibilityKbReport = {
     generated_at?: string | null;
     mode?: "deterministic" | "ai" | string;
     ai_error?: string;
+    scoring_mode?: string;
   };
-
   signals?: Signals;
   graphs?: Graphs;
   sections?: Section[];
-
   ai?: AiInsights | null;
   ai_meta?: any;
 };
@@ -123,11 +112,46 @@ type PortalReportResponse = {
       email_report?: boolean | null;
       meta?: any;
     };
-    totals?: any;
-    debug?: any;
   };
   error?: string;
 };
+
+type PillarItem = {
+  key: string;
+  label: string;
+  value: number;
+  band: string;
+  color: string;
+};
+
+const BRAND = {
+  bg: "#061A3A",
+  border: "rgba(255,255,255,0.12)",
+  borderSoft: "rgba(255,255,255,0.08)",
+  text: "rgba(255,255,255,0.94)",
+  textDim: "rgba(255,255,255,0.76)",
+  textFaint: "rgba(255,255,255,0.56)",
+  white: "#F8FAFC",
+  blue: "#4F7DFF",
+  teal: "#45E0D1",
+  purple: "#8B5CF6",
+  amber: "#F3B95C",
+  tier: {
+    Invisible: "#A7B3C7",
+    Emerging: "#4F7DFF",
+    Established: "#32D7C8",
+    Magnetic: "#8B5CF6",
+  } as Record<Tier, string>,
+};
+
+function safeString(x: any): string {
+  return typeof x === "string" ? x.trim() : "";
+}
+
+function safeNumber(x: any, fallback = 0): number {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 function safeText(x: any): string {
   if (typeof x === "string") return x;
@@ -136,21 +160,11 @@ function safeText(x: any): string {
   return String(x);
 }
 
-function safeString(x: any): string {
-  return typeof x === "string" ? x.trim() : "";
-}
-
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function readinessLabel(r?: Readiness) {
-  if (r === "ready_to_progress") return "Ready to progress";
-  if (r === "stabilise") return "Stabilise";
-  return "—";
-}
-
-function fullName(taker?: any) {
+function fullName(taker?: any): string {
   const n = [taker?.first_name, taker?.last_name]
     .filter(Boolean)
     .join(" ")
@@ -158,14 +172,13 @@ function fullName(taker?: any) {
   return n || "Your";
 }
 
-function tierBand(level: number): Tier {
-  if (level <= 5) return "Invisible";
-  if (level <= 10) return "Emerging";
-  if (level <= 15) return "Established";
-  return "Magnetic";
+function readinessLabel(r?: Readiness): string {
+  if (r === "ready_to_progress") return "Ready to progress";
+  if (r === "stabilise") return "Stabilise";
+  return "—";
 }
 
-function formatDate(d?: string | null) {
+function formatDate(d?: string | null): string {
   const dt = d ? new Date(d) : new Date();
   if (Number.isNaN(dt.getTime())) return "";
   return dt.toLocaleDateString(undefined, {
@@ -173,6 +186,13 @@ function formatDate(d?: string | null) {
     month: "short",
     year: "numeric",
   });
+}
+
+function tierBand(level: number): Tier {
+  if (level <= 5) return "Invisible";
+  if (level <= 10) return "Emerging";
+  if (level <= 15) return "Established";
+  return "Magnetic";
 }
 
 async function fetchJson<T = any>(url: string): Promise<T> {
@@ -187,706 +207,737 @@ async function fetchJson<T = any>(url: string): Promise<T> {
   return j as T;
 }
 
-/* ---------------- Brand palette (WhatsWhats Prime) ---------------- */
-const BRAND = {
-  bg: "#061A3A",
-  accent: "#0F6DFF",
-  textDim: "rgba(255,255,255,0.75)",
-  textFaint: "rgba(255,255,255,0.55)",
-  border: "rgba(255,255,255,0.14)",
+function getPillarColor(key: string): string {
+  const k = key.toLowerCase();
+  if (k === "visibility" || k === "discoverability") return BRAND.blue;
+  if (k === "trust" || k === "credibility") return BRAND.teal;
+  if (k === "authority" || k === "conversion") return BRAND.amber;
+  if (k === "dominance" || k === "influence") return BRAND.purple;
+  return BRAND.blue;
+}
 
-  tier: {
-    Invisible: "#94A3B8",
-    Emerging: "#0F6DFF",
-    Established: "#38E1C6",
-    Magnetic: "#7C3AED",
-  } as Record<Tier, string>,
+function getPillarLabel(key: string): string {
+  const k = key.toLowerCase();
+  if (k === "visibility") return "Visibility";
+  if (k === "discoverability") return "Discoverability";
+  if (k === "trust") return "Trust";
+  if (k === "credibility") return "Credibility";
+  if (k === "authority") return "Authority";
+  if (k === "conversion") return "Conversion";
+  if (k === "dominance") return "Dominance";
+  if (k === "influence") return "Influence";
+  return key;
+}
 
-  ab: {
-    A: "#38E1C6",
-    B: "#4FB3FF",
-    C: "#F59E0B",
-    D: "#EF4444",
-  } as Record<AB, string>,
+function bandFromValue(value: number): string {
+  if (value >= 75) return "Strong";
+  if (value >= 50) return "Developing";
+  return "Weak";
+}
 
-  pillars: {
-    discoverability: "#0F6DFF",
-    trust: "#38E1C6",
-    conversion: "#F59E0B",
-  } as Record<string, string>,
-};
+function buildPillars(raw: Record<string, number> | undefined | null): PillarItem[] {
+  const source = raw || {};
+  const keys = Object.keys(source).map((k) => k.toLowerCase());
+  const isPrime =
+    keys.includes("visibility") ||
+    keys.includes("authority") ||
+    keys.includes("dominance");
 
-/* ---------------- UI atoms ---------------- */
+  const order = isPrime
+    ? ["visibility", "trust", "authority", "dominance"]
+    : ["discoverability", "trust", "conversion"];
 
-const Shell = ({ children }: { children: ReactNode }) => (
-  <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
-    <div className="pointer-events-none fixed inset-0">
-      <div
-        className="absolute inset-0 opacity-80"
-        style={{
-          background:
-            "radial-gradient(1100px 520px at 12% 10%, rgba(15,109,255,0.22), transparent 60%)," +
-            "radial-gradient(900px 480px at 86% 20%, rgba(56,225,198,0.14), transparent 55%)," +
-            "radial-gradient(700px 520px at 50% 88%, rgba(124,58,237,0.12), transparent 60%)",
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-25"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)," +
-            "linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)",
-          backgroundSize: "52px 52px",
-        }}
-      />
-    </div>
-    <div className="relative">{children}</div>
-  </div>
-);
+  return order.map((key) => {
+    const value = clamp(safeNumber((source as any)?.[key]), 0, 100);
+    return {
+      key,
+      label: getPillarLabel(key),
+      value,
+      band: bandFromValue(value),
+      color: getPillarColor(key),
+    };
+  });
+}
 
-function GlassCard({
-  title,
-  subtitle,
-  right,
+function sectionSummary(section?: Section | null): string {
+  if (!section) return "";
+  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  for (const block of blocks) {
+    const short = safeString(block.short_summary);
+    if (short) return short;
+    const para = (Array.isArray(block.paragraphs) ? block.paragraphs : [])
+      .map((p) => safeString(p))
+      .find(Boolean);
+    if (para) return para;
+  }
+  return "";
+}
+
+function sectionParagraphs(section?: Section | null): string[] {
+  if (!section) return [];
+  const out: string[] = [];
+  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  for (const block of blocks) {
+    const paras = Array.isArray(block.paragraphs) ? block.paragraphs : [];
+    for (const p of paras) {
+      const s = safeString(p);
+      if (s) out.push(s);
+    }
+  }
+  return out;
+}
+
+function sectionBullets(section?: Section | null): string[] {
+  if (!section) return [];
+  const out: string[] = [];
+  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  for (const block of blocks) {
+    const bullets = Array.isArray(block.bullets) ? block.bullets : [];
+    for (const b of bullets) {
+      const s = safeString(b);
+      if (s) out.push(s);
+    }
+  }
+  return out;
+}
+
+function firstItems(arr: string[], count: number): string[] {
+  return arr.filter(Boolean).slice(0, count);
+}
+
+function OuterCard({
   children,
+  className = "",
+  id,
 }: {
-  title?: string;
-  subtitle?: string;
-  right?: ReactNode;
   children: ReactNode;
+  className?: string;
+  id?: string;
 }) {
   return (
     <div
-      className="rounded-[28px] p-[1px]"
+      id={id}
+      className={`rounded-[28px] border ${className}`}
       style={{
+        borderColor: BRAND.border,
         background:
-          "linear-gradient(135deg, rgba(15,109,255,0.26), rgba(56,225,198,0.12), rgba(255,255,255,0.06))",
-        boxShadow: "0 18px 60px rgba(0,0,0,0.45)",
+          "linear-gradient(180deg, rgba(27,60,99,0.78), rgba(12,32,58,0.84))",
+        boxShadow: "0 18px 50px rgba(0,0,0,0.36)",
       }}
     >
-      <div
-        className="rounded-[27px] p-6"
-        style={{
+      {children}
+    </div>
+  );
+}
+
+function InnerPanel({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[22px] border ${className}`}
+      style={{
+        borderColor: BRAND.borderSoft,
+        background:
+          "linear-gradient(180deg, rgba(35,62,97,0.72), rgba(18,38,64,0.78))",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TopButton({
+  children,
+  onClick,
+  href,
+  variant = "dark",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  variant?: "dark" | "gradient";
+}) {
+  const className =
+    "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold";
+  const style =
+    variant === "gradient"
+      ? ({
           background:
-            "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))",
+            "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
+          color: "#071C36",
+        } as const)
+      : ({
+          background: "rgba(8,22,43,0.72)",
+          color: BRAND.white,
           border: `1px solid ${BRAND.border}`,
-          backdropFilter: "blur(10px)",
-        }}
+        } as const);
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        style={style}
       >
-        {(title || subtitle || right) && (
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              {title && <div className="text-lg font-semibold">{title}</div>}
-              {subtitle ? (
-                <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
-                  {subtitle}
-                </div>
-              ) : null}
-            </div>
-            {right}
-          </div>
-        )}
         {children}
+      </a>
+    );
+  }
+
+  return (
+    <button className={className} style={style} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
+      <div className="pointer-events-none fixed inset-0">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(1000px 520px at 12% 12%, rgba(79,125,255,0.22), transparent 58%)," +
+              "radial-gradient(860px 460px at 86% 18%, rgba(69,224,209,0.12), transparent 56%)," +
+              "radial-gradient(720px 520px at 50% 92%, rgba(139,92,246,0.10), transparent 60%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
       </div>
+      <div className="relative">{children}</div>
     </div>
   );
 }
 
-function PrimaryButton({
-  children,
-  onClick,
-  href,
-  disabled,
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  href?: string;
-  disabled?: boolean;
-}) {
-  const cls =
-    "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition " +
-    (disabled ? "opacity-60 cursor-not-allowed" : "hover:opacity-95");
-  const style = {
-    background: BRAND.accent,
-    color: "white",
-    boxShadow: "0 10px 30px rgba(15,109,255,0.30)",
-  } as any;
-
-  if (href) {
-    return (
-      <a
-        className={cls}
-        style={style}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {children}
-      </a>
-    );
-  }
+function Chip({ children }: { children: ReactNode }) {
   return (
-    <button className={cls} style={style} onClick={onClick} disabled={disabled}>
+    <div
+      className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase"
+      style={{
+        border: `1px solid ${BRAND.border}`,
+        background: "rgba(255,255,255,0.05)",
+        color: "rgba(255,255,255,0.86)",
+      }}
+    >
       {children}
-    </button>
+    </div>
   );
 }
 
-function SecondaryButton({
-  children,
-  onClick,
-  href,
-  disabled,
+function SectionTitle({
+  title,
+  subtitle,
 }: {
-  children: ReactNode;
-  onClick?: () => void;
-  href?: string;
-  disabled?: boolean;
+  title: string;
+  subtitle?: string;
 }) {
-  const cls =
-    "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition border " +
-    (disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-white/5");
-  const style = {
-    borderColor: "rgba(255,255,255,0.18)",
-    background: "rgba(0,0,0,0.18)",
-    color: "white",
-  } as any;
-
-  if (href) {
-    return (
-      <a
-        className={cls}
-        style={style}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {children}
-      </a>
-    );
-  }
   return (
-    <button className={cls} style={style} onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
+    <>
+      <div className="text-[16px] font-semibold">{title}</div>
+      {subtitle ? (
+        <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
+          {subtitle}
+        </div>
+      ) : null}
+    </>
   );
 }
 
-/* ---------------- Visuals ---------------- */
+function SummaryCard({
+  title,
+  content,
+  bullets,
+}: {
+  title: string;
+  content?: string;
+  bullets?: string[];
+}) {
+  return (
+    <OuterCard className="p-5 h-full">
+      <div className="text-[16px] font-semibold">{title}</div>
+      {content ? (
+        <div className="mt-2 text-sm leading-8" style={{ color: BRAND.text }}>
+          {content}
+        </div>
+      ) : null}
+      {bullets && bullets.length ? (
+        <ul className="mt-3 space-y-2 text-sm leading-8" style={{ color: BRAND.text }}>
+          {bullets.map((item, idx) => (
+            <li key={idx} className="flex gap-2">
+              <span style={{ color: BRAND.teal }}>+</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </OuterCard>
+  );
+}
 
-function LadderGrid({ level }: { level: number }) {
-  const active = clamp(level, 1, 20);
-  const steps = Array.from({ length: 20 }, (_, i) => i + 1);
+function TextSection({
+  id,
+  title,
+  section,
+}: {
+  id?: string;
+  title: string;
+  section?: Section | null;
+}) {
+  const summary = sectionSummary(section);
+  const paragraphs = sectionParagraphs(section);
+  const transition =
+    (Array.isArray(section?.blocks) ? section?.blocks : [])
+      .map((b) => safeString(b.transition))
+      .find(Boolean) || "";
 
   return (
-    <div className="mt-4 grid grid-cols-10 gap-2">
-      {steps.map((s) => {
-        const isActive = s === active;
-        const band = tierBand(s);
-        const bandColor = BRAND.tier[band];
-        return (
+    <OuterCard id={id} className="p-5 md:p-6">
+      <div className="text-[16px] font-semibold">{title}</div>
+
+      <InnerPanel className="mt-4 p-5">
+        {summary ? (
           <div
-            key={s}
-            className="h-9 rounded-xl border text-[11px] flex items-center justify-center select-none"
+            className="rounded-2xl border px-4 py-3 text-sm"
             style={{
-              borderColor: isActive
-                ? "rgba(255,255,255,0.30)"
-                : "rgba(255,255,255,0.12)",
-              background: isActive
-                ? `linear-gradient(180deg, ${bandColor}33, rgba(255,255,255,0.10))`
-                : "rgba(255,255,255,0.04)",
-              boxShadow: isActive ? `0 0 22px ${bandColor}66` : "none",
-              color: isActive ? "white" : "rgba(255,255,255,0.75)",
+              borderColor: BRAND.borderSoft,
+              background: "rgba(255,255,255,0.04)",
+              color: "rgba(255,255,255,0.88)",
             }}
-            title={`${band} • Level ${s}`}
           >
-            {s}
+            <span className="font-medium">In short:</span> {summary}
           </div>
-        );
-      })}
-    </div>
+        ) : null}
+
+        <div className="mt-4 space-y-4 text-sm leading-8" style={{ color: BRAND.text }}>
+          {paragraphs.map((p, idx) => (
+            <p key={idx}>{p}</p>
+          ))}
+        </div>
+
+        {transition ? (
+          <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
+            {transition}
+          </div>
+        ) : null}
+      </InnerPanel>
+    </OuterCard>
   );
 }
 
-// ✅ Magnetic at TOP -> Established -> Emerging -> Invisible at bottom
-function TierPyramid({ tier, level }: { tier: Tier; level: number }) {
-  const tiersTopDown: Tier[] = [
-    "Magnetic",
-    "Established",
-    "Emerging",
-    "Invisible",
+function LadderSidebar({
+  tier,
+  level,
+  nextStepsUrl,
+  onDownload,
+  reportIndex,
+}: {
+  tier: Tier;
+  level: number;
+  nextStepsUrl?: string;
+  onDownload: () => void;
+  reportIndex: Array<{ id: string; label: string }>;
+}) {
+  const levels = Array.from({ length: 20 }, (_, i) => 20 - i);
+  const groups: Array<{ tier: Tier; from: number; to: number }> = [
+    { tier: "Magnetic", from: 16, to: 20 },
+    { tier: "Established", from: 11, to: 15 },
+    { tier: "Emerging", from: 6, to: 10 },
+    { tier: "Invisible", from: 1, to: 5 },
   ];
 
   return (
-    <div className="mt-5">
-      <div className="text-xs" style={{ color: BRAND.textFaint }}>
-        Pyramid view shows tier ordering at a glance (Magnetic at top →
-        Invisible at bottom).
-      </div>
+    <div className="space-y-4">
+      <OuterCard className="p-4">
+        <div
+          className="text-[12px] uppercase tracking-[0.24em]"
+          style={{ color: BRAND.textFaint }}
+        >
+          Ladder Position
+        </div>
 
-      <div className="mt-3 flex items-center justify-center">
-        <div className="w-full max-w-[560px] space-y-2">
-          {tiersTopDown.map((t, idx) => {
-            const isActive = t === tier;
-            const c = BRAND.tier[t];
-
-            const widthPct = 60 + idx * 12;
-
-            return (
-              <div key={t} className="flex items-center justify-center">
+        <div className="mt-4 flex gap-3">
+          <div className="w-[34px] shrink-0 space-y-3">
+            {groups.map((g) => (
+              <div
+                key={g.tier}
+                className="relative flex items-center justify-center rounded-[14px]"
+                style={{
+                  height: `${g.to - g.from + 1 > 4 ? 104 : 84}px`,
+                  background: `${BRAND.tier[g.tier]}22`,
+                  border: `1px solid ${BRAND.border}`,
+                }}
+              >
                 <div
-                  className="h-12 rounded-2xl border flex items-center justify-between px-4"
-                  style={{
-                    width: `${widthPct}%`,
-                    borderColor: isActive
-                      ? "rgba(255,255,255,0.28)"
-                      : "rgba(255,255,255,0.12)",
-                    background: isActive
-                      ? `linear-gradient(90deg, ${c}66, rgba(255,255,255,0.06))`
-                      : "rgba(255,255,255,0.04)",
-                    boxShadow: isActive ? `0 0 22px ${c}55` : "none",
-                  }}
+                  className="absolute left-0 top-3 bottom-3 w-[6px] rounded-r-full"
+                  style={{ background: BRAND.tier[g.tier] }}
+                />
+                <div
+                  className="rotate-[-90deg] whitespace-nowrap text-[11px] font-semibold"
+                  style={{ color: BRAND.tier[g.tier] }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-3 w-3 rounded-full"
-                      style={{ background: c, boxShadow: `0 0 12px ${c}66` }}
-                    />
-                    <div className="text-sm font-semibold">{t}</div>
-                  </div>
-                  <div className="text-xs" style={{ color: BRAND.textDim }}>
-                    {isActive ? `Level ${level}` : ""}
-                  </div>
+                  {g.tier}
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-2">
+            {levels.map((n) => {
+              const active = n === level;
+              const band = tierBand(n);
+              const bandColor = BRAND.tier[band];
+
+              return (
+                <div
+                  key={n}
+                  className="relative h-8 rounded-xl border flex items-center justify-center text-sm"
+                  style={{
+                    borderColor: active ? bandColor : "rgba(255,255,255,0.10)",
+                    background: active
+                      ? `linear-gradient(90deg, ${bandColor}cc, rgba(255,255,255,0.14))`
+                      : "rgba(7,22,43,0.34)",
+                    color: "rgba(255,255,255,0.92)",
+                    boxShadow: active ? `0 0 24px ${bandColor}55` : "none",
+                  }}
+                >
+                  {n}
+                  <div
+                    className="absolute right-0 top-0 bottom-0 w-[4px] rounded-r-xl"
+                    style={{ background: bandColor }}
+                  />
+                  {active ? (
+                    <div
+                      className="absolute -right-3 h-6 w-6 rounded-full"
+                      style={{
+                        background: bandColor,
+                        opacity: 0.9,
+                      }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-y-2 text-sm">
+          <div>Magnetic</div>
+          <div className="text-right" style={{ color: BRAND.textDim }}>
+            16–20
+          </div>
+          <div>Established</div>
+          <div className="text-right" style={{ color: BRAND.textDim }}>
+            11–15
+          </div>
+          <div>Emerging</div>
+          <div className="text-right" style={{ color: BRAND.textDim }}>
+            6–10
+          </div>
+          <div>Invisible</div>
+          <div className="text-right" style={{ color: BRAND.textDim }}>
+            1–5
+          </div>
+        </div>
+      </OuterCard>
+
+      <OuterCard className="p-4">
+        <div
+          className="text-[12px] uppercase tracking-[0.24em]"
+          style={{ color: BRAND.textFaint }}
+        >
+          Report Index
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {reportIndex.map((item, idx) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              className="block rounded-xl border px-3 py-3 text-sm hover:bg-white/5"
+              style={{
+                borderColor: BRAND.borderSoft,
+                background: "rgba(8,22,43,0.24)",
+              }}
+            >
+              {idx + 1}. {item.label}
+            </a>
+          ))}
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <TopButton onClick={onDownload}>Download PDF</TopButton>
+          {nextStepsUrl ? (
+            <TopButton href={nextStepsUrl} variant="gradient">
+              Next steps
+            </TopButton>
+          ) : null}
+        </div>
+      </OuterCard>
     </div>
   );
 }
 
-function derivePillarsFromTierCounts(tierCounts: Record<string, number>) {
-  const inv = Number(tierCounts?.Invisible ?? 0);
-  const em = Number(tierCounts?.Emerging ?? 0);
-  const est = Number(tierCounts?.Established ?? 0);
-  const mag = Number(tierCounts?.Magnetic ?? 0);
-  const total = inv + em + est + mag;
-  if (!total) return null;
-
-  const discoverability = ((total - inv) / total) * 100;
-  const trust = ((est + mag) / total) * 100;
-  const conversion = (mag / total) * 100;
-
-  return {
-    discoverability: Math.round(discoverability),
-    trust: Math.round(trust),
-    conversion: Math.round(conversion),
-  };
-}
-
-function PillarsBars({
+function StructuralBreakdown({
   pillars,
   weakest,
   strongest,
+  overallPct,
 }: {
-  pillars: Record<string, number>;
+  pillars: PillarItem[];
   weakest?: string | null;
   strongest?: string | null;
+  overallPct: number;
 }) {
-  const items = [
-    { key: "discoverability", label: "Discoverability" },
-    { key: "trust", label: "Trust" },
-    { key: "conversion", label: "Conversion" },
-  ].map((p) => ({
-    ...p,
-    value: Number((pillars as any)?.[p.key] ?? 0),
-    color: BRAND.pillars[p.key] || BRAND.accent,
-    tag: p.key === strongest ? "Strongest" : p.key === weakest ? "Weakest" : "",
-  }));
-
-  const hasAny = items.some((x) => Number.isFinite(x.value) && x.value > 0);
-
-  if (!hasAny) {
-    return (
-      <div
-        className="h-[240px] rounded-2xl flex items-center justify-center text-sm"
-        style={{
-          background: "rgba(0,0,0,0.18)",
-          border: `1px solid ${BRAND.border}`,
-        }}
-      >
-        Pillar scores will appear here once enabled.
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-4 space-y-4">
-      <div className="text-sm" style={{ color: BRAND.textDim }}>
-        The pillar percentages are a{" "}
-        <span className="font-semibold">signal reading</span> of your answers.
-        Higher % = stronger and more consistent signals. Lower % = where
-        friction is most likely limiting momentum.
+    <>
+      <div
+        className="mt-6 text-[12px] uppercase tracking-[0.30em]"
+        style={{ color: BRAND.textFaint }}
+      >
+        Prime Structural Breakdown
       </div>
 
-      {items.map((it) => {
-        const pct = clamp(Math.round(it.value), 0, 100);
-        return (
-          <div key={it.key} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">
-                {it.label}
-                {it.tag ? (
-                  <span
-                    className="ml-2 text-[11px] px-2 py-0.5 rounded-full border"
-                    style={{
-                      borderColor: "rgba(255,255,255,0.18)",
-                      color: "rgba(255,255,255,0.80)",
-                      background: "rgba(0,0,0,0.18)",
-                    }}
-                  >
-                    {it.tag}
-                  </span>
-                ) : null}
+      <div
+        className={`mt-4 grid gap-4 ${
+          pillars.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
+        }`}
+      >
+        {pillars.map((pillar) => (
+          <InnerPanel key={pillar.key} className="p-4">
+            <div className="text-[14px] font-semibold uppercase tracking-[0.14em]">
+              {pillar.label}
+            </div>
+
+            <div className="mt-4 flex items-end justify-between gap-3">
+              <div
+                className="text-[22px] font-semibold"
+                style={{ color: pillar.color }}
+              >
+                {pillar.value}%
               </div>
               <div className="text-sm" style={{ color: BRAND.textDim }}>
-                {pct}%
+                {pillar.band}
               </div>
             </div>
 
             <div
-              className="h-3 rounded-full overflow-hidden border"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(255,255,255,0.06)",
-              }}
+              className="mt-3 h-3 rounded-full overflow-hidden"
+              style={{ background: "rgba(255,255,255,0.08)" }}
             >
               <div
                 className="h-full rounded-full"
                 style={{
-                  width: `${pct}%`,
-                  background: `linear-gradient(90deg, ${it.color}, rgba(255,255,255,0.18))`,
-                  boxShadow: `0 0 18px ${it.color}55`,
+                  width: `${pillar.value}%`,
+                  background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.25))`,
                 }}
               />
             </div>
+          </InnerPanel>
+        ))}
+      </div>
 
-            <div className="text-xs" style={{ color: BRAND.textFaint }}>
-              {it.key === "discoverability"
-                ? "Can the market reliably find you?"
-                : it.key === "trust"
-                  ? "Does it feel safe and credible to choose you?"
-                  : "Is it easy to take action right now?"}
-            </div>
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <InnerPanel className="p-4">
+          <div
+            className="text-[12px] uppercase tracking-[0.24em]"
+            style={{ color: BRAND.textFaint }}
+          >
+            Weakest Signal
           </div>
-        );
-      })}
-    </div>
+          <div className="mt-2 text-[18px] font-semibold">
+            {getPillarLabel(weakest || pillars[0]?.key || "visibility")}
+          </div>
+        </InnerPanel>
+
+        <InnerPanel className="p-4">
+          <div
+            className="text-[12px] uppercase tracking-[0.24em]"
+            style={{ color: BRAND.textFaint }}
+          >
+            Strongest Signal
+          </div>
+          <div className="mt-2 text-[18px] font-semibold">
+            {getPillarLabel(
+              strongest || pillars[pillars.length - 1]?.key || "trust"
+            )}
+          </div>
+        </InnerPanel>
+
+        <InnerPanel className="p-4">
+          <div
+            className="text-[12px] uppercase tracking-[0.24em]"
+            style={{ color: BRAND.textFaint }}
+          >
+            Overall Score
+          </div>
+          <div className="mt-2 text-[18px] font-semibold">{overallPct}%</div>
+        </InnerPanel>
+      </div>
+    </>
   );
 }
 
-/* ---------------- Narrative rendering ---------------- */
-
-function SectionBlocks({ section }: { section: Section }) {
-  const title = safeString(section?.title) || safeString(section?.key);
-  const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
-
+function SignalGraph({
+  tier,
+  level,
+  overallPct,
+  pillars,
+  weakest,
+  strongest,
+}: {
+  tier: Tier;
+  level: number;
+  overallPct: number;
+  pillars: PillarItem[];
+  weakest?: string | null;
+  strongest?: string | null;
+}) {
   return (
-    <div className="mt-4 space-y-5">
-      {blocks.map((b, idx) => {
-        const bt = safeString(b?.title);
-        const showBlockTitle = bt && bt.toLowerCase() !== title.toLowerCase();
-        const short = safeString(b?.short_summary);
-        const ps = Array.isArray(b?.paragraphs) ? b.paragraphs : [];
-        const transition = safeString(b?.transition);
+    <OuterCard className="p-5 h-full">
+      <div
+        className="text-[12px] font-semibold uppercase tracking-[0.26em]"
+        style={{ color: BRAND.purple }}
+      >
+        Signal Graph
+      </div>
 
-        return (
-          <div
-            key={idx}
-            className="rounded-2xl p-5 border"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
-            {showBlockTitle ? (
-              <div className="text-base font-semibold">{bt}</div>
-            ) : null}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <InnerPanel className="p-4">
+          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+            Tier
+          </div>
+          <div className="mt-2 font-semibold" style={{ color: BRAND.tier[tier] }}>
+            {tier}
+          </div>
+        </InnerPanel>
 
-            {short ? (
+        <InnerPanel className="p-4">
+          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+            Level
+          </div>
+          <div className="mt-2 font-semibold">{level}</div>
+        </InnerPanel>
+
+        <InnerPanel className="p-4">
+          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+            Overall
+          </div>
+          <div className="mt-2 font-semibold">{overallPct}%</div>
+        </InnerPanel>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {pillars.map((pillar) => {
+          const tag =
+            pillar.key === safeString(weakest).toLowerCase()
+              ? "weakest"
+              : pillar.key === safeString(strongest).toLowerCase()
+              ? "strongest"
+              : "";
+
+          return (
+            <div key={pillar.key}>
+              <div className="mb-1 flex items-center justify-between text-sm">
+                <div className="font-medium">
+                  {pillar.label}{" "}
+                  {tag ? (
+                    <span
+                      className="ml-1 text-xs"
+                      style={{ color: BRAND.textFaint }}
+                    >
+                      {tag}
+                    </span>
+                  ) : null}
+                </div>
+                <div>{pillar.value}%</div>
+              </div>
+
               <div
-                className="mt-3 rounded-xl border px-4 py-3 text-sm"
-                style={{
-                  borderColor: "rgba(255,255,255,0.14)",
-                  background: "rgba(255,255,255,0.05)",
-                }}
+                className="h-2 rounded-full overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.08)" }}
               >
-                <span style={{ color: BRAND.textFaint }}>In short:</span>{" "}
-                <span style={{ color: "rgba(255,255,255,0.88)" }}>{short}</span>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${pillar.value}%`,
+                    background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.45))`,
+                  }}
+                />
               </div>
-            ) : null}
-
-            <div
-              className="mt-4 space-y-3 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.85)" }}
-            >
-              {ps.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
             </div>
-
-            {transition ? (
-              <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
-                {transition}
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </OuterCard>
   );
 }
 
-function InsightsCard({
-  ai,
-  error,
-}: {
-  ai: AiInsights | null | undefined;
-  error?: string | null;
-}) {
+function CoachingInsights({ ai }: { ai: AiInsights }) {
   return (
-    <GlassCard title="Insights" subtitle="">
-      {error ? (
-        <div
-          className="mt-2 text-sm"
-          style={{ color: "rgba(248,113,113,0.95)" }}
-        >
-          Insights generation failed: {error}
+    <OuterCard className="p-5 md:p-6">
+      <SectionTitle
+        title="Coaching insights"
+        subtitle="An additional interpretation layer built from your scored signals and narrative blocks."
+      />
+
+      <InnerPanel className="mt-4 p-5">
+        <div className="text-[15px] font-semibold">Executive summary</div>
+        <div className="mt-3 text-sm leading-8" style={{ color: BRAND.text }}>
+          {ai.executive_summary}
         </div>
-      ) : ai ? (
-        <div className="mt-4 space-y-4">
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
-            <div className="text-sm font-semibold">Executive summary</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
-              {ai.executive_summary}
-            </div>
-          </div>
+      </InnerPanel>
 
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
-            <div className="text-sm font-semibold">What this means</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
-              {ai.what_this_means}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
-              <div className="text-sm font-semibold">Strengths</div>
-              <ul
-                className="mt-2 list-disc pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
-                {ai.strengths?.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
-              <div className="text-sm font-semibold">Friction</div>
-              <ul
-                className="mt-2 list-disc pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
-                {ai.friction?.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div
-            className="rounded-2xl border p-4"
-            style={{
-              borderColor: "rgba(255,255,255,0.14)",
-              background: "rgba(0,0,0,0.14)",
-            }}
-          >
-            <div className="text-sm font-semibold">Strategic opportunity</div>
-            <div
-              className="mt-2 text-sm leading-6"
-              style={{ color: "rgba(255,255,255,0.86)" }}
-            >
-              {ai.strategic_opportunity}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
-              <div className="text-sm font-semibold">7-day plan</div>
-              <ol
-                className="mt-2 list-decimal pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
-                {ai.plan_7_days?.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </div>
-
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                borderColor: "rgba(255,255,255,0.14)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
-              <div className="text-sm font-semibold">30-day plan</div>
-              <ol
-                className="mt-2 list-decimal pl-5 text-sm space-y-1"
-                style={{ color: "rgba(255,255,255,0.86)" }}
-              >
-                {ai.plan_30_days?.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-          Insights are not available yet.
-        </div>
-      )}
-    </GlassCard>
-  );
-}
-
-/* ---------------- Charts used inside sections ---------------- */
-
-function TierCountsChart({
-  data,
-}: {
-  data: { name: string; value: number; color: string }[];
-}) {
-  return (
-    <div className="mt-4 h-[260px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} barCategoryGap={22}>
-          <CartesianGrid
-            stroke="rgba(255,255,255,0.12)"
-            strokeDasharray="4 6"
-          />
-          <XAxis
-            dataKey="name"
-            tick={{ fill: "rgba(255,255,255,0.78)" }}
-          />
-          <YAxis
-            tick={{ fill: "rgba(255,255,255,0.70)" }}
-            allowDecimals={false}
-          />
-          <Tooltip
-            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-            contentStyle={{
-              background: "rgba(7,18,38,0.92)",
-              border: "1px solid rgba(255,255,255,0.14)",
-              borderRadius: 14,
-              color: "white",
-            }}
-            labelStyle={{ color: "rgba(255,255,255,0.9)" }}
-          />
-          <Bar dataKey="value" radius={[14, 14, 6, 6]}>
-            {data.map((d) => (
-              <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <InnerPanel className="p-5">
+          <div className="text-[15px] font-semibold">Strengths</div>
+          <ul className="mt-3 space-y-2 text-sm leading-8" style={{ color: BRAND.text }}>
+            {(ai.strengths || []).map((item, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span>•</span>
+                <span>{item}</span>
+              </li>
             ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
+          </ul>
+        </InnerPanel>
 
-function PersonalityChart({
-  data,
-}: {
-  data: { name: string; value: number; color: string }[];
-}) {
-  return (
-    <div className="mt-4 h-[260px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} barCategoryGap={24}>
-          <CartesianGrid
-            stroke="rgba(255,255,255,0.12)"
-            strokeDasharray="4 6"
-          />
-          <XAxis
-            dataKey="name"
-            tick={{ fill: "rgba(255,255,255,0.78)" }}
-          />
-          <YAxis
-            tick={{ fill: "rgba(255,255,255,0.70)" }}
-            allowDecimals={false}
-          />
-          <Tooltip
-            cursor={{ fill: "rgba(255,255,255,0.05)" }}
-            contentStyle={{
-              background: "rgba(7,18,38,0.92)",
-              border: "1px solid rgba(255,255,255,0.14)",
-              borderRadius: 14,
-              color: "white",
-            }}
-            labelStyle={{ color: "rgba(255,255,255,0.9)" }}
-          />
-          <Bar dataKey="value" radius={[14, 14, 6, 6]}>
-            {data.map((d) => (
-              <Cell key={d.name} fill={d.color} fillOpacity={0.9} />
+        <InnerPanel className="p-5">
+          <div className="text-[15px] font-semibold">Friction</div>
+          <ul className="mt-3 space-y-2 text-sm leading-8" style={{ color: BRAND.text }}>
+            {(ai.friction || []).map((item, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span>•</span>
+                <span>{item}</span>
+              </li>
             ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+          </ul>
+        </InnerPanel>
+      </div>
+
+      <InnerPanel className="mt-4 p-5">
+        <div className="text-[15px] font-semibold">Strategic opportunity</div>
+        <div className="mt-3 text-sm leading-8" style={{ color: BRAND.text }}>
+          {ai.strategic_opportunity}
+        </div>
+      </InnerPanel>
+    </OuterCard>
   );
 }
-
-/* ---------------- Main ---------------- */
 
 export default function VisibilityReportClient({
   token,
@@ -901,142 +952,9 @@ export default function VisibilityReportClient({
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
   const [portalMeta, setPortalMeta] =
     useState<PortalReportResponse["data"] | null>(null);
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
-
-  const orgName =
-    portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
-  const orgLogoUrl =
-    portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
-  const testName =
-    portalMeta?.test_name || kbReport?.meta?.test_name || "Visibility Ladder";
-  const takerName = fullName(portalMeta?.taker);
-
-  const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
-
-  const tier: Tier | null = (kbReport?.signals?.tier as Tier) || null;
-  const level: number = Number(kbReport?.signals?.level ?? 0);
-  const style: AB | null = (kbReport?.signals?.style as AB) || null;
-  const readiness = kbReport?.signals?.readiness as Readiness | undefined;
-
-  const tierColor = tier ? BRAND.tier[tier] : "rgba(255,255,255,0.85)";
-  const styleColor = style ? BRAND.ab[style] : "rgba(255,255,255,0.85)";
-
-  const reportDate = formatDate(kbReport?.meta?.generated_at);
-
-  const tierCountsData = useMemo(() => {
-    const counts = kbReport?.graphs?.tier_counts || {};
-    return (
-      ["Invisible", "Emerging", "Established", "Magnetic"] as Tier[]
-    ).map((t) => ({
-      name: t,
-      value: Number((counts as any)[t] ?? 0),
-      color: BRAND.tier[t],
-    }));
-  }, [kbReport?.graphs]);
-
-  const personalityData = useMemo(() => {
-    const pts = kbReport?.graphs?.personality_points || {};
-    const order: AB[] = ["A", "B", "C", "D"];
-    return order.map((k) => ({
-      name: k,
-      value: Number((pts as any)[k] ?? 0),
-      color: BRAND.ab[k],
-    }));
-  }, [kbReport?.graphs]);
-
-  const pillars = useMemo(() => {
-    const apiPillars = (kbReport?.graphs?.pillars || {}) as Record<
-      string,
-      number
-    >;
-    const hasApi =
-      apiPillars &&
-      typeof apiPillars === "object" &&
-      Object.keys(apiPillars).length > 0;
-    if (hasApi) return apiPillars;
-
-    const tc = (kbReport?.graphs?.tier_counts || {}) as Record<string, number>;
-    return derivePillarsFromTierCounts(tc) || {};
-  }, [kbReport?.graphs]);
-
-  const weakest = kbReport?.signals?.weakest_pillar ?? null;
-  const strongest = kbReport?.signals?.strongest_pillar ?? null;
-
-  const sections = Array.isArray(kbReport?.sections) ? kbReport.sections : [];
-  const sectionByKey = useMemo(() => {
-    const m = new Map<string, Section>();
-    sections.forEach((s) => m.set(s.key, s));
-    return m;
-  }, [sections]);
-
-  const introKeys = [
-    "welcome",
-    "how_to_use",
-    "understanding",
-    "tiers_levels",
-    "behaviour_profiles",
-  ];
-  const introSections = introKeys
-    .map((k) => sectionByKey.get(k))
-    .filter(Boolean) as Section[];
-  const missingIntroKeys = introKeys.filter((k) => !sectionByKey.get(k));
-
-  const secSnapshot = sectionByKey.get("snapshot") || null;
-  const secPillars = sectionByKey.get("pillars") || null;
-  const secLevelMeaning = sectionByKey.get("level_meaning") || null;
-
-  const ai = kbReport?.ai ?? null;
-  const aiError = safeString(kbReport?.meta?.ai_error);
-
-  async function downloadPdf() {
-    try {
-      const node = reportRootRef.current;
-      if (!node) return;
-
-      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all(
-        [html2canvasPromise(), jsPdfPromise()]
-      );
-
-      const canvas = await html2canvas(node, {
-        backgroundColor: BRAND.bg,
-        scale: 2,
-        useCORS: true,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new JsPDF("p", "pt", "a4");
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let y = 0;
-      let remaining = imgHeight;
-
-      while (remaining > 0) {
-        pdf.addImage(imgData, "PNG", 0, y, imgWidth, imgHeight);
-        remaining -= pageHeight;
-        if (remaining > 0) {
-          pdf.addPage();
-          y -= pageHeight;
-        }
-      }
-
-      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
-        /[^\w\-]+/g,
-        "_"
-      );
-      pdf.save(safeName);
-    } catch (e: any) {
-      console.error("[visibility] pdf export failed", e);
-      alert("Sorry — PDF export failed. Check console for details.");
-    }
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1046,23 +964,22 @@ export default function VisibilityReportClient({
         setLoading(true);
         setErr(null);
 
-        if (!token || !tid) {
-          throw new Error("Missing token or tid (required for report load).");
-        }
+        if (!token || !tid) throw new Error("Missing token or tid.");
 
         const portalUrl = `/api/public/test/${encodeURIComponent(
           token
         )}/report?tid=${encodeURIComponent(tid)}${
           src ? `&src=${encodeURIComponent(src)}` : ""
         }`;
-
         const portalRes = await fetchJson<PortalReportResponse>(portalUrl);
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
 
         const kbUrl = `/api/public/visibility/${encodeURIComponent(
           token
-        )}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
+        )}/report?tid=${encodeURIComponent(
+          tid
+        )}&audience=taker_report`;
         const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
         setKbReport(kbRes?.data ?? null);
@@ -1080,25 +997,166 @@ export default function VisibilityReportClient({
     };
   }, [token, tid, src]);
 
+  const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
+  const orgLogoUrl =
+    portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
+  const takerName = fullName(portalMeta?.taker);
+  const reportDate = formatDate(kbReport?.meta?.generated_at);
+  const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
+
+  const tier = ((kbReport?.signals?.tier as Tier) || "Invisible") as Tier;
+  const level = clamp(safeNumber(kbReport?.signals?.level, 1), 1, 20);
+  const readiness = kbReport?.signals?.readiness;
+  const overallPct = (() => {
+    const direct = safeNumber(kbReport?.signals?.overall_pct, -1);
+    if (direct >= 0) return direct;
+    const pillars = buildPillars(
+      kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores
+    );
+    if (!pillars.length) return 0;
+    return Math.round(
+      pillars.reduce((sum, pillar) => sum + pillar.value, 0) / pillars.length
+    );
+  })();
+
+  const sectionMap = useMemo(() => {
+    const map = new Map<string, Section>();
+    const sections = Array.isArray(kbReport?.sections) ? kbReport?.sections : [];
+    for (const section of sections) {
+      map.set(section.key, section);
+    }
+    return map;
+  }, [kbReport?.sections]);
+
+  const secWelcome = sectionMap.get("welcome") || null;
+  const secHowToUse = sectionMap.get("how_to_use") || null;
+  const secUnderstanding = sectionMap.get("understanding") || null;
+  const secStrengths = sectionMap.get("strengths") || null;
+  const secFriction = sectionMap.get("friction") || null;
+  const secMarketExperience = sectionMap.get("market_experience") || null;
+  const secOpportunity = sectionMap.get("opportunity") || null;
+  const secNextMove = sectionMap.get("next_move") || null;
+  const secLevelMeaning = sectionMap.get("level_meaning") || null;
+  const secSnapshot = sectionMap.get("snapshot") || null;
+  const secClosing = sectionMap.get("closing") || null;
+
+  const pillars = buildPillars(
+    kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores
+  );
+  const weakest = safeString(kbReport?.signals?.weakest_pillar).toLowerCase() || null;
+  const strongest =
+    safeString(kbReport?.signals?.strongest_pillar).toLowerCase() || null;
+
+  const heroCopy =
+    sectionSummary(secLevelMeaning) ||
+    sectionSummary(secSnapshot) ||
+    (tier === "Invisible"
+      ? "You are in the Invisible tier — your market signals are still too weak or inconsistent to create reliable response."
+      : tier === "Emerging"
+      ? "You are in the Emerging tier — people can see you, but you are not yet the default choice."
+      : tier === "Established"
+      ? "You are in the Established tier — your market can recognise your value, but stronger authority is still needed."
+      : "You are in the Magnetic tier — your market sees you as a recognised authority with strong pull and influence.");
+
+  const currentPositionCopy =
+    tier === "Invisible"
+      ? "You are visible in some places, but not yet enough to create reliable market confidence."
+      : tier === "Emerging"
+      ? "You are visible in market terms, but this level is about strengthening structural consistency."
+      : tier === "Established"
+      ? "You are recognised and trusted, but this level is about consolidating leadership signals."
+      : "You are in a leadership position — the focus here is sustaining authority and protecting consistency.";
+
+  const tierRangeCopy =
+    tier === "Invisible"
+      ? "Levels 1–5. Early market signals are present, but they are not yet stable enough to drive predictable response."
+      : tier === "Emerging"
+      ? "Levels 6–10. Movement inside the tier reflects how stable your market position is."
+      : tier === "Established"
+      ? "Levels 11–15. The market recognises your value, but stronger consistency still separates expert from authority."
+      : "Levels 16–20. This range reflects strong authority, stronger pull, and greater market recognition.";
+
+  const marketRealityBullets = (() => {
+    const bullets = firstItems(sectionBullets(secMarketExperience), 3);
+    if (bullets.length) return bullets;
+    return firstItems(sectionParagraphs(secMarketExperience), 2);
+  })();
+
+  const opportunityBullets = (() => {
+    const bullets = firstItems(sectionBullets(secOpportunity), 3);
+    if (bullets.length) return bullets;
+    return firstItems(sectionParagraphs(secOpportunity), 2);
+  })();
+
+  const nextMoveBullets = (() => {
+    const bullets = firstItems(sectionBullets(secNextMove), 4);
+    if (bullets.length) return bullets;
+    return firstItems(sectionParagraphs(secNextMove), 4);
+  })();
+
+  const reportIndex = [
+    { id: "welcome", label: "A Personal Welcome From Bogdan Stan" },
+    { id: "how-to-use", label: "How To Use This Report" },
+    { id: "understanding", label: "Understanding the Visibility Ladder" },
+    { id: "working", label: "What is already working" },
+    { id: "friction", label: "Where visibility friction exists" },
+    { id: "closing", label: "Turning insight into strategy" },
+  ];
+
+  async function downloadPdf() {
+    try {
+      const node = reportRootRef.current;
+      if (!node) return;
+
+      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
+        html2canvasPromise(),
+        jsPdfPromise(),
+      ]);
+
+      const canvas = await html2canvas(node, {
+        backgroundColor: BRAND.bg,
+        scale: 2,
+        useCORS: true,
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new JsPDF("p", "pt", "a4");
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
+        /[^\w\-]+/g,
+        "_"
+      );
+      pdf.save(safeName);
+    } catch (e) {
+      console.error("[visibility] pdf export failed", e);
+      alert("PDF export failed.");
+    }
+  }
+
   if (loading) {
     return (
       <Shell>
-        <div
-  style={{
-    position: "fixed",
-    top: 8,
-    right: 8,
-    zIndex: 9999,
-    background: "red",
-    color: "white",
-    padding: "8px 12px",
-    fontWeight: 700,
-    borderRadius: 8,
-  }}
->
-  BUILD CHECK 27 MAR
-</div>
-        <div className="mx-auto max-w-6xl p-6">
+        <div className="mx-auto max-w-[1720px] px-4 py-6">
           <div className="text-2xl font-semibold">Loading your report…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Visibility Ladder report.
@@ -1111,14 +1169,9 @@ export default function VisibilityReportClient({
   if (err || !kbReport) {
     return (
       <Shell>
-        <div className="mx-auto max-w-6xl p-6 space-y-4">
-          <div className="text-2xl font-semibold">
-            Couldn’t load Visibility report
-          </div>
-          <p
-            className="text-sm"
-            style={{ color: "rgba(248,113,113,0.95)" }}
-          >
+        <div className="mx-auto max-w-[1720px] px-4 py-6 space-y-4">
+          <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
+          <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
           </p>
           <div
@@ -1139,294 +1192,311 @@ export default function VisibilityReportClient({
     );
   }
 
-  const renderedKeys = new Set<string>();
-  introKeys.forEach((k) => renderedKeys.add(k));
-  renderedKeys.add("snapshot");
-  renderedKeys.add("pillars");
-  renderedKeys.add("level_meaning");
-
-  const remainingSections = sections.filter((s) => !renderedKeys.has(s.key));
-
   return (
     <Shell>
-      <div ref={reportRootRef} className="mx-auto max-w-6xl p-6 space-y-6">
-        {/* ✅ HEADER (DO NOT CHANGE) */}
-        <GlassCard
-          title=""
-          subtitle=""
-          right={
-            <div className="flex flex-col gap-3 items-end">
-              <div className="flex flex-wrap gap-2 justify-end">
-                <SecondaryButton onClick={downloadPdf}>
-                  Download PDF
-                </SecondaryButton>
-                {nextStepsUrl ? (
-                  <PrimaryButton href={nextStepsUrl}>Next steps</PrimaryButton>
-                ) : null}
-              </div>
+      <div
+        ref={reportRootRef}
+        className="mx-auto max-w-[1720px] px-4 py-5 md:px-6 md:py-6"
+      >
+        <OuterCard className="p-5 md:p-6">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-start gap-4">
+                {orgLogoUrl ? (
+                  <img
+                    src={orgLogoUrl}
+                    alt={orgName}
+                    className="h-12 w-12 rounded-2xl object-cover"
+                    style={{ border: `1px solid ${BRAND.border}` }}
+                    onError={(e: any) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="h-12 w-12 rounded-2xl"
+                    style={{
+                      border: `1px solid ${BRAND.border}`,
+                      background: "rgba(255,255,255,0.06)",
+                    }}
+                  />
+                )}
 
-              <div
-                className="rounded-2xl border p-4 min-w-[260px]"
-                style={{
-                  borderColor: BRAND.border,
-                  background: "rgba(0,0,0,0.18)",
-                }}
-              >
-                <div className="text-xs" style={{ color: BRAND.textFaint }}>
-                  Scores
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <div style={{ color: BRAND.textFaint }}>Tier</div>
-                    <div className="font-semibold" style={{ color: tierColor }}>
-                      {tier || "—"}
-                    </div>
+                <div>
+                  <div className="text-[30px] md:text-[36px] font-semibold tracking-[0.14em] uppercase leading-none">
+                    Visibility Ladder™
                   </div>
-                  <div>
-                    <div style={{ color: BRAND.textFaint }}>Level</div>
-                    <div className="font-semibold">
-                      {Number.isFinite(level) && level > 0 ? level : "—"}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ color: BRAND.textFaint }}>Readiness</div>
-                    <div className="font-semibold">
-                      {readinessLabel(readiness)}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ color: BRAND.textFaint }}>Style</div>
-                    <div className="font-semibold" style={{ color: styleColor }}>
-                      {style || "—"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          }
-        >
-          <div className="flex items-start gap-4">
-            {orgLogoUrl ? (
-              <img
-                src={orgLogoUrl}
-                alt={orgName}
-                className="h-12 w-12 rounded-2xl object-cover"
-                style={{ border: `1px solid ${BRAND.border}` }}
-                onError={(e: any) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            ) : (
-              <div
-                className="h-12 w-12 rounded-2xl"
-                style={{
-                  border: `1px solid ${BRAND.border}`,
-                  background: "rgba(255,255,255,0.06)",
-                }}
-              />
-            )}
-
-            <div className="flex-1">
-              <div className="text-xl font-semibold">{orgName}</div>
-              <div className="text-sm mt-0.5" style={{ color: BRAND.textDim }}>
-                {testName}
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                <div style={{ color: BRAND.textDim }}>
-                  Prepared for:{" "}
-                  <span className="font-semibold text-white">{takerName}</span>
-                </div>
-                <div style={{ color: BRAND.textDim }}>
-                  Date:{" "}
-                  <span className="font-semibold text-white">
-                    {reportDate || formatDate(null)}
-                  </span>
-                </div>
-                <div style={{ color: BRAND.textDim }}>
-                  Framework created by:{" "}
-                  <span className="font-semibold text-white">Bogdan Stan</span>
-                </div>
-              </div>
-
-              <div className="mt-4 text-white/85">
-                <span className="font-semibold" style={{ color: tierColor }}>
-                  {tier || "—"}
-                </span>{" "}
-                {level ? (
-                  <>
-                    • Level <span className="font-semibold">{level}</span>
-                  </>
-                ) : null}{" "}
-                {readiness ? (
-                  <>
-                    •{" "}
-                    <span className="font-semibold">
-                      {readinessLabel(readiness)}
-                    </span>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </GlassCard>
-
-        {/* Intro sections (KB-driven) */}
-        <GlassCard title="Intro sections">
-          {introSections.length ? (
-            <div className="mt-2 space-y-6">
-              {introSections.map((s) => (
-                <div key={s.key}>
-                  <div className="text-base font-semibold">
-                    {s.title || s.key}
-                  </div>
-                  <SectionBlocks section={s} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div
-              className="mt-3 rounded-2xl border p-4 text-sm"
-              style={{
-                borderColor: BRAND.border,
-                background: "rgba(0,0,0,0.18)",
-                color: BRAND.textDim,
-              }}
-            >
-              Intro sections (pending). Once inserted into{" "}
-              <code>visibility.kb_blocks</code>, they will render here
-              automatically.
-              <div className="mt-2 text-xs" style={{ color: BRAND.textFaint }}>
-                Missing KB section keys (expected):{" "}
-                <span className="font-semibold">
-                  {missingIntroKeys.join(", ") || "none"}
-                </span>
-              </div>
-            </div>
-          )}
-        </GlassCard>
-
-        {/* Insights (AI) */}
-        <InsightsCard ai={ai} error={aiError || null} />
-
-        {/* ✅ Your visibility snapshot: add BOTH charts here */}
-        {secSnapshot ? (
-          <GlassCard
-            title={secSnapshot.title || "Your visibility snapshot"}
-            subtitle="These graphs show how your answers mapped across tiers and behaviour style."
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
-              <div
-                className="rounded-2xl border p-4"
-                style={{
-                  borderColor: BRAND.border,
-                  background: "rgba(0,0,0,0.14)",
-                }}
-              >
-                <div className="text-sm font-semibold">Signal distribution</div>
-                <div className="text-xs mt-1" style={{ color: BRAND.textFaint }}>
-                  How your answers mapped across tiers — influences your dominant
-                  tier and stability level.
-                </div>
-                <TierCountsChart data={tierCountsData} />
-              </div>
-
-              <div
-                className="rounded-2xl border p-4"
-                style={{
-                  borderColor: BRAND.border,
-                  background: "rgba(0,0,0,0.14)",
-                }}
-              >
-                <div className="text-sm font-semibold">
-                  Your behaviour style (from Q1–Q8)
-                </div>
-                <div className="text-xs mt-1" style={{ color: BRAND.textFaint }}>
-                  How you naturally approach visibility and growth — helps you
-                  pick strategies you can sustain.
-                </div>
-                <PersonalityChart data={personalityData} />
-                <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-                  Primary style:{" "}
-                  <span
-                    className="font-semibold"
-                    style={{ color: styleColor }}
+                  <div
+                    className="mt-2 text-[13px] md:text-[14px] uppercase tracking-[0.28em]"
+                    style={{ color: BRAND.textDim }}
                   >
-                    {style || "—"}
-                  </span>
+                    Strategic Visibility Assessment
+                  </div>
                 </div>
               </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Chip>WhatsWhat Prime</Chip>
+              </div>
             </div>
 
-            <SectionBlocks section={secSnapshot} />
-          </GlassCard>
-        ) : null}
-
-        {/* ✅ Your visibility pillars: put the pillars bars ABOVE the written content */}
-        {secPillars ? (
-          <GlassCard
-            title={secPillars.title || "Your visibility pillars"}
-            subtitle="Discoverability, Trust, and Conversion shape how the market responds to you."
-          >
-            <PillarsBars
-              pillars={pillars}
-              weakest={weakest}
-              strongest={strongest}
-            />
-            <SectionBlocks section={secPillars} />
-          </GlassCard>
-        ) : null}
-
-        {/* ✅ What your current level means: include Ladder Position graph ABOVE the content */}
-        {secLevelMeaning ? (
-          <GlassCard
-            title={secLevelMeaning.title || "What your current level means"}
-            subtitle="Your ladder position shows your current level and tier band."
-          >
-            <div
-              className="rounded-2xl border p-5 mt-3"
-              style={{
-                borderColor: BRAND.border,
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
-              <div className="text-sm font-semibold">Your ladder position</div>
-              <div className="text-xs mt-1" style={{ color: BRAND.textFaint }}>
-                The highlighted number is your current level. Levels 1–5
-                Invisible, 6–10 Emerging, 11–15 Established, 16–20 Magnetic.
+            <div className="flex flex-col items-end gap-3">
+              <div className="flex gap-2">
+                <TopButton onClick={downloadPdf}>Download PDF</TopButton>
+                {nextStepsUrl ? (
+                  <TopButton href={nextStepsUrl} variant="gradient">
+                    Next steps
+                  </TopButton>
+                ) : null}
               </div>
 
-              <LadderGrid level={level || 1} />
-              <TierPyramid
-                tier={tier || tierBand(level || 1)}
-                level={level || 1}
-              />
-            </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <InnerPanel className="px-4 py-3 min-w-[170px]">
+                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                    Prepared for
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">{takerName}</div>
+                </InnerPanel>
 
-            <SectionBlocks section={secLevelMeaning} />
-          </GlassCard>
-        ) : null}
+                <InnerPanel className="px-4 py-3 min-w-[150px]">
+                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                    Date
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">
+                    {reportDate || formatDate(null)}
+                  </div>
+                </InnerPanel>
 
-        {/* Remaining dynamic content */}
-        <GlassCard title="Your personalised report">
-          {remainingSections.length ? (
-            <div className="mt-4 space-y-6">
-              {remainingSections.map((s) => (
-                <GlassCard key={s.key} title={s.title || s.key} subtitle="">
-                  <SectionBlocks section={s} />
-                </GlassCard>
-              ))}
+                <InnerPanel className="px-4 py-3 min-w-[170px]">
+                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                    Framework
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">WhatsWhat Prime</div>
+                </InnerPanel>
+              </div>
             </div>
-          ) : (
-            <div className="mt-3 text-sm" style={{ color: BRAND.textDim }}>
-              No additional narrative sections were returned yet.
-            </div>
-          )}
-          <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
-            engine: {safeString(kbReport.engine_key || "visibility_v1")} • v
-            {kbReport.version ?? 1}
           </div>
-        </GlassCard>
+        </OuterCard>
+
+        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <div className="xl:sticky xl:top-5 self-start">
+            <LadderSidebar
+              tier={tier}
+              level={level}
+              nextStepsUrl={nextStepsUrl}
+              onDownload={downloadPdf}
+              reportIndex={reportIndex}
+            />
+          </div>
+
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
+              <OuterCard className="p-5 md:p-6">
+                <div
+                  className="text-[12px] uppercase tracking-[0.26em]"
+                  style={{ color: BRAND.textFaint }}
+                >
+                  WhatsWhat Prime Visibility Ladder
+                </div>
+
+                <div className="mt-2 text-[42px] md:text-[58px] font-semibold leading-none tracking-[0.01em]">
+                  {takerName.toUpperCase()}
+                </div>
+
+                <InnerPanel className="mt-5 p-5 md:p-6">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div
+                        className="text-[34px] md:text-[52px] font-semibold leading-none"
+                        style={{ color: BRAND.tier[tier] }}
+                      >
+                        Level {level} — {tier}
+                      </div>
+                      <div
+                        className="mt-3 max-w-4xl text-[18px] leading-9"
+                        style={{ color: BRAND.text }}
+                      >
+                        {heroCopy}
+                      </div>
+                    </div>
+
+                    <InnerPanel className="px-5 py-4 shrink-0">
+                      <div
+                        className="text-[12px] uppercase tracking-[0.24em]"
+                        style={{ color: BRAND.textFaint }}
+                      >
+                        Status
+                      </div>
+                      <div className="mt-2 text-[18px] font-semibold">
+                        {readinessLabel(readiness)}
+                      </div>
+                    </InnerPanel>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div>
+                      <div
+                        className="text-[12px] uppercase tracking-[0.24em]"
+                        style={{ color: BRAND.textFaint }}
+                      >
+                        Current Position
+                      </div>
+                      <div
+                        className="mt-3 text-[16px] leading-8"
+                        style={{ color: BRAND.text }}
+                      >
+                        {currentPositionCopy}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        className="text-[12px] uppercase tracking-[0.24em]"
+                        style={{ color: BRAND.textFaint }}
+                      >
+                        Tier Range
+                      </div>
+                      <div
+                        className="mt-3 text-[16px] leading-8"
+                        style={{ color: BRAND.text }}
+                      >
+                        {tierRangeCopy}
+                      </div>
+                    </div>
+                  </div>
+                </InnerPanel>
+
+                <StructuralBreakdown
+                  pillars={pillars}
+                  weakest={weakest}
+                  strongest={strongest}
+                  overallPct={overallPct}
+                />
+              </OuterCard>
+
+              <div className="space-y-5">
+                <SummaryCard
+                  title="Market reality"
+                  content={
+                    !marketRealityBullets.length
+                      ? sectionSummary(secMarketExperience)
+                      : undefined
+                  }
+                  bullets={marketRealityBullets}
+                />
+
+                <SummaryCard
+                  title="Your strategic visibility opportunity"
+                  content={
+                    !opportunityBullets.length
+                      ? sectionSummary(secOpportunity)
+                      : undefined
+                  }
+                  bullets={opportunityBullets}
+                />
+
+                <SummaryCard
+                  title="Your most effective next move"
+                  content={
+                    !nextMoveBullets.length
+                      ? sectionSummary(secNextMove)
+                      : undefined
+                  }
+                  bullets={nextMoveBullets}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
+              <div className="space-y-5">
+                <TextSection
+                  id="welcome"
+                  title="A Personal Welcome From Bogdan Stan"
+                  section={secWelcome}
+                />
+                <TextSection
+                  id="how-to-use"
+                  title="How To Use This Report"
+                  section={secHowToUse}
+                />
+              </div>
+
+              <div className="space-y-5">
+                <TextSection
+                  id="understanding"
+                  title="Understanding the Visibility Ladder"
+                  section={secUnderstanding}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)]">
+              <div className="space-y-5">
+                <TextSection
+                  id="working"
+                  title="What is already working"
+                  section={secStrengths}
+                />
+                <TextSection
+                  title="How the market is likely experiencing your business"
+                  section={secMarketExperience}
+                />
+              </div>
+
+              <div className="space-y-5">
+                <TextSection
+                  id="friction"
+                  title="Where visibility friction exists"
+                  section={secFriction}
+                />
+                <SignalGraph
+                  tier={tier}
+                  level={level}
+                  overallPct={overallPct}
+                  pillars={pillars}
+                  weakest={weakest}
+                  strongest={strongest}
+                />
+              </div>
+            </div>
+
+            {kbReport.ai ? <CoachingInsights ai={kbReport.ai} /> : null}
+
+            <OuterCard id="closing" className="p-5 md:p-6">
+              <SectionTitle
+                title={secClosing?.title || "Turning insight into strategy"}
+              />
+
+              <InnerPanel className="mt-4 p-5">
+                {sectionSummary(secClosing) ? (
+                  <div
+                    className="rounded-2xl border px-4 py-3 text-sm"
+                    style={{
+                      borderColor: BRAND.borderSoft,
+                      background: "rgba(255,255,255,0.04)",
+                      color: "rgba(255,255,255,0.88)",
+                    }}
+                  >
+                    <span className="font-medium">In short:</span>{" "}
+                    {sectionSummary(secClosing)}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 space-y-4 text-sm leading-8" style={{ color: BRAND.text }}>
+                  {sectionParagraphs(secClosing).map((p, idx) => (
+                    <p key={idx}>{p}</p>
+                  ))}
+                </div>
+              </InnerPanel>
+
+              <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
+                engine: {safeString(kbReport.engine_key || "visibility_prime_v1")} • v
+                {kbReport.version ?? 2} • mode:{" "}
+                {safeString(kbReport?.meta?.scoring_mode || "prime")}
+              </div>
+            </OuterCard>
+          </div>
+        </div>
       </div>
     </Shell>
   );
