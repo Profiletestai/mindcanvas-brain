@@ -143,7 +143,6 @@ export default async function TakerDetail({
     .maybeSingle();
   if (!org) return notFound();
 
-  // NOTE: do not org-filter taker here; we validate access below (supports wrapper org setups)
   const { data: taker } = await sb
     .from("test_takers")
     .select(
@@ -154,9 +153,6 @@ export default async function TakerDetail({
 
   if (!taker) return notFound();
 
-  // ✅ Access check:
-  // 1) allow if taker belongs to this org
-  // 2) otherwise allow if taker has ANY submission for a test whose tests.org_id == this org
   let allowed = taker.org_id === org.id;
 
   if (!allowed) {
@@ -199,20 +195,18 @@ export default async function TakerDetail({
   const latest = (results ?? [])[0] || null;
   const totalsRaw = parseTotals(latest?.totals);
 
-  // ✅ Detect Visibility engine totals (from your submit route)
   const isVisibility =
     Boolean(totalsRaw?.visibility) ||
     String(totalsRaw?.meta?.engine || "").toLowerCase().includes("visibility");
 
-  // ----- Meta + framework lookup ------------------------------------------
   const meta: any = (test?.meta as any) ?? {};
   const framework: any = meta?.framework || meta || {};
 
   const profilesSource: any[] = Array.isArray(framework?.profiles)
     ? framework.profiles
     : Array.isArray(meta?.profiles)
-    ? meta.profiles
-    : [];
+      ? meta.profiles
+      : [];
 
   const profiles: Array<{ name: string; code?: string; frequency?: string }> =
     profilesSource.map((p: any) => ({
@@ -224,8 +218,8 @@ export default async function TakerDetail({
   const freqSource: any[] = Array.isArray(framework?.frequencies)
     ? framework.frequencies
     : Array.isArray(meta?.frequencies)
-    ? meta.frequencies
-    : [];
+      ? meta.frequencies
+      : [];
 
   const freqLabels: Record<string, string> = freqSource.length
     ? Object.fromEntries(
@@ -236,7 +230,6 @@ export default async function TakerDetail({
       )
     : { A: "A", B: "B", C: "C", D: "D" };
 
-  // --- Build frequency and profile score maps (raw points) ----------------
   let profileScores: Record<string, number> = {};
   let frequencyScores: Record<string, number> = {};
 
@@ -245,7 +238,6 @@ export default async function TakerDetail({
     typeof totalsRaw === "object" &&
     ("frequencies" in totalsRaw || "profiles" in totalsRaw)
   ) {
-    // New structured shape: { frequencies: {...}, profiles: {...} }
     const tr: any = totalsRaw;
 
     if (tr.frequencies && typeof tr.frequencies === "object") {
@@ -281,7 +273,6 @@ export default async function TakerDetail({
       }
     }
   } else {
-    // Legacy flat totals
     const keys = Object.keys(totalsRaw || {});
     const isFreqTotals =
       keys.length &&
@@ -295,7 +286,6 @@ export default async function TakerDetail({
         ])
       );
     } else {
-      // Assume these are profile scores keyed by profile name
       profileScores = Object.fromEntries(
         Object.entries(totalsRaw).map(([k, v]) => [String(k), Number(v) || 0])
       );
@@ -315,12 +305,10 @@ export default async function TakerDetail({
     }
   }
 
-  // --- Percentages for display (0–100) ------------------------------------
   const freqPct = asPercentMap(frequencyScores);
   const profilePct = asPercentMap(profileScores);
   const topProfile = sortDesc(profileScores)[0] as [string, number] | undefined;
 
-  // --- Decimals for coach summary (0–1) -----------------------------------
   const freqDec = asDecimalMap(frequencyScores);
   const profileDec = asDecimalMap(profileScores);
 
@@ -379,7 +367,6 @@ export default async function TakerDetail({
   const fullName =
     [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
 
-  // Build top 3 profiles for cards (using percentage profile mix)
   const sortedProfilePct = sortDesc(profilePct);
   const topThreeProfiles = sortedProfilePct.slice(0, 3).map(([name, pct]) => {
     const pMeta = profiles.find((p) => p.name === name);
@@ -389,7 +376,6 @@ export default async function TakerDetail({
 
   const labels = ["Primary profile", "Secondary", "Tertiary"];
 
-  // --- QSC URLs (Portal-only Snapshot + Portal-only Extended + Public Strategic) ---
   const isQsc =
     test?.slug === "qsc-core" ||
     test?.slug === "qsc-leaders" ||
@@ -400,7 +386,6 @@ export default async function TakerDetail({
   let qscExtendedUrl: string | null = null;
   let qscStrategicUrl: string | null = null;
 
-  // Determine QSC audience server-side so we build correct URLs (leader vs entrepreneur)
   let qscAudience: QscAudience | null = null;
 
   if (isQsc && taker.link_token) {
@@ -436,13 +421,11 @@ export default async function TakerDetail({
     qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
-  // --- Main report URL (what "Open test-taker report" should open) ----------
   let reportUrl: string | null = null;
 
   if (isQsc) {
     reportUrl = qscStrategicUrl;
   } else if (isVisibility && taker.link_token) {
-    // ✅ Visibility should open the bespoke visibility report
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
     )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
@@ -456,11 +439,19 @@ export default async function TakerDetail({
 
   const freqDefs: any[] = freqSource || [];
 
-  // ✅ Load internal visibility snapshot (Option B2 endpoint)
   const visibilitySnapshot = await fetchVisibilityInternalSnapshot({
     orgSlug: slug,
     takerId: taker.id,
   });
+
+  const profileExtendedReportUrl =
+    isVisibility && latest?.id
+      ? `/portal/${encodeURIComponent(
+          slug
+        )}/database/${encodeURIComponent(
+          taker.id
+        )}/profile-extended-report`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -477,7 +468,6 @@ export default async function TakerDetail({
         </Link>
       </header>
 
-      {/* Contact */}
       <section className="rounded-xl border p-4 bg-white">
         <h2 className="font-medium mb-3">Contact</h2>
         <dl className="grid grid-cols-3 gap-2 text-sm">
@@ -502,7 +492,6 @@ export default async function TakerDetail({
         </dl>
       </section>
 
-      {/* ✅ Visibility Snapshot Panel (Portal-only) */}
       {visibilitySnapshot && (
         <section className="rounded-xl border p-4 bg-white space-y-3">
           <div className="flex items-center justify-between">
@@ -513,18 +502,31 @@ export default async function TakerDetail({
               </p>
             </div>
 
-            {taker.link_token && (
-              <Link
-                href={`/t/${encodeURIComponent(
-                  taker.link_token
-                )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
-              >
-                Open Visibility Report
-              </Link>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {profileExtendedReportUrl ? (
+                <Link
+                  href={profileExtendedReportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-50 hover:bg-slate-800"
+                >
+                  Generate Profile Extended Report
+                </Link>
+              ) : null}
+
+              {taker.link_token && (
+                <Link
+                  href={`/t/${encodeURIComponent(
+                    taker.link_token
+                  )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
+                >
+                  Open Visibility Report
+                </Link>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
@@ -652,7 +654,6 @@ export default async function TakerDetail({
         </section>
       )}
 
-      {/* Latest Result */}
       <section className="rounded-xl border p-4 bg-white space-y-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
@@ -689,7 +690,6 @@ export default async function TakerDetail({
           </div>
         </div>
 
-        {/* ✅ QSC buttons now open in a new tab */}
         {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
           <div className="flex flex-wrap gap-2 pt-2">
             {qscSnapshotUrl && (
@@ -768,7 +768,6 @@ export default async function TakerDetail({
           )}
         </div>
 
-        {/* Primary / Secondary / Tertiary cards for coaches */}
         {topThreeProfiles.length > 0 && (
           <div className="grid gap-4 md:grid-cols-3 pt-4">
             {topThreeProfiles.map((p, idx) => (

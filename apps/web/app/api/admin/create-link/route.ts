@@ -1,3 +1,4 @@
+//apps/web/app/api/admin/create-link/route.ts
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
@@ -5,6 +6,8 @@ import { Resend } from "resend";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
+
+type ReportVariant = "lite" | "full";
 
 type Body = {
   orgId: string;
@@ -15,17 +18,15 @@ type Body = {
   emailReport?: boolean;
   hiddenResultsMessage?: string | null;
 
-  // When results are hidden
   redirectUrl?: string | null;
-
-  // When results are shown (CTA link on report)
   nextStepsUrl?: string | null;
-
   expiresAt?: string | null;
 
-  // Optional email via Resend
   recipientEmail?: string | null;
   recipientName?: string | null;
+
+  reportVariant?: ReportVariant | null;
+  report_variant?: ReportVariant | null;
 };
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
@@ -42,6 +43,10 @@ function absoluteUrl(path: string) {
     "http://localhost:3000";
   const base = host.startsWith("http") ? host : `https://${host}`;
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function normalizeReportVariant(v: any): ReportVariant {
+  return String(v || "").trim().toLowerCase() === "lite" ? "lite" : "full";
 }
 
 export async function POST(req: Request) {
@@ -70,9 +75,11 @@ export async function POST(req: Request) {
       recipientName,
     } = body;
 
-    const sb = createClient().schema("portal");
+    const reportVariant = normalizeReportVariant(
+      body.report_variant ?? body.reportVariant
+    );
 
-    // 32-char-ish token, url-safe-ish (hex)
+    const sb = createClient().schema("portal");
     const token = crypto.randomUUID().replace(/-/g, "");
 
     const insertPayload: any = {
@@ -85,12 +92,15 @@ export async function POST(req: Request) {
       email_report: !!emailReport,
       is_active: true,
 
-      // When results are hidden
       hidden_results_message: showResults ? null : hiddenResultsMessage || null,
       redirect_url: showResults ? null : redirectUrl || null,
 
-      // When results are shown (report CTA)
-      next_steps_url: showResults ? nextStepsUrl || null : null,
+      // keep this available on the link either way
+      next_steps_url: nextStepsUrl || null,
+
+      meta: {
+        report_variant: reportVariant,
+      },
     };
 
     if (expiresAt) {
@@ -100,7 +110,7 @@ export async function POST(req: Request) {
     const { data: linkRow, error: insErr } = await sb
       .from("test_links")
       .insert(insertPayload)
-      .select("token, show_results, redirect_url, next_steps_url")
+      .select("token, show_results, redirect_url, next_steps_url, meta")
       .single();
 
     if (insErr) {
@@ -110,71 +120,69 @@ export async function POST(req: Request) {
       );
     }
 
-    const publicUrl = absoluteUrl(`/t/${linkRow!.token}`);
+    const publicUrl = absoluteUrl(`/t/${linkRow.token}`);
 
-    // Optional email via Resend
     let emailResult: any = null;
+    let emailError: string | null = null;
+
     if (recipientEmail) {
       if (!RESEND_API_KEY) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Missing RESEND_API_KEY or EMAIL_FROM env vars.",
-            url: publicUrl,
-          },
-          { status: 500 }
-        );
+        emailError = "Missing RESEND_API_KEY or EMAIL_FROM env vars.";
+      } else {
+        try {
+          const resend = new Resend(RESEND_API_KEY);
+          const to = recipientName?.trim()
+            ? `${recipientName} <${recipientEmail}>`
+            : recipientEmail;
+
+          const subject = testDisplayName
+            ? `Your ${testDisplayName} link`
+            : "Your MindCanvas test link";
+
+          const html = `
+            <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.6;">
+              <h2 style="margin:0 0 12px;">You're invited to take a MindCanvas profile test</h2>
+              ${
+                contactOwner
+                  ? `<p>Contact owner: <strong>${escapeHtml(
+                      contactOwner
+                    )}</strong></p>`
+                  : ""
+              }
+              <p>Click below to start:</p>
+              <p style="margin:16px 0;">
+                <a href="${publicUrl}" style="background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;">Start your test</a>
+              </p>
+              <p style="margin:16px 0 0;font-size:12px;color:#666;">
+                If the button doesn't work, copy this link:<br/>${publicUrl}
+              </p>
+            </div>
+          `;
+
+          emailResult = await resend.emails.send({
+            from: EMAIL_FROM,
+            to,
+            subject,
+            html,
+          });
+        } catch (e: any) {
+          emailError = e?.message || "Email send failed.";
+        }
       }
-
-      const resend = new Resend(RESEND_API_KEY);
-      const to = recipientName?.trim()
-        ? `${recipientName} <${recipientEmail}>`
-        : recipientEmail;
-
-      const subject = testDisplayName
-        ? `Your ${testDisplayName} link`
-        : "Your MindCanvas test link";
-
-      const html = `
-        <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.6;">
-          <h2 style="margin:0 0 12px;">You're invited to take a MindCanvas profile test</h2>
-          ${
-            contactOwner
-              ? `<p>Contact owner: <strong>${escapeHtml(
-                  contactOwner
-                )}</strong></p>`
-              : ""
-          }
-          <p>Click below to start:</p>
-          <p style="margin:16px 0;">
-            <a href="${publicUrl}" style="background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;">Start your test</a>
-          </p>
-          <p style="margin:16px 0 0;font-size:12px;color:#666;">
-            If the button doesn't work, copy this link:<br/>${publicUrl}
-          </p>
-        </div>
-      `;
-
-      emailResult = await resend.emails.send({
-        from: EMAIL_FROM,
-        to,
-        subject,
-        html,
-      });
     }
 
     return NextResponse.json({
       ok: true,
-      token: linkRow!.token,
+      token: linkRow.token,
       url: publicUrl,
-
-      // Useful debug payload:
-      show_results: linkRow!.show_results,
-      redirect_url: linkRow!.redirect_url,
-      next_steps_url: linkRow!.next_steps_url,
-
-      emailed: !!recipientEmail,
+      show_results: linkRow.show_results,
+      redirect_url: linkRow.redirect_url,
+      next_steps_url: linkRow.next_steps_url,
+      report_variant:
+        linkRow?.meta?.report_variant === "lite" ? "lite" : "full",
+      emailed: !!recipientEmail && !emailError,
       emailResultId: emailResult?.id ?? null,
+      emailError,
     });
   } catch (e: any) {
     return NextResponse.json(
@@ -192,4 +200,3 @@ function escapeHtml(s: string) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
-

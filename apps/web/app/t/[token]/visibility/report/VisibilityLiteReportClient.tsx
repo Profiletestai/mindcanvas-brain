@@ -1,4 +1,4 @@
-// apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
+//apps/web/app/t/[token]/visibility/report/VisibilityLiteReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -268,20 +268,6 @@ function sectionSummary(section?: Section | null): string {
   return "";
 }
 
-function sectionParagraphs(section?: Section | null): string[] {
-  if (!section) return [];
-  const out: string[] = [];
-  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-  for (const block of blocks) {
-    const paras = Array.isArray(block.paragraphs) ? block.paragraphs : [];
-    for (const p of paras) {
-      const s = safeString(p);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
 function sectionBullets(section?: Section | null): string[] {
   if (!section) return [];
   const out: string[] = [];
@@ -298,6 +284,98 @@ function sectionBullets(section?: Section | null): string[] {
 
 function firstItems(arr: string[], count: number): string[] {
   return arr.filter(Boolean).slice(0, count);
+}
+
+function buildTierCounts(raw: Record<string, number> | undefined | null, dominantTier: Tier) {
+  const source = raw || {};
+  const out: Record<Tier, number> = {
+    Invisible: safeNumber((source as any)?.Invisible, 0),
+    Emerging: safeNumber((source as any)?.Emerging, 0),
+    Established: safeNumber((source as any)?.Established, 0),
+    Magnetic: safeNumber((source as any)?.Magnetic, 0),
+  };
+
+  const total = out.Invisible + out.Emerging + out.Established + out.Magnetic;
+  if (total > 0) return out;
+
+  return {
+    Invisible: dominantTier === "Invisible" ? 5 : 1,
+    Emerging: dominantTier === "Emerging" ? 5 : 1,
+    Established: dominantTier === "Established" ? 5 : 1,
+    Magnetic: dominantTier === "Magnetic" ? 5 : 1,
+  };
+}
+
+function realityForTier(tier: Tier) {
+  switch (tier) {
+    case "Invisible":
+      return {
+        intro:
+          "Your business is beginning to appear, but the market still experiences inconsistency and uncertainty.",
+        marketCan: [
+          "Occasionally notice your presence",
+          "See early signs of value",
+          "Begin recognising your offer",
+        ],
+        caution: [
+          "You are not yet easy to find",
+          "Trust is not yet automatic",
+          "Interest can stall before action",
+        ],
+      };
+    case "Emerging":
+      return {
+        intro:
+          "Your business is visible and gaining notice, but it is not yet the obvious choice in the market.",
+        marketCan: [
+          "Find you more consistently",
+          "Understand your offer more clearly",
+          "See growing signs of credibility",
+        ],
+        caution: [
+          "You may still be compared against alternatives",
+          "Trust is not yet fully settled",
+          "Momentum can slow before conversion",
+        ],
+      };
+    case "Established":
+      return {
+        intro:
+          "Your business is recognised and trusted enough to create stronger confidence, but there is still room to deepen authority.",
+        marketCan: ["Find you", "Understand what you do", "Recognise your value"],
+        caution: [
+          "You are not always the obvious choice",
+          "Trust may still require reassurance",
+          "Growth can flatten without stronger authority cues",
+        ],
+      };
+    case "Magnetic":
+    default:
+      return {
+        intro:
+          "Your business carries strong market pull. Visibility, trust, and authority are working together at a high level.",
+        marketCan: [
+          "Recognise you quickly",
+          "Trust your position with confidence",
+          "Move toward action with less persuasion",
+        ],
+        caution: [
+          "Consistency still needs protecting",
+          "Strong reputation must be sustained",
+          "Leadership signals need to remain visible",
+        ],
+      };
+  }
+}
+
+function pillarInterpretation(pillar: PillarItem): string {
+  if (pillar.band === "Strong") {
+    return `${pillar.label} is strong — this signal is helping the market respond to you with greater confidence and consistency.`;
+  }
+  if (pillar.band === "Developing") {
+    return `${pillar.label} is developing — this signal is present, but it still needs strengthening to become more reliable.`;
+  }
+  return `${pillar.label} is weak — this is currently one of the areas most likely to create hesitation or friction in the market response.`;
 }
 
 function OuterCard({
@@ -451,106 +529,6 @@ function Chip({ children }: { children: ReactNode }) {
   );
 }
 
-function SectionTitle({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <>
-      <div className="text-[15px] font-semibold">{title}</div>
-      {subtitle ? (
-        <div className="mt-1 text-[13px]" style={{ color: BRAND.textDim }}>
-          {subtitle}
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function SummaryCard({
-  title,
-  content,
-  bullets,
-}: {
-  title: string;
-  content?: string;
-  bullets?: string[];
-}) {
-  return (
-    <OuterCard className="p-4 h-full">
-      <div className="text-[15px] font-semibold">{title}</div>
-      {content ? (
-        <div className="mt-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {content}
-        </div>
-      ) : null}
-      {bullets && bullets.length ? (
-        <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {bullets.map((item, idx) => (
-            <li key={idx} className="flex gap-2">
-              <span style={{ color: BRAND.teal }}>+</span>
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </OuterCard>
-  );
-}
-
-function TextSection({
-  id,
-  title,
-  section,
-}: {
-  id?: string;
-  title: string;
-  section?: Section | null;
-}) {
-  const summary = sectionSummary(section);
-  const paragraphs = sectionParagraphs(section);
-  const transition =
-    (Array.isArray(section?.blocks) ? section?.blocks : [])
-      .map((b) => safeString(b.transition))
-      .find(Boolean) || "";
-
-  return (
-    <OuterCard id={id} className="p-4 md:p-5">
-      <div className="text-[15px] font-semibold">{title}</div>
-
-      <InnerPanel className="mt-3 p-4">
-        {summary ? (
-          <div
-            className="rounded-2xl border px-4 py-3 text-[13px]"
-            style={{
-              borderColor: BRAND.borderSoft,
-              background: "rgba(255,255,255,0.04)",
-              color: "rgba(255,255,255,0.88)",
-            }}
-          >
-            <span className="font-medium">In short:</span> {summary}
-          </div>
-        ) : null}
-
-        <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {paragraphs.map((p, idx) => (
-            <p key={idx}>{p}</p>
-          ))}
-        </div>
-
-        {transition ? (
-          <div className="mt-4 text-[11px]" style={{ color: BRAND.textFaint }}>
-            {transition}
-          </div>
-        ) : null}
-      </InnerPanel>
-    </OuterCard>
-  );
-}
-
 function HeaderCard({
   orgLogoUrl,
   takerName,
@@ -634,9 +612,9 @@ function HeaderCard({
 
             <InnerPanel className="px-3.5 py-3 min-w-[150px]">
               <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                Framework
+                Report type
               </div>
-              <div className="mt-1.5 text-[16px] font-semibold">WhatsWhat Prime</div>
+              <div className="mt-1.5 text-[16px] font-semibold">Lite snapshot</div>
             </InnerPanel>
           </div>
         </div>
@@ -650,13 +628,11 @@ function LadderSidebar({
   level,
   nextStepsUrl,
   onDownload,
-  reportIndex,
 }: {
   tier: Tier;
   level: number;
   nextStepsUrl?: string;
   onDownload: () => void;
-  reportIndex: Array<{ id: string; label: string }>;
 }) {
   const levels = Array.from({ length: 20 }, (_, i) => 20 - i);
   const groups: Array<{
@@ -778,30 +754,7 @@ function LadderSidebar({
       </OuterCard>
 
       <OuterCard className="p-3.5">
-        <div
-          className="text-[10px] uppercase tracking-[0.24em]"
-          style={{ color: BRAND.textFaint }}
-        >
-          Report Index
-        </div>
-
-        <div className="mt-3 space-y-1.5">
-          {reportIndex.map((item, idx) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              className="block rounded-xl border px-3 py-2.5 text-[12px] leading-5 hover:bg-white/5"
-              style={{
-                borderColor: BRAND.borderSoft,
-                background: "rgba(8,22,43,0.24)",
-              }}
-            >
-              {idx + 1}. {item.label}
-            </a>
-          ))}
-        </div>
-
-        <div className="mt-3 space-y-2">
+        <div className="space-y-2">
           <TopButton onClick={onDownload}>Download PDF</TopButton>
           {nextStepsUrl ? (
             <TopButton href={nextStepsUrl} variant="gradient">
@@ -814,317 +767,262 @@ function LadderSidebar({
   );
 }
 
-function HeroAndBreakdown({
-  takerName,
+function LitePositionCard({
   tier,
   level,
-  heroCopy,
-  currentPositionCopy,
-  tierRangeCopy,
   readiness,
-  pillars,
-  weakest,
-  strongest,
-  overallPct,
+  intro,
+  marketCan,
+  caution,
 }: {
-  takerName: string;
   tier: Tier;
   level: number;
-  heroCopy: string;
-  currentPositionCopy: string;
-  tierRangeCopy: string;
   readiness?: Readiness;
-  pillars: PillarItem[];
-  weakest?: string | null;
-  strongest?: string | null;
-  overallPct: number;
+  intro: string;
+  marketCan: string[];
+  caution: string[];
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <div
-        className="text-[10px] uppercase tracking-[0.26em]"
-        style={{ color: BRAND.textFaint }}
-      >
-        WhatsWhat Prime Visibility Ladder
+      <div className="text-[16px] md:text-[18px] font-semibold">
+        You are currently positioned at:{" "}
+        <span style={{ color: BRAND.tier[tier] }}>Level {level}</span>{" "}
+        <span style={{ color: BRAND.textDim }}>{tier} Tier</span>
       </div>
 
-      <div className="mt-2 text-[34px] md:text-[50px] font-semibold leading-none tracking-[0.01em]">
-        {takerName.toUpperCase()}
+      <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
+        {intro}
       </div>
 
-      <InnerPanel className="mt-4 p-4 md:p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <div
-              className="text-[28px] md:text-[44px] font-semibold leading-none"
-              style={{ color: BRAND.tier[tier] }}
-            >
-              Level {level} — {tier}
-            </div>
-            <div
-              className="mt-3 max-w-4xl text-[15px] leading-7"
-              style={{ color: BRAND.text }}
-            >
-              {heroCopy}
-            </div>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <InnerPanel className="px-4 py-3">
+          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+            Status
           </div>
+          <div className="mt-1.5 text-[14px] font-semibold">
+            {readinessLabel(readiness)}
+          </div>
+        </InnerPanel>
 
-          <InnerPanel className="px-4 py-3 shrink-0">
-            <div
-              className="text-[10px] uppercase tracking-[0.24em]"
-              style={{ color: BRAND.textFaint }}
-            >
-              Status
-            </div>
-            <div className="mt-1.5 text-[16px] font-semibold">
-              {readinessLabel(readiness)}
-            </div>
-          </InnerPanel>
-        </div>
+        <InnerPanel className="px-4 py-3">
+          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+            Tier range
+          </div>
+          <div className="mt-1.5 text-[14px] font-semibold">
+            {tier === "Invisible"
+              ? "1–5"
+              : tier === "Emerging"
+              ? "6–10"
+              : tier === "Established"
+              ? "11–15"
+              : "16–20"}
+          </div>
+        </InnerPanel>
+      </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <InnerPanel className="mt-4 p-4">
+        <div className="text-[14px] font-semibold">What this means in reality</div>
+
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
           <div>
-            <div
-              className="text-[10px] uppercase tracking-[0.24em]"
-              style={{ color: BRAND.textFaint }}
-            >
-              Current Position
+            <div className="text-[12px] font-semibold" style={{ color: BRAND.textDim }}>
+              The market can:
             </div>
-            <div
-              className="mt-2 text-[14px] leading-7"
-              style={{ color: BRAND.text }}
-            >
-              {currentPositionCopy}
-            </div>
+            <ul className="mt-2 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+              {marketCan.map((item, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span style={{ color: BRAND.teal }}>✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div>
-            <div
-              className="text-[10px] uppercase tracking-[0.24em]"
-              style={{ color: BRAND.textFaint }}
-            >
-              Tier Range
+            <div className="text-[12px] font-semibold" style={{ color: BRAND.textDim }}>
+              But when it matters:
             </div>
-            <div
-              className="mt-2 text-[14px] leading-7"
-              style={{ color: BRAND.text }}
-            >
-              {tierRangeCopy}
-            </div>
+            <ul className="mt-2 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+              {caution.map((item, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span style={{ color: "#FF7A7A" }}>×</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </InnerPanel>
+    </OuterCard>
+  );
+}
 
-      <div
-        className="mt-5 text-[10px] uppercase tracking-[0.30em]"
-        style={{ color: BRAND.textFaint }}
-      >
-        Prime Structural Breakdown
+function DistributionChart({
+  tierCounts,
+}: {
+  tierCounts: Record<Tier, number>;
+}) {
+  const items: Array<{ key: Tier; value: number; color: string }> = [
+    { key: "Invisible", value: tierCounts.Invisible, color: BRAND.tier.Invisible },
+    { key: "Emerging", value: tierCounts.Emerging, color: BRAND.tier.Emerging },
+    { key: "Established", value: tierCounts.Established, color: BRAND.tier.Established },
+    { key: "Magnetic", value: tierCounts.Magnetic, color: BRAND.tier.Magnetic },
+  ];
+
+  const max = Math.max(...items.map((i) => i.value), 1);
+
+  return (
+    <OuterCard className="p-4">
+      <div className="text-[15px] font-semibold">Signal distribution</div>
+      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+        These graphs show how your answers map across ladder tiers.
       </div>
 
-      <div
-        className={`mt-3 grid gap-3 ${
-          pillars.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
-        }`}
-      >
-        {pillars.map((pillar) => (
-          <InnerPanel key={pillar.key} className="p-3.5">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em]">
-              {pillar.label}
-            </div>
-
-            <div className="mt-3 flex items-end justify-between gap-2">
-              <div
-                className="text-[16px] font-semibold"
-                style={{ color: pillar.color }}
-              >
-                {pillar.value}%
+      <InnerPanel className="mt-4 p-4">
+        <div className="flex h-[220px] items-end justify-between gap-4">
+          {items.map((item) => {
+            const h = Math.max(12, Math.round((item.value / max) * 150));
+            return (
+              <div key={item.key} className="flex flex-1 flex-col items-center gap-3">
+                <div className="text-[12px] font-medium">{item.value}</div>
+                <div
+                  className="w-full max-w-[74px] rounded-[12px]"
+                  style={{
+                    height: `${h}px`,
+                    background: `linear-gradient(180deg, ${item.color}, ${item.color}cc)`,
+                    boxShadow: `0 0 20px ${item.color}33`,
+                  }}
+                />
+                <div className="text-center text-[11px]" style={{ color: BRAND.textDim }}>
+                  {item.key}
+                </div>
               </div>
+            );
+          })}
+        </div>
+      </InnerPanel>
+    </OuterCard>
+  );
+}
+
+function SnapshotSummaryCard({
+  tier,
+  level,
+  summary,
+}: {
+  tier: Tier;
+  level: number;
+  summary: string;
+}) {
+  return (
+    <OuterCard className="p-4 h-full">
+      <div className="text-[15px] font-semibold">Your visibility snapshot</div>
+      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+        A concise summary of where you currently stand.
+      </div>
+
+      <InnerPanel className="mt-4 p-4">
+        <div className="text-[13px] leading-7" style={{ color: BRAND.text }}>
+          <span className="font-semibold" style={{ color: BRAND.tier[tier] }}>
+            Level {level} — {tier}
+          </span>
+          {" · "}
+          {summary}
+        </div>
+      </InnerPanel>
+
+      <InnerPanel className="mt-4 p-4">
+        <div className="text-[13px] font-semibold">What this tells you</div>
+        <div className="mt-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+          This snapshot highlights your current market position and the major signal pattern shaping how prospects interpret your business.
+        </div>
+      </InnerPanel>
+    </OuterCard>
+  );
+}
+
+function PillarSnapshot({
+  pillars,
+}: {
+  pillars: PillarItem[];
+}) {
+  return (
+    <OuterCard className="p-4">
+      <div className="text-[15px] font-semibold">Your visibility pillars</div>
+      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+        A quick reading of the key signals shaping market response.
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {pillars.map((pillar) => (
+          <InnerPanel key={pillar.key} className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-[13px] font-semibold">{pillar.label}</div>
               <div className="text-[12px]" style={{ color: BRAND.textDim }}>
-                {pillar.band}
+                {pillar.value}%
               </div>
             </div>
 
             <div
-              className="mt-2.5 h-2.5 rounded-full overflow-hidden"
+              className="mt-2 h-2.5 rounded-full overflow-hidden"
               style={{ background: "rgba(255,255,255,0.08)" }}
             >
               <div
                 className="h-full rounded-full"
                 style={{
                   width: `${pillar.value}%`,
-                  background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.25))`,
+                  background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.28))`,
                 }}
               />
+            </div>
+
+            <div className="mt-3 text-[12px] leading-6" style={{ color: BRAND.text }}>
+              {pillarInterpretation(pillar)}
             </div>
           </InnerPanel>
         ))}
       </div>
-
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <InnerPanel className="p-3.5">
-          <div
-            className="text-[10px] uppercase tracking-[0.24em]"
-            style={{ color: BRAND.textFaint }}
-          >
-            Weakest Signal
-          </div>
-          <div className="mt-2 text-[16px] font-semibold">
-            {getPillarLabel(weakest || pillars[0]?.key || "visibility")}
-          </div>
-        </InnerPanel>
-
-        <InnerPanel className="p-3.5">
-          <div
-            className="text-[10px] uppercase tracking-[0.24em]"
-            style={{ color: BRAND.textFaint }}
-          >
-            Strongest Signal
-          </div>
-          <div className="mt-2 text-[16px] font-semibold">
-            {getPillarLabel(
-              strongest || pillars[pillars.length - 1]?.key || "trust"
-            )}
-          </div>
-        </InnerPanel>
-
-        <InnerPanel className="p-3.5">
-          <div
-            className="text-[10px] uppercase tracking-[0.24em]"
-            style={{ color: BRAND.textFaint }}
-          >
-            Overall Score
-          </div>
-          <div className="mt-2 text-[16px] font-semibold">{overallPct}%</div>
-        </InnerPanel>
-      </div>
     </OuterCard>
   );
 }
 
-function SignalGraph({
-  tier,
-  level,
-  overallPct,
-  pillars,
-  weakest,
-  strongest,
-}: {
-  tier: Tier;
-  level: number;
-  overallPct: number;
-  pillars: PillarItem[];
-  weakest?: string | null;
-  strongest?: string | null;
-}) {
-  return (
-    <OuterCard className="p-4 h-full">
-      <div
-        className="text-[10px] font-semibold uppercase tracking-[0.26em]"
-        style={{ color: BRAND.purple }}
-      >
-        Signal Graph
-      </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-2.5">
-        <InnerPanel className="p-3">
-          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-            Tier
-          </div>
-          <div className="mt-1.5 text-[13px] font-semibold" style={{ color: BRAND.tier[tier] }}>
-            {tier}
-          </div>
-        </InnerPanel>
-
-        <InnerPanel className="p-3">
-          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-            Level
-          </div>
-          <div className="mt-1.5 text-[13px] font-semibold">{level}</div>
-        </InnerPanel>
-
-        <InnerPanel className="p-3">
-          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-            Overall
-          </div>
-          <div className="mt-1.5 text-[13px] font-semibold">{overallPct}%</div>
-        </InnerPanel>
-      </div>
-
-      <div className="mt-4 space-y-3.5">
-        {pillars.map((pillar) => {
-          const tag =
-            pillar.key === safeString(weakest).toLowerCase()
-              ? "weakest"
-              : pillar.key === safeString(strongest).toLowerCase()
-              ? "strongest"
-              : "";
-
-          return (
-            <div key={pillar.key}>
-              <div className="mb-1 flex items-center justify-between text-[12px]">
-                <div className="font-medium">
-                  {pillar.label}{" "}
-                  {tag ? (
-                    <span className="ml-1 text-[10px]" style={{ color: BRAND.textFaint }}>
-                      {tag}
-                    </span>
-                  ) : null}
-                </div>
-                <div>{pillar.value}%</div>
-              </div>
-
-              <div
-                className="h-2 rounded-full overflow-hidden"
-                style={{ background: "rgba(255,255,255,0.08)" }}
-              >
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${pillar.value}%`,
-                    background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.45))`,
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </OuterCard>
-  );
-}
-
-function CoachingInsights({
+function InsightsSnapshot({
   ai,
-  fallbackStrengths,
-  fallbackFriction,
-  fallbackOpportunity,
+  strengths,
+  friction,
+  opportunity,
+  nextStepsUrl,
 }: {
   ai?: AiInsights | null;
-  fallbackStrengths?: string[];
-  fallbackFriction?: string[];
-  fallbackOpportunity?: string;
+  strengths: string[];
+  friction: string[];
+  opportunity: string;
+  nextStepsUrl?: string;
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <SectionTitle
-        title="Coaching insights"
-        subtitle="An additional interpretation layer built from your scored signals and narrative blocks."
-      />
+      <div className="text-[15px] font-semibold">Insights</div>
 
-      <InnerPanel className="mt-3 p-4">
+      <InnerPanel className="mt-4 p-4">
         <div className="text-[14px] font-semibold">Executive summary</div>
         <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {ai?.executive_summary ||
-            "This section provides a guided interpretation of the report so the reader can turn signals into practical direction."}
+            "This results snapshot gives a concise view of your current position and the signals shaping market response."}
         </div>
       </InnerPanel>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <InnerPanel className="mt-4 p-4">
+        <div className="text-[14px] font-semibold">What this means</div>
+        <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
+          {ai?.what_this_means || opportunity}
+        </div>
+      </InnerPanel>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <InnerPanel className="p-4">
           <div className="text-[14px] font-semibold">Strengths</div>
           <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-            {(ai?.strengths?.length ? ai.strengths : fallbackStrengths || []).map((item, idx) => (
+            {strengths.map((item, idx) => (
               <li key={idx} className="flex gap-2">
                 <span>•</span>
                 <span>{item}</span>
@@ -1136,7 +1034,7 @@ function CoachingInsights({
         <InnerPanel className="p-4">
           <div className="text-[14px] font-semibold">Friction</div>
           <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-            {(ai?.friction?.length ? ai.friction : fallbackFriction || []).map((item, idx) => (
+            {friction.map((item, idx) => (
               <li key={idx} className="flex gap-2">
                 <span>•</span>
                 <span>{item}</span>
@@ -1146,19 +1044,32 @@ function CoachingInsights({
         </InnerPanel>
       </div>
 
-      <InnerPanel className="mt-3 p-4">
+      <InnerPanel className="mt-4 p-4">
         <div className="text-[14px] font-semibold">Strategic opportunity</div>
         <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {ai?.strategic_opportunity ||
-            fallbackOpportunity ||
-            "Clarify the highest-impact next move and focus effort where it will create the greatest lift."}
+          {ai?.strategic_opportunity || opportunity}
         </div>
       </InnerPanel>
+
+      <OuterCard className="mt-4 p-4">
+        <div className="text-[16px] font-semibold">Want the full Visibility Ladder report?</div>
+        <div className="mt-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+          The full report includes deeper strategic interpretation, broader coaching insights, and a more complete diagnostic view of your market position.
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          {nextStepsUrl ? (
+            <TopButton href={nextStepsUrl} variant="gradient">
+              Unlock next step
+            </TopButton>
+          ) : null}
+        </div>
+      </OuterCard>
     </OuterCard>
   );
 }
 
-export default function VisibilityReportClient({
+export default function VisibilityLiteReportClient({
   token,
   tid,
   src,
@@ -1220,13 +1131,8 @@ export default function VisibilityReportClient({
   const level = clamp(safeNumber(kbReport?.signals?.level, 1), 1, 20);
   const readiness = kbReport?.signals?.readiness;
 
-  const overallPct = (() => {
-    const direct = safeNumber(kbReport?.signals?.overall_pct, -1);
-    if (direct >= 0) return direct;
-    const pillars = buildPillars(kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores);
-    if (!pillars.length) return 0;
-    return Math.round(pillars.reduce((sum, pillar) => sum + pillar.value, 0) / pillars.length);
-  })();
+  const pillars = buildPillars(kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores);
+  const tierCounts = buildTierCounts(kbReport?.graphs?.tier_counts, tier);
 
   const sectionMap = useMemo(() => {
     const map = new Map<string, Section>();
@@ -1235,77 +1141,36 @@ export default function VisibilityReportClient({
     return map;
   }, [kbReport?.sections]);
 
-  const secWelcome = sectionMap.get("welcome") || null;
-  const secHowToUse = sectionMap.get("how_to_use") || null;
-  const secUnderstanding = sectionMap.get("understanding") || null;
-  const secStrengths = sectionMap.get("strengths") || null;
-  const secFriction = sectionMap.get("friction") || null;
   const secMarketExperience = sectionMap.get("market_experience") || null;
   const secOpportunity = sectionMap.get("opportunity") || null;
-  const secNextMove = sectionMap.get("next_move") || null;
-  const secLevelMeaning = sectionMap.get("level_meaning") || null;
+  const secStrengths = sectionMap.get("strengths") || null;
+  const secFriction = sectionMap.get("friction") || null;
   const secSnapshot = sectionMap.get("snapshot") || null;
-  const secClosing = sectionMap.get("closing") || null;
 
-  const pillars = buildPillars(kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores);
-  const weakest = safeString(kbReport?.signals?.weakest_pillar).toLowerCase() || null;
-  const strongest = safeString(kbReport?.signals?.strongest_pillar).toLowerCase() || null;
-
-  const heroCopy =
-    sectionSummary(secLevelMeaning) ||
+  const reality = realityForTier(tier);
+  const snapshotSummary =
     sectionSummary(secSnapshot) ||
-    (tier === "Invisible"
-      ? "You are in the Invisible tier — your market signals are still too weak or inconsistent to create reliable response."
-      : tier === "Emerging"
-      ? "You are in the Emerging tier — people can see you, but you are not yet the default choice."
-      : tier === "Established"
-      ? "You are in the Established tier — your market can recognise your value, but stronger authority is still needed."
-      : "You are in the Magnetic tier — your market sees you as a recognised authority with strong pull and influence.");
+    sectionSummary(secMarketExperience) ||
+    reality.intro;
 
-  const currentPositionCopy =
-    tier === "Invisible"
-      ? "You are visible in some places, but not yet enough to create reliable market confidence."
-      : tier === "Emerging"
-      ? "You are visible in market terms, but this level is about strengthening structural consistency."
-      : tier === "Established"
-      ? "You are recognised and trusted, but this level is about consolidating leadership signals."
-      : "You are in a leadership position — the focus here is sustaining authority and protecting consistency.";
+  const strengths = firstItems(
+    (kbReport?.ai?.strengths?.length ? kbReport.ai.strengths : []).concat(
+      firstItems(sectionBullets(secStrengths), 3)
+    ),
+    3
+  );
 
-  const tierRangeCopy =
-    tier === "Invisible"
-      ? "Levels 1–5. Early market signals are present, but they are not yet stable enough to drive predictable response."
-      : tier === "Emerging"
-      ? "Levels 6–10. Movement inside the tier reflects how stable your market position is."
-      : tier === "Established"
-      ? "Levels 11–15. The market recognises your value, but stronger consistency still separates expert from authority."
-      : "Levels 16–20. This range reflects strong authority, stronger pull, and greater market recognition.";
+  const friction = firstItems(
+    (kbReport?.ai?.friction?.length ? kbReport.ai.friction : []).concat(
+      firstItems(sectionBullets(secFriction), 3)
+    ),
+    3
+  );
 
-  const marketRealityBullets = (() => {
-    const bullets = firstItems(sectionBullets(secMarketExperience), 3);
-    if (bullets.length) return bullets;
-    return firstItems(sectionParagraphs(secMarketExperience), 2);
-  })();
-
-  const opportunityBullets = (() => {
-    const bullets = firstItems(sectionBullets(secOpportunity), 3);
-    if (bullets.length) return bullets;
-    return firstItems(sectionParagraphs(secOpportunity), 2);
-  })();
-
-  const nextMoveBullets = (() => {
-    const bullets = firstItems(sectionBullets(secNextMove), 4);
-    if (bullets.length) return bullets;
-    return firstItems(sectionParagraphs(secNextMove), 4);
-  })();
-
-  const reportIndex = [
-    { id: "welcome", label: "A Personal Welcome From Bogdan Stan" },
-    { id: "how-to-use", label: "How To Use This Report" },
-    { id: "understanding", label: "Understanding the Visibility Ladder" },
-    { id: "working", label: "What is already working" },
-    { id: "friction", label: "Where visibility friction exists" },
-    { id: "closing", label: "Turning insight into strategy" },
-  ];
+  const opportunity =
+    kbReport?.ai?.strategic_opportunity ||
+    sectionSummary(secOpportunity) ||
+    "Strengthen the most important weak signal so your market response becomes more consistent and predictable.";
 
   async function downloadPdf() {
     try {
@@ -1344,35 +1209,35 @@ export default function VisibilityReportClient({
         pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
       }
 
-      const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
+      const safeName = `${safeString(takerName) || "Visibility"}-Results-Snapshot.pdf`.replace(
         /[^\w\-]+/g,
         "_"
       );
       pdf.save(safeName);
     } catch (e) {
-      console.error("[visibility] pdf export failed", e);
+      console.error("[visibility-lite] pdf export failed", e);
       alert("PDF export failed.");
     }
   }
 
   if (loading) {
     return (
-      <Shell>
+      <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
         <div className="mx-auto max-w-[1560px] px-4 py-5">
-          <div className="text-2xl font-semibold">Loading your report…</div>
+          <div className="text-2xl font-semibold">Loading your snapshot…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
-            Preparing your Visibility Ladder report.
+            Preparing your Results Snapshot.
           </div>
         </div>
-      </Shell>
+      </div>
     );
   }
 
   if (err || !kbReport) {
     return (
-      <Shell>
+      <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
         <div className="mx-auto max-w-[1560px] px-4 py-5 space-y-4">
-          <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
+          <div className="text-2xl font-semibold">Couldn’t load Visibility snapshot</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
           </p>
@@ -1390,7 +1255,7 @@ export default function VisibilityReportClient({
             Go back
           </Link>
         </div>
-      </Shell>
+      </div>
     );
   }
 
@@ -1400,7 +1265,7 @@ export default function VisibilityReportClient({
         ref={reportRootRef}
         className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-6"
       >
-        <ReportPage>
+        <ReportPage id="ladder-position">
           <HeaderCard
             orgLogoUrl={orgLogoUrl}
             takerName={takerName}
@@ -1416,142 +1281,43 @@ export default function VisibilityReportClient({
                 level={level}
                 nextStepsUrl={nextStepsUrl}
                 onDownload={downloadPdf}
-                reportIndex={reportIndex}
               />
             </div>
 
             <div className="space-y-4">
-              <HeroAndBreakdown
-                takerName={takerName}
+              <LitePositionCard
                 tier={tier}
                 level={level}
-                heroCopy={heroCopy}
-                currentPositionCopy={currentPositionCopy}
-                tierRangeCopy={tierRangeCopy}
                 readiness={readiness}
-                pillars={pillars}
-                weakest={weakest}
-                strongest={strongest}
-                overallPct={overallPct}
+                intro={reality.intro}
+                marketCan={reality.marketCan}
+                caution={reality.caution}
               />
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
-                <SummaryCard
-                  title="Market reality"
-                  content={
-                    !marketRealityBullets.length ? sectionSummary(secMarketExperience) : undefined
-                  }
-                  bullets={marketRealityBullets}
-                />
-
-                <SummaryCard
-                  title="Your strategic visibility opportunity"
-                  content={!opportunityBullets.length ? sectionSummary(secOpportunity) : undefined}
-                  bullets={opportunityBullets}
-                />
-
-                <SummaryCard
-                  title="Your most effective next move"
-                  content={!nextMoveBullets.length ? sectionSummary(secNextMove) : undefined}
-                  bullets={nextMoveBullets}
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] items-stretch">
+                <DistributionChart tierCounts={tierCounts} />
+                <SnapshotSummaryCard
+                  tier={tier}
+                  level={level}
+                  summary={snapshotSummary}
                 />
               </div>
             </div>
           </div>
         </ReportPage>
 
-        <ReportPage>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)] items-start">
-            <div className="space-y-4">
-              <TextSection
-                id="welcome"
-                title="A Personal Welcome From Bogdan Stan"
-                section={secWelcome}
-              />
-              <TextSection id="how-to-use" title="How To Use This Report" section={secHowToUse} />
-            </div>
-
-            <div className="space-y-4">
-              <TextSection
-                id="understanding"
-                title="Understanding the Visibility Ladder"
-                section={secUnderstanding}
-              />
-            </div>
-          </div>
+        <ReportPage id="visibility-snapshot">
+          <PillarSnapshot pillars={pillars} />
         </ReportPage>
 
-        <ReportPage>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] items-start">
-            <div className="space-y-4">
-              <TextSection
-                id="working"
-                title="What is already working"
-                section={secStrengths}
-              />
-              <TextSection
-                title="How the market is likely experiencing your business"
-                section={secMarketExperience}
-              />
-            </div>
-
-            <div className="space-y-4 self-start">
-              <TextSection
-                id="friction"
-                title="Where visibility friction exists"
-                section={secFriction}
-              />
-              <SignalGraph
-                tier={tier}
-                level={level}
-                overallPct={overallPct}
-                pillars={pillars}
-                weakest={weakest}
-                strongest={strongest}
-              />
-            </div>
-          </div>
-        </ReportPage>
-
-        <ReportPage>
-          <CoachingInsights
+        <ReportPage id="results-snapshot">
+          <InsightsSnapshot
             ai={kbReport.ai}
-            fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
-            fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
-            fallbackOpportunity={sectionSummary(secOpportunity)}
+            strengths={strengths}
+            friction={friction}
+            opportunity={opportunity}
+            nextStepsUrl={nextStepsUrl}
           />
-        </ReportPage>
-
-        <ReportPage>
-          <OuterCard id="closing" className="p-4 md:p-5">
-            <SectionTitle title={secClosing?.title || "Turning insight into strategy"} />
-
-            <InnerPanel className="mt-3 p-4">
-              {sectionSummary(secClosing) ? (
-                <div
-                  className="rounded-2xl border px-4 py-3 text-[13px]"
-                  style={{
-                    borderColor: BRAND.borderSoft,
-                    background: "rgba(255,255,255,0.04)",
-                    color: "rgba(255,255,255,0.88)",
-                  }}
-                >
-                  <span className="font-medium">In short:</span> {sectionSummary(secClosing)}
-                </div>
-              ) : null}
-
-              <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-                {sectionParagraphs(secClosing).map((p, idx) => (
-                  <p key={idx}>{p}</p>
-                ))}
-              </div>
-            </InnerPanel>
-
-            <div className="mt-3 text-[11px]" style={{ color: BRAND.textFaint }}>
-              engine: {safeString(kbReport.engine_key || "visibility_prime_v1")} • v
-              {kbReport.version ?? 2} • mode: {safeString(kbReport?.meta?.scoring_mode || "prime")}
-            </div>
-          </OuterCard>
         </ReportPage>
       </div>
     </Shell>
