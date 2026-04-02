@@ -321,7 +321,7 @@ function OuterCard({
       style={{
         borderColor: BRAND.border,
         background:
-          "linear-gradient(180deg, rgba(27,60,99,0.76), rgba(12,32,58,0.84))",
+          "linear-gradient(180deg, rgba(27,60,99,0.78), rgba(12,32,58,0.84))",
         boxShadow: "0 14px 42px rgba(0,0,0,0.32)",
       }}
     >
@@ -343,7 +343,30 @@ function InnerPanel({
       style={{
         borderColor: BRAND.borderSoft,
         background:
-          "linear-gradient(180deg, rgba(35,62,97,0.70), rgba(18,38,64,0.76))",
+          "linear-gradient(180deg, rgba(35,62,97,0.72), rgba(18,38,64,0.78))",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function PageFrame({
+  children,
+  className = "",
+  id,
+}: {
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  return (
+    <div
+      id={id}
+      data-pdf-page="true"
+      className={`rounded-[26px] ${className}`}
+      style={{
+        pageBreakAfter: "always",
       }}
     >
       {children}
@@ -540,6 +563,100 @@ function TextSection({
   );
 }
 
+function HeaderCard({
+  orgLogoUrl,
+  takerName,
+  reportDate,
+  nextStepsUrl,
+  onDownload,
+}: {
+  orgLogoUrl?: string | null;
+  takerName: string;
+  reportDate: string;
+  nextStepsUrl?: string;
+  onDownload: () => void;
+}) {
+  return (
+    <OuterCard className="p-4 md:p-5">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-start gap-3">
+            {orgLogoUrl ? (
+              <img
+                src={orgLogoUrl}
+                alt="Organisation logo"
+                className="h-10 w-10 rounded-2xl object-cover"
+                style={{ border: `1px solid ${BRAND.border}` }}
+                onError={(e: any) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <div
+                className="h-10 w-10 rounded-2xl"
+                style={{
+                  border: `1px solid ${BRAND.border}`,
+                  background: "rgba(255,255,255,0.06)",
+                }}
+              />
+            )}
+
+            <div>
+              <div className="text-[28px] md:text-[32px] font-semibold tracking-[0.14em] uppercase leading-none">
+                Visibility Ladder™
+              </div>
+              <div
+                className="mt-1.5 text-[12px] md:text-[13px] uppercase tracking-[0.28em]"
+                style={{ color: BRAND.textDim }}
+              >
+                Strategic Visibility Assessment
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Chip>WhatsWhat Prime</Chip>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2.5">
+          <div className="flex gap-2">
+            <TopButton onClick={onDownload}>Download PDF</TopButton>
+            {nextStepsUrl ? (
+              <TopButton href={nextStepsUrl} variant="gradient">
+                Next steps
+              </TopButton>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+            <InnerPanel className="px-3.5 py-3 min-w-[150px]">
+              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+                Prepared for
+              </div>
+              <div className="mt-1.5 text-[16px] font-semibold">{takerName}</div>
+            </InnerPanel>
+
+            <InnerPanel className="px-3.5 py-3 min-w-[130px]">
+              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+                Date
+              </div>
+              <div className="mt-1.5 text-[16px] font-semibold">{reportDate}</div>
+            </InnerPanel>
+
+            <InnerPanel className="px-3.5 py-3 min-w-[150px]">
+              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+                Framework
+              </div>
+              <div className="mt-1.5 text-[16px] font-semibold">WhatsWhat Prime</div>
+            </InnerPanel>
+          </div>
+        </div>
+      </div>
+    </OuterCard>
+  );
+}
+
 function LadderSidebar({
   tier,
   level,
@@ -693,19 +810,107 @@ function LadderSidebar({
   );
 }
 
-function StructuralBreakdown({
+function HeroAndBreakdown({
+  takerName,
+  tier,
+  level,
+  heroCopy,
+  currentPositionCopy,
+  tierRangeCopy,
+  readiness,
   pillars,
   weakest,
   strongest,
   overallPct,
 }: {
+  takerName: string;
+  tier: Tier;
+  level: number;
+  heroCopy: string;
+  currentPositionCopy: string;
+  tierRangeCopy: string;
+  readiness?: Readiness;
   pillars: PillarItem[];
   weakest?: string | null;
   strongest?: string | null;
   overallPct: number;
 }) {
   return (
-    <>
+    <OuterCard className="p-4 md:p-5">
+      <div
+        className="text-[10px] uppercase tracking-[0.26em]"
+        style={{ color: BRAND.textFaint }}
+      >
+        WhatsWhat Prime Visibility Ladder
+      </div>
+
+      <div className="mt-2 text-[34px] md:text-[50px] font-semibold leading-none tracking-[0.01em]">
+        {takerName.toUpperCase()}
+      </div>
+
+      <InnerPanel className="mt-4 p-4 md:p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <div
+              className="text-[28px] md:text-[44px] font-semibold leading-none"
+              style={{ color: BRAND.tier[tier] }}
+            >
+              Level {level} — {tier}
+            </div>
+            <div
+              className="mt-3 max-w-4xl text-[15px] leading-7"
+              style={{ color: BRAND.text }}
+            >
+              {heroCopy}
+            </div>
+          </div>
+
+          <InnerPanel className="px-4 py-3 shrink-0">
+            <div
+              className="text-[10px] uppercase tracking-[0.24em]"
+              style={{ color: BRAND.textFaint }}
+            >
+              Status
+            </div>
+            <div className="mt-1.5 text-[16px] font-semibold">
+              {readinessLabel(readiness)}
+            </div>
+          </InnerPanel>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <div
+              className="text-[10px] uppercase tracking-[0.24em]"
+              style={{ color: BRAND.textFaint }}
+            >
+              Current Position
+            </div>
+            <div
+              className="mt-2 text-[14px] leading-7"
+              style={{ color: BRAND.text }}
+            >
+              {currentPositionCopy}
+            </div>
+          </div>
+
+          <div>
+            <div
+              className="text-[10px] uppercase tracking-[0.24em]"
+              style={{ color: BRAND.textFaint }}
+            >
+              Tier Range
+            </div>
+            <div
+              className="mt-2 text-[14px] leading-7"
+              style={{ color: BRAND.text }}
+            >
+              {tierRangeCopy}
+            </div>
+          </div>
+        </div>
+      </InnerPanel>
+
       <div
         className="mt-5 text-[10px] uppercase tracking-[0.30em]"
         style={{ color: BRAND.textFaint }}
@@ -789,7 +994,7 @@ function StructuralBreakdown({
           <div className="mt-2 text-[16px] font-semibold">{overallPct}%</div>
         </InnerPanel>
       </div>
-    </>
+    </OuterCard>
   );
 }
 
@@ -888,7 +1093,17 @@ function SignalGraph({
   );
 }
 
-function CoachingInsights({ ai }: { ai: AiInsights }) {
+function CoachingInsights({
+  ai,
+  fallbackStrengths,
+  fallbackFriction,
+  fallbackOpportunity,
+}: {
+  ai?: AiInsights | null;
+  fallbackStrengths?: string[];
+  fallbackFriction?: string[];
+  fallbackOpportunity?: string;
+}) {
   return (
     <OuterCard className="p-4 md:p-5">
       <SectionTitle
@@ -899,7 +1114,8 @@ function CoachingInsights({ ai }: { ai: AiInsights }) {
       <InnerPanel className="mt-3 p-4">
         <div className="text-[14px] font-semibold">Executive summary</div>
         <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {ai.executive_summary}
+          {ai?.executive_summary ||
+            "This section provides a guided interpretation of the report so the reader can turn signals into practical direction."}
         </div>
       </InnerPanel>
 
@@ -907,24 +1123,28 @@ function CoachingInsights({ ai }: { ai: AiInsights }) {
         <InnerPanel className="p-4">
           <div className="text-[14px] font-semibold">Strengths</div>
           <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-            {(ai.strengths || []).map((item, idx) => (
-              <li key={idx} className="flex gap-2">
-                <span>•</span>
-                <span>{item}</span>
-              </li>
-            ))}
+            {(ai?.strengths?.length ? ai.strengths : fallbackStrengths || []).map(
+              (item, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span>•</span>
+                  <span>{item}</span>
+                </li>
+              )
+            )}
           </ul>
         </InnerPanel>
 
         <InnerPanel className="p-4">
           <div className="text-[14px] font-semibold">Friction</div>
           <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-            {(ai.friction || []).map((item, idx) => (
-              <li key={idx} className="flex gap-2">
-                <span>•</span>
-                <span>{item}</span>
-              </li>
-            ))}
+            {(ai?.friction?.length ? ai.friction : fallbackFriction || []).map(
+              (item, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span>•</span>
+                  <span>{item}</span>
+                </li>
+              )
+            )}
           </ul>
         </InnerPanel>
       </div>
@@ -932,7 +1152,7 @@ function CoachingInsights({ ai }: { ai: AiInsights }) {
       <InnerPanel className="mt-3 p-4">
         <div className="text-[14px] font-semibold">Strategic opportunity</div>
         <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {ai.strategic_opportunity}
+          {ai?.strategic_opportunity || fallbackOpportunity || "Clarify the highest-impact next move and focus effort where it will create the greatest lift."}
         </div>
       </InnerPanel>
     </OuterCard>
@@ -997,7 +1217,6 @@ export default function VisibilityReportClient({
     };
   }, [token, tid, src]);
 
-  const orgName = portalMeta?.org_name || kbReport?.meta?.org_name || "Organisation";
   const orgLogoUrl =
     portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
   const takerName = fullName(portalMeta?.taker);
@@ -1105,41 +1324,56 @@ export default function VisibilityReportClient({
 
   async function downloadPdf() {
     try {
-      const node = reportRootRef.current;
-      if (!node) return;
+      const root = reportRootRef.current;
+      if (!root) return;
+
+      const pageNodes = Array.from(
+        root.querySelectorAll("[data-pdf-page='true']")
+      ) as HTMLDivElement[];
+
+      if (!pageNodes.length) return;
 
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
         html2canvasPromise(),
         jsPdfPromise(),
       ]);
 
-      const canvas = await html2canvas(node, {
-        backgroundColor: BRAND.bg,
-        scale: 2,
-        useCORS: true,
-        windowWidth: node.scrollWidth,
-        windowHeight: node.scrollHeight,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new JsPDF("p", "pt", "a4");
-
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      for (let i = 0; i < pageNodes.length; i += 1) {
+        const pageNode = pageNodes[i];
+        const canvas = await html2canvas(pageNode, {
+          backgroundColor: BRAND.bg,
+          scale: 2,
+          useCORS: true,
+          windowWidth: pageNode.scrollWidth,
+          windowHeight: pageNode.scrollHeight,
+        });
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        if (i > 0) pdf.addPage();
+
+        if (imgHeight <= pageHeight) {
+          pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+        } else {
+          let heightLeft = imgHeight;
+          let position = 0;
+
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+
+          while (heightLeft > 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+          }
+        }
       }
 
       const safeName = `${safeString(takerName) || "Visibility"}-Visibility-Ladder.pdf`.replace(
@@ -1196,307 +1430,186 @@ export default function VisibilityReportClient({
     <Shell>
       <div
         ref={reportRootRef}
-        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4"
+        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-6"
       >
-        <OuterCard className="p-4 md:p-5">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-start gap-3">
-                {orgLogoUrl ? (
-                  <img
-                    src={orgLogoUrl}
-                    alt={orgName}
-                    className="h-10 w-10 rounded-2xl object-cover"
-                    style={{ border: `1px solid ${BRAND.border}` }}
-                    onError={(e: any) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="h-10 w-10 rounded-2xl"
-                    style={{
-                      border: `1px solid ${BRAND.border}`,
-                      background: "rgba(255,255,255,0.06)",
-                    }}
-                  />
-                )}
-
-                <div>
-                  <div className="text-[28px] md:text-[32px] font-semibold tracking-[0.14em] uppercase leading-none">
-                    Visibility Ladder™
-                  </div>
-                  <div
-                    className="mt-1.5 text-[12px] md:text-[13px] uppercase tracking-[0.28em]"
-                    style={{ color: BRAND.textDim }}
-                  >
-                    Strategic Visibility Assessment
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Chip>WhatsWhat Prime</Chip>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-2.5">
-              <div className="flex gap-2">
-                <TopButton onClick={downloadPdf}>Download PDF</TopButton>
-                {nextStepsUrl ? (
-                  <TopButton href={nextStepsUrl} variant="gradient">
-                    Next steps
-                  </TopButton>
-                ) : null}
-              </div>
-
-              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
-                <InnerPanel className="px-3.5 py-3 min-w-[150px]">
-                  <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                    Prepared for
-                  </div>
-                  <div className="mt-1.5 text-[16px] font-semibold">{takerName}</div>
-                </InnerPanel>
-
-                <InnerPanel className="px-3.5 py-3 min-w-[130px]">
-                  <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                    Date
-                  </div>
-                  <div className="mt-1.5 text-[16px] font-semibold">
-                    {reportDate || formatDate(null)}
-                  </div>
-                </InnerPanel>
-
-                <InnerPanel className="px-3.5 py-3 min-w-[150px]">
-                  <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                    Framework
-                  </div>
-                  <div className="mt-1.5 text-[16px] font-semibold">WhatsWhat Prime</div>
-                </InnerPanel>
-              </div>
-            </div>
-          </div>
-        </OuterCard>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
-          <div className="xl:sticky xl:top-4 self-start">
-            <LadderSidebar
-              tier={tier}
-              level={level}
+        {/* PAGE 1 */}
+        <PageFrame>
+          <div className="space-y-4">
+            <HeaderCard
+              orgLogoUrl={orgLogoUrl}
+              takerName={takerName}
+              reportDate={reportDate || formatDate(null)}
               nextStepsUrl={nextStepsUrl}
               onDownload={downloadPdf}
-              reportIndex={reportIndex}
             />
-          </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.8fr)]">
-              <OuterCard className="p-4 md:p-5">
-                <div
-                  className="text-[10px] uppercase tracking-[0.26em]"
-                  style={{ color: BRAND.textFaint }}
-                >
-                  WhatsWhat Prime Visibility Ladder
-                </div>
-
-                <div className="mt-2 text-[34px] md:text-[50px] font-semibold leading-none tracking-[0.01em]">
-                  {takerName.toUpperCase()}
-                </div>
-
-                <InnerPanel className="mt-4 p-4 md:p-5">
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0">
-                      <div
-                        className="text-[28px] md:text-[44px] font-semibold leading-none"
-                        style={{ color: BRAND.tier[tier] }}
-                      >
-                        Level {level} — {tier}
-                      </div>
-                      <div
-                        className="mt-3 max-w-4xl text-[15px] leading-7"
-                        style={{ color: BRAND.text }}
-                      >
-                        {heroCopy}
-                      </div>
-                    </div>
-
-                    <InnerPanel className="px-4 py-3 shrink-0">
-                      <div
-                        className="text-[10px] uppercase tracking-[0.24em]"
-                        style={{ color: BRAND.textFaint }}
-                      >
-                        Status
-                      </div>
-                      <div className="mt-1.5 text-[16px] font-semibold">
-                        {readinessLabel(readiness)}
-                      </div>
-                    </InnerPanel>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <div
-                        className="text-[10px] uppercase tracking-[0.24em]"
-                        style={{ color: BRAND.textFaint }}
-                      >
-                        Current Position
-                      </div>
-                      <div
-                        className="mt-2 text-[14px] leading-7"
-                        style={{ color: BRAND.text }}
-                      >
-                        {currentPositionCopy}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div
-                        className="text-[10px] uppercase tracking-[0.24em]"
-                        style={{ color: BRAND.textFaint }}
-                      >
-                        Tier Range
-                      </div>
-                      <div
-                        className="mt-2 text-[14px] leading-7"
-                        style={{ color: BRAND.text }}
-                      >
-                        {tierRangeCopy}
-                      </div>
-                    </div>
-                  </div>
-                </InnerPanel>
-
-                <StructuralBreakdown
-                  pillars={pillars}
-                  weakest={weakest}
-                  strongest={strongest}
-                  overallPct={overallPct}
-                />
-              </OuterCard>
-
-              <div className="space-y-4">
-                <SummaryCard
-                  title="Market reality"
-                  content={
-                    !marketRealityBullets.length
-                      ? sectionSummary(secMarketExperience)
-                      : undefined
-                  }
-                  bullets={marketRealityBullets}
-                />
-
-                <SummaryCard
-                  title="Your strategic visibility opportunity"
-                  content={
-                    !opportunityBullets.length
-                      ? sectionSummary(secOpportunity)
-                      : undefined
-                  }
-                  bullets={opportunityBullets}
-                />
-
-                <SummaryCard
-                  title="Your most effective next move"
-                  content={
-                    !nextMoveBullets.length
-                      ? sectionSummary(secNextMove)
-                      : undefined
-                  }
-                  bullets={nextMoveBullets}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)]">
-              <div className="space-y-4">
-                <TextSection
-                  id="welcome"
-                  title="A Personal Welcome From Bogdan Stan"
-                  section={secWelcome}
-                />
-                <TextSection
-                  id="how-to-use"
-                  title="How To Use This Report"
-                  section={secHowToUse}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <TextSection
-                  id="understanding"
-                  title="Understanding the Visibility Ladder"
-                  section={secUnderstanding}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]">
-              <div className="space-y-4">
-                <TextSection
-                  id="working"
-                  title="What is already working"
-                  section={secStrengths}
-                />
-                <TextSection
-                  title="How the market is likely experiencing your business"
-                  section={secMarketExperience}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <TextSection
-                  id="friction"
-                  title="Where visibility friction exists"
-                  section={secFriction}
-                />
-                <SignalGraph
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+              <div className="self-start">
+                <LadderSidebar
                   tier={tier}
                   level={level}
-                  overallPct={overallPct}
+                  nextStepsUrl={nextStepsUrl}
+                  onDownload={downloadPdf}
+                  reportIndex={reportIndex}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <HeroAndBreakdown
+                  takerName={takerName}
+                  tier={tier}
+                  level={level}
+                  heroCopy={heroCopy}
+                  currentPositionCopy={currentPositionCopy}
+                  tierRangeCopy={tierRangeCopy}
+                  readiness={readiness}
                   pillars={pillars}
                   weakest={weakest}
                   strongest={strongest}
+                  overallPct={overallPct}
                 />
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  <SummaryCard
+                    title="Market reality"
+                    content={
+                      !marketRealityBullets.length
+                        ? sectionSummary(secMarketExperience)
+                        : undefined
+                    }
+                    bullets={marketRealityBullets}
+                  />
+
+                  <SummaryCard
+                    title="Your strategic visibility opportunity"
+                    content={
+                      !opportunityBullets.length
+                        ? sectionSummary(secOpportunity)
+                        : undefined
+                    }
+                    bullets={opportunityBullets}
+                  />
+
+                  <SummaryCard
+                    title="Your most effective next move"
+                    content={
+                      !nextMoveBullets.length
+                        ? sectionSummary(secNextMove)
+                        : undefined
+                    }
+                    bullets={nextMoveBullets}
+                  />
+                </div>
               </div>
             </div>
-
-            {kbReport.ai ? <CoachingInsights ai={kbReport.ai} /> : null}
-
-            <OuterCard id="closing" className="p-4 md:p-5">
-              <SectionTitle
-                title={secClosing?.title || "Turning insight into strategy"}
-              />
-
-              <InnerPanel className="mt-3 p-4">
-                {sectionSummary(secClosing) ? (
-                  <div
-                    className="rounded-2xl border px-4 py-3 text-[13px]"
-                    style={{
-                      borderColor: BRAND.borderSoft,
-                      background: "rgba(255,255,255,0.04)",
-                      color: "rgba(255,255,255,0.88)",
-                    }}
-                  >
-                    <span className="font-medium">In short:</span>{" "}
-                    {sectionSummary(secClosing)}
-                  </div>
-                ) : null}
-
-                <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-                  {sectionParagraphs(secClosing).map((p, idx) => (
-                    <p key={idx}>{p}</p>
-                  ))}
-                </div>
-              </InnerPanel>
-
-              <div className="mt-3 text-[11px]" style={{ color: BRAND.textFaint }}>
-                engine: {safeString(kbReport.engine_key || "visibility_prime_v1")} • v
-                {kbReport.version ?? 2} • mode:{" "}
-                {safeString(kbReport?.meta?.scoring_mode || "prime")}
-              </div>
-            </OuterCard>
           </div>
-        </div>
+        </PageFrame>
+
+        {/* PAGE 2 */}
+        <PageFrame>
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)]">
+            <div className="space-y-4">
+              <TextSection
+                id="welcome"
+                title="A Personal Welcome From Bogdan Stan"
+                section={secWelcome}
+              />
+              <TextSection
+                id="how-to-use"
+                title="How To Use This Report"
+                section={secHowToUse}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <TextSection
+                id="understanding"
+                title="Understanding the Visibility Ladder"
+                section={secUnderstanding}
+              />
+            </div>
+          </div>
+        </PageFrame>
+
+        {/* PAGE 3 */}
+        <PageFrame>
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)]">
+            <div className="space-y-4">
+              <TextSection
+                id="working"
+                title="What is already working"
+                section={secStrengths}
+              />
+              <TextSection
+                title="How the market is likely experiencing your business"
+                section={secMarketExperience}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <TextSection
+                id="friction"
+                title="Where visibility friction exists"
+                section={secFriction}
+              />
+              <SignalGraph
+                tier={tier}
+                level={level}
+                overallPct={overallPct}
+                pillars={pillars}
+                weakest={weakest}
+                strongest={strongest}
+              />
+            </div>
+          </div>
+        </PageFrame>
+
+        {/* PAGE 4 */}
+        <PageFrame>
+          <CoachingInsights
+            ai={kbReport.ai}
+            fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
+            fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
+            fallbackOpportunity={sectionSummary(secOpportunity)}
+          />
+        </PageFrame>
+
+        {/* PAGE 5 */}
+        <PageFrame>
+          <OuterCard id="closing" className="p-4 md:p-5">
+            <SectionTitle
+              title={secClosing?.title || "Turning insight into strategy"}
+            />
+
+            <InnerPanel className="mt-3 p-4">
+              {sectionSummary(secClosing) ? (
+                <div
+                  className="rounded-2xl border px-4 py-3 text-[13px]"
+                  style={{
+                    borderColor: BRAND.borderSoft,
+                    background: "rgba(255,255,255,0.04)",
+                    color: "rgba(255,255,255,0.88)",
+                  }}
+                >
+                  <span className="font-medium">In short:</span>{" "}
+                  {sectionSummary(secClosing)}
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
+                {sectionParagraphs(secClosing).map((p, idx) => (
+                  <p key={idx}>{p}</p>
+                ))}
+              </div>
+            </InnerPanel>
+
+            <div className="mt-3 text-[11px]" style={{ color: BRAND.textFaint }}>
+              engine: {safeString(kbReport.engine_key || "visibility_prime_v1")} • v
+              {kbReport.version ?? 2} • mode:{" "}
+              {safeString(kbReport?.meta?.scoring_mode || "prime")}
+            </div>
+          </OuterCard>
+        </PageFrame>
       </div>
     </Shell>
   );
