@@ -165,10 +165,7 @@ function clamp(n: number, min: number, max: number) {
 }
 
 function fullName(taker?: any): string {
-  const n = [taker?.first_name, taker?.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const n = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
   return n || "Your";
 }
 
@@ -239,9 +236,7 @@ function buildPillars(raw: Record<string, number> | undefined | null): PillarIte
   const source = raw || {};
   const keys = Object.keys(source).map((k) => k.toLowerCase());
   const isPrime =
-    keys.includes("visibility") ||
-    keys.includes("authority") ||
-    keys.includes("dominance");
+    keys.includes("visibility") || keys.includes("authority") || keys.includes("dominance");
 
   const order = isPrime
     ? ["visibility", "trust", "authority", "dominance"]
@@ -320,8 +315,7 @@ function OuterCard({
       className={`rounded-[24px] border ${className}`}
       style={{
         borderColor: BRAND.border,
-        background:
-          "linear-gradient(180deg, rgba(27,60,99,0.78), rgba(12,32,58,0.84))",
+        background: "linear-gradient(180deg, rgba(27,60,99,0.78), rgba(12,32,58,0.84))",
         boxShadow: "0 14px 42px rgba(0,0,0,0.32)",
       }}
     >
@@ -342,8 +336,7 @@ function InnerPanel({
       className={`rounded-[18px] border ${className}`}
       style={{
         borderColor: BRAND.borderSoft,
-        background:
-          "linear-gradient(180deg, rgba(35,62,97,0.72), rgba(18,38,64,0.78))",
+        background: "linear-gradient(180deg, rgba(35,62,97,0.72), rgba(18,38,64,0.78))",
       }}
     >
       {children}
@@ -363,11 +356,9 @@ function ReportPage({
       id={id}
       data-pdf-page="true"
       className="block w-full"
-      style={{
-        pageBreakAfter: "always",
-      }}
+      style={{ pageBreakAfter: "always" }}
     >
-      <div className="min-h-[1120px] flex flex-col justify-start">{children}</div>
+      <div className="flex flex-col gap-4">{children}</div>
     </section>
   );
 }
@@ -388,8 +379,7 @@ function TopButton({
   const style =
     variant === "gradient"
       ? ({
-          background:
-            "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
+          background: "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
           color: "#071C36",
         } as const)
       : ({
@@ -669,11 +659,15 @@ function LadderSidebar({
   reportIndex: Array<{ id: string; label: string }>;
 }) {
   const levels = Array.from({ length: 20 }, (_, i) => 20 - i);
-  const groups: Array<{ tier: Tier; from: number; to: number }> = [
-    { tier: "Magnetic", from: 16, to: 20 },
-    { tier: "Established", from: 11, to: 15 },
-    { tier: "Emerging", from: 6, to: 10 },
-    { tier: "Invisible", from: 1, to: 5 },
+  const groups: Array<{
+    tier: Tier;
+    startRow: number;
+    span: number;
+  }> = [
+    { tier: "Magnetic", startRow: 1, span: 5 },
+    { tier: "Established", startRow: 6, span: 5 },
+    { tier: "Emerging", startRow: 11, span: 5 },
+    { tier: "Invisible", startRow: 16, span: 5 },
   ];
 
   return (
@@ -686,24 +680,30 @@ function LadderSidebar({
           Ladder Position
         </div>
 
-        <div className="mt-3 flex gap-2.5">
-          <div className="w-[24px] shrink-0 space-y-2.5 pl-0.5">
+        <div className="mt-3 grid grid-cols-[38px_minmax(0,1fr)] gap-2.5">
+          <div
+            className="grid"
+            style={{
+              gridTemplateRows: "repeat(20, 28px)",
+              rowGap: "6px",
+            }}
+          >
             {groups.map((g) => (
               <div
                 key={g.tier}
-                className="relative flex items-center justify-center rounded-[12px]"
+                className="relative flex items-center justify-center overflow-hidden rounded-[12px]"
                 style={{
-                  height: `${g.to - g.from + 1 > 4 ? 86 : 68}px`,
+                  gridRow: `${g.startRow} / span ${g.span}`,
                   background: `${BRAND.tier[g.tier]}20`,
                   border: `1px solid ${BRAND.border}`,
                 }}
               >
                 <div
-                  className="absolute left-0 top-2.5 bottom-2.5 w-[5px] rounded-r-full"
+                  className="absolute left-0 top-0 bottom-0 w-[5px] rounded-r-full"
                   style={{ background: BRAND.tier[g.tier] }}
                 />
                 <div
-                  className="rotate-[-90deg] whitespace-nowrap text-[9px] font-semibold"
+                  className="rotate-[-90deg] whitespace-nowrap text-[10px] font-semibold"
                   style={{ color: BRAND.tier[g.tier] }}
                 >
                   {g.tier}
@@ -712,7 +712,13 @@ function LadderSidebar({
             ))}
           </div>
 
-          <div className="min-w-0 flex-1 space-y-1.5">
+          <div
+            className="grid"
+            style={{
+              gridTemplateRows: "repeat(20, 28px)",
+              rowGap: "6px",
+            }}
+          >
             {levels.map((n) => {
               const active = n === level;
               const band = tierBand(n);
@@ -721,7 +727,7 @@ function LadderSidebar({
               return (
                 <div
                   key={n}
-                  className="relative h-7 rounded-[10px] border flex items-center justify-center text-[12px]"
+                  className="relative rounded-[10px] border flex items-center justify-center text-[12px]"
                   style={{
                     borderColor: active ? bandColor : "rgba(255,255,255,0.10)",
                     background: active
@@ -1060,10 +1066,7 @@ function SignalGraph({
                 <div className="font-medium">
                   {pillar.label}{" "}
                   {tag ? (
-                    <span
-                      className="ml-1 text-[10px]"
-                      style={{ color: BRAND.textFaint }}
-                    >
+                    <span className="ml-1 text-[10px]" style={{ color: BRAND.textFaint }}>
                       {tag}
                     </span>
                   ) : null}
@@ -1121,28 +1124,24 @@ function CoachingInsights({
         <InnerPanel className="p-4">
           <div className="text-[14px] font-semibold">Strengths</div>
           <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-            {(ai?.strengths?.length ? ai.strengths : fallbackStrengths || []).map(
-              (item, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span>•</span>
-                  <span>{item}</span>
-                </li>
-              )
-            )}
+            {(ai?.strengths?.length ? ai.strengths : fallbackStrengths || []).map((item, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span>•</span>
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
         </InnerPanel>
 
         <InnerPanel className="p-4">
           <div className="text-[14px] font-semibold">Friction</div>
           <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
-            {(ai?.friction?.length ? ai.friction : fallbackFriction || []).map(
-              (item, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span>•</span>
-                  <span>{item}</span>
-                </li>
-              )
-            )}
+            {(ai?.friction?.length ? ai.friction : fallbackFriction || []).map((item, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span>•</span>
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
         </InnerPanel>
       </div>
@@ -1172,8 +1171,7 @@ export default function VisibilityReportClient({
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [portalMeta, setPortalMeta] =
-    useState<PortalReportResponse["data"] | null>(null);
+  const [portalMeta, setPortalMeta] = useState<PortalReportResponse["data"] | null>(null);
   const [kbReport, setKbReport] = useState<VisibilityKbReport | null>(null);
 
   useEffect(() => {
@@ -1186,20 +1184,16 @@ export default function VisibilityReportClient({
 
         if (!token || !tid) throw new Error("Missing token or tid.");
 
-        const portalUrl = `/api/public/test/${encodeURIComponent(
-          token
-        )}/report?tid=${encodeURIComponent(tid)}${
-          src ? `&src=${encodeURIComponent(src)}` : ""
-        }`;
+        const portalUrl = `/api/public/test/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+          tid
+        )}${src ? `&src=${encodeURIComponent(src)}` : ""}`;
         const portalRes = await fetchJson<PortalReportResponse>(portalUrl);
         if (cancelled) return;
         setPortalMeta(portalRes?.data ?? null);
 
         const kbUrl = `/api/public/visibility/${encodeURIComponent(
           token
-        )}/report?tid=${encodeURIComponent(
-          tid
-        )}&audience=taker_report`;
+        )}/report?tid=${encodeURIComponent(tid)}&audience=taker_report`;
         const kbRes = await fetchJson<VisibilityKbApiResponse>(kbUrl);
         if (cancelled) return;
         setKbReport(kbRes?.data ?? null);
@@ -1217,8 +1211,7 @@ export default function VisibilityReportClient({
     };
   }, [token, tid, src]);
 
-  const orgLogoUrl =
-    portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
+  const orgLogoUrl = portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
   const takerName = fullName(portalMeta?.taker);
   const reportDate = formatDate(kbReport?.meta?.generated_at);
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
@@ -1226,24 +1219,19 @@ export default function VisibilityReportClient({
   const tier = ((kbReport?.signals?.tier as Tier) || "Invisible") as Tier;
   const level = clamp(safeNumber(kbReport?.signals?.level, 1), 1, 20);
   const readiness = kbReport?.signals?.readiness;
+
   const overallPct = (() => {
     const direct = safeNumber(kbReport?.signals?.overall_pct, -1);
     if (direct >= 0) return direct;
-    const pillars = buildPillars(
-      kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores
-    );
+    const pillars = buildPillars(kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores);
     if (!pillars.length) return 0;
-    return Math.round(
-      pillars.reduce((sum, pillar) => sum + pillar.value, 0) / pillars.length
-    );
+    return Math.round(pillars.reduce((sum, pillar) => sum + pillar.value, 0) / pillars.length);
   })();
 
   const sectionMap = useMemo(() => {
     const map = new Map<string, Section>();
     const sections = Array.isArray(kbReport?.sections) ? kbReport?.sections : [];
-    for (const section of sections) {
-      map.set(section.key, section);
-    }
+    for (const section of sections) map.set(section.key, section);
     return map;
   }, [kbReport?.sections]);
 
@@ -1259,12 +1247,9 @@ export default function VisibilityReportClient({
   const secSnapshot = sectionMap.get("snapshot") || null;
   const secClosing = sectionMap.get("closing") || null;
 
-  const pillars = buildPillars(
-    kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores
-  );
+  const pillars = buildPillars(kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores);
   const weakest = safeString(kbReport?.signals?.weakest_pillar).toLowerCase() || null;
-  const strongest =
-    safeString(kbReport?.signals?.strongest_pillar).toLowerCase() || null;
+  const strongest = safeString(kbReport?.signals?.strongest_pillar).toLowerCase() || null;
 
   const heroCopy =
     sectionSummary(secLevelMeaning) ||
@@ -1413,75 +1398,63 @@ export default function VisibilityReportClient({
     <Shell>
       <div
         ref={reportRootRef}
-        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-10"
+        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-6"
       >
         <ReportPage>
-          <div className="space-y-4">
-            <HeaderCard
-              orgLogoUrl={orgLogoUrl}
-              takerName={takerName}
-              reportDate={reportDate || formatDate(null)}
-              nextStepsUrl={nextStepsUrl}
-              onDownload={downloadPdf}
-            />
+          <HeaderCard
+            orgLogoUrl={orgLogoUrl}
+            takerName={takerName}
+            reportDate={reportDate || formatDate(null)}
+            nextStepsUrl={nextStepsUrl}
+            onDownload={downloadPdf}
+          />
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
-              <div className="self-start">
-                <LadderSidebar
-                  tier={tier}
-                  level={level}
-                  nextStepsUrl={nextStepsUrl}
-                  onDownload={downloadPdf}
-                  reportIndex={reportIndex}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
+            <div className="self-start">
+              <LadderSidebar
+                tier={tier}
+                level={level}
+                nextStepsUrl={nextStepsUrl}
+                onDownload={downloadPdf}
+                reportIndex={reportIndex}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <HeroAndBreakdown
+                takerName={takerName}
+                tier={tier}
+                level={level}
+                heroCopy={heroCopy}
+                currentPositionCopy={currentPositionCopy}
+                tierRangeCopy={tierRangeCopy}
+                readiness={readiness}
+                pillars={pillars}
+                weakest={weakest}
+                strongest={strongest}
+                overallPct={overallPct}
+              />
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
+                <SummaryCard
+                  title="Market reality"
+                  content={
+                    !marketRealityBullets.length ? sectionSummary(secMarketExperience) : undefined
+                  }
+                  bullets={marketRealityBullets}
                 />
-              </div>
 
-              <div className="space-y-4">
-                <HeroAndBreakdown
-                  takerName={takerName}
-                  tier={tier}
-                  level={level}
-                  heroCopy={heroCopy}
-                  currentPositionCopy={currentPositionCopy}
-                  tierRangeCopy={tierRangeCopy}
-                  readiness={readiness}
-                  pillars={pillars}
-                  weakest={weakest}
-                  strongest={strongest}
-                  overallPct={overallPct}
+                <SummaryCard
+                  title="Your strategic visibility opportunity"
+                  content={!opportunityBullets.length ? sectionSummary(secOpportunity) : undefined}
+                  bullets={opportunityBullets}
                 />
 
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
-                  <SummaryCard
-                    title="Market reality"
-                    content={
-                      !marketRealityBullets.length
-                        ? sectionSummary(secMarketExperience)
-                        : undefined
-                    }
-                    bullets={marketRealityBullets}
-                  />
-
-                  <SummaryCard
-                    title="Your strategic visibility opportunity"
-                    content={
-                      !opportunityBullets.length
-                        ? sectionSummary(secOpportunity)
-                        : undefined
-                    }
-                    bullets={opportunityBullets}
-                  />
-
-                  <SummaryCard
-                    title="Your most effective next move"
-                    content={
-                      !nextMoveBullets.length
-                        ? sectionSummary(secNextMove)
-                        : undefined
-                    }
-                    bullets={nextMoveBullets}
-                  />
-                </div>
+                <SummaryCard
+                  title="Your most effective next move"
+                  content={!nextMoveBullets.length ? sectionSummary(secNextMove) : undefined}
+                  bullets={nextMoveBullets}
+                />
               </div>
             </div>
           </div>
@@ -1495,11 +1468,7 @@ export default function VisibilityReportClient({
                 title="A Personal Welcome From Bogdan Stan"
                 section={secWelcome}
               />
-              <TextSection
-                id="how-to-use"
-                title="How To Use This Report"
-                section={secHowToUse}
-              />
+              <TextSection id="how-to-use" title="How To Use This Report" section={secHowToUse} />
             </div>
 
             <div className="space-y-4">
@@ -1555,9 +1524,7 @@ export default function VisibilityReportClient({
 
         <ReportPage>
           <OuterCard id="closing" className="p-4 md:p-5">
-            <SectionTitle
-              title={secClosing?.title || "Turning insight into strategy"}
-            />
+            <SectionTitle title={secClosing?.title || "Turning insight into strategy"} />
 
             <InnerPanel className="mt-3 p-4">
               {sectionSummary(secClosing) ? (
@@ -1569,8 +1536,7 @@ export default function VisibilityReportClient({
                     color: "rgba(255,255,255,0.88)",
                   }}
                 >
-                  <span className="font-medium">In short:</span>{" "}
-                  {sectionSummary(secClosing)}
+                  <span className="font-medium">In short:</span> {sectionSummary(secClosing)}
                 </div>
               ) : null}
 
@@ -1583,8 +1549,7 @@ export default function VisibilityReportClient({
 
             <div className="mt-3 text-[11px]" style={{ color: BRAND.textFaint }}>
               engine: {safeString(kbReport.engine_key || "visibility_prime_v1")} • v
-              {kbReport.version ?? 2} • mode:{" "}
-              {safeString(kbReport?.meta?.scoring_mode || "prime")}
+              {kbReport.version ?? 2} • mode: {safeString(kbReport?.meta?.scoring_mode || "prime")}
             </div>
           </OuterCard>
         </ReportPage>
