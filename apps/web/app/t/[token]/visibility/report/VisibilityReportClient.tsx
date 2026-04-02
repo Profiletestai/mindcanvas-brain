@@ -317,12 +317,12 @@ function OuterCard({
   return (
     <div
       id={id}
-      className={`rounded-[28px] border ${className}`}
+      className={`rounded-[24px] border ${className}`}
       style={{
         borderColor: BRAND.border,
         background:
-          "linear-gradient(180deg, rgba(27,60,99,0.78), rgba(12,32,58,0.84))",
-        boxShadow: "0 18px 50px rgba(0,0,0,0.36)",
+          "linear-gradient(180deg, rgba(27,60,99,0.76), rgba(12,32,58,0.84))",
+        boxShadow: "0 14px 42px rgba(0,0,0,0.32)",
       }}
     >
       {children}
@@ -339,11 +339,11 @@ function InnerPanel({
 }) {
   return (
     <div
-      className={`rounded-[22px] border ${className}`}
+      className={`rounded-[18px] border ${className}`}
       style={{
         borderColor: BRAND.borderSoft,
         background:
-          "linear-gradient(180deg, rgba(35,62,97,0.72), rgba(18,38,64,0.78))",
+          "linear-gradient(180deg, rgba(35,62,97,0.70), rgba(18,38,64,0.76))",
       }}
     >
       {children}
@@ -363,7 +363,7 @@ function TopButton({
   variant?: "dark" | "gradient";
 }) {
   const className =
-    "inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold";
+    "inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold";
   const style =
     variant === "gradient"
       ? ({
@@ -428,7 +428,7 @@ function Shell({ children }: { children: ReactNode }) {
 function Chip({ children }: { children: ReactNode }) {
   return (
     <div
-      className="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase"
+      className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase"
       style={{
         border: `1px solid ${BRAND.border}`,
         background: "rgba(255,255,255,0.05)",
@@ -449,9 +449,9 @@ function SectionTitle({
 }) {
   return (
     <>
-      <div className="text-[16px] font-semibold">{title}</div>
+      <div className="text-[15px] font-semibold">{title}</div>
       {subtitle ? (
-        <div className="mt-1 text-sm" style={{ color: BRAND.textDim }}>
+        <div className="mt-1 text-[13px]" style={{ color: BRAND.textDim }}>
           {subtitle}
         </div>
       ) : null}
@@ -469,15 +469,15 @@ function SummaryCard({
   bullets?: string[];
 }) {
   return (
-    <OuterCard className="p-5 h-full">
-      <div className="text-[16px] font-semibold">{title}</div>
+    <OuterCard className="p-4 h-full">
+      <div className="text-[15px] font-semibold">{title}</div>
       {content ? (
-        <div className="mt-2 text-sm leading-8" style={{ color: BRAND.text }}>
+        <div className="mt-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {content}
         </div>
       ) : null}
       {bullets && bullets.length ? (
-        <ul className="mt-3 space-y-2 text-sm leading-8" style={{ color: BRAND.text }}>
+        <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {bullets.map((item, idx) => (
             <li key={idx} className="flex gap-2">
               <span style={{ color: BRAND.teal }}>+</span>
@@ -507,13 +507,13 @@ function TextSection({
       .find(Boolean) || "";
 
   return (
-    <OuterCard id={id} className="p-5 md:p-6">
-      <div className="text-[16px] font-semibold">{title}</div>
+    <OuterCard id={id} className="p-4 md:p-5">
+      <div className="text-[15px] font-semibold">{title}</div>
 
-      <InnerPanel className="mt-4 p-5">
+      <InnerPanel className="mt-3 p-4">
         {summary ? (
           <div
-            className="rounded-2xl border px-4 py-3 text-sm"
+            className="rounded-2xl border px-4 py-3 text-[13px]"
             style={{
               borderColor: BRAND.borderSoft,
               background: "rgba(255,255,255,0.04)",
@@ -524,14 +524,14 @@ function TextSection({
           </div>
         ) : null}
 
-        <div className="mt-4 space-y-4 text-sm leading-8" style={{ color: BRAND.text }}>
+        <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {paragraphs.map((p, idx) => (
             <p key={idx}>{p}</p>
           ))}
         </div>
 
         {transition ? (
-          <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
+          <div className="mt-4 text-[11px]" style={{ color: BRAND.textFaint }}>
             {transition}
           </div>
         ) : null}
@@ -562,33 +562,33 @@ function LadderSidebar({
   ];
 
   return (
-    <div className="space-y-4">
-      <OuterCard className="p-4">
+    <div className="space-y-3">
+      <OuterCard className="p-3.5">
         <div
-          className="text-[12px] uppercase tracking-[0.24em]"
+          className="text-[10px] uppercase tracking-[0.24em]"
           style={{ color: BRAND.textFaint }}
         >
           Ladder Position
         </div>
 
-        <div className="mt-4 flex gap-3">
-          <div className="w-[34px] shrink-0 space-y-3">
+        <div className="mt-3 flex gap-2.5">
+          <div className="w-[24px] shrink-0 space-y-2.5 pl-0.5">
             {groups.map((g) => (
               <div
                 key={g.tier}
-                className="relative flex items-center justify-center rounded-[14px]"
+                className="relative flex items-center justify-center rounded-[12px]"
                 style={{
-                  height: `${g.to - g.from + 1 > 4 ? 104 : 84}px`,
-                  background: `${BRAND.tier[g.tier]}22`,
+                  height: `${g.to - g.from + 1 > 4 ? 86 : 68}px`,
+                  background: `${BRAND.tier[g.tier]}20`,
                   border: `1px solid ${BRAND.border}`,
                 }}
               >
                 <div
-                  className="absolute left-0 top-3 bottom-3 w-[6px] rounded-r-full"
+                  className="absolute left-0 top-2.5 bottom-2.5 w-[5px] rounded-r-full"
                   style={{ background: BRAND.tier[g.tier] }}
                 />
                 <div
-                  className="rotate-[-90deg] whitespace-nowrap text-[11px] font-semibold"
+                  className="rotate-[-90deg] whitespace-nowrap text-[9px] font-semibold"
                   style={{ color: BRAND.tier[g.tier] }}
                 >
                   {g.tier}
@@ -597,7 +597,7 @@ function LadderSidebar({
             ))}
           </div>
 
-          <div className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 flex-1 space-y-1.5">
             {levels.map((n) => {
               const active = n === level;
               const band = tierBand(n);
@@ -606,27 +606,27 @@ function LadderSidebar({
               return (
                 <div
                   key={n}
-                  className="relative h-8 rounded-xl border flex items-center justify-center text-sm"
+                  className="relative h-7 rounded-[10px] border flex items-center justify-center text-[12px]"
                   style={{
                     borderColor: active ? bandColor : "rgba(255,255,255,0.10)",
                     background: active
                       ? `linear-gradient(90deg, ${bandColor}cc, rgba(255,255,255,0.14))`
                       : "rgba(7,22,43,0.34)",
                     color: "rgba(255,255,255,0.92)",
-                    boxShadow: active ? `0 0 24px ${bandColor}55` : "none",
+                    boxShadow: active ? `0 0 18px ${bandColor}44` : "none",
                   }}
                 >
                   {n}
                   <div
-                    className="absolute right-0 top-0 bottom-0 w-[4px] rounded-r-xl"
+                    className="absolute right-0 top-0 bottom-0 w-[4px] rounded-r-[10px]"
                     style={{ background: bandColor }}
                   />
                   {active ? (
                     <div
-                      className="absolute -right-3 h-6 w-6 rounded-full"
+                      className="absolute -right-2.5 h-5 w-5 rounded-full"
                       style={{
                         background: bandColor,
-                        opacity: 0.9,
+                        opacity: 0.86,
                       }}
                     />
                   ) : null}
@@ -636,7 +636,7 @@ function LadderSidebar({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-y-2 text-sm">
+        <div className="mt-4 grid grid-cols-2 gap-y-1.5 text-[12px]">
           <div>Magnetic</div>
           <div className="text-right" style={{ color: BRAND.textDim }}>
             16–20
@@ -656,20 +656,20 @@ function LadderSidebar({
         </div>
       </OuterCard>
 
-      <OuterCard className="p-4">
+      <OuterCard className="p-3.5">
         <div
-          className="text-[12px] uppercase tracking-[0.24em]"
+          className="text-[10px] uppercase tracking-[0.24em]"
           style={{ color: BRAND.textFaint }}
         >
           Report Index
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-1.5">
           {reportIndex.map((item, idx) => (
             <a
               key={item.id}
               href={`#${item.id}`}
-              className="block rounded-xl border px-3 py-3 text-sm hover:bg-white/5"
+              className="block rounded-xl border px-3 py-2.5 text-[12px] leading-5 hover:bg-white/5"
               style={{
                 borderColor: BRAND.borderSoft,
                 background: "rgba(8,22,43,0.24)",
@@ -680,7 +680,7 @@ function LadderSidebar({
           ))}
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-2">
           <TopButton onClick={onDownload}>Download PDF</TopButton>
           {nextStepsUrl ? (
             <TopButton href={nextStepsUrl} variant="gradient">
@@ -707,37 +707,37 @@ function StructuralBreakdown({
   return (
     <>
       <div
-        className="mt-6 text-[12px] uppercase tracking-[0.30em]"
+        className="mt-5 text-[10px] uppercase tracking-[0.30em]"
         style={{ color: BRAND.textFaint }}
       >
         Prime Structural Breakdown
       </div>
 
       <div
-        className={`mt-4 grid gap-4 ${
+        className={`mt-3 grid gap-3 ${
           pillars.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"
         }`}
       >
         {pillars.map((pillar) => (
-          <InnerPanel key={pillar.key} className="p-4">
-            <div className="text-[14px] font-semibold uppercase tracking-[0.14em]">
+          <InnerPanel key={pillar.key} className="p-3.5">
+            <div className="text-[12px] font-semibold uppercase tracking-[0.12em]">
               {pillar.label}
             </div>
 
-            <div className="mt-4 flex items-end justify-between gap-3">
+            <div className="mt-3 flex items-end justify-between gap-2">
               <div
-                className="text-[22px] font-semibold"
+                className="text-[16px] font-semibold"
                 style={{ color: pillar.color }}
               >
                 {pillar.value}%
               </div>
-              <div className="text-sm" style={{ color: BRAND.textDim }}>
+              <div className="text-[12px]" style={{ color: BRAND.textDim }}>
                 {pillar.band}
               </div>
             </div>
 
             <div
-              className="mt-3 h-3 rounded-full overflow-hidden"
+              className="mt-2.5 h-2.5 rounded-full overflow-hidden"
               style={{ background: "rgba(255,255,255,0.08)" }}
             >
               <div
@@ -752,41 +752,41 @@ function StructuralBreakdown({
         ))}
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <InnerPanel className="p-4">
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <InnerPanel className="p-3.5">
           <div
-            className="text-[12px] uppercase tracking-[0.24em]"
+            className="text-[10px] uppercase tracking-[0.24em]"
             style={{ color: BRAND.textFaint }}
           >
             Weakest Signal
           </div>
-          <div className="mt-2 text-[18px] font-semibold">
+          <div className="mt-2 text-[16px] font-semibold">
             {getPillarLabel(weakest || pillars[0]?.key || "visibility")}
           </div>
         </InnerPanel>
 
-        <InnerPanel className="p-4">
+        <InnerPanel className="p-3.5">
           <div
-            className="text-[12px] uppercase tracking-[0.24em]"
+            className="text-[10px] uppercase tracking-[0.24em]"
             style={{ color: BRAND.textFaint }}
           >
             Strongest Signal
           </div>
-          <div className="mt-2 text-[18px] font-semibold">
+          <div className="mt-2 text-[16px] font-semibold">
             {getPillarLabel(
               strongest || pillars[pillars.length - 1]?.key || "trust"
             )}
           </div>
         </InnerPanel>
 
-        <InnerPanel className="p-4">
+        <InnerPanel className="p-3.5">
           <div
-            className="text-[12px] uppercase tracking-[0.24em]"
+            className="text-[10px] uppercase tracking-[0.24em]"
             style={{ color: BRAND.textFaint }}
           >
             Overall Score
           </div>
-          <div className="mt-2 text-[18px] font-semibold">{overallPct}%</div>
+          <div className="mt-2 text-[16px] font-semibold">{overallPct}%</div>
         </InnerPanel>
       </div>
     </>
@@ -809,40 +809,40 @@ function SignalGraph({
   strongest?: string | null;
 }) {
   return (
-    <OuterCard className="p-5 h-full">
+    <OuterCard className="p-4 h-full">
       <div
-        className="text-[12px] font-semibold uppercase tracking-[0.26em]"
+        className="text-[10px] font-semibold uppercase tracking-[0.26em]"
         style={{ color: BRAND.purple }}
       >
         Signal Graph
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <InnerPanel className="p-4">
-          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+      <div className="mt-3 grid grid-cols-3 gap-2.5">
+        <InnerPanel className="p-3">
+          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
             Tier
           </div>
-          <div className="mt-2 font-semibold" style={{ color: BRAND.tier[tier] }}>
+          <div className="mt-1.5 text-[13px] font-semibold" style={{ color: BRAND.tier[tier] }}>
             {tier}
           </div>
         </InnerPanel>
 
-        <InnerPanel className="p-4">
-          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+        <InnerPanel className="p-3">
+          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
             Level
           </div>
-          <div className="mt-2 font-semibold">{level}</div>
+          <div className="mt-1.5 text-[13px] font-semibold">{level}</div>
         </InnerPanel>
 
-        <InnerPanel className="p-4">
-          <div className="text-xs" style={{ color: BRAND.textFaint }}>
+        <InnerPanel className="p-3">
+          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
             Overall
           </div>
-          <div className="mt-2 font-semibold">{overallPct}%</div>
+          <div className="mt-1.5 text-[13px] font-semibold">{overallPct}%</div>
         </InnerPanel>
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 space-y-3.5">
         {pillars.map((pillar) => {
           const tag =
             pillar.key === safeString(weakest).toLowerCase()
@@ -853,12 +853,12 @@ function SignalGraph({
 
           return (
             <div key={pillar.key}>
-              <div className="mb-1 flex items-center justify-between text-sm">
+              <div className="mb-1 flex items-center justify-between text-[12px]">
                 <div className="font-medium">
                   {pillar.label}{" "}
                   {tag ? (
                     <span
-                      className="ml-1 text-xs"
+                      className="ml-1 text-[10px]"
                       style={{ color: BRAND.textFaint }}
                     >
                       {tag}
@@ -890,23 +890,23 @@ function SignalGraph({
 
 function CoachingInsights({ ai }: { ai: AiInsights }) {
   return (
-    <OuterCard className="p-5 md:p-6">
+    <OuterCard className="p-4 md:p-5">
       <SectionTitle
         title="Coaching insights"
         subtitle="An additional interpretation layer built from your scored signals and narrative blocks."
       />
 
-      <InnerPanel className="mt-4 p-5">
-        <div className="text-[15px] font-semibold">Executive summary</div>
-        <div className="mt-3 text-sm leading-8" style={{ color: BRAND.text }}>
+      <InnerPanel className="mt-3 p-4">
+        <div className="text-[14px] font-semibold">Executive summary</div>
+        <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {ai.executive_summary}
         </div>
       </InnerPanel>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <InnerPanel className="p-5">
-          <div className="text-[15px] font-semibold">Strengths</div>
-          <ul className="mt-3 space-y-2 text-sm leading-8" style={{ color: BRAND.text }}>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <InnerPanel className="p-4">
+          <div className="text-[14px] font-semibold">Strengths</div>
+          <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
             {(ai.strengths || []).map((item, idx) => (
               <li key={idx} className="flex gap-2">
                 <span>•</span>
@@ -916,9 +916,9 @@ function CoachingInsights({ ai }: { ai: AiInsights }) {
           </ul>
         </InnerPanel>
 
-        <InnerPanel className="p-5">
-          <div className="text-[15px] font-semibold">Friction</div>
-          <ul className="mt-3 space-y-2 text-sm leading-8" style={{ color: BRAND.text }}>
+        <InnerPanel className="p-4">
+          <div className="text-[14px] font-semibold">Friction</div>
+          <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
             {(ai.friction || []).map((item, idx) => (
               <li key={idx} className="flex gap-2">
                 <span>•</span>
@@ -929,9 +929,9 @@ function CoachingInsights({ ai }: { ai: AiInsights }) {
         </InnerPanel>
       </div>
 
-      <InnerPanel className="mt-4 p-5">
-        <div className="text-[15px] font-semibold">Strategic opportunity</div>
-        <div className="mt-3 text-sm leading-8" style={{ color: BRAND.text }}>
+      <InnerPanel className="mt-3 p-4">
+        <div className="text-[14px] font-semibold">Strategic opportunity</div>
+        <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {ai.strategic_opportunity}
         </div>
       </InnerPanel>
@@ -1156,7 +1156,7 @@ export default function VisibilityReportClient({
   if (loading) {
     return (
       <Shell>
-        <div className="mx-auto max-w-[1720px] px-4 py-6">
+        <div className="mx-auto max-w-[1560px] px-4 py-5">
           <div className="text-2xl font-semibold">Loading your report…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Visibility Ladder report.
@@ -1169,7 +1169,7 @@ export default function VisibilityReportClient({
   if (err || !kbReport) {
     return (
       <Shell>
-        <div className="mx-auto max-w-[1720px] px-4 py-6 space-y-4">
+        <div className="mx-auto max-w-[1560px] px-4 py-5 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility report</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
             {safeText(err || "Unknown error")}
@@ -1196,17 +1196,17 @@ export default function VisibilityReportClient({
     <Shell>
       <div
         ref={reportRootRef}
-        className="mx-auto max-w-[1720px] px-4 py-5 md:px-6 md:py-6"
+        className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4"
       >
-        <OuterCard className="p-5 md:p-6">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+        <OuterCard className="p-4 md:p-5">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 {orgLogoUrl ? (
                   <img
                     src={orgLogoUrl}
                     alt={orgName}
-                    className="h-12 w-12 rounded-2xl object-cover"
+                    className="h-10 w-10 rounded-2xl object-cover"
                     style={{ border: `1px solid ${BRAND.border}` }}
                     onError={(e: any) => {
                       e.currentTarget.style.display = "none";
@@ -1214,7 +1214,7 @@ export default function VisibilityReportClient({
                   />
                 ) : (
                   <div
-                    className="h-12 w-12 rounded-2xl"
+                    className="h-10 w-10 rounded-2xl"
                     style={{
                       border: `1px solid ${BRAND.border}`,
                       background: "rgba(255,255,255,0.06)",
@@ -1223,11 +1223,11 @@ export default function VisibilityReportClient({
                 )}
 
                 <div>
-                  <div className="text-[30px] md:text-[36px] font-semibold tracking-[0.14em] uppercase leading-none">
+                  <div className="text-[28px] md:text-[32px] font-semibold tracking-[0.14em] uppercase leading-none">
                     Visibility Ladder™
                   </div>
                   <div
-                    className="mt-2 text-[13px] md:text-[14px] uppercase tracking-[0.28em]"
+                    className="mt-1.5 text-[12px] md:text-[13px] uppercase tracking-[0.28em]"
                     style={{ color: BRAND.textDim }}
                   >
                     Strategic Visibility Assessment
@@ -1235,12 +1235,12 @@ export default function VisibilityReportClient({
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Chip>WhatsWhat Prime</Chip>
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-col items-end gap-2.5">
               <div className="flex gap-2">
                 <TopButton onClick={downloadPdf}>Download PDF</TopButton>
                 {nextStepsUrl ? (
@@ -1250,36 +1250,36 @@ export default function VisibilityReportClient({
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <InnerPanel className="px-4 py-3 min-w-[170px]">
-                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+                <InnerPanel className="px-3.5 py-3 min-w-[150px]">
+                  <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
                     Prepared for
                   </div>
-                  <div className="mt-2 text-lg font-semibold">{takerName}</div>
+                  <div className="mt-1.5 text-[16px] font-semibold">{takerName}</div>
                 </InnerPanel>
 
-                <InnerPanel className="px-4 py-3 min-w-[150px]">
-                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                <InnerPanel className="px-3.5 py-3 min-w-[130px]">
+                  <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
                     Date
                   </div>
-                  <div className="mt-2 text-lg font-semibold">
+                  <div className="mt-1.5 text-[16px] font-semibold">
                     {reportDate || formatDate(null)}
                   </div>
                 </InnerPanel>
 
-                <InnerPanel className="px-4 py-3 min-w-[170px]">
-                  <div className="text-xs" style={{ color: BRAND.textFaint }}>
+                <InnerPanel className="px-3.5 py-3 min-w-[150px]">
+                  <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
                     Framework
                   </div>
-                  <div className="mt-2 text-lg font-semibold">WhatsWhat Prime</div>
+                  <div className="mt-1.5 text-[16px] font-semibold">WhatsWhat Prime</div>
                 </InnerPanel>
               </div>
             </div>
           </div>
         </OuterCard>
 
-        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="xl:sticky xl:top-5 self-start">
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="xl:sticky xl:top-4 self-start">
             <LadderSidebar
               tier={tier}
               level={level}
@@ -1289,60 +1289,60 @@ export default function VisibilityReportClient({
             />
           </div>
 
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
-              <OuterCard className="p-5 md:p-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.8fr)]">
+              <OuterCard className="p-4 md:p-5">
                 <div
-                  className="text-[12px] uppercase tracking-[0.26em]"
+                  className="text-[10px] uppercase tracking-[0.26em]"
                   style={{ color: BRAND.textFaint }}
                 >
                   WhatsWhat Prime Visibility Ladder
                 </div>
 
-                <div className="mt-2 text-[42px] md:text-[58px] font-semibold leading-none tracking-[0.01em]">
+                <div className="mt-2 text-[34px] md:text-[50px] font-semibold leading-none tracking-[0.01em]">
                   {takerName.toUpperCase()}
                 </div>
 
-                <InnerPanel className="mt-5 p-5 md:p-6">
+                <InnerPanel className="mt-4 p-4 md:p-5">
                   <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
                       <div
-                        className="text-[34px] md:text-[52px] font-semibold leading-none"
+                        className="text-[28px] md:text-[44px] font-semibold leading-none"
                         style={{ color: BRAND.tier[tier] }}
                       >
                         Level {level} — {tier}
                       </div>
                       <div
-                        className="mt-3 max-w-4xl text-[18px] leading-9"
+                        className="mt-3 max-w-4xl text-[15px] leading-7"
                         style={{ color: BRAND.text }}
                       >
                         {heroCopy}
                       </div>
                     </div>
 
-                    <InnerPanel className="px-5 py-4 shrink-0">
+                    <InnerPanel className="px-4 py-3 shrink-0">
                       <div
-                        className="text-[12px] uppercase tracking-[0.24em]"
+                        className="text-[10px] uppercase tracking-[0.24em]"
                         style={{ color: BRAND.textFaint }}
                       >
                         Status
                       </div>
-                      <div className="mt-2 text-[18px] font-semibold">
+                      <div className="mt-1.5 text-[16px] font-semibold">
                         {readinessLabel(readiness)}
                       </div>
                     </InnerPanel>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                  <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <div
-                        className="text-[12px] uppercase tracking-[0.24em]"
+                        className="text-[10px] uppercase tracking-[0.24em]"
                         style={{ color: BRAND.textFaint }}
                       >
                         Current Position
                       </div>
                       <div
-                        className="mt-3 text-[16px] leading-8"
+                        className="mt-2 text-[14px] leading-7"
                         style={{ color: BRAND.text }}
                       >
                         {currentPositionCopy}
@@ -1351,13 +1351,13 @@ export default function VisibilityReportClient({
 
                     <div>
                       <div
-                        className="text-[12px] uppercase tracking-[0.24em]"
+                        className="text-[10px] uppercase tracking-[0.24em]"
                         style={{ color: BRAND.textFaint }}
                       >
                         Tier Range
                       </div>
                       <div
-                        className="mt-3 text-[16px] leading-8"
+                        className="mt-2 text-[14px] leading-7"
                         style={{ color: BRAND.text }}
                       >
                         {tierRangeCopy}
@@ -1374,7 +1374,7 @@ export default function VisibilityReportClient({
                 />
               </OuterCard>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <SummaryCard
                   title="Market reality"
                   content={
@@ -1407,8 +1407,8 @@ export default function VisibilityReportClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
-              <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.85fr)]">
+              <div className="space-y-4">
                 <TextSection
                   id="welcome"
                   title="A Personal Welcome From Bogdan Stan"
@@ -1421,7 +1421,7 @@ export default function VisibilityReportClient({
                 />
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <TextSection
                   id="understanding"
                   title="Understanding the Visibility Ladder"
@@ -1430,8 +1430,8 @@ export default function VisibilityReportClient({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)]">
-              <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.28fr)_minmax(320px,0.92fr)]">
+              <div className="space-y-4">
                 <TextSection
                   id="working"
                   title="What is already working"
@@ -1443,7 +1443,7 @@ export default function VisibilityReportClient({
                 />
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <TextSection
                   id="friction"
                   title="Where visibility friction exists"
@@ -1462,15 +1462,15 @@ export default function VisibilityReportClient({
 
             {kbReport.ai ? <CoachingInsights ai={kbReport.ai} /> : null}
 
-            <OuterCard id="closing" className="p-5 md:p-6">
+            <OuterCard id="closing" className="p-4 md:p-5">
               <SectionTitle
                 title={secClosing?.title || "Turning insight into strategy"}
               />
 
-              <InnerPanel className="mt-4 p-5">
+              <InnerPanel className="mt-3 p-4">
                 {sectionSummary(secClosing) ? (
                   <div
-                    className="rounded-2xl border px-4 py-3 text-sm"
+                    className="rounded-2xl border px-4 py-3 text-[13px]"
                     style={{
                       borderColor: BRAND.borderSoft,
                       background: "rgba(255,255,255,0.04)",
@@ -1482,14 +1482,14 @@ export default function VisibilityReportClient({
                   </div>
                 ) : null}
 
-                <div className="mt-4 space-y-4 text-sm leading-8" style={{ color: BRAND.text }}>
+                <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
                   {sectionParagraphs(secClosing).map((p, idx) => (
                     <p key={idx}>{p}</p>
                   ))}
                 </div>
               </InnerPanel>
 
-              <div className="mt-4 text-xs" style={{ color: BRAND.textFaint }}>
+              <div className="mt-3 text-[11px]" style={{ color: BRAND.textFaint }}>
                 engine: {safeString(kbReport.engine_key || "visibility_prime_v1")} • v
                 {kbReport.version ?? 2} • mode:{" "}
                 {safeString(kbReport?.meta?.scoring_mode || "prime")}
