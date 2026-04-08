@@ -249,11 +249,6 @@ export async function POST(req: Request) {
           candidate_email: email,
           candidate_phone: phone,
           consent: true,
-          meta: {
-            job_id,
-            campaign_id,
-            source: "api",
-          },
         })
         .select("*")
         .single();
@@ -271,13 +266,6 @@ export async function POST(req: Request) {
 
       applicationRow = createdApp;
     } else {
-      const nextMeta = {
-        ...(applicationRow.meta || {}),
-        job_id,
-        campaign_id,
-        source: "api",
-      };
-
       const { data: updatedApp, error: updateAppErr } = await sb
         .from("partner_applications")
         .update({
@@ -290,7 +278,6 @@ export async function POST(req: Request) {
           consent: true,
           status: applicationRow.started_at ? applicationRow.status : "started",
           started_at: applicationRow.started_at || nowIso(),
-          meta: nextMeta,
         })
         .eq("id", applicationRow.id)
         .select("*")
@@ -569,7 +556,7 @@ export async function POST(req: Request) {
       .update({ status: "completed", completed_at: completedAt })
       .eq("id", applicationRow.id);
 
-    // 8) Build report payload
+    // 8) Build response payload
     const careerVerticalCode = `V${verticalLevel}`;
     const careerVerticalLabel =
       cvLabels[careerVerticalCode] || careerVerticalCode;
