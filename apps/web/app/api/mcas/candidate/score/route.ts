@@ -155,7 +155,7 @@ export async function POST(req: Request) {
 
     const { data: partner, error: partnerErr } = await sb
       .from("partners")
-      .select("partner_key, is_active")
+      .select("partner_key, is_active, allowed_org_id")
       .eq("partner_key", partner_key)
       .maybeSingle();
 
@@ -169,6 +169,20 @@ export async function POST(req: Request) {
     if (!partner || !partner.is_active) {
       return NextResponse.json(
         { ok: false, error: "Invalid or inactive partner_key" },
+        { status: 400 }
+      );
+    }
+
+    const requestedOrgId = body?.org_id ? String(body.org_id).trim() : null;
+    const resolvedOrgId = requestedOrgId || partner?.allowed_org_id || null;
+
+    if (!resolvedOrgId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "org_id is required for this partner because no default allowed_org_id is configured",
+        },
         { status: 400 }
       );
     }
@@ -216,7 +230,6 @@ export async function POST(req: Request) {
     const qLookup = new Map<string, FrameworkQuestion>();
     for (const q of questions) qLookup.set(q.code, q);
 
-    // 1) Resolve / upsert partner application
     const { data: existingApp, error: findAppErr } = await sb
       .from("partner_applications")
       .select("*")
@@ -239,7 +252,7 @@ export async function POST(req: Request) {
         .insert({
           partner_key,
           application_id,
-          org_id: body?.org_id || null,
+          org_id: resolvedOrgId,
           framework_slug,
           framework_version,
           status: "started",
@@ -269,6 +282,7 @@ export async function POST(req: Request) {
       const { data: updatedApp, error: updateAppErr } = await sb
         .from("partner_applications")
         .update({
+          org_id: applicationRow.org_id || resolvedOrgId,
           framework_slug,
           framework_version,
           candidate_first_name: first_name,
@@ -297,7 +311,6 @@ export async function POST(req: Request) {
       applicationRow = updatedApp;
     }
 
-    // 2) Upsert individual
     let individualId: string | null = null;
 
     if (applicationRow.org_id) {
@@ -337,7 +350,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3) Create or reuse assessment
     const { data: existingAssessment, error: findAssessmentErr } = await sb
       .from("assessments")
       .select("id, status")
@@ -382,7 +394,6 @@ export async function POST(req: Request) {
       assessmentId = createdAssessment.id;
     }
 
-    // 4) Store answers
     await sb.from("assessment_answers").delete().eq("assessment_id", assessmentId);
 
     const answerRows = Object.entries(answers).map(([question_code, option_code]) => ({
@@ -401,7 +412,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 5) Score
     const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
     const osTotals: Record<string, number> = {};
     const verticalValues: number[] = [];
@@ -521,7 +531,6 @@ export async function POST(req: Request) {
 
     const scoring_model_version = `mcas_${framework_version}_candidate_v1`;
 
-    // 6) Persist result
     await sb.from("results").delete().eq("assessment_id", assessmentId);
 
     const resultRow = {
@@ -543,7 +552,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 7) Mark completed
     const completedAt = nowIso();
 
     await sb
@@ -556,7 +564,6 @@ export async function POST(req: Request) {
       .update({ status: "completed", completed_at: completedAt })
       .eq("id", applicationRow.id);
 
-    // 8) Build response payload
     const careerVerticalCode = `V${verticalLevel}`;
     const careerVerticalLabel =
       cvLabels[careerVerticalCode] || careerVerticalCode;
