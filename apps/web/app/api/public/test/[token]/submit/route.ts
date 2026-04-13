@@ -22,6 +22,10 @@ type PMEntry = { points?: number; profile?: string };
 type PortalQuestionRow = {
   id: string;
   idx?: number | string | null;
+  text?: string | null;
+  category?: string | null;
+  type?: string | null;
+  options?: any | null;
   profile_map?: PMEntry[] | null;
   weights?: any | null;
 };
@@ -63,6 +67,44 @@ type ScoringPrime = {
 
 type VisScoring = ScoringPersonality | ScoringTier | ScoringPrime;
 
+type GedDiagnosticKey =
+  | "business_stage"
+  | "core_constraint"
+  | "scale_readiness"
+  | "self_diagnosis";
+
+type GedChoiceAnswer = {
+  question_id: string;
+  question_text: string | null;
+  value: string | null;
+  label: string | null;
+};
+
+type GedDiagnostics = {
+  business_stage: GedChoiceAnswer | null;
+  core_constraint: GedChoiceAnswer | null;
+  scale_readiness: GedChoiceAnswer | null;
+  self_diagnosis: string | null;
+};
+
+type QscResultSummary = {
+  audience: "entrepreneur" | "leader";
+  personality_layer: string | null;
+  mindset_layer: string | null;
+  quantum_profile: string | null;
+  primary_personality_raw: string | null;
+  primary_mindset_raw: string | null;
+  combined_profile_code_raw: string | null;
+};
+
+type GhlSyncResult = {
+  ok: boolean;
+  skipped?: boolean;
+  message?: string;
+  status?: number;
+  response?: any;
+};
+
 const TIERS: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
 const PRIME_PILLARS: PrimePillar[] = [
   "visibility",
@@ -70,6 +112,9 @@ const PRIME_PILLARS: PrimePillar[] = [
   "authority",
   "dominance",
 ];
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function supa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -97,6 +142,10 @@ function isUuidLike(s: string) {
 
 function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
+}
+
+function normalizeText(v: any): string {
+  return typeof v === "string" ? v.trim() : "";
 }
 
 function parseMaybeJson<T = any>(value: any): T | null {
@@ -213,6 +262,387 @@ function getDefaultSupportEmail() {
     normalizeEmail(process.env.INTERNAL_NOTIFICATIONS_EMAIL) ||
     "support@profiletest.ai"
   );
+}
+
+/* ---------------- GED helpers ---------------- */
+
+function titleCaseWord(word: string) {
+  const s = normalizeText(word).toLowerCase();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
+
+function formatQscDisplay(value: any): string | null {
+  const raw = normalizeText(value);
+  if (!raw) return null;
+  return raw
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map(titleCaseWord)
+    .join(" ");
+}
+
+function getQuestionOptions(q: PortalQuestionRow): any[] {
+  if (Array.isArray(q.options)) return q.options;
+  const parsed = parseMaybeJson<any>(q.options);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function getTextAnswerValue(row: any): string | null {
+  const candidates = [
+    row?.text,
+    row?.answer,
+    row?.free_text,
+    row?.freeText,
+    row?.response,
+    row?.input,
+    row?.value,
+    row?.selected_text,
+    row?.selectedText,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      if (!trimmed) continue;
+      const n = Number(trimmed);
+      if (Number.isFinite(n) && String(n) === trimmed) continue;
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+function getSelectedOptionInfo(
+  q: PortalQuestionRow,
+  row: any
+): { value: string | null; label: string | null } | null {
+  const sel = toZeroBasedSelected(row);
+  if (sel == null || sel < 0) return null;
+
+  const options = getQuestionOptions(q);
+  const opt = options[sel];
+  if (opt == null) return null;
+
+  if (typeof opt === "string" || typeof opt === "number") {
+    const s = String(opt).trim();
+    return { value: s || null, label: s || null };
+  }
+
+  if (typeof opt === "object") {
+    const value =
+      normalizeText(opt.value) ||
+      normalizeText(opt.code) ||
+      normalizeText(opt.key) ||
+      normalizeText(opt.id) ||
+      normalizeText(opt.slug) ||
+      normalizeText(opt.label) ||
+      normalizeText(opt.text) ||
+      normalizeText(opt.title) ||
+      null;
+
+    const label =
+      normalizeText(opt.label) ||
+      normalizeText(opt.text) ||
+      normalizeText(opt.title) ||
+      normalizeText(opt.name) ||
+      normalizeText(opt.value) ||
+      normalizeText(opt.code) ||
+      null;
+
+    return { value, label };
+  }
+
+  return null;
+}
+
+function getGedDiagnosticKey(q: PortalQuestionRow): GedDiagnosticKey | null {
+  const text = normalizeText(q.text).toLowerCase();
+
+  if (text === "which best describes your current business?") {
+    return "business_stage";
+  }
+
+  if (text === "where is your biggest constraint right now?") {
+    return "core_constraint";
+  }
+
+  if (text === "if you stepped out of the business for 30 days, what would happen?") {
+    return "scale_readiness";
+  }
+
+  if (
+    text ===
+    "in your own words, what is currently stopping your business from scaling without you?"
+  ) {
+    return "self_diagnosis";
+  }
+
+  return null;
+}
+
+function extractGedDiagnostics(
+  questionRows: PortalQuestionRow[],
+  answerRows: any[]
+): GedDiagnostics {
+  const byId = new Map<string, PortalQuestionRow>();
+  for (const q of questionRows || []) {
+    byId.set(String(q.id), q);
+  }
+
+  const diagnostics: GedDiagnostics = {
+    business_stage: null,
+    core_constraint: null,
+    scale_readiness: null,
+    self_diagnosis: null,
+  };
+
+  for (const row of answerRows || []) {
+    const qid = String(row?.question_id || row?.qid || row?.id || "").trim();
+    if (!qid) continue;
+
+    const q = byId.get(qid);
+    if (!q) continue;
+
+    const key = getGedDiagnosticKey(q);
+    if (!key) continue;
+
+    if (key === "self_diagnosis") {
+      diagnostics.self_diagnosis = getTextAnswerValue(row);
+      continue;
+    }
+
+    const selected = getSelectedOptionInfo(q, row);
+    diagnostics[key] = {
+      question_id: qid,
+      question_text: normalizeText(q.text) || null,
+      value: selected?.value ?? null,
+      label: selected?.label ?? null,
+    };
+  }
+
+  return diagnostics;
+}
+
+function hasGedDiagnostics(diagnostics: GedDiagnostics) {
+  return Boolean(
+    diagnostics.business_stage ||
+      diagnostics.core_constraint ||
+      diagnostics.scale_readiness ||
+      diagnostics.self_diagnosis
+  );
+}
+
+function pushCustomField(
+  customFields: any[],
+  identifier: string | undefined,
+  value: any
+) {
+  const fieldValue =
+    typeof value === "string"
+      ? value.trim()
+      : value == null
+        ? ""
+        : String(value).trim();
+
+  if (!identifier || !identifier.trim() || !fieldValue) return;
+
+  const token = identifier.trim();
+
+  if (token.startsWith("key:")) {
+    const key = token.slice(4).trim();
+    if (!key) return;
+    customFields.push({ key, value: fieldValue, field_value: fieldValue });
+    return;
+  }
+
+  if (token.startsWith("id:")) {
+    const id = token.slice(3).trim();
+    if (!id) return;
+    customFields.push({ id, value: fieldValue, field_value: fieldValue });
+    return;
+  }
+
+  customFields.push({ id: token, value: fieldValue, field_value: fieldValue });
+}
+
+async function syncGedToGhl(args: {
+  taker: any;
+  token: string;
+  testName: string;
+  orgId: string;
+  reportUrl: string;
+  resultUrl: string;
+  qscSummary: QscResultSummary | null;
+  gedDiagnostics: GedDiagnostics;
+}): Promise<GhlSyncResult> {
+  const endpoint =
+    normalizeText(process.env.GHL_CONTACT_UPSERT_URL) ||
+    "https://services.leadconnectorhq.com/contacts/upsert";
+
+  const apiKey = normalizeText(process.env.GHL_API_KEY);
+  const locationId = normalizeText(process.env.GHL_LOCATION_ID);
+  const apiVersion =
+    normalizeText(process.env.GHL_API_VERSION) || "2021-07-28";
+
+  if (!apiKey || !locationId || !endpoint) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped GHL sync because GHL_CONTACT_UPSERT_URL, GHL_API_KEY, or GHL_LOCATION_ID is missing.",
+    };
+  }
+
+  const email = normalizeEmail(args.taker?.email);
+  const phone = normalizeText(args.taker?.phone);
+
+  if (!email && !phone) {
+    return {
+      ok: false,
+      skipped: true,
+      message: "Skipped GHL sync because taker has neither email nor phone.",
+    };
+  }
+
+  const customFields: any[] = [];
+
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_PERSONALITY_LAYER,
+    args.qscSummary?.personality_layer
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_MINDSET_LAYER,
+    args.qscSummary?.mindset_layer
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_QUANTUM_PROFILE,
+    args.qscSummary?.quantum_profile
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_BUSINESS_STAGE,
+    args.gedDiagnostics.business_stage?.label ||
+      args.gedDiagnostics.business_stage?.value
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_CORE_CONSTRAINT,
+    args.gedDiagnostics.core_constraint?.label ||
+      args.gedDiagnostics.core_constraint?.value
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_SCALE_READINESS,
+    args.gedDiagnostics.scale_readiness?.label ||
+      args.gedDiagnostics.scale_readiness?.value
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_SELF_DIAGNOSIS,
+    args.gedDiagnostics.self_diagnosis
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_REPORT_URL,
+    args.reportUrl
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_RESULT_URL,
+    args.resultUrl
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_ASSESSMENT_NAME,
+    args.testName
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_TOKEN,
+    args.token
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_ORG_ID,
+    args.orgId
+  );
+  pushCustomField(
+    customFields,
+    process.env.GHL_CF_GED_COMPLETED_AT,
+    new Date().toISOString()
+  );
+
+  const completionTag =
+    normalizeText(process.env.GHL_TAG_GED_COMPLETED_ASSESSMENT) ||
+    "GED_completed_assessment";
+
+  const tags = [completionTag].filter(Boolean);
+
+  const fullName = [args.taker?.first_name, args.taker?.last_name]
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const payload: any = {
+    locationId,
+    firstName: normalizeText(args.taker?.first_name) || undefined,
+    lastName: normalizeText(args.taker?.last_name) || undefined,
+    name: fullName || undefined,
+    email: email || undefined,
+    phone: phone || undefined,
+    tags,
+    customFields: customFields.length ? customFields : undefined,
+  };
+
+  if (normalizeText(args.taker?.company)) {
+    payload.companyName = normalizeText(args.taker?.company);
+  }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Version: apiVersion,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+
+    const raw = await res.text();
+    let parsed: any = raw;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      // keep raw text
+    }
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        message: `GHL sync failed with status ${res.status}`,
+        response: parsed,
+      };
+    }
+
+    return {
+      ok: true,
+      status: res.status,
+      response: parsed,
+    };
+  } catch (e: any) {
+    return {
+      ok: false,
+      message: `GHL sync request failed: ${String(e?.message || e)}`,
+    };
+  }
 }
 
 /**
@@ -740,9 +1170,6 @@ function computePrimeReadiness(
 
 /* ---------------- End visibility helpers ---------------- */
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 export async function POST(
   req: Request,
   { params }: { params: { token: string } }
@@ -1063,7 +1490,7 @@ export async function POST(
         version: primeMode ? 2 : 1,
         personality_type,
         personality_points: personalityPoints,
-        personality_percent,
+        personality_percent: personality_percent,
         tier,
         level,
         tier_counts: tierCounts,
@@ -1378,13 +1805,19 @@ export async function POST(
     const isQscEntrepreneur =
       isQscTest && (qscVariantLower === "entrepreneur" || slugLower.includes("core"));
 
+    const isGedTest =
+      meta?.is_ged === true ||
+      String(meta?.assessment_name || "").toLowerCase() ===
+        "growth engine diagnostic" ||
+      slugLower.includes("growth-engine-diagnostic");
+
     const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur
       ? "entrepreneur"
       : "leader";
 
     const { data: questions, error: qErr } = await sb
       .from("test_questions")
-      .select("id, idx, profile_map, weights")
+      .select("id, idx, text, category, type, options, profile_map, weights")
       .eq("test_id", effectiveTestId)
       .order("idx", { ascending: true })
       .order("created_at", { ascending: true });
@@ -1400,6 +1833,8 @@ export async function POST(
     for (const q of questions || []) {
       byId[q.id] = q;
     }
+
+    const gedDiagnostics = extractGedDiagnostics(questions || [], answers);
 
     const { data: labels, error: labErr } = await sb
       .from("test_profile_labels")
@@ -1434,12 +1869,15 @@ export async function POST(
 
     const freqTotals: Record<AB, number> = { A: 0, B: 0, C: 0, D: 0 };
     const profileTotals: Record<string, number> = {};
+    let qscSummary: QscResultSummary | null = null;
 
     for (let idx = 0; idx < answers.length; idx++) {
       const row = answers[idx];
       const qid = row?.question_id || row?.qid || row?.id;
       const q: PortalQuestionRow | undefined = qid ? byId[qid] : undefined;
       if (!q) continue;
+
+      if (String(q.category || "").toLowerCase() === "diagnostic") continue;
 
       const mapEntries = coerceProfileMapEntries(q.profile_map);
       const fallbackEntries = coerceProfileMapEntries(q.weights);
@@ -1476,6 +1914,8 @@ export async function POST(
       meta: {
         wrapper_test_id: taker.test_id,
         effective_test_id: effectiveTestId,
+        is_ged: isGedTest,
+        ged: hasGedDiagnostics(gedDiagnostics) ? gedDiagnostics : null,
       },
     };
 
@@ -1523,20 +1963,38 @@ export async function POST(
             return {
               id: q.id as string,
               idx: (q.idx as number | null) ?? null,
+              category: q.category ?? null,
               profile_map: scoringEntries as any,
             };
           })
           .filter(
-            (q) => Array.isArray(q.profile_map) && q.profile_map.length > 0
+            (q) =>
+              String(q.category || "").toLowerCase() !== "diagnostic" &&
+              Array.isArray(q.profile_map) &&
+              q.profile_map.length > 0
           );
 
         const answersForScoring = answers
           .map((row: any) => {
             const qid = row?.question_id || row?.qid || row?.id;
+            const q = qid ? byId[qid] : null;
             const sel = toZeroBasedSelected(row);
-            return { question_id: qid as string, choice: sel ?? -1 };
+            return {
+              question_id: qid as string,
+              choice: sel ?? -1,
+              category: q?.category ?? null,
+            };
           })
-          .filter((a: any) => a.question_id && a.choice >= 0);
+          .filter(
+            (a: any) =>
+              String(a.category || "").toLowerCase() !== "diagnostic" &&
+              a.question_id &&
+              a.choice >= 0
+          )
+          .map((a: any) => ({
+            question_id: a.question_id,
+            choice: a.choice,
+          }));
 
         if (questionsForScoring.length === 0) {
           throw new Error(
@@ -1565,6 +2023,17 @@ export async function POST(
             )} mindset=${JSON.stringify(scoring.mindsetTotals || {})}`
           );
         }
+
+        qscSummary = {
+          audience: qscAudience,
+          personality_layer: formatQscDisplay(scoring.primaryPersonality),
+          mindset_layer: formatQscDisplay(scoring.primaryMindset),
+          quantum_profile: formatQscDisplay(scoring.combinedProfileCode),
+          primary_personality_raw: normalizeText(scoring.primaryPersonality) || null,
+          primary_mindset_raw: normalizeText(scoring.primaryMindset) || null,
+          combined_profile_code_raw:
+            normalizeText(scoring.combinedProfileCode) || null,
+        };
 
         let qscProfileId: string | null = null;
 
@@ -1727,6 +2196,27 @@ export async function POST(
       normalizeEmail((orgRow as any)?.support_email) ||
       getDefaultSupportEmail();
 
+    let ghlSyncResult: GhlSyncResult | null = null;
+    if (isGedTest) {
+      ghlSyncResult = await syncGedToGhl({
+        taker,
+        token,
+        testName:
+          String(test.name || meta?.assessment_name || "Growth Engine Diagnostic"),
+        orgId: String(taker.org_id),
+        reportUrl: reportUrlForEmail,
+        resultUrl: baseResultUrl,
+        qscSummary,
+        gedDiagnostics,
+      });
+
+      if (!ghlSyncResult.ok && !ghlSyncResult.skipped) {
+        console.error("[submit] GED GHL sync failed", ghlSyncResult);
+      } else if (ghlSyncResult.skipped) {
+        console.warn("[submit] GED GHL sync skipped", ghlSyncResult);
+      }
+    }
+
     let takerEmailResult: any = null;
     try {
       if (linkBehavior.email_report && normalizeEmail(taker.email)) {
@@ -1795,6 +2285,12 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       totals,
+      ged: isGedTest
+        ? {
+            diagnostics: gedDiagnostics,
+            ghl_sync: ghlSyncResult,
+          }
+        : null,
       link: {
         show_results: linkBehavior.show_results,
         redirect_url: linkBehavior.redirect_url,
