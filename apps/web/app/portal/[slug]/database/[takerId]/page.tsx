@@ -2,813 +2,597 @@
 // Server component — /portal/[slug]/database/[takerId]
 // Contact info + latest results with Frequency/Profile mixes (no fragile views)
 
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { createClient } from "@/lib/server/supabaseAdmin";
-import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
-import { getBaseUrl } from "@/lib/baseUrl";
-
 export const dynamic = "force-dynamic";
 
-type Totals = Record<string, any> | string | null | undefined;
+import { createClient } from "@supabase/supabase-js";
+import FrequencyPie from "@/components/charts/FrequencyPie";
+import ProfileBar from "@/components/charts/ProfileBar";
+import {
+  QscMatrix,
+  type PersonalityKey,
+  type MindsetKey,
+} from "@/app/qsc/QscMatrix";
 
-function parseTotals(totals: Totals): any {
-  if (!totals) return {};
-  try {
-    if (typeof totals === "string") {
-      const once = JSON.parse(totals);
-      if (typeof once === "string") return JSON.parse(once);
-      return once;
-    }
-    return totals || {};
-  } catch {
-    return {};
+type ScoreMap = Record<string, number>;
+
+type FrequencyPieData = {
+  A: number;
+  B: number;
+  C: number;
+  D: number;
+};
+
+type PersonalityPercMap = Partial<Record<PersonalityKey, number>>;
+type MindsetPercMap = Partial<Record<MindsetKey, number>>;
+
+const PERSONALITIES: { key: PersonalityKey; label: string; code: string }[] = [
+  { key: "FIRE", label: "Fire", code: "A" },
+  { key: "FLOW", label: "Flow", code: "B" },
+  { key: "FORM", label: "Form", code: "C" },
+  { key: "FIELD", label: "Field", code: "D" },
+];
+
+const MINDSETS: { key: MindsetKey; label: string; level: number }[] = [
+  { key: "ORIGIN", label: "Origin", level: 1 },
+  { key: "MOMENTUM", label: "Momentum", level: 2 },
+  { key: "VECTOR", label: "Vector", level: 3 },
+  { key: "ORBIT", label: "Orbit", level: 4 },
+  { key: "QUANTUM", label: "Quantum", level: 5 },
+];
+
+const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
+  FIRE: "#f97316",
+  FLOW: "#0ea5e9",
+  FORM: "#22c55e",
+  FIELD: "#a855f7",
+};
+
+async function getData(takerId: string) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE!,
+    { auth: { persistSession: false } },
+  );
+
+  const { data, error } = await supabase
+    .from("test_taker_reports_view")
+    .select("*")
+    .eq("taker_id", takerId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+function normalisePercent(raw: number | undefined | null): number {
+  if (raw == null || !Number.isFinite(raw)) return 0;
+
+  if (raw > 0 && raw <= 1.5) {
+    return raw * 100;
   }
+
+  return Math.min(Math.max(raw, 0), 100);
 }
 
-function asPercentMap(values: Record<string, number>): Record<string, number> {
-  const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
-  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
-  return Object.fromEntries(
-    Object.entries(values).map(([k, v]) => [
-      k,
-      Math.round(((Number(v) || 0) / sum) * 100),
-    ])
+function toScoreMap(value: unknown): ScoreMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const out: ScoreMap = {};
+
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const n =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string"
+          ? parseFloat(raw)
+          : 0;
+
+    out[key] = Number.isFinite(n) ? n : 0;
+  }
+
+  return out;
+}
+
+function toFrequencyPieData(freqScores: ScoreMap): FrequencyPieData {
+  return {
+    A: freqScores.A ?? 0,
+    B: freqScores.B ?? 0,
+    C: freqScores.C ?? 0,
+    D: freqScores.D ?? 0,
+  };
+}
+
+function percentLabel(value: number | undefined | null): string {
+  const v = typeof value === "number" ? value : 0;
+  return `${v.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function isQscProfile(data: any, profileScores: ScoreMap): boolean {
+  return Boolean(
+    data?.combined_profile_code ||
+      data?.primary_personality ||
+      data?.primary_mindset ||
+      data?.personality_percentages ||
+      data?.mindset_percentages ||
+      Object.keys(profileScores).some((k) => k.toUpperCase().startsWith("QSC_")),
   );
 }
 
-function asDecimalMap(values: Record<string, number>): Record<string, number> {
-  const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
-  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
-  return Object.fromEntries(
-    Object.entries(values).map(([k, v]) => [k, (Number(v) || 0) / sum])
-  );
+function getPersonalityPercentages(data: any, freqScores: ScoreMap): PersonalityPercMap {
+  const raw = toScoreMap(data?.personality_percentages);
+
+  if (Object.keys(raw).length > 0) {
+    return {
+      FIRE: normalisePercent(raw.FIRE ?? raw.fire ?? raw.A ?? raw.a ?? 0),
+      FLOW: normalisePercent(raw.FLOW ?? raw.flow ?? raw.B ?? raw.b ?? 0),
+      FORM: normalisePercent(raw.FORM ?? raw.form ?? raw.C ?? raw.c ?? 0),
+      FIELD: normalisePercent(raw.FIELD ?? raw.field ?? raw.D ?? raw.d ?? 0),
+    };
+  }
+
+  return {
+    FIRE: normalisePercent(freqScores.A ?? 0),
+    FLOW: normalisePercent(freqScores.B ?? 0),
+    FORM: normalisePercent(freqScores.C ?? 0),
+    FIELD: normalisePercent(freqScores.D ?? 0),
+  };
 }
 
-function sortDesc(obj: Record<string, number>) {
-  return Object.entries(obj).sort((a, b) =>
-    b[1] === a[1] ? a[0].localeCompare(b[0]) : b[1] - a[1]
-  );
+function getMindsetPercentages(data: any, profileScores: ScoreMap): MindsetPercMap {
+  const raw = toScoreMap(data?.mindset_percentages);
+
+  if (Object.keys(raw).length > 0) {
+    return {
+      ORIGIN: normalisePercent(raw.ORIGIN ?? raw.origin ?? 0),
+      MOMENTUM: normalisePercent(raw.MOMENTUM ?? raw.momentum ?? 0),
+      VECTOR: normalisePercent(raw.VECTOR ?? raw.vector ?? 0),
+      ORBIT: normalisePercent(raw.ORBIT ?? raw.orbit ?? 0),
+      QUANTUM: normalisePercent(raw.QUANTUM ?? raw.quantum ?? 0),
+    };
+  }
+
+  return {
+    ORIGIN: normalisePercent(
+      profileScores.QSC_MINDSET_ORIGIN ?? profileScores.ORIGIN ?? 0,
+    ),
+    MOMENTUM: normalisePercent(
+      profileScores.QSC_MINDSET_MOMENTUM ?? profileScores.MOMENTUM ?? 0,
+    ),
+    VECTOR: normalisePercent(
+      profileScores.QSC_MINDSET_VECTOR ?? profileScores.VECTOR ?? 0,
+    ),
+    ORBIT: normalisePercent(
+      profileScores.QSC_MINDSET_ORBIT ?? profileScores.ORBIT ?? 0,
+    ),
+    QUANTUM: normalisePercent(
+      profileScores.QSC_MINDSET_QUANTUM ?? profileScores.QUANTUM ?? 0,
+    ),
+  };
 }
 
-function codeToPShort(code?: string | null) {
-  if (!code) return "";
-  const m = code.match(/PROFILE_(\d+)/i);
-  if (m) return `P${m[1]}`;
-  const m2 = code.match(/P(\d+)/i);
-  return m2 ? `P${m2[1]}` : code;
+function rankPersonalityKeys(map: PersonalityPercMap): PersonalityKey[] {
+  return [...PERSONALITIES]
+    .sort((a, b) => (map[b.key] ?? 0) - (map[a.key] ?? 0))
+    .map((p) => p.key);
 }
 
-function BarRow({
-  label,
-  pct,
-  note,
-}: {
+function rankMindsetKeys(map: MindsetPercMap): MindsetKey[] {
+  return [...MINDSETS]
+    .sort((a, b) => (map[b.key] ?? 0) - (map[a.key] ?? 0))
+    .map((m) => m.key);
+}
+
+function coercePersonality(value: unknown): PersonalityKey | null {
+  const v = String(value || "").trim().toUpperCase();
+  if (v === "FIRE" || v === "FLOW" || v === "FORM" || v === "FIELD") return v;
+  return null;
+}
+
+function coerceMindset(value: unknown): MindsetKey | null {
+  const v = String(value || "").trim().toUpperCase();
+  if (
+    v === "ORIGIN" ||
+    v === "MOMENTUM" ||
+    v === "VECTOR" ||
+    v === "ORBIT" ||
+    v === "QUANTUM"
+  ) {
+    return v;
+  }
+  return null;
+}
+
+function getPrimarySecondaryPersonality(
+  data: any,
+  personalityPerc: PersonalityPercMap,
+): { primary: PersonalityKey | null; secondary: PersonalityKey | null } {
+  const ranked = rankPersonalityKeys(personalityPerc);
+  return {
+    primary: coercePersonality(data?.primary_personality) ?? ranked[0] ?? null,
+    secondary: coercePersonality(data?.secondary_personality) ?? ranked[1] ?? null,
+  };
+}
+
+function getPrimarySecondaryMindset(
+  data: any,
+  mindsetPerc: MindsetPercMap,
+): { primary: MindsetKey | null; secondary: MindsetKey | null } {
+  const ranked = rankMindsetKeys(mindsetPerc);
+  return {
+    primary: coerceMindset(data?.primary_mindset) ?? ranked[0] ?? null,
+    secondary: coerceMindset(data?.secondary_mindset) ?? ranked[1] ?? null,
+  };
+}
+
+function getCombinedTitle(
+  data: any,
+  primaryPersonality: PersonalityKey | null,
+  primaryMindset: MindsetKey | null,
+): string {
+  if (data?.profile_label) return String(data.profile_label);
+  if (data?.profile) return String(data.profile);
+
+  const personalityLabel =
+    PERSONALITIES.find((p) => p.key === primaryPersonality)?.label ?? "";
+  const mindsetLabel = MINDSETS.find((m) => m.key === primaryMindset)?.label ?? "";
+
+  return personalityLabel && mindsetLabel
+    ? `${personalityLabel} ${mindsetLabel}`
+    : "QSC Snapshot";
+}
+
+function getCombinedCode(
+  data: any,
+  primaryPersonality: PersonalityKey | null,
+  primaryMindset: MindsetKey | null,
+): string {
+  if (data?.combined_profile_code) return String(data.combined_profile_code);
+
+  const pCode = PERSONALITIES.find((p) => p.key === primaryPersonality)?.code ?? "";
+  const mLevel = MINDSETS.find((m) => m.key === primaryMindset)?.level ?? "";
+
+  return pCode && mLevel ? `${pCode}${mLevel}` : "—";
+}
+
+type FrequencyDonutDatum = {
+  key: PersonalityKey;
   label: string;
-  pct: number;
-  note?: string;
-}) {
+  value: number;
+};
+
+function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
+  const total = data.reduce((sum, d) => sum + (Number.isFinite(d.value) ? d.value : 0), 0) || 1;
+
+  const radius = 60;
+  const strokeWidth = 20;
+  const center = 80;
+  const circumference = 2 * Math.PI * radius;
+
+  let offset = 0;
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-48 text-sm">
-        <span className="font-medium">{label}</span>
-        {note ? <span className="text-gray-500"> {note}</span> : null}
-      </div>
-      <div className="flex-1 h-2 rounded bg-gray-200">
-        <div
-          className="h-2 rounded bg-blue-600"
-          style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-        />
-      </div>
-      <div className="w-10 text-right text-sm tabular-nums">{pct}%</div>
+    <svg viewBox="0 0 160 160" className="h-40 w-40 md:h-48 md:w-48" aria-hidden="true">
+      <circle
+        cx={center}
+        cy={center}
+        r={radius}
+        stroke="rgba(15,23,42,0.9)"
+        strokeWidth={strokeWidth}
+        fill="transparent"
+      />
+      {data.map((d) => {
+        const fraction = (Number.isFinite(d.value) ? d.value : 0) / total;
+        const dash = circumference * fraction;
+        const dashArray = `${dash} ${circumference}`;
+        const strokeDashoffset = offset;
+        offset -= dash;
+
+        return (
+          <circle
+            key={d.key}
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={FREQUENCY_COLORS[d.key]}
+            strokeWidth={strokeWidth}
+            fill="transparent"
+            strokeDasharray={dashArray}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />
+        );
+      })}
+
+      <circle cx={center} cy={center} r={radius - strokeWidth} fill="#020617" />
+
+      <text
+        x={center}
+        y={center - 4}
+        textAnchor="middle"
+        fill="#e5e7eb"
+        style={{ fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 10 }}
+      >
+        BUYER
+      </text>
+      <text
+        x={center}
+        y={center + 10}
+        textAnchor="middle"
+        fill="#e5e7eb"
+        style={{ fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 10 }}
+      >
+        FREQUENCY
+      </text>
+    </svg>
+  );
+}
+
+function Bar({ pct }: { pct: number }) {
+  const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+  const width = `${clamped}%`;
+
+  return (
+    <div className="w-full h-2 rounded-full bg-slate-800/90 overflow-hidden">
+      <div className="h-2 rounded-full bg-sky-500" style={{ width }} />
     </div>
   );
 }
 
-type QscAudience = "entrepreneur" | "leader";
-
-async function fetchVisibilityInternalSnapshot(args: {
-  orgSlug: string;
-  takerId: string;
+function QscSnapshot({
+  data,
+  personalityPerc,
+  mindsetPerc,
+  primaryPersonality,
+  secondaryPersonality,
+  primaryMindset,
+  secondaryMindset,
+}: {
+  data: any;
+  personalityPerc: PersonalityPercMap;
+  mindsetPerc: MindsetPercMap;
+  primaryPersonality: PersonalityKey | null;
+  secondaryPersonality: PersonalityKey | null;
+  primaryMindset: MindsetKey | null;
+  secondaryMindset: MindsetKey | null;
 }) {
-  const { orgSlug, takerId } = args;
+  const combinedTitle = getCombinedTitle(data, primaryPersonality, primaryMindset);
+  const combinedCode = getCombinedCode(data, primaryPersonality, primaryMindset);
 
-  try {
-    const origin = getBaseUrl();
-    const url = `${origin}/api/portal/visibility/taker/${encodeURIComponent(
-      takerId
-    )}/snapshot?org=${encodeURIComponent(orgSlug)}&audience=internal_snapshot`;
+  const createdAt =
+    data?.created_at || data?.completed_at || data?.submitted_at
+      ? new Date(data.created_at || data.completed_at || data.submitted_at)
+      : null;
 
-    const res = await fetch(url, { cache: "no-store" });
-    const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("application/json")) return null;
+  const frequencyDonutData: FrequencyDonutDatum[] = PERSONALITIES.map((p) => ({
+    key: p.key,
+    label: p.label,
+    value: normalisePercent(personalityPerc[p.key]),
+  }));
 
-    const j = await res.json().catch(() => null);
-    if (!res.ok || !j?.ok) return null;
-    return j?.data ?? null;
-  } catch {
-    return null;
-  }
-}
+  return (
+    <div className="space-y-8">
+      <section className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 md:p-7 shadow-xl shadow-black/50 text-slate-50">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-300/90">
+              QSC Snapshot
+            </p>
 
-function prettyTier(t?: string | null) {
-  const s = String(t || "").trim();
-  return s || "—";
-}
+            <h2 className="mt-3 text-2xl font-semibold">{combinedTitle}</h2>
 
-function prettyStyle(s?: string | null) {
-  const t = String(s || "").trim().toUpperCase();
-  return t || "—";
-}
+            <p className="mt-1 text-xs text-slate-400">
+              Code: <span className="font-mono text-slate-100">{combinedCode}</span>
+            </p>
 
-function prettyReadiness(r?: string | null) {
-  const t = String(r || "").trim().toLowerCase();
-  if (t === "ready_to_progress") return "Ready to progress";
-  if (t === "stabilise") return "Stabilise";
-  return t || "—";
+            <dl className="mt-5 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-400">
+                  Primary personality
+                </dt>
+                <dd className="mt-0.5 font-medium">{primaryPersonality || "—"}</dd>
+              </div>
+
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-slate-400">
+                  Secondary personality
+                </dt>
+                <dd className="mt-0.5 font-medium">{secondaryPersonality || "—"}</dd>
+              </div>
+
+              <div className="mt-2">
+                <dt className="text-xs uppercase tracking-wide text-slate-400">
+                  Primary mindset
+                </dt>
+                <dd className="mt-0.5 font-medium">{primaryMindset || "—"}</dd>
+              </div>
+
+              <div className="mt-2">
+                <dt className="text-xs uppercase tracking-wide text-slate-400">
+                  Secondary mindset
+                </dt>
+                <dd className="mt-0.5 font-medium">{secondaryMindset || "—"}</dd>
+              </div>
+            </dl>
+
+            {createdAt ? (
+              <p className="mt-5 text-xs text-slate-500">
+                Created at{" "}
+                {createdAt.toLocaleString(undefined, {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
+            <h3 className="text-lg font-semibold">Buyer Frequency Type</h3>
+            <p className="mt-1 text-sm text-slate-300">
+              Emotional and energetic style across Fire, Flow, Form and Field.
+            </p>
+
+            <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center">
+              <div className="flex justify-center">
+                <FrequencyDonut data={frequencyDonutData} />
+              </div>
+
+              <div className="space-y-3 text-sm">
+                {frequencyDonutData.map((d) => (
+                  <div key={d.key} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: FREQUENCY_COLORS[d.key] }}
+                      />
+                      <span className="font-medium text-slate-100">{d.label}</span>
+                    </div>
+                    <span className="text-sm text-slate-300">{percentLabel(d.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
+          <h3 className="text-lg font-semibold">Buyer Mindset Levels</h3>
+          <p className="mt-1 text-sm text-slate-300">
+            Where they are in their current business or leadership journey.
+          </p>
+
+          <div className="mt-5 space-y-3">
+            {MINDSETS.map((m) => {
+              const pct = normalisePercent(mindsetPerc[m.key]);
+              return (
+                <div key={m.key} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-slate-100">{m.label}</span>
+                    <span className="text-slate-400">{percentLabel(pct)}</span>
+                  </div>
+                  <Bar pct={pct} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
+          <h3 className="text-lg font-semibold">Buyer Persona Matrix</h3>
+          <p className="mt-1 text-sm text-slate-300">
+            Visual intersection of buyer frequency type and buyer mindset level.
+          </p>
+
+          <div className="mt-5">
+            <QscMatrix
+              primaryPersonality={primaryPersonality}
+              secondaryPersonality={secondaryPersonality}
+              primaryMindset={primaryMindset}
+              secondaryMindset={secondaryMindset}
+              personalityPercentages={personalityPerc}
+              mindsetPercentages={mindsetPerc}
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export default async function TakerDetail({
   params,
 }: {
-  params: { slug: string; takerId: string };
+  params: { takerId: string };
 }) {
-  const { slug, takerId } = params;
-  const sb = createClient().schema("portal");
+  const d = await getData(params.takerId);
 
-  const { data: org } = await sb
-    .from("orgs")
-    .select("id, slug, name")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (!org) return notFound();
+  const freqScores = toScoreMap(d?.freq_scores);
+  const profileScores = toScoreMap(d?.profile_scores);
+  const pieData = toFrequencyPieData(freqScores);
 
-  const { data: taker } = await sb
-    .from("test_takers")
-    .select(
-      "id, org_id, test_id, first_name, last_name, email, phone, created_at, company, role_title, link_token, last_result_url"
-    )
-    .eq("id", takerId)
-    .maybeSingle();
+  const qsc = isQscProfile(d, profileScores);
 
-  if (!taker) return notFound();
+  const personalityPerc = getPersonalityPercentages(d, freqScores);
+  const mindsetPerc = getMindsetPercentages(d, profileScores);
 
-  let allowed = taker.org_id === org.id;
+  const { primary: primaryPersonality, secondary: secondaryPersonality } =
+    getPrimarySecondaryPersonality(d, personalityPerc);
 
-  if (!allowed) {
-    const { data: subs } = await sb
-      .from("test_submissions")
-      .select("test_id")
-      .eq("taker_id", taker.id)
-      .order("created_at", { ascending: false })
-      .limit(25);
-
-    const testIds = Array.from(
-      new Set((subs || []).map((s: any) => s?.test_id).filter(Boolean))
-    ) as string[];
-
-    if (testIds.length) {
-      const { data: testsForSubs } = await sb
-        .from("tests")
-        .select("id, org_id")
-        .in("id", testIds);
-
-      allowed = (testsForSubs || []).some((t: any) => t?.org_id === org.id);
-    }
-  }
-
-  if (!allowed) return notFound();
-
-  const { data: test } = await sb
-    .from("tests")
-    .select("id, name, slug, meta")
-    .eq("id", taker.test_id)
-    .maybeSingle();
-
-  const { data: results } = await sb
-    .from("test_results")
-    .select("id, created_at, totals")
-    .eq("taker_id", taker.id)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  const latest = (results ?? [])[0] || null;
-  const totalsRaw = parseTotals(latest?.totals);
-
-  const isVisibility =
-    Boolean(totalsRaw?.visibility) ||
-    String(totalsRaw?.meta?.engine || "").toLowerCase().includes("visibility");
-
-  const meta: any = (test?.meta as any) ?? {};
-  const framework: any = meta?.framework || meta || {};
-
-  const profilesSource: any[] = Array.isArray(framework?.profiles)
-    ? framework.profiles
-    : Array.isArray(meta?.profiles)
-      ? meta.profiles
-      : [];
-
-  const profiles: Array<{ name: string; code?: string; frequency?: string }> =
-    profilesSource.map((p: any) => ({
-      name: String(p?.name ?? ""),
-      code: p?.code ?? null,
-      frequency: p?.frequency ?? null,
-    }));
-
-  const freqSource: any[] = Array.isArray(framework?.frequencies)
-    ? framework.frequencies
-    : Array.isArray(meta?.frequencies)
-      ? meta.frequencies
-      : [];
-
-  const freqLabels: Record<string, string> = freqSource.length
-    ? Object.fromEntries(
-        freqSource.map((f: any) => [
-          String(f?.code ?? "").toUpperCase(),
-          String(f?.label ?? ""),
-        ])
-      )
-    : { A: "A", B: "B", C: "C", D: "D" };
-
-  let profileScores: Record<string, number> = {};
-  let frequencyScores: Record<string, number> = {};
-
-  if (
-    totalsRaw &&
-    typeof totalsRaw === "object" &&
-    ("frequencies" in totalsRaw || "profiles" in totalsRaw)
-  ) {
-    const tr: any = totalsRaw;
-
-    if (tr.frequencies && typeof tr.frequencies === "object") {
-      frequencyScores = Object.fromEntries(
-        Object.entries(tr.frequencies).map(([k, v]) => [
-          String(k).toUpperCase(),
-          Number(v) || 0,
-        ])
-      );
-    }
-
-    if (tr.profiles && typeof tr.profiles === "object") {
-      const rawProfiles = tr.profiles as Record<string, number>;
-
-      const codeToName = new Map<string, string>();
-      for (const p of profiles) {
-        if (p.code) {
-          const upperCode = String(p.code).toUpperCase();
-          codeToName.set(upperCode, p.name);
-          codeToName.set(codeToPShort(upperCode), p.name);
-        }
-      }
-
-      profileScores = {};
-      for (const [rawKey, value] of Object.entries(rawProfiles)) {
-        const upperKey = String(rawKey).toUpperCase();
-        const short = codeToPShort(upperKey);
-        const mappedName =
-          codeToName.get(upperKey) ||
-          codeToName.get(short.toUpperCase()) ||
-          rawKey;
-        profileScores[mappedName] = Number(value) || 0;
-      }
-    }
-  } else {
-    const keys = Object.keys(totalsRaw || {});
-    const isFreqTotals =
-      keys.length &&
-      keys.every((k) => ["A", "B", "C", "D"].includes(k.toUpperCase()));
-
-    if (isFreqTotals) {
-      frequencyScores = Object.fromEntries(
-        Object.entries(totalsRaw).map(([k, v]) => [
-          k.toUpperCase(),
-          Number(v) || 0,
-        ])
-      );
-    } else {
-      profileScores = Object.fromEntries(
-        Object.entries(totalsRaw).map(([k, v]) => [String(k), Number(v) || 0])
-      );
-
-      const p2f = Object.fromEntries(
-        profiles.map((p) => [p.name, (p.frequency || "").toUpperCase()])
-      );
-      frequencyScores = Object.entries(profileScores).reduce(
-        (acc, [pName, score]) => {
-          const f = p2f[pName] || "";
-          if (!f) return acc;
-          acc[f] = (acc[f] || 0) + (Number(score) || 0);
-          return acc;
-        },
-        {} as Record<string, number>
-      );
-    }
-  }
-
-  const freqPct = asPercentMap(frequencyScores);
-  const profilePct = asPercentMap(profileScores);
-  const topProfile = sortDesc(profileScores)[0] as [string, number] | undefined;
-
-  const freqDec = asDecimalMap(frequencyScores);
-  const profileDec = asDecimalMap(profileScores);
-
-  const freqLabelArray = (["A", "B", "C", "D"] as const).map((code) => ({
-    code,
-    name: freqLabels[code] || code,
-  }));
-
-  const topFreqEntry = sortDesc(freqDec)[0];
-  const topFreqCode = (topFreqEntry ? topFreqEntry[0].toUpperCase() : "A") as
-    | "A"
-    | "B"
-    | "C"
-    | "D";
-
-  const sortedProfileDec = sortDesc(profileDec);
-  const primaryDec = sortedProfileDec[0]
-    ? { code: "", name: sortedProfileDec[0][0], pct: sortedProfileDec[0][1] }
-    : undefined;
-  const secondaryDec = sortedProfileDec[1]
-    ? { code: "", name: sortedProfileDec[1][0], pct: sortedProfileDec[1][1] }
-    : undefined;
-  const tertiaryDec = sortedProfileDec[2]
-    ? { code: "", name: sortedProfileDec[2][0], pct: sortedProfileDec[2][1] }
-    : undefined;
-
-  const hasScores =
-    Object.values(frequencyScores).some((v) => v > 0) ||
-    Object.values(profileScores).some((v) => v > 0);
-
-  const coachSummary = hasScores
-    ? buildCoachSummary({
-        participant: {
-          firstName: taker.first_name || undefined,
-          role: taker.role_title || undefined,
-          company: taker.company || undefined,
-        },
-        organisation: {
-          name: org.name,
-        },
-        frequencies: {
-          labels: freqLabelArray,
-          percentages: freqDec as Record<"A" | "B" | "C" | "D", number>,
-          topCode: topFreqCode,
-        },
-        profiles: {
-          labels: profiles.map((p) => ({ code: p.code || "", name: p.name })),
-          percentages: profileDec,
-          primary: primaryDec,
-          secondary: secondaryDec,
-          tertiary: tertiaryDec,
-        },
-      })
-    : "";
-
-  const fullName =
-    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
-
-  const sortedProfilePct = sortDesc(profilePct);
-  const topThreeProfiles = sortedProfilePct.slice(0, 3).map(([name, pct]) => {
-    const pMeta = profiles.find((p) => p.name === name);
-    const code = pMeta?.code || "";
-    return { name, pct, code };
-  });
-
-  const labels = ["Primary profile", "Secondary", "Tertiary"];
-
-  const isQsc =
-    test?.slug === "qsc-core" ||
-    test?.slug === "qsc-leaders" ||
-    (typeof meta?.frameworkType === "string" &&
-      meta.frameworkType.toLowerCase() === "qsc");
-
-  let qscSnapshotUrl: string | null = null;
-  let qscExtendedUrl: string | null = null;
-  let qscStrategicUrl: string | null = null;
-
-  let qscAudience: QscAudience | null = null;
-
-  if (isQsc && taker.link_token) {
-    const { data: qscRow } = await sb
-      .from("qsc_results")
-      .select("audience, created_at")
-      .eq("token", taker.link_token)
-      .eq("taker_id", taker.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const aud = (qscRow?.audience as QscAudience | null) ?? null;
-
-    if (aud === "leader" || aud === "entrepreneur") {
-      qscAudience = aud;
-    } else if (test?.slug === "qsc-leaders") {
-      qscAudience = "leader";
-    } else {
-      qscAudience = "entrepreneur";
-    }
-
-    const base = `/qsc/${encodeURIComponent(taker.link_token)}`;
-    const query = `?tid=${encodeURIComponent(taker.id)}`;
-
-    qscSnapshotUrl = `${base}${query}`;
-
-    const extendedPath =
-      qscAudience === "leader" ? "/extended-leader" : "/extended";
-    qscExtendedUrl = `${base}${extendedPath}${query}`;
-
-    const strategicPath = qscAudience === "leader" ? "/leader" : "/entrepreneur";
-    qscStrategicUrl = `${base}${strategicPath}${query}`;
-  }
-
-  let reportUrl: string | null = null;
-
-  if (isQsc) {
-    reportUrl = qscStrategicUrl;
-  } else if (isVisibility && taker.link_token) {
-    reportUrl = `/t/${encodeURIComponent(
-      taker.link_token
-    )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-  } else if (taker.link_token) {
-    reportUrl = `/t/${encodeURIComponent(
-      taker.link_token
-    )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-  } else if (taker.last_result_url) {
-    reportUrl = String(taker.last_result_url);
-  }
-
-  const freqDefs: any[] = freqSource || [];
-
-  const visibilitySnapshot = await fetchVisibilityInternalSnapshot({
-    orgSlug: slug,
-    takerId: taker.id,
-  });
-
-  const profileExtendedReportUrl =
-    isVisibility && latest?.id
-      ? `/portal/${encodeURIComponent(
-          slug
-        )}/database/${encodeURIComponent(
-          taker.id
-        )}/profile-extended-report`
-      : null;
+  const { primary: primaryMindset, secondary: secondaryMindset } =
+    getPrimarySecondaryMindset(d, mindsetPerc);
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{fullName}</h1>
-          <p className="text-sm text-gray-500">{org.name}</p>
+      <div>
+        <h1 className="text-xl font-semibold">{d?.full_name ?? "Test Taker"}</h1>
+        <div className="text-gray-600 text-sm">{d?.email}</div>
+      </div>
+
+      {qsc ? (
+        <QscSnapshot
+          data={d}
+          personalityPerc={personalityPerc}
+          mindsetPerc={mindsetPerc}
+          primaryPersonality={primaryPersonality}
+          secondaryPersonality={secondaryPersonality}
+          primaryMindset={primaryMindset}
+          secondaryMindset={secondaryMindset}
+        />
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-white border rounded p-4">
+            <div className="font-medium mb-2">Frequency</div>
+            <div className="text-sm mb-3">
+              Top: <span className="font-semibold">{d?.frequency ?? "—"}</span>
+            </div>
+            <FrequencyPie data={pieData} />
+          </div>
+
+          <div className="bg-white border rounded p-4">
+            <div className="font-medium mb-2">Profile</div>
+            <div className="text-sm mb-3">
+              Top: <span className="font-semibold">{d?.profile ?? "—"}</span>
+            </div>
+            <ProfileBar data={profileScores} />
+          </div>
         </div>
-        <Link
-          href={`/portal/${slug}/database`}
-          className="rounded-md border px-3 py-2 text-sm"
-        >
-          Back to database
-        </Link>
-      </header>
-
-      <section className="rounded-xl border p-4 bg-white">
-        <h2 className="font-medium mb-3">Contact</h2>
-        <dl className="grid grid-cols-3 gap-2 text-sm">
-          <dt className="text-gray-500">First name</dt>
-          <dd className="col-span-2">{taker.first_name || "—"}</dd>
-          <dt className="text-gray-500">Last name</dt>
-          <dd className="col-span-2">{taker.last_name || "—"}</dd>
-          <dt className="text-gray-500">Email</dt>
-          <dd className="col-span-2">{taker.email || "—"}</dd>
-          <dt className="text-gray-500">Phone</dt>
-          <dd className="col-span-2">{taker.phone || "—"}</dd>
-          <dt className="text-gray-500">Created at</dt>
-          <dd className="col-span-2">
-            {taker.created_at
-              ? new Date(taker.created_at as any).toLocaleString()
-              : "—"}
-          </dd>
-          <dt className="text-gray-500">Company</dt>
-          <dd className="col-span-2">{taker.company || "—"}</dd>
-          <dt className="text-gray-500">Role title</dt>
-          <dd className="col-span-2">{taker.role_title || "—"}</dd>
-        </dl>
-      </section>
-
-      {visibilitySnapshot && (
-        <section className="rounded-xl border p-4 bg-white space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-medium">Visibility Snapshot</h2>
-              <p className="text-sm text-gray-500">
-                Internal summary (KB-driven)
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {profileExtendedReportUrl ? (
-                <Link
-                  href={profileExtendedReportUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-50 hover:bg-slate-800"
-                >
-                  Generate Profile Extended Report
-                </Link>
-              ) : null}
-
-              {taker.link_token && (
-                <Link
-                  href={`/t/${encodeURIComponent(
-                    taker.link_token
-                  )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
-                >
-                  Open Visibility Report
-                </Link>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Tier
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {prettyTier(visibilitySnapshot?.signals?.tier)}
-              </div>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Level
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {Number(visibilitySnapshot?.signals?.level ?? 0) || "—"}
-              </div>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Style
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {prettyStyle(visibilitySnapshot?.signals?.style)}
-              </div>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Readiness
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {prettyReadiness(visibilitySnapshot?.signals?.readiness)}
-              </div>
-            </div>
-          </div>
-
-          {visibilitySnapshot?.summary && (
-            <div className="rounded-lg border bg-white p-3">
-              <div className="text-sm font-medium">Quick take</div>
-              <div className="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-700">
-                {visibilitySnapshot.summary.snapshot ? (
-                  <p>
-                    <span className="font-semibold">Snapshot:</span>{" "}
-                    {visibilitySnapshot.summary.snapshot}
-                  </p>
-                ) : null}
-                {visibilitySnapshot.summary.pillars ? (
-                  <p>
-                    <span className="font-semibold">Pillars:</span>{" "}
-                    {visibilitySnapshot.summary.pillars}
-                  </p>
-                ) : null}
-                {visibilitySnapshot.summary.opportunity ? (
-                  <p>
-                    <span className="font-semibold">Opportunity:</span>{" "}
-                    {visibilitySnapshot.summary.opportunity}
-                  </p>
-                ) : null}
-                {visibilitySnapshot.summary.next_move ? (
-                  <p>
-                    <span className="font-semibold">Next move:</span>{" "}
-                    {visibilitySnapshot.summary.next_move}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {Array.isArray(visibilitySnapshot?.sections) &&
-            visibilitySnapshot.sections.length > 0 && (
-              <div className="space-y-2">
-                {visibilitySnapshot.sections.map((sec: any) => (
-                  <details
-                    key={sec.key}
-                    className="rounded-lg border bg-white p-3"
-                  >
-                    <summary className="cursor-pointer font-medium">
-                      {sec.title || sec.key}
-                    </summary>
-                    <div className="mt-3 space-y-3 text-sm text-slate-700">
-                      {(sec.blocks || []).map((b: any, idx: number) => (
-                        <div key={idx} className="space-y-2">
-                          {b?.paragraphs && Array.isArray(b.paragraphs) ? (
-                            b.paragraphs
-                              .map((p: any) => String(p || "").trim())
-                              .filter(Boolean)
-                              .map((p: string, i: number) => (
-                                <p key={i} className="leading-relaxed">
-                                  {p}
-                                </p>
-                              ))
-                          ) : b?.short_summary ? (
-                            <p className="leading-relaxed">
-                              {String(b.short_summary)}
-                            </p>
-                          ) : null}
-
-                          {b?.bullets && Array.isArray(b.bullets) && b.bullets.length ? (
-                            <ul className="list-disc pl-5 space-y-1">
-                              {b.bullets
-                                .map((x: any) => String(x || "").trim())
-                                .filter(Boolean)
-                                .map((x: string, i: number) => (
-                                  <li key={i}>{x}</li>
-                                ))}
-                            </ul>
-                          ) : null}
-
-                          {b?.transition ? (
-                            <p className="text-slate-500 italic">
-                              {String(b.transition)}
-                            </p>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
-        </section>
       )}
 
-      <section className="rounded-xl border p-4 bg-white space-y-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="font-medium">Latest Result</h2>
-            <dl className="mt-1 grid grid-cols-3 gap-2 text-sm">
-              <dt className="text-gray-500">Test</dt>
-              <dd className="col-span-2">{test?.name || "—"}</dd>
-              <dt className="text-gray-500">Completed</dt>
-              <dd className="col-span-2">
-                {latest?.created_at
-                  ? new Date(latest.created_at as any).toLocaleString()
-                  : "—"}
-              </dd>
-              <dt className="text-gray-500">Top profile</dt>
-              <dd className="col-span-2">
-                {topProfile ? `${topProfile[0]} (${topProfile[1]})` : "—"}
-              </dd>
-            </dl>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex flex-wrap gap-2">
-              {reportUrl && (
-                <Link
-                  href={reportUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
-                >
-                  Open test-taker report
-                </Link>
-              )}
-            </div>
-          </div>
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="bg-white border rounded p-4">
+          <div className="font-medium mb-2">Strengths</div>
+          <div
+            className="prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{
+              __html: d?.sections?.strengths ?? "<p>—</p>",
+            }}
+          />
         </div>
 
-        {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
-          <div className="flex flex-wrap gap-2 pt-2">
-            {qscSnapshotUrl && (
-              <Link
-                href={qscSnapshotUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
-              >
-                Buyer Persona Snapshot
-              </Link>
-            )}
-
-            {qscExtendedUrl && (
-              <Link
-                href={qscExtendedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
-              >
-                Extended Source Code Snapshot
-              </Link>
-            )}
-
-            {qscStrategicUrl && (
-              <Link
-                href={qscStrategicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-amber-600 bg-amber-500 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-400"
-              >
-                QSC — Strategic Growth Report
-              </Link>
-            )}
-          </div>
-        )}
-
-        <div className="space-y-2 pt-4">
-          <h3 className="font-medium">Frequency mix</h3>
-          {["A", "B", "C", "D"].map((f) => (
-            <BarRow
-              key={f}
-              label={
-                (freqDefs.find(
-                  (x: any) => String(x?.code).toUpperCase() === f
-                )?.label as string) ||
-                freqLabels[f] ||
-                f
-              }
-              note={`(${f})`}
-              pct={freqPct[f] ?? 0}
-            />
-          ))}
+        <div className="bg-white border rounded p-4">
+          <div className="font-medium mb-2">Challenges</div>
+          <div
+            className="prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{
+              __html: d?.sections?.challenges ?? "<p>—</p>",
+            }}
+          />
         </div>
 
-        <div className="space-y-2">
-          <h3 className="font-medium">Profile mix</h3>
-          {Object.keys(profilePct).length ? (
-            sortDesc(profilePct).map(([name, pct]) => {
-              const p = profiles.find((x) => x.name === name);
-              const short = codeToPShort(p?.code || "");
-              return (
-                <BarRow
-                  key={name}
-                  label={name}
-                  note={short ? `(${short})` : undefined}
-                  pct={pct}
-                />
-              );
-            })
-          ) : (
-            <p className="text-sm text-gray-500">
-              Profile-level scores aren’t available for this result (only
-              frequencies were stored).
-            </p>
-          )}
+        <div className="bg-white border rounded p-4">
+          <div className="font-medium mb-2">Recommendations</div>
+          <div
+            className="prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{
+              __html: d?.sections?.recommendations ?? "<p>—</p>",
+            }}
+          />
         </div>
-
-        {topThreeProfiles.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-3 pt-4">
-            {topThreeProfiles.map((p, idx) => (
-              <div
-                key={p.name}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {labels[idx] || "Profile"}
-                </p>
-                <h3 className="mt-1 text-base font-semibold text-slate-900">
-                  {p.name}
-                </h3>
-                {p.code && (
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                    {p.code}
-                  </p>
-                )}
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {p.pct}% match
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {coachSummary && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h3 className="font-medium mb-2">Coach summary</h3>
-            <div className="space-y-2 text-sm leading-relaxed text-gray-700">
-              {coachSummary
-                .split(/\n{2,}/)
-                .map((p) => p.trim())
-                .filter(Boolean)
-                .map((p, idx) => (
-                  <p key={idx}>{p}</p>
-                ))}
-            </div>
-          </div>
-        )}
-      </section>
+      </div>
     </div>
   );
 }
