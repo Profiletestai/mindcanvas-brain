@@ -1,7 +1,7 @@
 // apps/web/app/portal/[slug]/links/LinksClient.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getBaseUrl } from "@/lib/baseUrl";
 
 type Test = {
@@ -100,11 +100,30 @@ export default function LinksClient(props: {
 
   useEffect(refreshLinks, [orgId]);
 
+  const selectedTest = useMemo(
+    () => tests.find((t) => t.id === testId) || null,
+    [tests, testId]
+  );
+
+  const supportsLiteReport = useMemo(() => {
+    const slugOk = orgSlug === "whatswhats-global";
+    const testOk = /visibility ladder/i.test(selectedTest?.name || "");
+    return slugOk && testOk;
+  }, [orgSlug, selectedTest]);
+
+  useEffect(() => {
+    if (!supportsLiteReport && reportVariant === "lite") {
+      setReportVariant("full");
+    }
+  }, [supportsLiteReport, reportVariant]);
+
   const fullLink = (token: string) => `${baseUrl}/t/${token}`;
   const embedLink = (token: string) => `${baseUrl}/t/${token}/embed`;
 
   const embedCode = (token: string) =>
-    `<iframe src="${embedLink(token)}" style="width:100%;height:900px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+    `<iframe src="${embedLink(
+      token
+    )}" style="width:100%;height:900px;border:0;border-radius:16px;overflow:hidden;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
 
   const htmlButton = (url: string) =>
     `<a href="${url}" style="background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;text-align:center;display:inline-block;">Start your test</a>`;
@@ -191,6 +210,8 @@ export default function LinksClient(props: {
           ? hiddenResultsMessage.trim()
           : null;
 
+      const finalReportVariant: ReportVariant = supportsLiteReport ? reportVariant : "full";
+
       const res = await fetch("/api/admin/create-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,8 +226,8 @@ export default function LinksClient(props: {
           redirectUrl: !showResults ? redirectUrl.trim() : null,
           nextStepsUrl: nextStepsUrl.trim(),
           expiresAt: expiresAt || null,
-          reportVariant,
-          report_variant: reportVariant,
+          reportVariant: finalReportVariant,
+          report_variant: finalReportVariant,
         }),
       });
 
@@ -221,8 +242,7 @@ export default function LinksClient(props: {
       const shouldSendEmail = sendEmail && !!recipientEmail && !!token;
 
       if (shouldSendEmail) {
-        const url = fullLink(token!);
-        const selectedTest = tests.find((t) => t.id === testId) || null;
+        const url = fullLink(token);
         const emailTestName =
           testDisplayName || selectedTest?.name || "Profile Test";
 
@@ -382,15 +402,25 @@ export default function LinksClient(props: {
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => setReportVariant("lite")}
+                onClick={() => {
+                  if (supportsLiteReport) setReportVariant("lite");
+                }}
+                disabled={!supportsLiteReport}
+                title={
+                  supportsLiteReport
+                    ? "Use the lite report"
+                    : "Lite report is only available for Visibility Ladder right now"
+                }
                 className={`rounded-lg border px-3 py-3 text-left text-sm transition ${
-                  reportVariant === "lite"
+                  reportVariant === "lite" && supportsLiteReport
                     ? "border-sky-500 bg-sky-50 text-sky-900"
-                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    : supportsLiteReport
+                    ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    : "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
                 }`}
               >
                 <div className="font-medium">Lite report</div>
-                <div className="mt-1 text-xs text-gray-500">
+                <div className="mt-1 text-xs">
                   Best for lead generation and first-touch assessments.
                 </div>
               </button>
@@ -411,9 +441,15 @@ export default function LinksClient(props: {
               </button>
             </div>
 
-            <p className="mt-2 text-xs text-gray-500">
-              This controls which report version the test taker receives after completing the test.
-            </p>
+            {!supportsLiteReport ? (
+              <p className="mt-2 text-xs text-gray-500">
+                Lite report is currently only available for Visibility Ladder.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                This controls which report version the test taker receives after completing the test.
+              </p>
+            )}
           </div>
 
           <label className="flex items-center gap-2 text-sm">
@@ -454,7 +490,7 @@ export default function LinksClient(props: {
             </span>
           </label>
 
-          {reportVariant === "lite" && !nextStepsUrl.trim() && (
+          {reportVariant === "lite" && supportsLiteReport && !nextStepsUrl.trim() && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Lite reports work best with a next steps URL so people can upgrade, book, or buy the full report.
             </div>
