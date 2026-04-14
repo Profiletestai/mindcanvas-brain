@@ -2159,25 +2159,48 @@ export async function POST(
       token
     )}/leader?tid=${encodeURIComponent(taker.id)}`;
 
+    const gedSnapshotPath = `/ged/${encodeURIComponent(
+      token
+    )}?tid=${encodeURIComponent(taker.id)}`;
+    const gedStrategicPath = `/ged/${encodeURIComponent(
+      token
+    )}/entrepreneur?tid=${encodeURIComponent(taker.id)}`;
+    const gedExtendedPath = `/ged/${encodeURIComponent(
+      token
+    )}/extended?tid=${encodeURIComponent(taker.id)}`;
+
     const qscPublicPath = isQscEntrepreneur ? qscGrowthPath : qscLeaderPath;
     const qscPublicUrl = `${origin}${qscPublicPath}`;
+
+    const gedPublicPath = gedStrategicPath;
+    const gedPublicUrl = `${origin}${gedPublicPath}`;
+
+    const publicReportPath = isGedTest
+      ? gedPublicPath
+      : isQscTest
+        ? qscPublicPath
+        : reportPath;
+
+    const publicReportUrl = isGedTest
+      ? gedPublicUrl
+      : isQscTest
+        ? qscPublicUrl
+        : baseReportUrl;
 
     await sb
       .from("test_takers")
       .update({
         status: "completed",
-        last_result_url: isQscTest ? qscPublicPath : reportPath,
+        last_result_url: publicReportPath,
       })
       .eq("id", taker.id)
       .eq("link_token", token);
 
-    const reportUrlForEmail = isQscTest ? qscPublicUrl : baseReportUrl;
+    const reportUrlForEmail = publicReportUrl;
 
     const redirectUrl: string =
       linkBehavior.show_results === true
-        ? isQscTest
-          ? qscPublicPath
-          : reportPath
+        ? publicReportPath
         : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
           ? linkBehavior.redirect_url.trim()
           : resultPath;
@@ -2301,8 +2324,12 @@ export async function POST(
       redirect: redirectUrl,
       result_url: baseResultUrl,
       report_url: baseReportUrl,
-      qsc_public_path: isQscTest ? qscPublicPath : null,
-      qsc_public_url: isQscTest ? qscPublicUrl : null,
+      qsc_public_path: isQscTest && !isGedTest ? qscPublicPath : null,
+      qsc_public_url: isQscTest && !isGedTest ? qscPublicUrl : null,
+      ged_public_path: isGedTest ? gedPublicPath : null,
+      ged_public_url: isGedTest ? gedPublicUrl : null,
+      ged_snapshot_path: isGedTest ? gedSnapshotPath : null,
+      ged_extended_path: isGedTest ? gedExtendedPath : null,
       owner_notification: ownerNotification,
       taker_email: takerEmailResult,
     });
