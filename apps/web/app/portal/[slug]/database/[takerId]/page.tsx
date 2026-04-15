@@ -7,11 +7,6 @@ export const dynamic = "force-dynamic";
 import { createClient } from "@supabase/supabase-js";
 import FrequencyPie from "@/components/charts/FrequencyPie";
 import ProfileBar from "@/components/charts/ProfileBar";
-import {
-  QscMatrix,
-  type PersonalityKey,
-  type MindsetKey,
-} from "@/app/qsc/QscMatrix";
 
 type ScoreMap = Record<string, number>;
 
@@ -21,6 +16,9 @@ type FrequencyPieData = {
   C: number;
   D: number;
 };
+
+type PersonalityKey = "FIRE" | "FLOW" | "FORM" | "FIELD";
+type MindsetKey = "ORIGIN" | "MOMENTUM" | "VECTOR" | "ORBIT" | "QUANTUM";
 
 type PersonalityPercMap = Partial<Record<PersonalityKey, number>>;
 type MindsetPercMap = Partial<Record<MindsetKey, number>>;
@@ -74,6 +72,11 @@ function normalisePercent(raw: number | undefined | null): number {
   return Math.min(Math.max(raw, 0), 100);
 }
 
+function percentLabel(value: number | undefined | null): string {
+  const v = typeof value === "number" ? value : 0;
+  return `${v.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
 function toScoreMap(value: unknown): ScoreMap {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
 
@@ -100,11 +103,6 @@ function toFrequencyPieData(freqScores: ScoreMap): FrequencyPieData {
     C: freqScores.C ?? 0,
     D: freqScores.D ?? 0,
   };
-}
-
-function percentLabel(value: number | undefined | null): string {
-  const v = typeof value === "number" ? value : 0;
-  return `${v.toFixed(1).replace(/\.0$/, "")}%`;
 }
 
 function isQscProfile(data: any, profileScores: ScoreMap): boolean {
@@ -170,18 +168,6 @@ function getMindsetPercentages(data: any, profileScores: ScoreMap): MindsetPercM
   };
 }
 
-function rankPersonalityKeys(map: PersonalityPercMap): PersonalityKey[] {
-  return [...PERSONALITIES]
-    .sort((a, b) => (map[b.key] ?? 0) - (map[a.key] ?? 0))
-    .map((p) => p.key);
-}
-
-function rankMindsetKeys(map: MindsetPercMap): MindsetKey[] {
-  return [...MINDSETS]
-    .sort((a, b) => (map[b.key] ?? 0) - (map[a.key] ?? 0))
-    .map((m) => m.key);
-}
-
 function coercePersonality(value: unknown): PersonalityKey | null {
   const v = String(value || "").trim().toUpperCase();
   if (v === "FIRE" || v === "FLOW" || v === "FORM" || v === "FIELD") return v;
@@ -200,6 +186,18 @@ function coerceMindset(value: unknown): MindsetKey | null {
     return v;
   }
   return null;
+}
+
+function rankPersonalityKeys(map: PersonalityPercMap): PersonalityKey[] {
+  return [...PERSONALITIES]
+    .sort((a, b) => (map[b.key] ?? 0) - (map[a.key] ?? 0))
+    .map((p) => p.key);
+}
+
+function rankMindsetKeys(map: MindsetPercMap): MindsetKey[] {
+  return [...MINDSETS]
+    .sort((a, b) => (map[b.key] ?? 0) - (map[a.key] ?? 0))
+    .map((m) => m.key);
 }
 
 function getPrimarySecondaryPersonality(
@@ -252,6 +250,27 @@ function getCombinedCode(
   const mLevel = MINDSETS.find((m) => m.key === primaryMindset)?.level ?? "";
 
   return pCode && mLevel ? `${pCode}${mLevel}` : "—";
+}
+
+function clampPct(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function prettifyQscKey(key: string): string {
+  const upper = key.toUpperCase();
+
+  const mindset = MINDSETS.find((m) => upper.includes(m.key));
+  if (mindset) return mindset.label;
+
+  const personality = PERSONALITIES.find((p) => upper.includes(p.key));
+  if (personality) return personality.label;
+
+  return key
+    .replace(/^QSC_/, "")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 type FrequencyDonutDatum = {
@@ -310,7 +329,10 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         y={center - 4}
         textAnchor="middle"
         fill="#e5e7eb"
-        style={{ fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 10 }}
+        style={{
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          fontSize: 10,
+        }}
       >
         BUYER
       </text>
@@ -319,7 +341,10 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
         y={center + 10}
         textAnchor="middle"
         fill="#e5e7eb"
-        style={{ fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif", fontSize: 10 }}
+        style={{
+          fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          fontSize: 10,
+        }}
       >
         FREQUENCY
       </text>
@@ -338,6 +363,46 @@ function Bar({ pct }: { pct: number }) {
   );
 }
 
+function BarList({
+  title,
+  entries,
+}: {
+  title: string;
+  entries: Array<{ label: string; value: number; meta?: string }>;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
+      <h3 className="text-lg font-semibold">{title}</h3>
+
+      <div className="mt-5 space-y-3">
+        {entries.length === 0 ? (
+          <div className="text-sm text-slate-400">No data available.</div>
+        ) : null}
+
+        {entries.map((entry) => (
+          <div key={`${title}-${entry.label}-${entry.meta ?? ""}`} className="space-y-1">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="min-w-0">
+                <div className="truncate font-medium text-slate-100">{entry.label}</div>
+                {entry.meta ? (
+                  <div className="truncate text-[11px] text-slate-400">{entry.meta}</div>
+                ) : null}
+              </div>
+              <div className="shrink-0 text-slate-400">{percentLabel(entry.value)}</div>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800/90">
+              <div
+                className="h-full rounded-full bg-sky-500"
+                style={{ width: `${clampPct(entry.value)}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function QscSnapshot({
   data,
   personalityPerc,
@@ -346,6 +411,7 @@ function QscSnapshot({
   secondaryPersonality,
   primaryMindset,
   secondaryMindset,
+  profileScores,
 }: {
   data: any;
   personalityPerc: PersonalityPercMap;
@@ -354,6 +420,7 @@ function QscSnapshot({
   secondaryPersonality: PersonalityKey | null;
   primaryMindset: MindsetKey | null;
   secondaryMindset: MindsetKey | null;
+  profileScores: ScoreMap;
 }) {
   const combinedTitle = getCombinedTitle(data, primaryPersonality, primaryMindset);
   const combinedCode = getCombinedCode(data, primaryPersonality, primaryMindset);
@@ -369,90 +436,97 @@ function QscSnapshot({
     value: normalisePercent(personalityPerc[p.key]),
   }));
 
+  const profileMixEntries = Object.entries(profileScores)
+    .map(([key, value]) => ({
+      label: prettifyQscKey(key),
+      value: normalisePercent(value),
+      meta: key,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+
   return (
     <div className="space-y-8">
-      <section className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 md:p-7 shadow-xl shadow-black/50 text-slate-50">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-300/90">
-              QSC Snapshot
+      <section className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 md:p-7 shadow-xl shadow-black/50 text-slate-50">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-300/90">
+            QSC Snapshot
+          </p>
+
+          <h2 className="mt-3 text-2xl font-semibold">{combinedTitle}</h2>
+
+          <p className="mt-1 text-xs text-slate-400">
+            Code: <span className="font-mono text-slate-100">{combinedCode}</span>
+          </p>
+
+          <dl className="mt-5 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-400">
+                Primary personality
+              </dt>
+              <dd className="mt-0.5 font-medium">{primaryPersonality || "—"}</dd>
+            </div>
+
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-400">
+                Secondary personality
+              </dt>
+              <dd className="mt-0.5 font-medium">{secondaryPersonality || "—"}</dd>
+            </div>
+
+            <div className="mt-2">
+              <dt className="text-xs uppercase tracking-wide text-slate-400">
+                Primary mindset
+              </dt>
+              <dd className="mt-0.5 font-medium">{primaryMindset || "—"}</dd>
+            </div>
+
+            <div className="mt-2">
+              <dt className="text-xs uppercase tracking-wide text-slate-400">
+                Secondary mindset
+              </dt>
+              <dd className="mt-0.5 font-medium">{secondaryMindset || "—"}</dd>
+            </div>
+          </dl>
+
+          {createdAt ? (
+            <p className="mt-5 text-xs text-slate-500">
+              Created at{" "}
+              {createdAt.toLocaleString(undefined, {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </p>
+          ) : null}
+        </div>
 
-            <h2 className="mt-3 text-2xl font-semibold">{combinedTitle}</h2>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
+          <h3 className="text-lg font-semibold">Buyer Frequency Type</h3>
+          <p className="mt-1 text-sm text-slate-300">
+            Emotional and energetic style across Fire, Flow, Form and Field.
+          </p>
 
-            <p className="mt-1 text-xs text-slate-400">
-              Code: <span className="font-mono text-slate-100">{combinedCode}</span>
-            </p>
+          <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center">
+            <div className="flex justify-center">
+              <FrequencyDonut data={frequencyDonutData} />
+            </div>
 
-            <dl className="mt-5 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-400">
-                  Primary personality
-                </dt>
-                <dd className="mt-0.5 font-medium">{primaryPersonality || "—"}</dd>
-              </div>
-
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-slate-400">
-                  Secondary personality
-                </dt>
-                <dd className="mt-0.5 font-medium">{secondaryPersonality || "—"}</dd>
-              </div>
-
-              <div className="mt-2">
-                <dt className="text-xs uppercase tracking-wide text-slate-400">
-                  Primary mindset
-                </dt>
-                <dd className="mt-0.5 font-medium">{primaryMindset || "—"}</dd>
-              </div>
-
-              <div className="mt-2">
-                <dt className="text-xs uppercase tracking-wide text-slate-400">
-                  Secondary mindset
-                </dt>
-                <dd className="mt-0.5 font-medium">{secondaryMindset || "—"}</dd>
-              </div>
-            </dl>
-
-            {createdAt ? (
-              <p className="mt-5 text-xs text-slate-500">
-                Created at{" "}
-                {createdAt.toLocaleString(undefined, {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
-            <h3 className="text-lg font-semibold">Buyer Frequency Type</h3>
-            <p className="mt-1 text-sm text-slate-300">
-              Emotional and energetic style across Fire, Flow, Form and Field.
-            </p>
-
-            <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center">
-              <div className="flex justify-center">
-                <FrequencyDonut data={frequencyDonutData} />
-              </div>
-
-              <div className="space-y-3 text-sm">
-                {frequencyDonutData.map((d) => (
-                  <div key={d.key} className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: FREQUENCY_COLORS[d.key] }}
-                      />
-                      <span className="font-medium text-slate-100">{d.label}</span>
-                    </div>
-                    <span className="text-sm text-slate-300">{percentLabel(d.value)}</span>
+            <div className="space-y-3 text-sm">
+              {frequencyDonutData.map((d) => (
+                <div key={d.key} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: FREQUENCY_COLORS[d.key] }}
+                    />
+                    <span className="font-medium text-slate-100">{d.label}</span>
                   </div>
-                ))}
-              </div>
+                  <span className="text-sm text-slate-300">{percentLabel(d.value)}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -481,23 +555,7 @@ function QscSnapshot({
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
-          <h3 className="text-lg font-semibold">Buyer Persona Matrix</h3>
-          <p className="mt-1 text-sm text-slate-300">
-            Visual intersection of buyer frequency type and buyer mindset level.
-          </p>
-
-          <div className="mt-5">
-            <QscMatrix
-              primaryPersonality={primaryPersonality}
-              secondaryPersonality={secondaryPersonality}
-              primaryMindset={primaryMindset}
-              secondaryMindset={secondaryMindset}
-              personalityPercentages={personalityPerc}
-              mindsetPercentages={mindsetPerc}
-            />
-          </div>
-        </div>
+        <BarList title="Profile Mix" entries={profileMixEntries} />
       </section>
     </div>
   );
@@ -541,6 +599,7 @@ export default async function TakerDetail({
           secondaryPersonality={secondaryPersonality}
           primaryMindset={primaryMindset}
           secondaryMindset={secondaryMindset}
+          profileScores={profileScores}
         />
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
