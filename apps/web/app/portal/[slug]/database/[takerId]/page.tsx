@@ -1,7 +1,4 @@
 // apps/web/app/portal/[slug]/database/[takerId]/page.tsx
-// Server component — /portal/[slug]/database/[takerId]
-// Contact info + latest results with Frequency/Profile mixes (no fragile views)
-
 export const dynamic = "force-dynamic";
 
 import { createClient } from "@supabase/supabase-js";
@@ -64,17 +61,18 @@ async function getData(takerId: string) {
 
 function normalisePercent(raw: number | undefined | null): number {
   if (raw == null || !Number.isFinite(raw)) return 0;
-
-  if (raw > 0 && raw <= 1.5) {
-    return raw * 100;
-  }
-
+  if (raw > 0 && raw <= 1.5) return raw * 100;
   return Math.min(Math.max(raw, 0), 100);
 }
 
 function percentLabel(value: number | undefined | null): string {
   const v = typeof value === "number" ? value : 0;
   return `${v.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function clampPct(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
 }
 
 function toScoreMap(value: unknown): ScoreMap {
@@ -103,6 +101,28 @@ function toFrequencyPieData(freqScores: ScoreMap): FrequencyPieData {
     C: freqScores.C ?? 0,
     D: freqScores.D ?? 0,
   };
+}
+
+function safeSections(value: unknown): Record<string, string> {
+  if (!value) return {};
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, string>;
+      }
+    } catch {
+      return {};
+    }
+    return {};
+  }
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, string>;
+  }
+
+  return {};
 }
 
 function isQscProfile(data: any, profileScores: ScoreMap): boolean {
@@ -252,9 +272,43 @@ function getCombinedCode(
   return pCode && mLevel ? `${pCode}${mLevel}` : "—";
 }
 
-function clampPct(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, value));
+function classifyMatrixCell(
+  row: MindsetKey,
+  col: PersonalityKey,
+  primaryPersonality: PersonalityKey | null,
+  secondaryPersonality: PersonalityKey | null,
+  primaryMindset: MindsetKey | null,
+  secondaryMindset: MindsetKey | null,
+): "primary" | "secondary" | "related" | "other" {
+  if (col === primaryPersonality && row === primaryMindset) return "primary";
+
+  const secondaryCombo =
+    (col === secondaryPersonality && row === primaryMindset) ||
+    (col === primaryPersonality && row === secondaryMindset) ||
+    (col === secondaryPersonality && row === secondaryMindset);
+
+  if (secondaryCombo) return "secondary";
+
+  const related =
+    col === primaryPersonality ||
+    col === secondaryPersonality ||
+    row === primaryMindset ||
+    row === secondaryMindset;
+
+  return related ? "related" : "other";
+}
+
+function matrixCellClass(cat: "primary" | "secondary" | "related" | "other"): string {
+  switch (cat) {
+    case "primary":
+      return "border-sky-400 bg-sky-500 text-slate-50 shadow-xl shadow-sky-900/60";
+    case "secondary":
+      return "border-sky-400/80 bg-sky-500/15 text-slate-50 shadow-md shadow-sky-900/40";
+    case "related":
+      return "border-sky-400/40 bg-sky-500/5 text-slate-100";
+    default:
+      return "border-slate-700/60 bg-slate-900/70 text-slate-400";
+  }
 }
 
 function prettifyQscKey(key: string): string {
@@ -353,8 +407,7 @@ function FrequencyDonut({ data }: { data: FrequencyDonutDatum[] }) {
 }
 
 function Bar({ pct }: { pct: number }) {
-  const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
-  const width = `${clamped}%`;
+  const width = `${clampPct(pct)}%`;
 
   return (
     <div className="w-full h-2 rounded-full bg-slate-800/90 overflow-hidden">
@@ -390,6 +443,7 @@ function BarList({
               </div>
               <div className="shrink-0 text-slate-400">{percentLabel(entry.value)}</div>
             </div>
+
             <div className="h-2 overflow-hidden rounded-full bg-slate-800/90">
               <div
                 className="h-full rounded-full bg-sky-500"
@@ -557,6 +611,107 @@ function QscSnapshot({
 
         <BarList title="Profile Mix" entries={profileMixEntries} />
       </section>
+
+      <section className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40 text-slate-50">
+        <h3 className="text-lg font-semibold">Buyer Persona Matrix</h3>
+        <p className="mt-1 text-sm text-slate-300">
+          Visual intersection of buyer frequency type and buyer mindset level.
+        </p>
+
+        <div className="mt-5 overflow-x-auto">
+          <div className="inline-grid grid-cols-[auto_repeat(4,minmax(140px,1fr))] gap-3 md:gap-4 items-stretch">
+            <div />
+            {PERSONALITIES.map((p) => (
+              <div
+                key={`head-${p.key}`}
+                className="px-3 pb-1 pt-0.5 text-center text-xs font-semibold tracking-wide text-slate-300"
+              >
+                <div>{p.label}</div>
+                <div className="text-[11px] text-slate-500">Frequency {p.code}</div>
+              </div>
+            ))}
+
+            {MINDSETS.map((m) => (
+              <div key={`row-${m.key}`} className="contents">
+                <div className="flex flex-col justify-center text-xs font-medium text-slate-300 pr-2">
+                  <span>{m.label}</span>
+                  <span className="text-[11px] text-slate-500">Mindset {m.level}</span>
+                </div>
+
+                {PERSONALITIES.map((p) => {
+                  const cat = classifyMatrixCell(
+                    m.key,
+                    p.key,
+                    primaryPersonality,
+                    secondaryPersonality,
+                    primaryMindset,
+                    secondaryMindset,
+                  );
+
+                  return (
+                    <div
+                      key={`${m.key}_${p.key}`}
+                      className={[
+                        "min-h-[96px] rounded-2xl border px-3 py-3 md:px-4 md:py-4 flex flex-col justify-between text-xs transition-colors",
+                        matrixCellClass(cat),
+                      ].join(" ")}
+                    >
+                      <div>
+                        <div className="text-[11px] uppercase tracking-[0.15em] mb-1">
+                          {p.label} {m.label}
+                        </div>
+                        <div className="text-[11px] text-slate-300/90">
+                          Code:{" "}
+                          <span className="font-mono">
+                            {p.code}
+                            {m.level}
+                          </span>
+                        </div>
+                      </div>
+
+                      {cat === "primary" ? (
+                        <div className="mt-2 text-[11px] font-medium text-slate-50">
+                          Primary combined profile
+                        </div>
+                      ) : null}
+
+                      {cat === "secondary" ? (
+                        <div className="mt-2 text-[11px] font-medium text-slate-50/90">
+                          Secondary / supporting profile
+                        </div>
+                      ) : null}
+
+                      {cat === "related" ? (
+                        <div className="mt-2 text-[11px] text-slate-200/85">
+                          Related frequency or mindset
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailSection({
+  title,
+  html,
+}: {
+  title: string;
+  html: string;
+}) {
+  return (
+    <div className="bg-white border rounded p-4">
+      <div className="font-medium mb-2">{title}</div>
+      <div
+        className="prose prose-sm max-w-none"
+        dangerouslySetInnerHTML={{ __html: html || "<p>—</p>" }}
+      />
     </div>
   );
 }
@@ -566,92 +721,102 @@ export default async function TakerDetail({
 }: {
   params: { takerId: string };
 }) {
-  const d = await getData(params.takerId);
+  try {
+    const d = await getData(params.takerId);
 
-  const freqScores = toScoreMap(d?.freq_scores);
-  const profileScores = toScoreMap(d?.profile_scores);
-  const pieData = toFrequencyPieData(freqScores);
-
-  const qsc = isQscProfile(d, profileScores);
-
-  const personalityPerc = getPersonalityPercentages(d, freqScores);
-  const mindsetPerc = getMindsetPercentages(d, profileScores);
-
-  const { primary: primaryPersonality, secondary: secondaryPersonality } =
-    getPrimarySecondaryPersonality(d, personalityPerc);
-
-  const { primary: primaryMindset, secondary: secondaryMindset } =
-    getPrimarySecondaryMindset(d, mindsetPerc);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">{d?.full_name ?? "Test Taker"}</h1>
-        <div className="text-gray-600 text-sm">{d?.email}</div>
-      </div>
-
-      {qsc ? (
-        <QscSnapshot
-          data={d}
-          personalityPerc={personalityPerc}
-          mindsetPerc={mindsetPerc}
-          primaryPersonality={primaryPersonality}
-          secondaryPersonality={secondaryPersonality}
-          primaryMindset={primaryMindset}
-          secondaryMindset={secondaryMindset}
-          profileScores={profileScores}
-        />
-      ) : (
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white border rounded p-4">
-            <div className="font-medium mb-2">Frequency</div>
-            <div className="text-sm mb-3">
-              Top: <span className="font-semibold">{d?.frequency ?? "—"}</span>
-            </div>
-            <FrequencyPie data={pieData} />
-          </div>
-
-          <div className="bg-white border rounded p-4">
-            <div className="font-medium mb-2">Profile</div>
-            <div className="text-sm mb-3">
-              Top: <span className="font-semibold">{d?.profile ?? "—"}</span>
-            </div>
-            <ProfileBar data={profileScores} />
-          </div>
+    if (!d) {
+      return (
+        <div className="space-y-3 p-6 text-slate-700">
+          <h1 className="text-xl font-semibold">Test Taker</h1>
+          <p className="text-sm">No record was found for this test taker.</p>
         </div>
-      )}
+      );
+    }
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-white border rounded p-4">
-          <div className="font-medium mb-2">Strengths</div>
-          <div
-            className="prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{
-              __html: d?.sections?.strengths ?? "<p>—</p>",
-            }}
+    const freqScores = toScoreMap(d?.freq_scores);
+    const profileScores = toScoreMap(d?.profile_scores);
+    const pieData = toFrequencyPieData(freqScores);
+    const sections = safeSections(d?.sections);
+
+    const qsc = isQscProfile(d, profileScores);
+
+    const personalityPerc = getPersonalityPercentages(d, freqScores);
+    const mindsetPerc = getMindsetPercentages(d, profileScores);
+
+    const { primary: primaryPersonality, secondary: secondaryPersonality } =
+      getPrimarySecondaryPersonality(d, personalityPerc);
+
+    const { primary: primaryMindset, secondary: secondaryMindset } =
+      getPrimarySecondaryMindset(d, mindsetPerc);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold">{d?.full_name ?? "Test Taker"}</h1>
+          <div className="text-gray-600 text-sm">{d?.email ?? "—"}</div>
+        </div>
+
+        {qsc ? (
+          <QscSnapshot
+            data={d}
+            personalityPerc={personalityPerc}
+            mindsetPerc={mindsetPerc}
+            primaryPersonality={primaryPersonality}
+            secondaryPersonality={secondaryPersonality}
+            primaryMindset={primaryMindset}
+            secondaryMindset={secondaryMindset}
+            profileScores={profileScores}
           />
-        </div>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-white border rounded p-4">
+              <div className="font-medium mb-2">Frequency</div>
+              <div className="text-sm mb-3">
+                Top: <span className="font-semibold">{d?.frequency ?? "—"}</span>
+              </div>
+              <FrequencyPie data={pieData} />
+            </div>
 
-        <div className="bg-white border rounded p-4">
-          <div className="font-medium mb-2">Challenges</div>
-          <div
-            className="prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{
-              __html: d?.sections?.challenges ?? "<p>—</p>",
-            }}
+            <div className="bg-white border rounded p-4">
+              <div className="font-medium mb-2">Profile</div>
+              <div className="text-sm mb-3">
+                Top: <span className="font-semibold">{d?.profile ?? "—"}</span>
+              </div>
+              <ProfileBar data={profileScores} />
+            </div>
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-3 gap-6">
+          <DetailSection
+            title="Strengths"
+            html={sections.strengths ?? "<p>—</p>"}
           />
-        </div>
-
-        <div className="bg-white border rounded p-4">
-          <div className="font-medium mb-2">Recommendations</div>
-          <div
-            className="prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{
-              __html: d?.sections?.recommendations ?? "<p>—</p>",
-            }}
+          <DetailSection
+            title="Challenges"
+            html={sections.challenges ?? "<p>—</p>"}
+          />
+          <DetailSection
+            title="Recommendations"
+            html={sections.recommendations ?? "<p>—</p>"}
           />
         </div>
       </div>
-    </div>
-  );
+    );
+  } catch (err: any) {
+    return (
+      <div className="space-y-3 p-6 text-red-200">
+        <h1 className="text-xl font-semibold">Taker page error</h1>
+        <p className="text-sm">
+          Something went wrong while loading this test taker profile.
+        </p>
+        <pre className="whitespace-pre-wrap rounded border border-red-700/40 bg-red-950/40 p-3 text-xs">
+          {String(err?.message || err)}
+        </pre>
+        {err?.digest ? (
+          <p className="text-xs text-red-300/80">Digest: {String(err.digest)}</p>
+        ) : null}
+      </div>
+    );
+  }
 }
