@@ -50,6 +50,7 @@ async function getData(takerId: string) {
   );
 
   const { data, error } = await supabase
+    .schema("portal")
     .from("test_taker_reports_view")
     .select("*")
     .eq("taker_id", takerId)
