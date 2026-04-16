@@ -60,7 +60,7 @@ type ScoringTier = {
 
 type ScoringPrime = {
   type: "prime";
-  value?: number; // 0..4
+  value?: number;
   pillar?: PrimePillar;
   tier_weights?: Partial<Record<Tier, number>>;
 };
@@ -187,7 +187,6 @@ function coerceProfileMapEntries(value: any): PMEntry[] {
     );
 }
 
-// Accept PROFILE_1..8 or P1..P8 → A/B/C/D; fallback if value already starts with A/B/C/D
 function profileCodeToFreq(code: string): AB | null {
   const s = String(code || "").trim().toUpperCase();
   let n: number | null = null;
@@ -645,11 +644,6 @@ async function syncGedToGhl(args: {
   }
 }
 
-/**
- * Wrapper resolution:
- * - generic source_test_id/base_test_id/parent_test_id
- * - QSC wrapper source_tests/default_source_test
- */
 async function resolveEffectiveTestId(
   sb: ReturnType<typeof supa>,
   testRow: any
@@ -716,9 +710,6 @@ type LinkBehavior = {
   email_report: boolean;
 };
 
-/**
- * Load link behavior flags.
- */
 async function loadLinkBehavior(
   sb: ReturnType<typeof supa>,
   token: string
@@ -1228,7 +1219,6 @@ export async function POST(
       );
     }
 
-    // ✅ VISIBILITY BRANCH (supports legacy + prime)
     const vis = visSupa();
     const { data: vTest, error: vTestErr } = await vis
       .from("tests")
@@ -1304,11 +1294,7 @@ export async function POST(
       }));
 
       const qById = new Map<string, VisQuestionRow>();
-      const qCodeById = new Map<string, string>();
-      for (const q of vQs) {
-        qById.set(q.id, q);
-        qCodeById.set(q.id, q.code);
-      }
+      for (const q of vQs) qById.set(q.id, q);
 
       const scoringMap: Record<string, Partial<Record<AnswerCode, VisScoring>>> =
         {};
@@ -1793,6 +1779,7 @@ export async function POST(
     const testFamilyLower = String(
       meta?.test_family || meta?.testFamily || ""
     ).toLowerCase();
+    const testNameLower = String(test.name || "").toLowerCase().trim();
 
     const isQscTest =
       slugLower.startsWith("qsc-") ||
@@ -1807,9 +1794,14 @@ export async function POST(
 
     const isGedTest =
       meta?.is_ged === true ||
-      String(meta?.assessment_name || "").toLowerCase() ===
+      String(meta?.assessment_name || "").toLowerCase().trim() ===
         "growth engine diagnostic" ||
-      slugLower.includes("growth-engine-diagnostic");
+      String(meta?.report_brand || "").toLowerCase().trim() === "ged" ||
+      String(meta?.public_report_route || "").toLowerCase().trim() === "ged" ||
+      slugLower.includes("growth-engine-diagnostic") ||
+      slugLower.startsWith("ged-") ||
+      testNameLower.includes("growth engine diagnostic") ||
+      testNameLower.startsWith("ged");
 
     const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur
       ? "entrepreneur"
@@ -1951,7 +1943,6 @@ export async function POST(
       );
     }
 
-    // ---------------- QSC SCORING ----------------
     if (isQscTest) {
       try {
         const questionsForScoring = (questions || [])
@@ -2138,7 +2129,6 @@ export async function POST(
         );
       }
     }
-    // ---------------- END QSC SCORING ----------------
 
     const origin = getBaseUrl();
 
