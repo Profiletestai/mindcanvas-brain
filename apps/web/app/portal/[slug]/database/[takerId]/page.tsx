@@ -376,11 +376,24 @@ export default async function TakerDetail({
 
   const labels = ["Primary profile", "Secondary", "Tertiary"];
 
+  const slugLower = String(test?.slug || "").toLowerCase();
+  const testNameLower = String(test?.name || "").toLowerCase();
+
+  const isGed =
+    meta?.is_ged === true ||
+    String(meta?.assessment_name || "").toLowerCase().trim() ===
+      "growth engine diagnostic" ||
+    slugLower.includes("growth-engine-diagnostic") ||
+    slugLower.startsWith("ged-") ||
+    testNameLower.includes("growth engine diagnostic") ||
+    testNameLower.startsWith("ged");
+
   const isQsc =
-    test?.slug === "qsc-core" ||
-    test?.slug === "qsc-leaders" ||
-    (typeof meta?.frameworkType === "string" &&
-      meta.frameworkType.toLowerCase() === "qsc");
+    !isGed &&
+    (test?.slug === "qsc-core" ||
+      test?.slug === "qsc-leaders" ||
+      (typeof meta?.frameworkType === "string" &&
+        meta.frameworkType.toLowerCase() === "qsc"));
 
   let qscSnapshotUrl: string | null = null;
   let qscExtendedUrl: string | null = null;
@@ -421,20 +434,35 @@ export default async function TakerDetail({
     qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
+  let gedSnapshotUrl: string | null = null;
+  let gedExtendedUrl: string | null = null;
+  let gedStrategicUrl: string | null = null;
+
+  if (isGed && taker.link_token) {
+    const base = `/ged/${encodeURIComponent(taker.link_token)}`;
+    const query = `?tid=${encodeURIComponent(taker.id)}`;
+
+    gedSnapshotUrl = `${base}${query}`;
+    gedExtendedUrl = `${base}/extended${query}`;
+    gedStrategicUrl = `${base}/entrepreneur${query}`;
+  }
+
   let reportUrl: string | null = null;
 
-  if (isQsc) {
-    reportUrl = qscStrategicUrl;
-  } else if (isVisibility && taker.link_token) {
+  if (isVisibility && taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
     )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+  } else if (taker.last_result_url) {
+    reportUrl = String(taker.last_result_url);
+  } else if (isGed) {
+    reportUrl = gedStrategicUrl;
+  } else if (isQsc) {
+    reportUrl = qscStrategicUrl;
   } else if (taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
     )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-  } else if (taker.last_result_url) {
-    reportUrl = String(taker.last_result_url);
   }
 
   const freqDefs: any[] = freqSource || [];
@@ -689,6 +717,43 @@ export default async function TakerDetail({
             </div>
           </div>
         </div>
+
+        {isGed && (gedSnapshotUrl || gedExtendedUrl || gedStrategicUrl) && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {gedSnapshotUrl && (
+              <Link
+                href={gedSnapshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+              >
+                GED Snapshot
+              </Link>
+            )}
+
+            {gedExtendedUrl && (
+              <Link
+                href={gedExtendedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
+              >
+                GED Extended Snapshot
+              </Link>
+            )}
+
+            {gedStrategicUrl && (
+              <Link
+                href={gedStrategicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-emerald-600 bg-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-400"
+              >
+                GED — Strategic Growth Report
+              </Link>
+            )}
+          </div>
+        )}
 
         {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
           <div className="flex flex-wrap gap-2 pt-2">

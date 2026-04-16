@@ -113,8 +113,6 @@ const PRIME_PILLARS: PrimePillar[] = [
   "dominance",
 ];
 
-const DEBUG_SUBMIT_VERSION = "GED_REDIRECT_V3";
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -1735,9 +1733,6 @@ export async function POST(
       return NextResponse.json({
         ok: true,
         totals,
-        debug_submit_version: DEBUG_SUBMIT_VERSION,
-        debug_engine: "visibility",
-        debug_redirect: redirectPath,
         link: {
           show_results: linkBehavior.show_results,
           redirect_url: linkBehavior.redirect_url,
@@ -2309,15 +2304,6 @@ export async function POST(
             ghl_sync: ghlSyncResult,
           }
         : null,
-      debug_submit_version: DEBUG_SUBMIT_VERSION,
-      debug_is_ged: isGedTest,
-      debug_is_qsc: isQscTest,
-      debug_slug: slug,
-      debug_test_name: test.name || null,
-      debug_meta_is_ged: meta?.is_ged ?? null,
-      debug_public_report_path: publicReportPath,
-      debug_public_report_url: publicReportUrl,
-      debug_redirect: redirectUrl,
       link: {
         show_results: linkBehavior.show_results,
         redirect_url: linkBehavior.redirect_url,
