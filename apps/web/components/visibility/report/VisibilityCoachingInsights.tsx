@@ -9,12 +9,14 @@ export default function VisibilityCoachingInsights({
   fallbackFriction,
   fallbackOpportunity,
   iconSrc,
+  strategicOpportunityIconSrc,
 }: {
   ai?: AiInsights | null;
   fallbackStrengths?: string[];
   fallbackFriction?: string[];
   fallbackOpportunity?: string;
   iconSrc?: string;
+  strategicOpportunityIconSrc?: string;
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
@@ -63,7 +65,21 @@ export default function VisibilityCoachingInsights({
       </div>
 
       <InnerPanel className="mt-3 p-4">
-        <div className="text-[14px] font-semibold">Strategic opportunity</div>
+        <div className="flex items-center gap-3">
+          {strategicOpportunityIconSrc ? (
+            <img
+              src={strategicOpportunityIconSrc}
+              alt=""
+              className="h-10 w-10 object-contain shrink-0"
+              onError={(e: any) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : null}
+
+          <div className="text-[14px] font-semibold">Strategic opportunity</div>
+        </div>
+
         <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {ai?.strategic_opportunity ||
             fallbackOpportunity ||

@@ -1,4 +1,3 @@
-// apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,10 +24,7 @@ import {
   sectionParagraphs,
   sectionSummary,
 } from "@/components/visibility/report/VisibilityReportUtils";
-import {
-  ReportPage,
-  Shell,
-} from "@/components/visibility/report/VisibilityReportPrimitives";
+import { ReportPage, Shell } from "@/components/visibility/report/VisibilityReportPrimitives";
 import { VISIBILITY_REPORT_ASSETS } from "@/components/visibility/report/VisibilityReportAssets";
 import VisibilityReportHeader from "@/components/visibility/report/VisibilityReportHeader";
 import VisibilityHeroSection from "@/components/visibility/report/VisibilityHeroSection";
@@ -322,41 +318,41 @@ export default function VisibilityReportClient({
                 weakest={weakest}
                 strongest={strongest}
               />
-
-              <VisibilityInsightCards
-                marketReality={{
-                  title: "Market reality",
-                  content:
-                    !marketRealityBullets.length ? sectionSummary(secMarketExperience) : undefined,
-                  bullets: marketRealityBullets,
-                  iconSrc: VISIBILITY_REPORT_ASSETS.insights.marketReality,
-                }}
-                opportunity={{
-                  title: "Your strategic visibility opportunity",
-                  content:
-                    !opportunityBullets.length ? sectionSummary(secOpportunity) : undefined,
-                  bullets: opportunityBullets,
-                  iconSrc: VISIBILITY_REPORT_ASSETS.insights.opportunity,
-                }}
-                nextMove={{
-                  title: "Your most effective next move",
-                  content:
-                    !nextMoveBullets.length ? sectionSummary(secNextMove) : undefined,
-                  bullets: nextMoveBullets,
-                  iconSrc: VISIBILITY_REPORT_ASSETS.insights.nextMove,
-                }}
-              />
             </div>
 
             <div className="self-start">
               <VisibilityLadderPanel tier={tier} level={level} />
             </div>
           </div>
+
+          <VisibilityInsightCards
+            marketReality={{
+              title: "Market reality",
+              content:
+                !marketRealityBullets.length ? sectionSummary(secMarketExperience) : undefined,
+              bullets: marketRealityBullets,
+              iconSrc: VISIBILITY_REPORT_ASSETS.insights.marketReality,
+            }}
+            opportunity={{
+              title: "Your strategic visibility opportunity",
+              content:
+                !opportunityBullets.length ? sectionSummary(secOpportunity) : undefined,
+              bullets: opportunityBullets,
+              iconSrc: VISIBILITY_REPORT_ASSETS.insights.opportunity,
+            }}
+            nextMove={{
+              title: "Your most effective next move",
+              content:
+                !nextMoveBullets.length ? sectionSummary(secNextMove) : undefined,
+              bullets: nextMoveBullets,
+              iconSrc: VISIBILITY_REPORT_ASSETS.insights.nextMove,
+            }}
+          />
         </ReportPage>
 
         <ReportPage>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[240px_minmax(0,1fr)] items-start">
-            <div className="2xl:sticky 2xl:top-4 self-start">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
+            <div className="xl:sticky xl:top-4 self-start">
               <VisibilityReportIndex
                 reportIndex={reportIndex}
                 nextStepsUrl={nextStepsUrl}
@@ -373,7 +369,8 @@ export default function VisibilityReportClient({
                 footerProfile={{
                   imageSrc: VISIBILITY_REPORT_ASSETS.people.bogdan,
                   name: "Bogdan Stan",
-                  title: "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
+                  title:
+                    "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
                 }}
               />
               <VisibilityNarrativeSection
@@ -396,7 +393,7 @@ export default function VisibilityReportClient({
         </ReportPage>
 
         <ReportPage>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] items-start">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] items-start">
             <div className="space-y-4">
               <VisibilityNarrativeSection
                 id="working"
@@ -438,6 +435,7 @@ export default function VisibilityReportClient({
             fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
             fallbackOpportunity={sectionSummary(secOpportunity)}
             iconSrc={VISIBILITY_REPORT_ASSETS.sections.coaching}
+            strategicOpportunityIconSrc={VISIBILITY_REPORT_ASSETS.insights.opportunity}
           />
         </ReportPage>
 

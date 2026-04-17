@@ -1,5 +1,5 @@
 // apps/web/components/visibility/report/VisibilityInsightCards.tsx
-import { OuterCard } from "./VisibilityReportPrimitives";
+import { InnerPanel, OuterCard } from "./VisibilityReportPrimitives";
 import { BRAND } from "./VisibilityReportUtils";
 
 function InsightCard({
@@ -14,7 +14,7 @@ function InsightCard({
   iconSrc?: string;
 }) {
   return (
-    <OuterCard className="p-4 h-full">
+    <InnerPanel className="p-4 h-full">
       {iconSrc ? (
         <img
           src={iconSrc}
@@ -44,7 +44,7 @@ function InsightCard({
           ))}
         </ul>
       ) : null}
-    </OuterCard>
+    </InnerPanel>
   );
 }
 
@@ -73,10 +73,19 @@ export default function VisibilityInsightCards({
   };
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
-      <InsightCard {...marketReality} />
-      <InsightCard {...opportunity} />
-      <InsightCard {...nextMove} />
-    </div>
+    <OuterCard className="p-4 md:p-5">
+      <div
+        className="text-[10px] uppercase tracking-[0.26em]"
+        style={{ color: BRAND.textFaint }}
+      >
+        Key insights
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3 items-stretch">
+        <InsightCard {...marketReality} />
+        <InsightCard {...opportunity} />
+        <InsightCard {...nextMove} />
+      </div>
+    </OuterCard>
   );
 }
