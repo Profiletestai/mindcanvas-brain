@@ -447,23 +447,23 @@ export default async function TakerDetail({
     gedStrategicUrl = `${base}/entrepreneur${query}`;
   }
 
-  let reportUrl: string | null = null;
+   let reportUrl: string | null = null;
 
-  if (isVisibility && taker.link_token) {
+   if (isVisibility && taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
-      taker.link_token
-    )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-  } else if (taker.last_result_url) {
-    reportUrl = String(taker.last_result_url);
-  } else if (isGed) {
+    taker.link_token
+   )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+   } else if (isGed) {
     reportUrl = gedStrategicUrl;
-  } else if (isQsc) {
+   } else if (isQsc) {
     reportUrl = qscStrategicUrl;
-  } else if (taker.link_token) {
+   } else if (taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
-      taker.link_token
-    )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-  }
+    taker.link_token
+   )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+   } else if (taker.last_result_url) {
+    reportUrl = String(taker.last_result_url);
+   }
 
   const freqDefs: any[] = freqSource || [];
 
