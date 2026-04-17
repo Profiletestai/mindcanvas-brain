@@ -108,25 +108,6 @@ export default function VisibilityLadderPanel({
           })}
         </div>
       </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-y-1.5 text-[12px]">
-        <div>Magnetic</div>
-        <div className="text-right" style={{ color: BRAND.textDim }}>
-          16–20
-        </div>
-        <div>Established</div>
-        <div className="text-right" style={{ color: BRAND.textDim }}>
-          11–15
-        </div>
-        <div>Emerging</div>
-        <div className="text-right" style={{ color: BRAND.textDim }}>
-          6–10
-        </div>
-        <div>Invisible</div>
-        <div className="text-right" style={{ color: BRAND.textDim }}>
-          1–5
-        </div>
-      </div>
     </OuterCard>
   );
 }

@@ -10,6 +10,9 @@ export default function VisibilityNarrativeSection({
   footerNote,
   iconSrc,
   footerProfile,
+  infographicSrc,
+  infographicAlt,
+  infographicAfterParagraph,
 }: {
   id?: string;
   title: string;
@@ -21,6 +24,9 @@ export default function VisibilityNarrativeSection({
     name?: string;
     title?: string;
   };
+  infographicSrc?: string;
+  infographicAlt?: string;
+  infographicAfterParagraph?: number;
 }) {
   const summary = sectionSummary(section);
   const paragraphs = sectionParagraphs(section);
@@ -28,6 +34,8 @@ export default function VisibilityNarrativeSection({
     (Array.isArray(section?.blocks) ? section?.blocks : [])
       .map((b) => safeString(b.transition))
       .find(Boolean) || footerNote || "";
+
+  const insertAfter = typeof infographicAfterParagraph === "number" ? infographicAfterParagraph : 2;
 
   return (
     <OuterCard id={id} className="p-4 md:p-5">
@@ -61,7 +69,23 @@ export default function VisibilityNarrativeSection({
 
         <div className="mt-4 space-y-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
           {paragraphs.map((p, idx) => (
-            <p key={idx}>{p}</p>
+            <div key={idx}>
+              <p>{p}</p>
+
+              {infographicSrc && idx === insertAfter - 1 ? (
+                <div className="my-8 flex justify-center">
+                  <img
+                    src={infographicSrc}
+                    alt={infographicAlt || ""}
+                    className="max-w-full h-auto object-contain"
+                    style={{ maxHeight: 340 }}
+                    onError={(e: any) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
           ))}
         </div>
 

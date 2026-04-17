@@ -1,7 +1,7 @@
 // apps/web/components/visibility/report/VisibilityHeroSection.tsx
 import type { PillarItem, Readiness, Tier } from "./VisibilityReportTypes";
 import { InnerPanel, OuterCard } from "./VisibilityReportPrimitives";
-import { BRAND, getPillarLabel, readinessLabel } from "./VisibilityReportUtils";
+import { BRAND, readinessLabel } from "./VisibilityReportUtils";
 
 function LegendItem({
   color,
@@ -222,42 +222,6 @@ export default function VisibilityHeroSection({
         <LegendItem color="#F59E0B" label="Developing" />
         <LegendItem color="#60A5FA" label="Strong" />
         <LegendItem color="#22C55E" label="No action needed" />
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <InnerPanel className="p-3.5">
-          <div
-            className="text-[10px] uppercase tracking-[0.24em]"
-            style={{ color: BRAND.textFaint }}
-          >
-            Weakest Signal
-          </div>
-          <div className="mt-2 text-[16px] font-semibold">
-            {getPillarLabel(weakest || pillars[0]?.key || "visibility")}
-          </div>
-        </InnerPanel>
-
-        <InnerPanel className="p-3.5">
-          <div
-            className="text-[10px] uppercase tracking-[0.24em]"
-            style={{ color: BRAND.textFaint }}
-          >
-            Strongest Signal
-          </div>
-          <div className="mt-2 text-[16px] font-semibold">
-            {getPillarLabel(strongest || pillars[pillars.length - 1]?.key || "trust")}
-          </div>
-        </InnerPanel>
-
-        <InnerPanel className="p-3.5">
-          <div
-            className="text-[10px] uppercase tracking-[0.24em]"
-            style={{ color: BRAND.textFaint }}
-          >
-            Overall Score
-          </div>
-          <div className="mt-2 text-[16px] font-semibold">{overallPct}%</div>
-        </InnerPanel>
       </div>
     </OuterCard>
   );

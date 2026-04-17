@@ -307,15 +307,7 @@ export default function VisibilityReportClient({
             onDownload={downloadPdf}
           />
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)_270px] items-start">
-            <div className="xl:sticky xl:top-4 self-start">
-              <VisibilityReportIndex
-                reportIndex={reportIndex}
-                nextStepsUrl={nextStepsUrl}
-                onDownload={downloadPdf}
-              />
-            </div>
-
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_270px] items-start">
             <div className="space-y-4">
               <VisibilityHeroSection
                 takerName={takerName}
@@ -356,14 +348,22 @@ export default function VisibilityReportClient({
               />
             </div>
 
-            <div className="xl:sticky xl:top-4 self-start">
+            <div className="self-start">
               <VisibilityLadderPanel tier={tier} level={level} />
             </div>
           </div>
         </ReportPage>
 
         <ReportPage>
-          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)] items-start">
+          <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[240px_minmax(0,1fr)] items-start">
+            <div className="2xl:sticky 2xl:top-4 self-start">
+              <VisibilityReportIndex
+                reportIndex={reportIndex}
+                nextStepsUrl={nextStepsUrl}
+                onDownload={downloadPdf}
+              />
+            </div>
+
             <div className="space-y-4">
               <VisibilityNarrativeSection
                 id="welcome"
@@ -381,10 +381,10 @@ export default function VisibilityReportClient({
                 title="How To Use This Report"
                 section={secHowToUse}
                 iconSrc={VISIBILITY_REPORT_ASSETS.sections.howToUse}
+                infographicSrc={VISIBILITY_REPORT_ASSETS.infographics.howToUse}
+                infographicAlt="Inside this report you will discover"
+                infographicAfterParagraph={3}
               />
-            </div>
-
-            <div className="space-y-4">
               <VisibilityNarrativeSection
                 id="understanding"
                 title="Understanding the Visibility Ladder"
@@ -407,7 +407,7 @@ export default function VisibilityReportClient({
               <VisibilityNarrativeSection
                 title="How the market is likely experiencing your business"
                 section={secMarketExperience}
-                iconSrc={VISIBILITY_REPORT_ASSETS.insights.marketReality}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
               />
             </div>
 
