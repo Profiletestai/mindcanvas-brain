@@ -824,6 +824,19 @@ export default function GedEntrepreneurStrategicReportPage({
           </ol>
         </section>
 
+        {nextStepsHref ? (
+          <div className="flex justify-end">
+            <a
+              href={nextStepsHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
+            >
+              Next Steps
+            </a>
+          </div>
+        ) : null}
+
         <footer className="pt-4 pb-6 text-xs text-slate-500">
           © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>

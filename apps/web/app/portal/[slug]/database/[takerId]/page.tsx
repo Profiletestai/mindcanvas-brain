@@ -711,7 +711,7 @@ export default async function TakerDetail({
                   rel="noopener noreferrer"
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
                 >
-                  Open test-taker report
+                  Open test-taker report in new tab
                 </Link>
               )}
             </div>
@@ -874,6 +874,34 @@ export default async function TakerDetail({
           </div>
         )}
       </section>
+
+      {reportUrl && (
+        <section className="rounded-xl border bg-white overflow-hidden">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <h2 className="font-medium">Embedded Report</h2>
+              <p className="text-sm text-gray-500">
+                View the test-taker report directly inside this profile
+              </p>
+            </div>
+
+            <Link
+              href={reportUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
+            >
+              Open full report
+            </Link>
+          </div>
+
+          <iframe
+            src={reportUrl}
+            title="Test-taker report"
+            className="w-full min-h-[1400px] bg-white"
+          />
+        </section>
+      )}
     </div>
   );
 }
