@@ -8,18 +8,33 @@ export default function VisibilityCoachingInsights({
   fallbackStrengths,
   fallbackFriction,
   fallbackOpportunity,
+  iconSrc,
 }: {
   ai?: AiInsights | null;
   fallbackStrengths?: string[];
   fallbackFriction?: string[];
   fallbackOpportunity?: string;
+  iconSrc?: string;
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <SectionTitle
-        title="Coaching insight"
-        subtitle="An additional interpretation layer built from your scored signals and narrative blocks"
-      />
+      <div className="flex items-center gap-3">
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="h-12 w-12 object-contain shrink-0"
+            onError={(e: any) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : null}
+
+        <SectionTitle
+          title="Coaching insight"
+          subtitle="An additional interpretation layer built from your scored signals and narrative blocks"
+        />
+      </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <InnerPanel className="p-4">

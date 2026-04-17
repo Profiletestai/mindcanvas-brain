@@ -10,6 +10,7 @@ export default function VisibilityClosingSection({
   engineKey,
   version,
   scoringMode,
+  iconSrc,
 }: {
   id?: string;
   title: string;
@@ -17,10 +18,24 @@ export default function VisibilityClosingSection({
   engineKey?: string;
   version?: number;
   scoringMode?: string;
+  iconSrc?: string;
 }) {
   return (
     <OuterCard id={id} className="p-4 md:p-5">
-      <SectionTitle title={title} />
+      <div className="flex items-center gap-3">
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="h-12 w-12 object-contain shrink-0"
+            onError={(e: any) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : null}
+
+        <SectionTitle title={title} />
+      </div>
 
       <InnerPanel className="mt-3 p-4">
         {sectionSummary(section) ? (

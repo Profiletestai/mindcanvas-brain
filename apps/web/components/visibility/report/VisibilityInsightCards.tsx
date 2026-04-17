@@ -6,14 +6,27 @@ function InsightCard({
   title,
   content,
   bullets,
+  iconSrc,
 }: {
   title: string;
   content?: string;
   bullets?: string[];
+  iconSrc?: string;
 }) {
   return (
     <OuterCard className="p-4 h-full">
-      <div className="text-[15px] font-semibold">{title}</div>
+      {iconSrc ? (
+        <img
+          src={iconSrc}
+          alt=""
+          className="h-14 w-14 object-contain"
+          onError={(e: any) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
+
+      <div className="mt-3 text-[15px] font-semibold">{title}</div>
 
       {content ? (
         <div className="mt-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
@@ -44,16 +57,19 @@ export default function VisibilityInsightCards({
     title: string;
     content?: string;
     bullets?: string[];
+    iconSrc?: string;
   };
   opportunity: {
     title: string;
     content?: string;
     bullets?: string[];
+    iconSrc?: string;
   };
   nextMove: {
     title: string;
     content?: string;
     bullets?: string[];
+    iconSrc?: string;
   };
 }) {
   return (

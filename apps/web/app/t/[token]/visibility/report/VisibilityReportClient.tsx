@@ -1,4 +1,3 @@
-// apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +28,7 @@ import {
   ReportPage,
   Shell,
 } from "@/components/visibility/report/VisibilityReportPrimitives";
+import { VISIBILITY_REPORT_ASSETS } from "@/components/visibility/report/VisibilityReportAssets";
 import VisibilityReportHeader from "@/components/visibility/report/VisibilityReportHeader";
 import VisibilityHeroSection from "@/components/visibility/report/VisibilityHeroSection";
 import VisibilityLadderPanel from "@/components/visibility/report/VisibilityLadderPanel";
@@ -337,18 +337,21 @@ export default function VisibilityReportClient({
                   content:
                     !marketRealityBullets.length ? sectionSummary(secMarketExperience) : undefined,
                   bullets: marketRealityBullets,
+                  iconSrc: VISIBILITY_REPORT_ASSETS.insights.marketReality,
                 }}
                 opportunity={{
                   title: "Your strategic visibility opportunity",
                   content:
                     !opportunityBullets.length ? sectionSummary(secOpportunity) : undefined,
                   bullets: opportunityBullets,
+                  iconSrc: VISIBILITY_REPORT_ASSETS.insights.opportunity,
                 }}
                 nextMove={{
                   title: "Your most effective next move",
                   content:
                     !nextMoveBullets.length ? sectionSummary(secNextMove) : undefined,
                   bullets: nextMoveBullets,
+                  iconSrc: VISIBILITY_REPORT_ASSETS.insights.nextMove,
                 }}
               />
             </div>
@@ -362,11 +365,18 @@ export default function VisibilityReportClient({
                 id="welcome"
                 title="A Personal Welcome From Bogdan Stan"
                 section={secWelcome}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.welcome}
+                footerProfile={{
+                  imageSrc: VISIBILITY_REPORT_ASSETS.people.bogdan,
+                  name: "Bogdan Stan",
+                  title: "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
+                }}
               />
               <VisibilityNarrativeSection
                 id="how-to-use"
                 title="How To Use This Report"
                 section={secHowToUse}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.howToUse}
               />
             </div>
 
@@ -375,6 +385,7 @@ export default function VisibilityReportClient({
                 id="understanding"
                 title="Understanding the Visibility Ladder"
                 section={secUnderstanding}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.understanding}
               />
             </div>
           </div>
@@ -387,10 +398,12 @@ export default function VisibilityReportClient({
                 id="working"
                 title="What is already working"
                 section={secStrengths}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.strengths}
               />
               <VisibilityNarrativeSection
                 title="How the market is likely experiencing your business"
                 section={secMarketExperience}
+                iconSrc={VISIBILITY_REPORT_ASSETS.insights.marketReality}
               />
             </div>
 
@@ -399,6 +412,7 @@ export default function VisibilityReportClient({
                 id="friction"
                 title="Where visibility friction exists"
                 section={secFriction}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.friction}
               />
               <VisibilitySignalGraph
                 tier={tier}
@@ -407,6 +421,7 @@ export default function VisibilityReportClient({
                 pillars={pillars}
                 weakest={weakest}
                 strongest={strongest}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
               />
             </div>
           </div>
@@ -418,6 +433,7 @@ export default function VisibilityReportClient({
             fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
             fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
             fallbackOpportunity={sectionSummary(secOpportunity)}
+            iconSrc={VISIBILITY_REPORT_ASSETS.sections.coaching}
           />
         </ReportPage>
 
@@ -429,6 +445,7 @@ export default function VisibilityReportClient({
             engineKey={kbReport.engine_key || "visibility_prime_v1"}
             version={kbReport.version ?? 2}
             scoringMode={kbReport?.meta?.scoring_mode || "prime"}
+            iconSrc={VISIBILITY_REPORT_ASSETS.sections.strategy}
           />
         </ReportPage>
       </div>

@@ -8,11 +8,19 @@ export default function VisibilityNarrativeSection({
   title,
   section,
   footerNote,
+  iconSrc,
+  footerProfile,
 }: {
   id?: string;
   title: string;
   section?: Section | null;
   footerNote?: string;
+  iconSrc?: string;
+  footerProfile?: {
+    imageSrc?: string;
+    name?: string;
+    title?: string;
+  };
 }) {
   const summary = sectionSummary(section);
   const paragraphs = sectionParagraphs(section);
@@ -23,7 +31,19 @@ export default function VisibilityNarrativeSection({
 
   return (
     <OuterCard id={id} className="p-4 md:p-5">
-      <div className="text-[15px] font-semibold">{title}</div>
+      <div className="flex items-center gap-3">
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="h-12 w-12 object-contain shrink-0"
+            onError={(e: any) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : null}
+        <div className="text-[15px] font-semibold">{title}</div>
+      </div>
 
       <InnerPanel className="mt-3 p-4">
         {summary ? (
@@ -44,6 +64,34 @@ export default function VisibilityNarrativeSection({
             <p key={idx}>{p}</p>
           ))}
         </div>
+
+        {footerProfile?.name || footerProfile?.title ? (
+          <div className="mt-6 flex items-center gap-3">
+            {footerProfile.imageSrc ? (
+              <img
+                src={footerProfile.imageSrc}
+                alt={footerProfile.name || "Profile"}
+                className="h-14 w-14 rounded-full object-cover"
+                onError={(e: any) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : null}
+
+            <div>
+              {footerProfile.name ? (
+                <div className="text-[13px] font-semibold" style={{ color: BRAND.text }}>
+                  {footerProfile.name}
+                </div>
+              ) : null}
+              {footerProfile.title ? (
+                <div className="text-[12px]" style={{ color: BRAND.textDim }}>
+                  {footerProfile.title}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {transition ? (
           <div className="mt-4 text-[11px]" style={{ color: BRAND.textFaint }}>

@@ -10,6 +10,7 @@ export default function VisibilitySignalGraph({
   pillars,
   weakest,
   strongest,
+  iconSrc,
 }: {
   tier: Tier;
   level: number;
@@ -17,14 +18,28 @@ export default function VisibilitySignalGraph({
   pillars: PillarItem[];
   weakest?: string | null;
   strongest?: string | null;
+  iconSrc?: string;
 }) {
   return (
     <OuterCard className="p-4 h-full">
-      <div
-        className="text-[10px] font-semibold uppercase tracking-[0.26em]"
-        style={{ color: BRAND.purple }}
-      >
-        Signal Graph
+      <div className="flex items-center gap-3">
+        {iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="h-12 w-12 object-contain shrink-0"
+            onError={(e: any) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : null}
+
+        <div
+          className="text-[10px] font-semibold uppercase tracking-[0.26em]"
+          style={{ color: BRAND.purple }}
+        >
+          Signal Graph
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2.5">
