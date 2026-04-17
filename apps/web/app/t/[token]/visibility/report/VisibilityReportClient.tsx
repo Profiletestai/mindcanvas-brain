@@ -1,3 +1,4 @@
+// apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -306,9 +307,8 @@ export default function VisibilityReportClient({
             onDownload={downloadPdf}
           />
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
-            <div className="space-y-4 self-start">
-              <VisibilityLadderPanel tier={tier} level={level} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)_270px] items-start">
+            <div className="xl:sticky xl:top-4 self-start">
               <VisibilityReportIndex
                 reportIndex={reportIndex}
                 nextStepsUrl={nextStepsUrl}
@@ -354,6 +354,10 @@ export default function VisibilityReportClient({
                   iconSrc: VISIBILITY_REPORT_ASSETS.insights.nextMove,
                 }}
               />
+            </div>
+
+            <div className="xl:sticky xl:top-4 self-start">
+              <VisibilityLadderPanel tier={tier} level={level} />
             </div>
           </div>
         </ReportPage>

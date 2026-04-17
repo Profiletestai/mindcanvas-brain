@@ -3,6 +3,26 @@ import type { PillarItem, Readiness, Tier } from "./VisibilityReportTypes";
 import { InnerPanel, OuterCard } from "./VisibilityReportPrimitives";
 import { BRAND, getPillarLabel, readinessLabel } from "./VisibilityReportUtils";
 
+function LegendItem({
+  color,
+  label,
+}: {
+  color: string;
+  label: string;
+}) {
+  return (
+    <div className="inline-flex items-center gap-2">
+      <span
+        className="h-2.5 w-2.5 rounded-full"
+        style={{ backgroundColor: color }}
+      />
+      <span className="text-[11px]" style={{ color: BRAND.textDim }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export default function VisibilityHeroSection({
   takerName,
   tier,
@@ -37,7 +57,7 @@ export default function VisibilityHeroSection({
         Your Result
       </div>
 
-      <div className="mt-2 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_272px]">
+      <div className="mt-2 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div>
           <div className="text-[34px] md:text-[50px] font-semibold leading-none tracking-[0.01em]">
             {takerName.toUpperCase()}
@@ -50,7 +70,7 @@ export default function VisibilityHeroSection({
             {heroCopy}
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
               <div
                 className="text-[10px] uppercase tracking-[0.24em]"
@@ -88,7 +108,9 @@ export default function VisibilityHeroSection({
             className="p-4"
             style={{
               borderTop: `6px solid ${BRAND.tier[tier]}`,
-            } as any}
+              background:
+                "linear-gradient(180deg, rgba(74,54,138,0.38), rgba(29,34,78,0.72))",
+            }}
           >
             <div className="text-center">
               <div
@@ -150,7 +172,7 @@ export default function VisibilityHeroSection({
                 {isStrongest ? (
                   <div
                     className="rounded-full px-2 py-0.5 text-[8px] uppercase tracking-[0.12em]"
-                    style={{ background: BRAND.green, color: BRAND.white }}
+                    style={{ background: "#22C55E", color: BRAND.white }}
                   >
                     Strongest Signal
                   </div>
@@ -159,7 +181,7 @@ export default function VisibilityHeroSection({
                 {isWeakest ? (
                   <div
                     className="rounded-full px-2 py-0.5 text-[8px] uppercase tracking-[0.12em]"
-                    style={{ background: BRAND.red, color: BRAND.white }}
+                    style={{ background: "#EF4444", color: BRAND.white }}
                   >
                     Weakest Signal
                   </div>
@@ -186,7 +208,7 @@ export default function VisibilityHeroSection({
                   className="h-full rounded-full"
                   style={{
                     width: `${pillar.value}%`,
-                    background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.25))`,
+                    background: `linear-gradient(90deg, ${pillar.color}, rgba(255,255,255,0.28))`,
                   }}
                 />
               </div>
@@ -195,7 +217,14 @@ export default function VisibilityHeroSection({
         })}
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <LegendItem color="#EF4444" label="Needs attention" />
+        <LegendItem color="#F59E0B" label="Developing" />
+        <LegendItem color="#60A5FA" label="Strong" />
+        <LegendItem color="#22C55E" label="No action needed" />
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
         <InnerPanel className="p-3.5">
           <div
             className="text-[10px] uppercase tracking-[0.24em]"
