@@ -41,17 +41,12 @@ import VisibilityVideoSection from "@/components/visibility/report/VisibilityVid
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
-const VIDEO_BUCKET = "report-videos";
-const LONG_VIDEO_PATH = "visibility/Visibility Ladder long_01.mp4";
-const POSTER_PATH = "visibility/visibility-ladder-long-01-poster.jpg";
+// Use your exact Supabase public URL here
+const PUBLIC_VIDEO_URL =
+  "https://xciojwhnamsspmxpipzn.supabase.co/storage/v1/object/public/report-videos/Visibility%20Ladder%20long_01.mp4";
 
-function buildSupabasePublicUrl(bucket: string, path: string): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  if (!base) return "";
-  const normalizedBase = base.replace(/\/+$/, "");
-  const encodedPath = encodeURI(path);
-  return `${normalizedBase}/storage/v1/object/public/${bucket}/${encodedPath}`;
-}
+// Optional poster image if you upload one later
+const PUBLIC_VIDEO_POSTER_URL = "";
 
 async function fetchJson<T = any>(url: string): Promise<T> {
   const r = await fetch(url, { cache: "no-store" });
@@ -122,11 +117,6 @@ export default function VisibilityReportClient({
   const takerName = fullName(portalMeta?.taker);
   const reportDate = formatDate(kbReport?.meta?.generated_at);
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
-
-  const publicVideoUrl = buildSupabasePublicUrl(VIDEO_BUCKET, LONG_VIDEO_PATH);
-  const publicPosterUrl = POSTER_PATH
-    ? buildSupabasePublicUrl(VIDEO_BUCKET, POSTER_PATH)
-    : "";
 
   const tier = ((kbReport?.signals?.tier as Tier) || "Invisible") as Tier;
   const level = clamp(safeNumber(kbReport?.signals?.level, 1), 1, 20);
@@ -369,113 +359,123 @@ export default function VisibilityReportClient({
           />
         </ReportPage>
 
-        <ReportPage>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
-            <div className="xl:sticky xl:top-4 self-start">
-              <VisibilityReportIndex
-                reportIndex={reportIndex}
-                nextStepsUrl={nextStepsUrl}
-                onDownload={downloadPdf}
-              />
-            </div>
-
-            <div className="space-y-4">
-              <VisibilityVideoSection
-                title="Video Introduction"
-                videoSrc={publicVideoUrl}
-                posterSrc={publicPosterUrl || undefined}
-                helperText="This video introduces how to use the report and what to focus on first."
-              />
-
-              <VisibilityNarrativeSection
-                id="welcome"
-                title="A Personal Welcome From Bogdan Stan"
-                section={secWelcome}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.welcome}
-                footerProfile={{
-                  imageSrc: VISIBILITY_REPORT_ASSETS.people.bogdan,
-                  name: "Bogdan Stan",
-                  title:
-                    "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
-                }}
-              />
-
-              <VisibilityNarrativeSection
-                id="how-to-use"
-                title="How To Use This Report"
-                section={secHowToUse}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.howToUse}
-                infographicSrc={VISIBILITY_REPORT_ASSETS.infographics.howToUse}
-                infographicAlt="Inside this report you will discover"
-                infographicAfterParagraph={3}
-              />
-
-              <VisibilityNarrativeSection
-                id="understanding"
-                title="Understanding the Visibility Ladder"
-                section={secUnderstanding}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.understanding}
-              />
-            </div>
-          </div>
-        </ReportPage>
-
-        <ReportPage>
-          <div className="space-y-4">
-            <VisibilityNarrativeSection
-              id="working"
-              title="What is already working"
-              section={secStrengths}
-              iconSrc={VISIBILITY_REPORT_ASSETS.sections.strengths}
-            />
-
-            <VisibilityNarrativeSection
-              title="How the market is likely experiencing your business"
-              section={secMarketExperience}
-              iconSrc={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
-            />
-
-            <VisibilityNarrativeSection
-              id="friction"
-              title="Where visibility friction exists"
-              section={secFriction}
-              iconSrc={VISIBILITY_REPORT_ASSETS.sections.friction}
-            />
-
-            <VisibilitySignalGraph
-              tier={tier}
-              level={level}
-              overallPct={overallPct}
-              pillars={pillars}
-              weakest={weakest}
-              strongest={strongest}
-              iconSrc={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
+          <div className="hidden xl:block xl:sticky xl:top-4 self-start">
+            <VisibilityReportIndex
+              reportIndex={reportIndex}
+              nextStepsUrl={nextStepsUrl}
+              onDownload={downloadPdf}
             />
           </div>
-        </ReportPage>
 
-        <ReportPage>
-          <VisibilityCoachingInsights
-            ai={kbReport.ai}
-            fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
-            fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
-            fallbackOpportunity={sectionSummary(secOpportunity)}
-            iconSrc={VISIBILITY_REPORT_ASSETS.sections.coaching}
-            strategicOpportunityIconSrc={VISIBILITY_REPORT_ASSETS.insights.opportunity}
-          />
-        </ReportPage>
+          <div className="space-y-6">
+            <ReportPage>
+              <div className="xl:hidden">
+                <VisibilityReportIndex
+                  reportIndex={reportIndex}
+                  nextStepsUrl={nextStepsUrl}
+                  onDownload={downloadPdf}
+                />
+              </div>
 
-        <ReportPage>
-          <VisibilityClosingSection
-            id="closing"
-            title={secClosing?.title || "Turning insight into strategy"}
-            section={secClosing}
-            engineKey={kbReport.engine_key || "visibility_prime_v1"}
-            version={kbReport.version ?? 2}
-            scoringMode={kbReport?.meta?.scoring_mode || "prime"}
-            iconSrc={VISIBILITY_REPORT_ASSETS.sections.strategy}
-          />
-        </ReportPage>
+              <div className="space-y-4">
+                <VisibilityVideoSection
+                  title="Video Introduction"
+                  videoSrc={PUBLIC_VIDEO_URL}
+                  posterSrc={PUBLIC_VIDEO_POSTER_URL || undefined}
+                  helperText="This video introduces how to use the report and what to focus on first."
+                />
+
+                <VisibilityNarrativeSection
+                  id="welcome"
+                  title="A Personal Welcome From Bogdan Stan"
+                  section={secWelcome}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.welcome}
+                  footerProfile={{
+                    imageSrc: VISIBILITY_REPORT_ASSETS.people.bogdan,
+                    name: "Bogdan Stan",
+                    title:
+                      "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
+                  }}
+                />
+
+                <VisibilityNarrativeSection
+                  id="how-to-use"
+                  title="How To Use This Report"
+                  section={secHowToUse}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.howToUse}
+                  infographicSrc={VISIBILITY_REPORT_ASSETS.infographics.howToUse}
+                  infographicAlt="Inside this report you will discover"
+                  infographicAfterParagraph={3}
+                />
+
+                <VisibilityNarrativeSection
+                  id="understanding"
+                  title="Understanding the Visibility Ladder"
+                  section={secUnderstanding}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.understanding}
+                />
+              </div>
+            </ReportPage>
+
+            <ReportPage>
+              <div className="space-y-4">
+                <VisibilityNarrativeSection
+                  id="working"
+                  title="What is already working"
+                  section={secStrengths}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.strengths}
+                />
+
+                <VisibilityNarrativeSection
+                  title="How the market is likely experiencing your business"
+                  section={secMarketExperience}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
+                />
+
+                <VisibilityNarrativeSection
+                  id="friction"
+                  title="Where visibility friction exists"
+                  section={secFriction}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.friction}
+                />
+
+                <VisibilitySignalGraph
+                  tier={tier}
+                  level={level}
+                  overallPct={overallPct}
+                  pillars={pillars}
+                  weakest={weakest}
+                  strongest={strongest}
+                  iconSrc={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
+                />
+              </div>
+            </ReportPage>
+
+            <ReportPage>
+              <VisibilityCoachingInsights
+                ai={kbReport.ai}
+                fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
+                fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
+                fallbackOpportunity={sectionSummary(secOpportunity)}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.coaching}
+                strategicOpportunityIconSrc={VISIBILITY_REPORT_ASSETS.insights.opportunity}
+              />
+            </ReportPage>
+
+            <ReportPage>
+              <VisibilityClosingSection
+                id="closing"
+                title={secClosing?.title || "Turning insight into strategy"}
+                section={secClosing}
+                engineKey={kbReport.engine_key || "visibility_prime_v1"}
+                version={kbReport.version ?? 2}
+                scoringMode={kbReport?.meta?.scoring_mode || "prime"}
+                iconSrc={VISIBILITY_REPORT_ASSETS.sections.strategy}
+              />
+            </ReportPage>
+          </div>
+        </div>
       </div>
     </Shell>
   );
