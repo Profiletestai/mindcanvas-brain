@@ -1,3 +1,4 @@
+//apps/web/app/t/[token]/visibility/report/VisibilityReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,9 +36,27 @@ import VisibilityNarrativeSection from "@/components/visibility/report/Visibilit
 import VisibilitySignalGraph from "@/components/visibility/report/VisibilitySignalGraph";
 import VisibilityCoachingInsights from "@/components/visibility/report/VisibilityCoachingInsights";
 import VisibilityClosingSection from "@/components/visibility/report/VisibilityClosingSection";
+import VisibilityVideoSection from "@/components/visibility/report/VisibilityVideoSection";
 
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
+
+/**
+ * PUBLIC SUPABASE STORAGE VIDEO CONFIG
+ * -----------------------------------
+ * Change these 3 values to match your uploaded file.
+ */
+const VIDEO_BUCKET = "report-videos";
+const LONG_VIDEO_PATH = "visibility/Visibility Ladder long_01.mp4";
+const POSTER_PATH = "visibility/visibility-ladder-long-01-poster.jpg"; // optional
+
+function buildSupabasePublicUrl(bucket: string, path: string): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  if (!base) return "";
+  const normalizedBase = base.replace(/\/+$/, "");
+  const encodedPath = encodeURI(path);
+  return `${normalizedBase}/storage/v1/object/public/${bucket}/${encodedPath}`;
+}
 
 async function fetchJson<T = any>(url: string): Promise<T> {
   const r = await fetch(url, { cache: "no-store" });
@@ -108,6 +127,11 @@ export default function VisibilityReportClient({
   const takerName = fullName(portalMeta?.taker);
   const reportDate = formatDate(kbReport?.meta?.generated_at);
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
+
+  const publicVideoUrl = buildSupabasePublicUrl(VIDEO_BUCKET, LONG_VIDEO_PATH);
+  const publicPosterUrl = POSTER_PATH
+    ? buildSupabasePublicUrl(VIDEO_BUCKET, POSTER_PATH)
+    : "";
 
   const tier = ((kbReport?.signals?.tier as Tier) || "Invisible") as Tier;
   const level = clamp(safeNumber(kbReport?.signals?.level, 1), 1, 20);
@@ -373,6 +397,14 @@ export default function VisibilityReportClient({
                     "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
                 }}
               />
+
+              <VisibilityVideoSection
+                title="Video Introduction"
+                videoSrc={publicVideoUrl}
+                posterSrc={publicPosterUrl || undefined}
+                helperText="This video introduces how to use the report and what to focus on first."
+              />
+
               <VisibilityNarrativeSection
                 id="how-to-use"
                 title="How To Use This Report"
@@ -382,6 +414,7 @@ export default function VisibilityReportClient({
                 infographicAlt="Inside this report you will discover"
                 infographicAfterParagraph={3}
               />
+
               <VisibilityNarrativeSection
                 id="understanding"
                 title="Understanding the Visibility Ladder"
