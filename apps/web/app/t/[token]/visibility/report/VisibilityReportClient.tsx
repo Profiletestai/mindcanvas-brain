@@ -41,14 +41,9 @@ import VisibilityVideoSection from "@/components/visibility/report/VisibilityVid
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
-/**
- * PUBLIC SUPABASE STORAGE VIDEO CONFIG
- * -----------------------------------
- * Change these 3 values to match your uploaded file.
- */
 const VIDEO_BUCKET = "report-videos";
 const LONG_VIDEO_PATH = "visibility/Visibility Ladder long_01.mp4";
-const POSTER_PATH = "visibility/visibility-ladder-long-01-poster.jpg"; // optional
+const POSTER_PATH = "visibility/visibility-ladder-long-01-poster.jpg";
 
 function buildSupabasePublicUrl(bucket: string, path: string): string {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -385,6 +380,13 @@ export default function VisibilityReportClient({
             </div>
 
             <div className="space-y-4">
+              <VisibilityVideoSection
+                title="Video Introduction"
+                videoSrc={publicVideoUrl}
+                posterSrc={publicPosterUrl || undefined}
+                helperText="This video introduces how to use the report and what to focus on first."
+              />
+
               <VisibilityNarrativeSection
                 id="welcome"
                 title="A Personal Welcome From Bogdan Stan"
@@ -396,13 +398,6 @@ export default function VisibilityReportClient({
                   title:
                     "Creator of The Visibility Ladder • Managing Director, WhatsWhat and UTender",
                 }}
-              />
-
-              <VisibilityVideoSection
-                title="Video Introduction"
-                videoSrc={publicVideoUrl}
-                posterSrc={publicPosterUrl || undefined}
-                helperText="This video introduces how to use the report and what to focus on first."
               />
 
               <VisibilityNarrativeSection
@@ -426,38 +421,36 @@ export default function VisibilityReportClient({
         </ReportPage>
 
         <ReportPage>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] items-start">
-            <div className="space-y-4">
-              <VisibilityNarrativeSection
-                id="working"
-                title="What is already working"
-                section={secStrengths}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.strengths}
-              />
-              <VisibilityNarrativeSection
-                title="How the market is likely experiencing your business"
-                section={secMarketExperience}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
-              />
-            </div>
+          <div className="space-y-4">
+            <VisibilityNarrativeSection
+              id="working"
+              title="What is already working"
+              section={secStrengths}
+              iconSrc={VISIBILITY_REPORT_ASSETS.sections.strengths}
+            />
 
-            <div className="space-y-4 self-start">
-              <VisibilityNarrativeSection
-                id="friction"
-                title="Where visibility friction exists"
-                section={secFriction}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.friction}
-              />
-              <VisibilitySignalGraph
-                tier={tier}
-                level={level}
-                overallPct={overallPct}
-                pillars={pillars}
-                weakest={weakest}
-                strongest={strongest}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
-              />
-            </div>
+            <VisibilityNarrativeSection
+              title="How the market is likely experiencing your business"
+              section={secMarketExperience}
+              iconSrc={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
+            />
+
+            <VisibilityNarrativeSection
+              id="friction"
+              title="Where visibility friction exists"
+              section={secFriction}
+              iconSrc={VISIBILITY_REPORT_ASSETS.sections.friction}
+            />
+
+            <VisibilitySignalGraph
+              tier={tier}
+              level={level}
+              overallPct={overallPct}
+              pillars={pillars}
+              weakest={weakest}
+              strongest={strongest}
+              iconSrc={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
+            />
           </div>
         </ReportPage>
 
