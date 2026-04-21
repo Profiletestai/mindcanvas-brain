@@ -2,11 +2,35 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { getBaseUrl } from "@/lib/baseUrl";
-import ProfileExtendedReportClient from "@/components/visibility/profile-extended/ProfileExtendedReportClient";
+import ProfileExtendedReportClient from "./ProfileExtendedReportClient";
 
 export const dynamic = "force-dynamic";
 
-type PortalVisibilityReportResponse = {
+type ReportPanel = {
+  panel_key: string;
+  title: string;
+  blocks: Array<Record<string, any>>;
+  matched_rows: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, any>;
+  }>;
+};
+
+type ReportSection = {
+  section_key: string;
+  heading: string;
+  panels: ReportPanel[];
+  matched_rows: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, any>;
+  }>;
+};
+
+type ExtendedReportResponse = {
   ok: boolean;
   data?: {
     audience?: string;
@@ -16,7 +40,23 @@ type PortalVisibilityReportResponse = {
     submission_id?: string | null;
     engine_key?: string;
     version?: number;
-    meta?: Record<string, any> | null;
+    meta?: {
+      org_name?: string | null;
+      org_logo_url?: string | null;
+      test_name?: string | null;
+      generated_at?: string | null;
+      mode?: string | null;
+      scoring_mode?: string | null;
+      report_variant?: string | null;
+    } | null;
+    input?: {
+      tier?: string;
+      level?: number;
+      behaviour_style?: string;
+      readiness?: string | null;
+      pillar_scores?: Record<string, number> | null;
+      tier_counts?: Record<string, number> | null;
+    } | null;
     signals?: {
       tier?: string;
       level?: number;
@@ -32,20 +72,7 @@ type PortalVisibilityReportResponse = {
       pillars?: Record<string, number> | null;
       pillar_bands?: Record<string, string> | null;
     } | null;
-    input?: {
-      tier?: string;
-      level?: number;
-      behaviour_style?: string;
-      readiness?: string | null;
-      pillar_scores?: Record<string, number> | null;
-    } | null;
-    sections?: Array<{
-      section_key: string;
-      heading?: string | null;
-      subheading?: string | null;
-      blocks?: Array<Record<string, any>>;
-      matched_rows?: Array<Record<string, any>>;
-    }>;
+    sections?: ReportSection[];
   };
   error?: string;
 };
@@ -126,17 +153,21 @@ export default async function ProfileExtendedReportPage({
     taker.link_token
   )}/report?tid=${encodeURIComponent(taker.id)}&audience=profile_extended_report`;
 
-  const reportRes = await fetchJson<PortalVisibilityReportResponse>(reportUrl);
+  const reportRes = await fetchJson<ExtendedReportResponse>(reportUrl);
 
   if (!reportRes?.ok || !reportRes?.data) return notFound();
 
   const fullName =
-    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "Unknown participant";
+    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() ||
+    "Unknown participant";
 
   return (
     <ProfileExtendedReportClient
-      orgSlug={org.slug}
-      orgName={org.name}
+      org={{
+        id: org.id,
+        slug: org.slug,
+        name: org.name,
+      }}
       taker={{
         id: taker.id,
         fullName,
