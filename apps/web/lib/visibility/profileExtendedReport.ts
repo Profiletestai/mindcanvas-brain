@@ -106,84 +106,51 @@ const REPORT_STRUCTURE: Array<{
     section_key: "result_at_a_glance",
     heading: "Result at a glance",
     panels: [
-      {
-        panel_key: "plain_english_summary",
-        title: "Plain-English summary",
-      },
+      { panel_key: "plain_english_summary", title: "Plain-English summary" },
     ],
   },
   {
     section_key: "what_this_tier_means",
     heading: "What this tier means",
     panels: [
-      {
-        panel_key: "core_diagnosis",
-        title: "Core diagnosis",
-      },
+      { panel_key: "core_diagnosis", title: "Core diagnosis" },
       {
         panel_key: "market_happening",
         title: "What is likely happening in the market",
       },
-      {
-        panel_key: "core_reading",
-        title: "Core reading",
-      },
+      { panel_key: "core_reading", title: "Core reading" },
     ],
   },
   {
     section_key: "level_nuance",
     heading: "Level nuance",
     panels: [
-      {
-        panel_key: "level_meaning",
-        title: "Level meaning",
-      },
-      {
-        panel_key: "meaning_in_practice",
-        title: "Meaning in practice",
-      },
+      { panel_key: "level_meaning", title: "Level meaning" },
+      { panel_key: "meaning_in_practice", title: "Meaning in practice" },
     ],
   },
   {
     section_key: "pillars_and_signals",
     heading: "Pillars and signals",
     panels: [
-      {
-        panel_key: "current_signal_pattern",
-        title: "Current signal pattern",
-      },
-      {
-        panel_key: "wider_signal_pathway",
-        title: "The wider signal pathway",
-      },
-      {
-        panel_key: "progression_pattern",
-        title: "Progression pattern",
-      },
+      { panel_key: "current_signal_pattern", title: "Current signal pattern" },
+      { panel_key: "wider_signal_pathway", title: "The wider signal pathway" },
+      { panel_key: "progression_pattern", title: "Progression pattern" },
     ],
   },
   {
     section_key: "behaviour_style",
     heading: "Behaviour style",
     panels: [
-      {
-        panel_key: "type_interpretation",
-        title: "Type interpretation",
-      },
-      {
-        panel_key: "how_to_use_this_layer",
-        title: "How to use this layer",
-      },
+      { panel_key: "type_interpretation", title: "Type interpretation" },
+      { panel_key: "how_to_use_this_layer", title: "How to use this layer" },
     ],
   },
   {
     section_key: "strategic_priority_now",
     heading: "Strategic priority now",
     panels: [
-      {
-        panel_key: "what_to_focus_on_now",
-        title: "What to focus on now",
-      },
+      { panel_key: "what_to_focus_on_now", title: "What to focus on now" },
     ],
   },
   {
@@ -273,24 +240,58 @@ function rowMatchesInput(row: KbBlockRow, input: ProfileExtendedReportInput): bo
   return true;
 }
 
+function makeBlock(partial?: Record<string, any> | null): Record<string, any> {
+  const src = partial || {};
+  const title =
+    safeString(src.title) ||
+    safeString(src.heading) ||
+    safeString(src.subheading) ||
+    "";
+  const shortSummary =
+    safeString(src.short_summary) ||
+    safeString(src.summary) ||
+    "";
+  const paragraphs = Array.isArray(src.paragraphs)
+    ? src.paragraphs.map((p: any) => safeString(p)).filter(Boolean)
+    : [];
+  const bullets = Array.isArray(src.bullets)
+    ? src.bullets.map((b: any) => safeString(b)).filter(Boolean)
+    : [];
+  const transition = safeString(src.transition);
+
+  const out: Record<string, any> = {
+    ...src,
+    title,
+    short_summary: shortSummary || undefined,
+    paragraphs,
+    bullets,
+    transition: transition || undefined,
+  };
+
+  return out;
+}
+
 function normalizeBlocks(content: Record<string, any> | null | undefined): Array<Record<string, any>> {
   if (!content) return [];
 
   if (Array.isArray(content.blocks)) {
-    return content.blocks.filter((block): block is Record<string, any> => {
-      return !!block && typeof block === "object";
-    });
+    return content.blocks
+      .filter((block): block is Record<string, any> => !!block && typeof block === "object")
+      .map((block) => makeBlock(block));
   }
 
-  const looksLikeSingleBlock =
+  const hasSingleBlockFields =
     content.title != null ||
+    content.heading != null ||
+    content.subheading != null ||
     content.short_summary != null ||
+    content.summary != null ||
     Array.isArray(content.paragraphs) ||
     Array.isArray(content.bullets) ||
     content.transition != null;
 
-  if (looksLikeSingleBlock) {
-    return [content];
+  if (hasSingleBlockFields) {
+    return [makeBlock(content)];
   }
 
   return [];
@@ -298,25 +299,48 @@ function normalizeBlocks(content: Record<string, any> | null | undefined): Array
 
 function buildSyntheticBlocksFromRow(row: KbBlockRow): Array<Record<string, any>> {
   const content = row.content || {};
-  const title = safeString(content.subheading) || safeString(content.heading);
-  const paragraphs = Array.isArray(content.paragraphs) ? content.paragraphs : [];
-  const bullets = Array.isArray(content.bullets) ? content.bullets : [];
-  const shortSummary = safeString(content.short_summary);
-  const transition = safeString(content.transition);
+  const block = makeBlock(content);
 
-  if (!title && !paragraphs.length && !bullets.length && !shortSummary && !transition) {
+  if (
+    !safeString(block.title) &&
+    !safeString(block.short_summary) &&
+    !(Array.isArray(block.paragraphs) && block.paragraphs.length) &&
+    !(Array.isArray(block.bullets) && block.bullets.length) &&
+    !safeString(block.transition)
+  ) {
     return [];
   }
 
-  return [
-    {
-      title,
-      short_summary: shortSummary || undefined,
-      paragraphs,
-      bullets,
-      transition: transition || undefined,
-    },
-  ];
+  return [block];
+}
+
+function panelToSection(panelKey: ProfileExtendedPanelKey): ProfileExtendedSectionKey {
+  const lookup: Record<ProfileExtendedPanelKey, ProfileExtendedSectionKey> = {
+    plain_english_summary: "result_at_a_glance",
+    core_diagnosis: "what_this_tier_means",
+    market_happening: "what_this_tier_means",
+    core_reading: "what_this_tier_means",
+    level_meaning: "level_nuance",
+    meaning_in_practice: "level_nuance",
+    current_signal_pattern: "pillars_and_signals",
+    wider_signal_pathway: "pillars_and_signals",
+    progression_pattern: "pillars_and_signals",
+    type_interpretation: "behaviour_style",
+    how_to_use_this_layer: "behaviour_style",
+    what_to_focus_on_now: "strategic_priority_now",
+    what_progression_looks_like_next: "progression_roadmap",
+    how_to_recognise_readiness: "progression_roadmap",
+  };
+
+  return lookup[panelKey];
+}
+
+function defaultPanelTitle(panelKey: ProfileExtendedPanelKey): string {
+  for (const section of REPORT_STRUCTURE) {
+    const panel = section.panels.find((p) => p.panel_key === panelKey);
+    if (panel) return panel.title;
+  }
+  return panelKey;
 }
 
 function uniqueRows(
@@ -337,7 +361,6 @@ function uniqueRows(
 
 function classifyPanelTitle(title: string): ProfileExtendedPanelKey | null {
   const t = normalizeText(title);
-
   if (!t) return null;
 
   if (t === "plain english summary") return "plain_english_summary";
@@ -366,38 +389,118 @@ function classifyPanelTitle(title: string): ProfileExtendedPanelKey | null {
   return null;
 }
 
-function fallbackPanelFromRow(
+function resolvePanelForRow(
   row: KbBlockRow,
   block: Record<string, any>
 ): ProfileExtendedPanelKey | null {
-  const rowHeading = normalizeText(row.content?.heading);
-  const rowSubheading = normalizeText(row.content?.subheading);
-  const blockTitle = normalizeText(block.title);
-
-  const candidates = [blockTitle, rowSubheading, rowHeading].filter(Boolean);
+  const candidates = [
+    safeString(block.title),
+    safeString((row.content || {}).subheading),
+    safeString((row.content || {}).heading),
+  ];
 
   for (const candidate of candidates) {
     const direct = classifyPanelTitle(candidate);
     if (direct) return direct;
   }
 
-  if (rowHeading === "result at a glance") return "plain_english_summary";
-  if (rowHeading === "what this tier means") return "core_diagnosis";
-  if (rowHeading === "level nuance") return "level_meaning";
-  if (rowHeading === "pillars and signals") return "current_signal_pattern";
-  if (rowHeading === "behaviour style") return "type_interpretation";
-  if (rowHeading === "strategic priority now") return "what_to_focus_on_now";
-  if (rowHeading === "progression roadmap") return "what_progression_looks_like_next";
+  const source = row.section_key;
+  const rowHeading = normalizeText((row.content || {}).heading);
+  const rowSubheading = normalizeText((row.content || {}).subheading);
+  const blockTitle = normalizeText(block.title);
+  const blockSummary = normalizeText(block.short_summary);
+
+  if (source === "result_interpretation_scripts") {
+    if (blockTitle.includes("market") || blockSummary.includes("market")) {
+      return "market_happening";
+    }
+    if (blockTitle.includes("core reading")) {
+      return "core_reading";
+    }
+    if (
+      blockTitle.includes("best fit strategic focus") ||
+      blockTitle.includes("what usually helps") ||
+      blockTitle.includes("what usually does not help") ||
+      blockTitle.includes("signs the business is ready")
+    ) {
+      return "what_to_focus_on_now";
+    }
+    return "core_diagnosis";
+  }
+
+  if (source === "level_progression_roadmap") {
+    if (
+      blockTitle.includes("recognise readiness") ||
+      rowSubheading.includes("expanded influence")
+    ) {
+      return "how_to_recognise_readiness";
+    }
+    if (
+      blockTitle.includes("progression") ||
+      rowHeading.includes("progression roadmap language")
+    ) {
+      return "what_progression_looks_like_next";
+    }
+    if (rowSubheading.includes("levels") || rowHeading.includes("level progression roadmap")) {
+      return "level_meaning";
+    }
+    return "meaning_in_practice";
+  }
+
+  if (source === "visibility_signal_framework") {
+    if (rowHeading.includes("pillar reading guidance")) {
+      return "current_signal_pattern";
+    }
+    if (
+      rowSubheading === "discoverability" ||
+      rowSubheading === "credibility" ||
+      rowSubheading === "authority" ||
+      rowSubheading === "positioning" ||
+      rowSubheading === "influence"
+    ) {
+      return "wider_signal_pathway";
+    }
+    if (rowHeading.includes("final content rules")) {
+      return "progression_pattern";
+    }
+    return "current_signal_pattern";
+  }
+
+  if (source === "visibility_audit_layer") {
+    if (rowHeading.includes("behaviour strategy by tier")) {
+      return "how_to_use_this_layer";
+    }
+    if (rowHeading.includes("behaviour style layer")) {
+      return "type_interpretation";
+    }
+    if (rowHeading.includes("pillar reading guidance")) {
+      return "current_signal_pattern";
+    }
+    return "type_interpretation";
+  }
 
   return null;
 }
 
-function defaultPanelTitle(panelKey: ProfileExtendedPanelKey): string {
-  for (const section of REPORT_STRUCTURE) {
-    const hit = section.panels.find((panel) => panel.panel_key === panelKey);
-    if (hit) return hit.title;
-  }
-  return panelKey;
+function buildAtAGlanceBlock(input: ProfileExtendedReportInput): Record<string, any> {
+  const readiness = safeString(input.readiness || "");
+  const readinessText =
+    readiness === "ready_to_progress"
+      ? "ready to progress"
+      : readiness === "stabilise"
+      ? "stabilise"
+      : "stabilise";
+
+  return makeBlock({
+    title: "Plain-English summary",
+    short_summary: `You are in the ${input.tier} tier at Level ${input.level}, with behaviour style ${input.behaviour_style} and readiness set to ${readinessText}.`,
+    paragraphs: [
+      `Tier explains the current stage of market visibility. Level explains how stable or advanced that stage currently is.`,
+      `Behaviour style shows how this person is most likely to sustain strategy in practice, while readiness helps guide how aggressive the next move should be.`,
+    ],
+    transition:
+      "This section gives the report its structural truth before moving into deeper interpretation.",
+  });
 }
 
 async function fetchKbRows(sb?: VisibilityDbClient): Promise<KbBlockRow[]> {
@@ -426,72 +529,91 @@ export function assembleProfileExtendedReport(
     .filter((row) => rowMatchesInput(row, input))
     .sort((a, b) => b.priority - a.priority);
 
-  const panelBuckets = new Map<
+  const bucketMap = new Map<
     ProfileExtendedPanelKey,
     Array<{
       block: Record<string, any>;
-      row: KbBlockRow;
+      row: KbBlockRow | null;
     }>
   >();
 
+  const pushToBucket = (
+    panelKey: ProfileExtendedPanelKey,
+    block: Record<string, any>,
+    row: KbBlockRow | null
+  ) => {
+    const existing = bucketMap.get(panelKey) || [];
+    existing.push({ block, row });
+    bucketMap.set(panelKey, existing);
+  };
+
+  // always seed the at-a-glance panel so the report is never empty at the top
+  pushToBucket("plain_english_summary", buildAtAGlanceBlock(input), null);
+
   for (const row of matchedRows) {
-    const normalized = normalizeBlocks(row.content);
-    const blocks = normalized.length ? normalized : buildSyntheticBlocksFromRow(row);
+    const blocks = normalizeBlocks(row.content).length
+      ? normalizeBlocks(row.content)
+      : buildSyntheticBlocksFromRow(row);
 
     for (const block of blocks) {
-      const explicitTitle =
-        safeString(block.title) ||
-        safeString(block.subheading) ||
-        safeString(row.content?.subheading) ||
-        safeString(row.content?.heading);
-
-      const panelKey = classifyPanelTitle(explicitTitle) || fallbackPanelFromRow(row, block);
+      const panelKey = resolvePanelForRow(row, block);
       if (!panelKey) continue;
-
-      const bucket = panelBuckets.get(panelKey) || [];
-      bucket.push({ block, row });
-      panelBuckets.set(panelKey, bucket);
+      pushToBucket(panelKey, block, row);
     }
   }
 
-  const sections: AssembledProfileExtendedSection[] = REPORT_STRUCTURE.map((section) => {
-    const panels: AssembledProfileExtendedPanel[] = section.panels
-      .map((panel) => {
-        const bucket = panelBuckets.get(panel.panel_key) || [];
-        if (!bucket.length) return null;
+  const sections: AssembledProfileExtendedSection[] = [];
 
-        const matchedRowsForPanel = uniqueRows(
-          bucket.map(({ row }) => ({
-            id: row.id,
-            priority: row.priority,
-            source_section_key: row.section_key,
-            triggers: row.triggers || {},
-          }))
-        );
+  for (const sectionDef of REPORT_STRUCTURE) {
+    const panels: AssembledProfileExtendedPanel[] = [];
 
-        const firstTitledBlock = bucket.find(({ block }) => safeString(block.title));
-        const title = safeString(firstTitledBlock?.block?.title) || panel.title;
+    for (const panelDef of sectionDef.panels) {
+      const bucket = bucketMap.get(panelDef.panel_key) || [];
+      if (!bucket.length) continue;
 
-        return {
-          panel_key: panel.panel_key,
-          title,
-          blocks: bucket.map(({ block }) => block),
-          matched_rows: matchedRowsForPanel,
-        };
-      })
-      .filter((panel): panel is AssembledProfileExtendedPanel => !!panel);
+      const blocks: Array<Record<string, any>> = bucket.map(({ block }) =>
+        makeBlock({
+          ...block,
+          title: safeString(block.title) || panelDef.title,
+          short_summary: safeString(block.short_summary || block.summary) || undefined,
+        })
+      );
 
-    const matchedRowsForSection = uniqueRows(
+      const matched_rows = uniqueRows(
+        bucket
+          .filter((item) => item.row !== null)
+          .map((item) => {
+            const row = item.row as KbBlockRow;
+            return {
+              id: row.id,
+              priority: row.priority,
+              source_section_key: row.section_key,
+              triggers: row.triggers || {},
+            };
+          })
+      );
+
+      panels.push({
+        panel_key: panelDef.panel_key,
+        title: panelDef.title,
+        blocks,
+        matched_rows,
+      });
+    }
+
+    if (!panels.length) continue;
+
+    const matched_rows = uniqueRows(
       panels.flatMap((panel) => panel.matched_rows)
     );
 
-    return {
-      section_key: section.section_key,
-      heading: section.heading,
+    sections.push({
+      section_key: sectionDef.section_key,
+      heading: sectionDef.heading,
       panels,
-      matched_rows: matchedRowsForSection,
-    };
-  }).filter((section) => section.panels.length > 0);
+      matched_rows,
+    });
+  }
 
   return {
     audience: "profile_extended_report",
