@@ -27,26 +27,30 @@ import {
 } from "@/components/visibility/report/VisibilityReportUtils";
 import { ReportPage, Shell } from "@/components/visibility/report/VisibilityReportPrimitives";
 import { VISIBILITY_REPORT_ASSETS } from "@/components/visibility/report/VisibilityReportAssets";
-import VisibilityReportHeader from "@/components/visibility/report/VisibilityReportHeader";
 import VisibilityHeroSection from "@/components/visibility/report/VisibilityHeroSection";
 import VisibilityLadderPanel from "@/components/visibility/report/VisibilityLadderPanel";
 import VisibilityReportIndex from "@/components/visibility/report/VisibilityReportIndex";
 import VisibilityInsightCards from "@/components/visibility/report/VisibilityInsightCards";
 import VisibilityNarrativeSection from "@/components/visibility/report/VisibilityNarrativeSection";
 import VisibilitySignalGraph from "@/components/visibility/report/VisibilitySignalGraph";
-import VisibilityCoachingInsights from "@/components/visibility/report/VisibilityCoachingInsights";
 import VisibilityClosingSection from "@/components/visibility/report/VisibilityClosingSection";
 import VisibilityVideoSection from "@/components/visibility/report/VisibilityVideoSection";
+import type { ReactNode } from "react";
 
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
-// Use your exact Supabase public URL here
 const PUBLIC_VIDEO_URL =
   "https://xciojwhnamsspmxpipzn.supabase.co/storage/v1/object/public/report-videos/Visibility%20Ladder%20long_01.mp4";
 
-// Optional poster image if you upload one later
 const PUBLIC_VIDEO_POSTER_URL = "";
+
+const REPORT_LOGO_SRC = "/images/visibility-report/logo/Whatswhat-logo.png";
+const COACHING_ICON_SRC = "/images/visibility-report/icons/coaching.png";
+const STRENGTHS_INFOGRAPHIC_SRC =
+  "/images/visibility-report/infographics/Strengths 3 pointers.png";
+const FRICTION_INFOGRAPHIC_SRC =
+  "/images/visibility-report/infographics/Friction 3 pointers.png";
 
 async function fetchJson<T = any>(url: string): Promise<T> {
   const r = await fetch(url, { cache: "no-store" });
@@ -58,6 +62,323 @@ async function fetchJson<T = any>(url: string): Promise<T> {
   const j = await r.json();
   if (!r.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${r.status}`);
   return j as T;
+}
+
+function LocalOuterCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[24px] border ${className}`}
+      style={{
+        borderColor: BRAND.border,
+        background: "linear-gradient(180deg, rgba(27,60,99,0.78), rgba(12,32,58,0.84))",
+        boxShadow: "0 14px 42px rgba(0,0,0,0.32)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function LocalInnerPanel({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[18px] border ${className}`}
+      style={{
+        borderColor: BRAND.borderSoft,
+        background: "linear-gradient(180deg, rgba(35,62,97,0.72), rgba(18,38,64,0.78))",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ActionButton({
+  children,
+  onClick,
+  href,
+  variant = "dark",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  variant?: "dark" | "gradient";
+}) {
+  const className =
+    "inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold";
+  const style =
+    variant === "gradient"
+      ? ({
+          background: "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
+          color: "#071C36",
+        } as const)
+      : ({
+          background: "rgba(8,22,43,0.72)",
+          color: BRAND.white,
+          border: `1px solid ${BRAND.border}`,
+        } as const);
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        style={style}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <button type="button" className={className} style={style} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function HeaderChip({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase"
+      style={{
+        border: `1px solid ${BRAND.border}`,
+        background: "rgba(255,255,255,0.05)",
+        color: "rgba(255,255,255,0.86)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FullReportHeader({
+  takerName,
+  reportDate,
+  nextStepsUrl,
+  onDownload,
+}: {
+  takerName: string;
+  reportDate: string;
+  nextStepsUrl?: string;
+  onDownload: () => void;
+}) {
+  return (
+    <LocalOuterCard className="p-4 md:p-5">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-start gap-3">
+            <div
+              className="h-10 w-10 rounded-2xl overflow-hidden shrink-0"
+              style={{
+                border: `1px solid ${BRAND.border}`,
+                background: "rgba(255,255,255,0.06)",
+              }}
+            >
+              <img
+                src={REPORT_LOGO_SRC}
+                alt="WhatsWhat Prime logo"
+                className="h-full w-full object-contain"
+                onError={(e: any) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+
+            <div>
+              <div className="text-[28px] md:text-[32px] font-semibold tracking-[0.14em] uppercase leading-none">
+                Visibility Ladder™
+              </div>
+              <div
+                className="mt-1.5 text-[12px] md:text-[13px] uppercase tracking-[0.28em]"
+                style={{ color: BRAND.textDim }}
+              >
+                Strategic Visibility Assessment
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <HeaderChip>WhatsWhat Prime</HeaderChip>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2.5">
+          <div className="flex gap-2">
+            <ActionButton onClick={onDownload}>Download PDF</ActionButton>
+            {nextStepsUrl ? (
+              <ActionButton href={nextStepsUrl} variant="gradient">
+                Next steps
+              </ActionButton>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+            <LocalInnerPanel className="px-3.5 py-3 min-w-[150px]">
+              <div className="text-[10px]" style={{ color: "rgba(255,255,255,0.56)" }}>
+                Prepared for
+              </div>
+              <div className="mt-1.5 text-[16px] font-semibold">{takerName}</div>
+            </LocalInnerPanel>
+
+            <LocalInnerPanel className="px-3.5 py-3 min-w-[130px]">
+              <div className="text-[10px]" style={{ color: "rgba(255,255,255,0.56)" }}>
+                Date
+              </div>
+              <div className="mt-1.5 text-[16px] font-semibold">{reportDate}</div>
+            </LocalInnerPanel>
+
+            <LocalInnerPanel className="px-3.5 py-3 min-w-[150px]">
+              <div className="text-[10px]" style={{ color: "rgba(255,255,255,0.56)" }}>
+                Framework
+              </div>
+              <div className="mt-1.5 text-[16px] font-semibold">WhatsWhat Prime</div>
+            </LocalInnerPanel>
+          </div>
+        </div>
+      </div>
+    </LocalOuterCard>
+  );
+}
+
+function CoachingColumn({
+  title,
+  imageSrc,
+  items,
+}: {
+  title: string;
+  imageSrc: string;
+  items: string[];
+}) {
+  return (
+    <LocalInnerPanel className="p-4">
+      <div className="text-[14px] font-semibold">{title}</div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+        <div className="overflow-hidden rounded-xl border" style={{ borderColor: BRAND.borderSoft }}>
+          <img
+            src={imageSrc}
+            alt={title}
+            className="block w-full h-auto object-contain"
+            onError={(e: any) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
+
+        <div className="space-y-4 text-[13px] leading-6" style={{ color: BRAND.text }}>
+          {items.map((item, idx) => (
+            <div key={idx}>{item}</div>
+          ))}
+        </div>
+      </div>
+    </LocalInnerPanel>
+  );
+}
+
+function InlineCoachingInsights({
+  executiveSummary,
+  strengths,
+  friction,
+  opportunity,
+}: {
+  executiveSummary: string;
+  strengths: string[];
+  friction: string[];
+  opportunity: string;
+}) {
+  return (
+    <LocalOuterCard className="p-4 md:p-5">
+      <div className="flex items-start gap-3">
+        <div
+          className="h-10 w-10 rounded-2xl overflow-hidden shrink-0"
+          style={{
+            border: `1px solid ${BRAND.border}`,
+            background: "rgba(255,255,255,0.06)",
+          }}
+        >
+          <img
+            src={COACHING_ICON_SRC}
+            alt="Coaching insight icon"
+            className="h-full w-full object-cover"
+            onError={(e: any) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
+
+        <div>
+          <div className="text-[15px] font-semibold">Coaching insight</div>
+          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+            An additional interpretation layer built from your scored signals and narrative blocks
+          </div>
+        </div>
+      </div>
+
+      <LocalInnerPanel className="mt-4 p-4">
+        <div className="text-[14px] font-semibold">Executive summary</div>
+        <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
+          {executiveSummary}
+        </div>
+      </LocalInnerPanel>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <CoachingColumn
+          title="Strengths"
+          imageSrc={STRENGTHS_INFOGRAPHIC_SRC}
+          items={strengths}
+        />
+
+        <CoachingColumn
+          title="Friction"
+          imageSrc={FRICTION_INFOGRAPHIC_SRC}
+          items={friction}
+        />
+      </div>
+
+      <LocalInnerPanel className="mt-4 p-4">
+        <div className="flex items-start gap-3">
+          <div
+            className="h-10 w-10 rounded-2xl overflow-hidden shrink-0"
+            style={{
+              border: `1px solid ${BRAND.border}`,
+              background: "rgba(255,255,255,0.06)",
+            }}
+          >
+            <img
+              src={VISIBILITY_REPORT_ASSETS.insights.opportunity}
+              alt="Strategic opportunity icon"
+              className="h-full w-full object-cover"
+              onError={(e: any) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold">Strategic opportunity</div>
+            <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
+              {opportunity}
+            </div>
+          </div>
+        </div>
+      </LocalInnerPanel>
+    </LocalOuterCard>
+  );
 }
 
 export default function VisibilityReportClient({
@@ -113,7 +434,6 @@ export default function VisibilityReportClient({
     };
   }, [token, tid, src]);
 
-  const orgLogoUrl = portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
   const takerName = fullName(portalMeta?.taker);
   const reportDate = formatDate(kbReport?.meta?.generated_at);
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
@@ -199,6 +519,31 @@ export default function VisibilityReportClient({
     if (bullets.length) return bullets;
     return firstItems(sectionParagraphs(secNextMove), 4);
   })();
+
+  const coachingStrengths = firstItems(
+    (kbReport?.ai?.strengths?.length ? kbReport.ai.strengths : []).concat(
+      firstItems(sectionBullets(secStrengths), 3),
+      firstItems(sectionParagraphs(secStrengths), 3)
+    ),
+    3
+  );
+
+  const coachingFriction = firstItems(
+    (kbReport?.ai?.friction?.length ? kbReport.ai.friction : []).concat(
+      firstItems(sectionBullets(secFriction), 3),
+      firstItems(sectionParagraphs(secFriction), 3)
+    ),
+    3
+  );
+
+  const coachingOpportunity =
+    kbReport?.ai?.strategic_opportunity ||
+    sectionSummary(secOpportunity) ||
+    "Clarify the highest-impact next move and focus effort where it will create the greatest lift.";
+
+  const coachingExecutiveSummary =
+    kbReport?.ai?.executive_summary ||
+    "This section provides a guided interpretation of the report so the reader can turn signals into practical direction.";
 
   const reportIndex: ReportIndexItem[] = [
     { id: "welcome", label: "A Personal Welcome From Bogdan Stan" },
@@ -303,11 +648,9 @@ export default function VisibilityReportClient({
         className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-6"
       >
         <ReportPage>
-          <VisibilityReportHeader
-            orgLogoUrl={orgLogoUrl}
+          <FullReportHeader
             takerName={takerName}
             reportDate={reportDate || formatDate(null)}
-            frameworkName="WhatsWhat Prime"
             nextStepsUrl={nextStepsUrl}
             onDownload={downloadPdf}
           />
@@ -453,13 +796,11 @@ export default function VisibilityReportClient({
             </ReportPage>
 
             <ReportPage>
-              <VisibilityCoachingInsights
-                ai={kbReport.ai}
-                fallbackStrengths={firstItems(sectionBullets(secStrengths), 4)}
-                fallbackFriction={firstItems(sectionBullets(secFriction), 4)}
-                fallbackOpportunity={sectionSummary(secOpportunity)}
-                iconSrc={VISIBILITY_REPORT_ASSETS.sections.coaching}
-                strategicOpportunityIconSrc={VISIBILITY_REPORT_ASSETS.insights.opportunity}
+              <InlineCoachingInsights
+                executiveSummary={coachingExecutiveSummary}
+                strengths={coachingStrengths}
+                friction={coachingFriction}
+                opportunity={coachingOpportunity}
               />
             </ReportPage>
 
