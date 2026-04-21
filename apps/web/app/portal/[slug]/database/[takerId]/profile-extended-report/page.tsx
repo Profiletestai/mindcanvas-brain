@@ -1,91 +1,88 @@
 // apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/page.tsx
 import { notFound } from "next/navigation";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
 import { createClient } from "@/lib/server/supabaseAdmin";
-import { getBaseUrl } from "@/lib/baseUrl";
 import ProfileExtendedReportClient from "./ProfileExtendedReportClient";
+import {
+  buildProfileExtendedReport,
+  type BehaviourStyle,
+  type ProfileExtendedReportInput,
+  type Readiness,
+  type VisibilityTier,
+} from "@/lib/visibility/profileExtendedReport";
 
 export const dynamic = "force-dynamic";
 
-type ReportPanel = {
-  panel_key: string;
-  title: string;
-  blocks: Array<Record<string, any>>;
-  matched_rows: Array<{
-    id: string;
-    priority: number;
-    source_section_key: string;
-    triggers: Record<string, any>;
-  }>;
-};
+function getServiceRoleKey() {
+  return (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_ANON_KEY ||
+    ""
+  );
+}
 
-type ReportSection = {
-  section_key: string;
-  heading: string;
-  panels: ReportPanel[];
-  matched_rows: Array<{
-    id: string;
-    priority: number;
-    source_section_key: string;
-    triggers: Record<string, any>;
-  }>;
-};
+function visibilityAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = getServiceRoleKey();
 
-type ExtendedReportResponse = {
-  ok: boolean;
-  data?: {
-    audience?: string;
-    token?: string;
-    tid?: string | null;
-    sid?: string | null;
-    submission_id?: string | null;
-    engine_key?: string;
-    version?: number;
-    meta?: {
-      org_name?: string | null;
-      org_logo_url?: string | null;
-      test_name?: string | null;
-      generated_at?: string | null;
-      mode?: string | null;
-      scoring_mode?: string | null;
-      report_variant?: string | null;
-    } | null;
-    input?: {
-      tier?: string;
-      level?: number;
-      behaviour_style?: string;
-      readiness?: string | null;
-      pillar_scores?: Record<string, number> | null;
-      tier_counts?: Record<string, number> | null;
-    } | null;
-    signals?: {
-      tier?: string;
-      level?: number;
-      style?: string;
-      readiness?: string | null;
-      overall_pct?: number | null;
-      pillar_scores?: Record<string, number> | null;
-      weakest_pillar?: string | null;
-      strongest_pillar?: string | null;
-    } | null;
-    graphs?: {
-      tier_counts?: Record<string, number> | null;
-      pillars?: Record<string, number> | null;
-      pillar_bands?: Record<string, string> | null;
-    } | null;
-    sections?: ReportSection[];
-  };
-  error?: string;
-};
-
-async function fetchJson<T>(url: string): Promise<T | null> {
-  try {
-    const res = await fetch(url, { cache: "no-store" });
-    const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("application/json")) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
+  if (!url || !key) {
+    throw new Error("Missing Supabase env vars");
   }
+
+  return createSupabaseClient(url, key, {
+    db: { schema: "visibility" },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+function safeString(v: any): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function safeNumber(v: any, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeTier(v: any): VisibilityTier {
+  const s = safeString(v);
+  if (s === "Invisible" || s === "Emerging" || s === "Established" || s === "Magnetic") {
+    return s;
+  }
+  return "Invisible";
+}
+
+function normalizeStyle(v: any): BehaviourStyle {
+  const s = safeString(v).toUpperCase();
+  if (s === "A" || s === "B" || s === "C" || s === "D") return s;
+  return "A";
+}
+
+function normalizeReadiness(v: any): Readiness | null {
+  const s = safeString(v).toLowerCase();
+  if (s === "stabilise") return "stabilise";
+  if (s === "ready_to_progress") return "ready_to_progress";
+  return null;
+}
+
+function normalizePillarScores(raw: any) {
+  return {
+    visibility: safeNumber(raw?.visibility, 0),
+    trust: safeNumber(raw?.trust, 0),
+    authority: safeNumber(raw?.authority, 0),
+    dominance: safeNumber(raw?.dominance, 0),
+  };
+}
+
+function normalizeTierCounts(raw: any) {
+  return {
+    Invisible: safeNumber(raw?.Invisible, 0),
+    Emerging: safeNumber(raw?.Emerging, 0),
+    Established: safeNumber(raw?.Established, 0),
+    Magnetic: safeNumber(raw?.Magnetic, 0),
+  };
 }
 
 export default async function ProfileExtendedReportPage({
@@ -93,10 +90,12 @@ export default async function ProfileExtendedReportPage({
 }: {
   params: { slug: string; takerId: string };
 }) {
-  const { slug, takerId } = params;
-  const sb = createClient().schema("portal");
+  const portal = createClient().schema("portal");
+  const vis = visibilityAdmin();
 
-  const { data: org } = await sb
+  const { slug, takerId } = params;
+
+  const { data: org } = await portal
     .from("orgs")
     .select("id, slug, name")
     .eq("slug", slug)
@@ -104,62 +103,92 @@ export default async function ProfileExtendedReportPage({
 
   if (!org) return notFound();
 
-  const { data: taker } = await sb
+  const { data: taker } = await portal
     .from("test_takers")
     .select(
-      "id, org_id, test_id, first_name, last_name, email, phone, company, role_title, link_token, created_at"
+      "id, org_id, test_id, link_token, first_name, last_name, email, phone, company, role_title, created_at"
     )
     .eq("id", takerId)
     .maybeSingle();
 
   if (!taker) return notFound();
 
-  let allowed = taker.org_id === org.id;
-
-  if (!allowed) {
-    const { data: subs } = await sb
-      .from("test_submissions")
-      .select("test_id")
-      .eq("taker_id", taker.id)
-      .order("created_at", { ascending: false })
-      .limit(25);
-
-    const testIds = Array.from(
-      new Set((subs || []).map((s: any) => s?.test_id).filter(Boolean))
-    ) as string[];
-
-    if (testIds.length) {
-      const { data: testsForSubs } = await sb
-        .from("tests")
-        .select("id, org_id")
-        .in("id", testIds);
-
-      allowed = (testsForSubs || []).some((t: any) => t?.org_id === org.id);
-    }
-  }
-
-  if (!allowed) return notFound();
-
-  const { data: test } = await sb
+  const { data: test } = await portal
     .from("tests")
     .select("id, name, slug")
     .eq("id", taker.test_id)
     .maybeSingle();
 
-  if (!taker.link_token) return notFound();
+  if (!test) return notFound();
 
-  const origin = getBaseUrl();
-  const reportUrl = `${origin}/api/public/visibility/${encodeURIComponent(
-    taker.link_token
-  )}/report?tid=${encodeURIComponent(taker.id)}&audience=profile_extended_report`;
+  const { data: submissions } = await vis
+    .from("submissions")
+    .select("id, token, taker_email, taker_name, metadata, created_at")
+    .eq("token", taker.link_token || "")
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-  const reportRes = await fetchJson<ExtendedReportResponse>(reportUrl);
+  const fullName = [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim();
+  const takerEmail = safeString(taker.email).toLowerCase();
 
-  if (!reportRes?.ok || !reportRes?.data) return notFound();
+  const submission =
+    (submissions || []).find((s: any) => safeString(s?.metadata?.taker_id) === taker.id) ||
+    (submissions || []).find(
+      (s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail
+    ) ||
+    (submissions || []).find((s: any) => safeString(s?.taker_name) === fullName) ||
+    (submissions || [])[0] ||
+    null;
 
-  const fullName =
-    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() ||
-    "Unknown participant";
+  if (!submission?.id) return notFound();
+
+  const { data: result } = await vis
+    .from("results")
+    .select(
+      "id, created_at, tier, level, readiness, personality_type, pillar_scores, tier_counts, engine_key, version"
+    )
+    .eq("submission_id", submission.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!result) return notFound();
+
+  const input: ProfileExtendedReportInput = {
+    tier: normalizeTier(result.tier),
+    level: safeNumber(result.level, 1),
+    behaviour_style: normalizeStyle(result.personality_type),
+    readiness: normalizeReadiness(result.readiness),
+    pillar_scores: normalizePillarScores(result.pillar_scores),
+    tier_counts: normalizeTierCounts(result.tier_counts),
+  };
+
+  const assembled = await buildProfileExtendedReport(input);
+
+  const report = {
+    audience: "profile_extended_report",
+    meta: {
+      org_name: org.name,
+      test_name: test.name,
+      generated_at: result.created_at || null,
+      mode: "internal",
+      scoring_mode: "prime",
+      report_variant: "extended",
+    },
+    input,
+    signals: {
+      tier: input.tier,
+      level: input.level,
+      style: input.behaviour_style,
+      readiness: input.readiness,
+      pillar_scores: input.pillar_scores,
+    },
+    graphs: {
+      pillars: input.pillar_scores,
+      tier_counts: input.tier_counts,
+    },
+    sections: assembled.sections,
+  };
 
   return (
     <ProfileExtendedReportClient
@@ -170,22 +199,22 @@ export default async function ProfileExtendedReportPage({
       }}
       taker={{
         id: taker.id,
-        fullName,
-        firstName: taker.first_name || "",
-        lastName: taker.last_name || "",
-        email: taker.email || "",
-        phone: taker.phone || "",
-        company: taker.company || "",
-        roleTitle: taker.role_title || "",
+        fullName: fullName || "Unknown",
+        firstName: safeString(taker.first_name),
+        lastName: safeString(taker.last_name),
+        email: safeString(taker.email),
+        phone: safeString(taker.phone),
+        company: safeString(taker.company),
+        roleTitle: safeString(taker.role_title),
         createdAt: taker.created_at || null,
       }}
       test={{
-        id: test?.id || "",
-        name: test?.name || "Visibility Ladder",
-        slug: test?.slug || "",
+        id: test.id,
+        name: test.name,
+        slug: test.slug,
       }}
-      report={reportRes.data}
-      backHref={`/portal/${slug}/database/${taker.id}`}
+      report={report}
+      backHref={`/portal/${slug}/database/${takerId}`}
     />
   );
 }
