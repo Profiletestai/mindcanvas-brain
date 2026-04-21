@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import VisibilityReportHeader from "@/components/visibility/report/VisibilityReportHeader";
+import VisibilityVideoSection from "@/components/visibility/report/VisibilityVideoSection";
 
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
@@ -144,10 +146,22 @@ const BRAND = {
   } as Record<Tier, string>,
 };
 
-const REPORT_LOGO = "/images/visibility-report/logo/Whatswhat-logo.png";
-const COACHING_ICON = "/images/visibility-report/icons/coaching.png";
-const LITE_VIDEO_URL =
+const SHORT_VIDEO_URL =
   "https://xciojwhnamsspmxpipzn.supabase.co/storage/v1/object/public/report-videos/Visibility%20Ladder%20Short.mp4";
+
+const SHORT_VIDEO_POSTER_URL = "";
+
+async function fetchJson<T = any>(url: string): Promise<T> {
+  const r = await fetch(url, { cache: "no-store" });
+  const ct = r.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) {
+    const text = (await r.text()).slice(0, 600);
+    throw new Error(`HTTP ${r.status} – non-JSON response:\n${text}`);
+  }
+  const j = await r.json();
+  if (!r.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${r.status}`);
+  return j as T;
+}
 
 function safeString(x: any): string {
   return typeof x === "string" ? x.trim() : "";
@@ -195,18 +209,6 @@ function tierBand(level: number): Tier {
   if (level <= 10) return "Emerging";
   if (level <= 15) return "Established";
   return "Magnetic";
-}
-
-async function fetchJson<T = any>(url: string): Promise<T> {
-  const r = await fetch(url, { cache: "no-store" });
-  const ct = r.headers.get("content-type") || "";
-  if (!ct.includes("application/json")) {
-    const text = (await r.text()).slice(0, 600);
-    throw new Error(`HTTP ${r.status} – non-JSON response:\n${text}`);
-  }
-  const j = await r.json();
-  if (!r.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${r.status}`);
-  return j as T;
 }
 
 function getPillarColor(key: string): string {
@@ -516,133 +518,6 @@ function Shell({ children }: { children: ReactNode }) {
       </div>
       <div className="relative">{children}</div>
     </div>
-  );
-}
-
-function Chip({ children }: { children: ReactNode }) {
-  return (
-    <div
-      className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.18em] uppercase"
-      style={{
-        border: `1px solid ${BRAND.border}`,
-        background: "rgba(255,255,255,0.05)",
-        color: "rgba(255,255,255,0.86)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function HeaderCard({
-  takerName,
-  reportDate,
-  nextStepsUrl,
-  onDownload,
-}: {
-  takerName: string;
-  reportDate: string;
-  nextStepsUrl?: string;
-  onDownload: () => void;
-}) {
-  return (
-    <OuterCard className="p-4 md:p-5">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-start gap-3">
-            <div
-              className="h-10 w-10 rounded-2xl overflow-hidden shrink-0"
-              style={{
-                border: `1px solid ${BRAND.border}`,
-                background: "rgba(255,255,255,0.06)",
-              }}
-            >
-              <img
-                src={REPORT_LOGO}
-                alt="WhatsWhat Prime logo"
-                className="h-full w-full object-contain"
-                onError={(e: any) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            </div>
-
-            <div>
-              <div className="text-[28px] md:text-[32px] font-semibold tracking-[0.14em] uppercase leading-none">
-                Visibility Ladder™
-              </div>
-              <div
-                className="mt-1.5 text-[12px] md:text-[13px] uppercase tracking-[0.28em]"
-                style={{ color: BRAND.textDim }}
-              >
-                Strategic Visibility Assessment
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Chip>WhatsWhat Prime</Chip>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-2.5">
-          <div className="flex gap-2">
-            <TopButton onClick={onDownload}>Download PDF</TopButton>
-            {nextStepsUrl ? (
-              <TopButton href={nextStepsUrl} variant="gradient">
-                Next steps
-              </TopButton>
-            ) : null}
-          </div>
-
-          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
-            <InnerPanel className="px-3.5 py-3 min-w-[150px]">
-              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                Prepared for
-              </div>
-              <div className="mt-1.5 text-[16px] font-semibold">{takerName}</div>
-            </InnerPanel>
-
-            <InnerPanel className="px-3.5 py-3 min-w-[130px]">
-              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                Date
-              </div>
-              <div className="mt-1.5 text-[16px] font-semibold">{reportDate}</div>
-            </InnerPanel>
-
-            <InnerPanel className="px-3.5 py-3 min-w-[150px]">
-              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                Report type
-              </div>
-              <div className="mt-1.5 text-[16px] font-semibold">Lite snapshot</div>
-            </InnerPanel>
-          </div>
-        </div>
-      </div>
-    </OuterCard>
-  );
-}
-
-function VideoCard() {
-  return (
-    <OuterCard className="p-4 md:p-5">
-      <div className="text-[15px] font-semibold">A quick welcome</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        Watch this short overview before reading your snapshot.
-      </div>
-
-      <div className="mt-4 overflow-hidden rounded-[18px] border" style={{ borderColor: BRAND.borderSoft }}>
-        <video
-          controls
-          playsInline
-          preload="metadata"
-          className="block w-full h-auto bg-black"
-        >
-          <source src={LITE_VIDEO_URL} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    </OuterCard>
   );
 }
 
@@ -1024,31 +899,7 @@ function InsightsSnapshot({
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <div className="flex items-start gap-3">
-        <div
-          className="h-10 w-10 rounded-2xl overflow-hidden shrink-0"
-          style={{
-            border: `1px solid ${BRAND.border}`,
-            background: "rgba(255,255,255,0.06)",
-          }}
-        >
-          <img
-            src={COACHING_ICON}
-            alt="Coaching insight icon"
-            className="h-full w-full object-cover"
-            onError={(e: any) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        </div>
-
-        <div>
-          <div className="text-[15px] font-semibold">Insights</div>
-          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-            A concise interpretation layer built from your scored signals and narrative blocks.
-          </div>
-        </div>
-      </div>
+      <div className="text-[15px] font-semibold">Insights</div>
 
       <InnerPanel className="mt-4 p-4">
         <div className="text-[14px] font-semibold">Executive summary</div>
@@ -1169,6 +1020,7 @@ export default function VisibilityLiteReportClient({
     };
   }, [token, tid, src]);
 
+  const orgLogoUrl = portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
   const takerName = fullName(portalMeta?.taker);
   const reportDate = formatDate(kbReport?.meta?.generated_at);
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
@@ -1312,14 +1164,21 @@ export default function VisibilityLiteReportClient({
         className="mx-auto max-w-[1560px] px-4 py-3 md:px-5 md:py-4 space-y-6"
       >
         <ReportPage id="ladder-position">
-          <HeaderCard
+          <VisibilityReportHeader
+            orgLogoUrl={orgLogoUrl}
             takerName={takerName}
             reportDate={reportDate || formatDate(null)}
+            frameworkName="WhatsWhat Prime"
             nextStepsUrl={nextStepsUrl}
             onDownload={downloadPdf}
           />
 
-          <VideoCard />
+          <VisibilityVideoSection
+            title="Welcome Video"
+            videoSrc={SHORT_VIDEO_URL}
+            posterSrc={SHORT_VIDEO_POSTER_URL || undefined}
+            helperText="Watch this short introduction before reviewing your snapshot."
+          />
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
             <div className="self-start">
