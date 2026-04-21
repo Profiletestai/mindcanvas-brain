@@ -1,6 +1,13 @@
 // apps/web/app/api/public/visibility/[token]/report/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  buildProfileExtendedReport,
+  type BehaviourStyle,
+  type ProfileExtendedReportInput,
+  type Readiness,
+  type VisibilityTier,
+} from "@/lib/visibility/profileExtendedReport";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -510,6 +517,74 @@ function normalizeLegacyPillarScores(raw: any) {
   };
 }
 
+function normalizeExtendedPillarScores(raw: any) {
+  return {
+    discoverability: safeNumber(raw?.discoverability ?? raw?.visibility),
+    trust: safeNumber(raw?.trust),
+    conversion: safeNumber(raw?.conversion ?? raw?.authority),
+    visibility: safeNumber(raw?.visibility ?? raw?.discoverability),
+    authority: safeNumber(raw?.authority ?? raw?.conversion),
+    dominance: safeNumber(raw?.dominance),
+  };
+}
+
+function toVisibilityTier(value: any): VisibilityTier {
+  const v = safeString(value);
+  if (v === "Invisible" || v === "Emerging" || v === "Established" || v === "Magnetic") {
+    return v;
+  }
+  return "Invisible";
+}
+
+function toBehaviourStyle(value: any): BehaviourStyle {
+  const v = safeString(value).toUpperCase();
+  if (v === "A" || v === "B" || v === "C" || v === "D") return v;
+  return "A";
+}
+
+function toReadiness(value: any): Readiness | null {
+  const v = safeString(value).toLowerCase();
+  if (v === "stabilise" || v === "ready_to_progress") return v as Readiness;
+  return null;
+}
+
+function calculateOverallPctForExtended(result: any) {
+  const direct = safeNumber(result?.computed?.overall_pct, -1);
+  if (direct >= 0) return direct;
+
+  const normalized = normalizeExtendedPillarScores(result?.pillar_scores || {});
+  const values = [
+    normalized.visibility,
+    normalized.trust,
+    normalized.authority,
+    normalized.dominance,
+  ].filter((n) => Number.isFinite(n));
+
+  if (!values.length) return 0;
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+}
+
+function isProfileExtendedCacheValid(cached: any) {
+  if (!cached || typeof cached !== "object") return false;
+  if (safeString(cached?.audience) !== "profile_extended_report") return false;
+
+  const sections = Array.isArray(cached?.sections) ? cached.sections : [];
+  if (!sections.length) return false;
+
+  const required = [
+    "result_at_a_glance",
+    "what_this_tier_means",
+    "level_nuance",
+    "pillars_and_signals",
+    "behaviour_style",
+    "strategic_priority_now",
+    "progression_roadmap",
+  ];
+
+  const byKey = new Set(sections.map((s: any) => safeString(s?.section_key)));
+  return required.every((k) => byKey.has(k));
+}
+
 /* ---------------- Route ---------------- */
 
 export async function GET(
@@ -734,6 +809,168 @@ export async function GET(
       }
     }
 
+    const orgId = taker?.org_id || submissionRow?.org_id || null;
+
+    const orgRowResp = orgId
+      ? await sb
+          .from("orgs")
+          .select("id, slug, name, logo_url")
+          .eq("id", orgId)
+          .maybeSingle()
+      : { data: null as any };
+
+    const orgRow = orgRowResp.data || null;
+    const orgName = orgRow?.name || orgRow?.slug || null;
+    const testName =
+      portalTest?.name ||
+      (mode === "prime"
+        ? "WhatsWhat Prime Visibility Ladder"
+        : "Visibility Ladder");
+
+    const takerName =
+      [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
+      safeString(submissionRow?.taker_name) ||
+      null;
+
+    /* ------------------------------------------------------------
+       PROFILE EXTENDED REPORT BRANCH
+       ------------------------------------------------------------ */
+    if (effectiveAudience === "profile_extended_report") {
+      let cached = await callRpc<any>(vis, "get_generated_report", {
+        p_submission_id: submissionId,
+        p_audience: effectiveAudience,
+        p_engine_key: engineKey,
+        p_version: version,
+      });
+
+      if (
+        cached &&
+        !cachedNeedsVariantRefresh(cached, reportVariant, effectiveAudience) &&
+        isProfileExtendedCacheValid(cached)
+      ) {
+        return NextResponse.json(
+          {
+            ok: true,
+            data: cached,
+            __meta: {
+              cached: true,
+              submission_id: submissionId,
+              engine_key: engineKey,
+              version,
+              audience: effectiveAudience,
+              scoring_mode: mode,
+              report_variant: reportVariant,
+            },
+          },
+          { status: 200 }
+        );
+      }
+
+      const extendedPillars = normalizeExtendedPillarScores(result?.pillar_scores || {});
+      const overallPct = calculateOverallPctForExtended(result);
+
+      const input: ProfileExtendedReportInput = {
+        tier: toVisibilityTier(result?.tier),
+        level: safeNumber(result?.level, 1),
+        behaviour_style: toBehaviourStyle(result?.personality_type),
+        readiness: toReadiness(result?.readiness),
+        pillar_scores: extendedPillars,
+      };
+
+      const assembled = await buildProfileExtendedReport(input);
+
+      const reportJson = {
+        token,
+        tid: tid || null,
+        sid: submissionId,
+        submission_id: submissionId,
+        engine_key: engineKey,
+        version,
+        audience: effectiveAudience,
+        meta: {
+          org_name: orgName,
+          org_logo_url: orgRow?.logo_url || null,
+          test_name: testName,
+          generated_at: new Date().toISOString(),
+          mode: "deterministic",
+          scoring_mode: mode,
+          report_variant: reportVariant,
+        },
+        input: assembled.input,
+        signals: {
+          tier: input.tier,
+          level: input.level,
+          style: input.behaviour_style,
+          readiness: input.readiness,
+          overall_pct: overallPct,
+          pillar_scores: {
+            visibility: extendedPillars.visibility,
+            trust: extendedPillars.trust,
+            authority: extendedPillars.authority,
+            dominance: extendedPillars.dominance,
+          },
+          weakest_pillar: result?.weakest_pillar ?? null,
+          strongest_pillar: result?.strongest_pillar ?? null,
+        },
+        graphs: {
+          tier_counts: result?.tier_counts || {},
+          pillars: {
+            visibility: extendedPillars.visibility,
+            trust: extendedPillars.trust,
+            authority: extendedPillars.authority,
+            dominance: extendedPillars.dominance,
+          },
+          pillar_bands: result?.pillar_bands || {},
+        },
+        sections: assembled.sections,
+        ai: null,
+        ai_meta: {
+          enabled: false,
+        },
+      };
+
+      const selectedBlocks = assembled.sections.flatMap((section) =>
+        (section.matched_rows || []).map((row) => ({
+          section_key: section.section_key,
+          id: row.id,
+          priority: row.priority,
+          triggers: row.triggers,
+          source_section_key: row.source_section_key,
+        }))
+      );
+
+      await callRpc<any>(vis, "upsert_generated_report", {
+        p_submission_id: submissionId,
+        p_audience: effectiveAudience,
+        p_report_json: reportJson,
+        p_signals: reportJson.signals,
+        p_selected_blocks: selectedBlocks,
+        p_engine_key: engineKey,
+        p_version: version,
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          data: reportJson,
+          __meta: {
+            cached: false,
+            submission_id: submissionId,
+            engine_key: engineKey,
+            version,
+            audience: effectiveAudience,
+            scoring_mode: mode,
+            report_variant: reportVariant,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    /* ------------------------------------------------------------
+       PUBLIC TAKER REPORT BRANCH
+       ------------------------------------------------------------ */
+
     let cached = await callRpc<any>(vis, "get_generated_report", {
       p_submission_id: submissionId,
       p_audience: effectiveAudience,
@@ -752,31 +989,6 @@ export async function GET(
     }
 
     const buildDeterministic = async () => {
-      const orgId = taker?.org_id || submissionRow?.org_id || null;
-
-      const orgRowResp = orgId
-        ? await sb
-            .from("orgs")
-            .select("id, slug, name, logo_url")
-            .eq("id", orgId)
-            .maybeSingle()
-        : { data: null as any };
-
-      const orgRow = orgRowResp.data || null;
-      const testRow = portalTest || null;
-
-      const orgName = orgRow?.name || orgRow?.slug || null;
-      const testName =
-        testRow?.name ||
-        (mode === "prime"
-          ? "WhatsWhat Prime Visibility Ladder"
-          : "Visibility Ladder");
-
-      const takerName =
-        [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim() ||
-        safeString(submissionRow?.taker_name) ||
-        null;
-
       const isPrimePublic = mode === "prime" && requestedAudience === "taker_report";
 
       const primePillarScores =

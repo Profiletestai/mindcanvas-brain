@@ -1,39 +1,20 @@
 // apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/page.tsx
-import "server-only";
+import { notFound } from "next/navigation";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+import { createClient } from "@/lib/server/supabaseAdmin";
+import ProfileExtendedReportClient from "./ProfileExtendedReportClient";
+import {
+  buildProfileExtendedReport,
+  type BehaviourStyle,
+  type ProfileExtendedReportInput,
+  type Readiness,
+  type VisibilityTier,
+} from "@/lib/visibility/profileExtendedReport";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
-import { notFound } from "next/navigation";
-import { headers } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
-import ProfileExtendedReportClient from "./ProfileExtendedReportClient";
-import { buildProfileExtendedReport } from "@/lib/visibility/profileExtendedReport";
-
-type VisibilityInputs = {
-  tier: string;
-  level: number;
-  behaviour_style?: string | null;
-  readiness?: string | null;
-  pillar_scores?: Record<string, number> | null;
-  tier_counts?: Record<string, number> | null;
-  personality_points?: Record<string, number> | null;
-};
-
-type ReportBlock = {
-  title?: string;
-  short_summary?: string;
-  paragraphs?: string[];
-  transition?: string;
-};
-
-type ReportSection = {
-  key: string;
-  title?: string;
-  blocks?: ReportBlock[];
-};
-
-function getKey() {
+function getServiceRoleKey() {
   return (
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE ||
@@ -42,231 +23,95 @@ function getKey() {
   );
 }
 
-function portalSb() {
+function visibilityAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = getKey();
-  if (!url || !key) throw new Error("Missing Supabase env vars");
-  return createClient(url, key, {
-    db: { schema: "portal" },
-    auth: { persistSession: false },
+  const key = getServiceRoleKey();
+
+  if (!url || !key) {
+    throw new Error("Missing Supabase env vars");
+  }
+
+  return createSupabaseClient(url, key, {
+    db: { schema: "visibility" },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
-function safeString(x: any) {
-  return typeof x === "string" ? x.trim() : "";
+function safeString(v: any): string {
+  return typeof v === "string" ? v.trim() : "";
 }
 
-function safeNumber(x: any, fallback = 0) {
-  const n = Number(x);
+function safeNumber(v: any, fallback = 0): number {
+  const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function normaliseObject(x: any) {
-  return x && typeof x === "object" ? x : {};
-}
-
-async function getBaseUrlFromHeaders() {
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") || "https";
-  const host = h.get("x-forwarded-host") || h.get("host") || "";
-  if (!host) throw new Error("Could not determine host");
-  return `${proto}://${host}`;
-}
-
-function normaliseSnapshotPayload(payload: any): VisibilityInputs | null {
-  const root = normaliseObject(payload?.data ?? payload);
-  const candidates = [
-    root,
-    root.visibility,
-    root.snapshot,
-    root.result,
-    root.signals,
-    root.visibility_result,
-    root.visibility_snapshot,
-  ].filter(Boolean);
-
-  for (const c of candidates) {
-    const obj = normaliseObject(c);
-    const tier = safeString(obj.tier ?? obj.visibility_tier ?? obj.result_tier);
-    const level = safeNumber(obj.level ?? obj.visibility_level ?? obj.result_level, 0);
-    const behaviour_style =
-      safeString(
-        obj.behaviour_style ??
-          obj.behavior_style ??
-          obj.style ??
-          obj.personality_type
-      ) || null;
-    const readiness = safeString(obj.readiness) || null;
-    const pillar_scores = normaliseObject(obj.pillar_scores);
-    const tier_counts = normaliseObject(obj.tier_counts);
-    const personality_points = normaliseObject(obj.personality_points);
-
-    if (tier && level > 0) {
-      return {
-        tier,
-        level,
-        behaviour_style,
-        readiness,
-        pillar_scores: Object.keys(pillar_scores).length ? pillar_scores : null,
-        tier_counts: Object.keys(tier_counts).length ? tier_counts : null,
-        personality_points: Object.keys(personality_points).length
-          ? personality_points
-          : null,
-      };
-    }
+function normalizeTier(v: any): VisibilityTier {
+  const s = safeString(v);
+  if (s === "Invisible" || s === "Emerging" || s === "Established" || s === "Magnetic") {
+    return s;
   }
+  return "Invisible";
+}
 
+function normalizeStyle(v: any): BehaviourStyle {
+  const s = safeString(v).toUpperCase();
+  if (s === "A" || s === "B" || s === "C" || s === "D") return s;
+  return "A";
+}
+
+function normalizeReadiness(v: any): Readiness | null {
+  const s = safeString(v).toLowerCase();
+  if (s === "stabilise") return "stabilise";
+  if (s === "ready_to_progress") return "ready_to_progress";
   return null;
 }
 
-function normaliseTotalsPayload(totals: any): VisibilityInputs | null {
-  const root = normaliseObject(totals?.visibility ?? totals);
-  const tier = safeString(root.tier);
-  const level = safeNumber(root.level, 0);
-  const behaviour_style =
-    safeString(
-      root.behaviour_style ??
-        root.behavior_style ??
-        root.style ??
-        root.personality_type
-    ) || null;
-  const readiness = safeString(root.readiness) || null;
-  const pillar_scores = normaliseObject(root.pillar_scores);
-  const tier_counts = normaliseObject(root.tier_counts);
-  const personality_points = normaliseObject(root.personality_points);
-
-  if (!tier || level <= 0) return null;
-
+function normalizePillarScores(raw: any) {
   return {
-    tier,
-    level,
-    behaviour_style,
-    readiness,
-    pillar_scores: Object.keys(pillar_scores).length ? pillar_scores : null,
-    tier_counts: Object.keys(tier_counts).length ? tier_counts : null,
-    personality_points: Object.keys(personality_points).length
-      ? personality_points
-      : null,
+    visibility: safeNumber(raw?.visibility, 0),
+    trust: safeNumber(raw?.trust, 0),
+    authority: safeNumber(raw?.authority, 0),
+    dominance: safeNumber(raw?.dominance, 0),
   };
 }
 
-async function loadVisibilityInputs(
-  slug: string,
-  takerId: string
-): Promise<VisibilityInputs | null> {
-  const portal = portalSb();
-
-  try {
-    const baseUrl = await getBaseUrlFromHeaders();
-    const h = await headers();
-    const cookie = h.get("cookie") || "";
-
-    const snapshotUrl = `${baseUrl}/api/portal/visibility/taker/${encodeURIComponent(
-      takerId
-    )}/snapshot?org=${encodeURIComponent(slug)}&audience=internal_snapshot`;
-
-    const res = await fetch(snapshotUrl, {
-      method: "GET",
-      headers: { cookie },
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const json = await res.json().catch(() => null);
-      const normalised = normaliseSnapshotPayload(json);
-      if (normalised) return normalised;
-    }
-  } catch (err) {
-    console.warn(
-      "[profile-extended-report] snapshot fetch failed, using fallback",
-      err
-    );
-  }
-
-  const { data: testResult, error } = await portal
-    .from("test_results")
-    .select("totals")
-    .eq("taker_id", takerId)
-    .maybeSingle();
-
-  if (error) {
-    console.warn("[profile-extended-report] test_results fallback failed", error);
-    return null;
-  }
-
-  return normaliseTotalsPayload(testResult?.totals);
-}
-
-function normaliseSections(rawReport: any): ReportSection[] {
-  const raw =
-    rawReport?.sections ??
-    rawReport?.report_sections ??
-    rawReport?.content ??
-    rawReport;
-
-  if (Array.isArray(raw)) {
-    return raw.map((s: any, idx: number) => ({
-      key: safeString(s?.key) || `section_${idx + 1}`,
-      title: safeString(s?.title) || undefined,
-      blocks: Array.isArray(s?.blocks)
-        ? s.blocks.map((b: any) => ({
-            title: safeString(b?.title) || undefined,
-            short_summary: safeString(b?.short_summary) || undefined,
-            paragraphs: Array.isArray(b?.paragraphs)
-              ? b.paragraphs.map((p: any) => String(p))
-              : [],
-            transition: safeString(b?.transition) || undefined,
-          }))
-        : [],
-    }));
-  }
-
-  if (raw && typeof raw === "object") {
-    return Object.entries(raw).map(([key, value]: [string, any]) => ({
-      key,
-      title: safeString(value?.title) || undefined,
-      blocks: Array.isArray(value?.blocks)
-        ? value.blocks.map((b: any) => ({
-            title: safeString(b?.title) || undefined,
-            short_summary: safeString(b?.short_summary) || undefined,
-            paragraphs: Array.isArray(b?.paragraphs)
-              ? b.paragraphs.map((p: any) => String(p))
-              : [],
-            transition: safeString(b?.transition) || undefined,
-          }))
-        : [],
-    }));
-  }
-
-  return [];
+function normalizeTierCounts(raw: any) {
+  return {
+    Invisible: safeNumber(raw?.Invisible, 0),
+    Emerging: safeNumber(raw?.Emerging, 0),
+    Established: safeNumber(raw?.Established, 0),
+    Magnetic: safeNumber(raw?.Magnetic, 0),
+  };
 }
 
 export default async function ProfileExtendedReportPage({
   params,
 }: {
-  params: Promise<{ slug: string; takerId: string }>;
+  params: { slug: string; takerId: string };
 }) {
-  const { slug, takerId } = await params;
-  const portal = portalSb();
+  const portal = createClient().schema("portal");
+  const vis = visibilityAdmin();
 
-  const { data: org, error: orgErr } = await portal
+  const { slug, takerId } = params;
+
+  const { data: org } = await portal
     .from("orgs")
     .select("id, slug, name")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (orgErr || !org) notFound();
+  if (!org) return notFound();
 
-  const { data: taker, error: takerErr } = await portal
+  const { data: taker } = await portal
     .from("test_takers")
     .select(
-      "id, org_id, test_id, first_name, last_name, email, company, role_title"
+      "id, org_id, test_id, link_token, first_name, last_name, email, phone, company, role_title, created_at"
     )
     .eq("id", takerId)
-    .eq("org_id", org.id)
     .maybeSingle();
 
-  if (takerErr || !taker) notFound();
+  if (!taker) return notFound();
 
   const { data: test } = await portal
     .from("tests")
@@ -274,39 +119,102 @@ export default async function ProfileExtendedReportPage({
     .eq("id", taker.test_id)
     .maybeSingle();
 
-  const visibilityInputs = await loadVisibilityInputs(slug, takerId);
+  if (!test) return notFound();
 
-  if (!visibilityInputs) {
-    notFound();
-  }
+  const { data: submissions } = await vis
+    .from("submissions")
+    .select("id, token, taker_email, taker_name, metadata, created_at")
+    .eq("token", taker.link_token || "")
+    .order("created_at", { ascending: false })
+    .limit(50);
 
-  const rawReport = await buildProfileExtendedReport({
-    tier: visibilityInputs.tier,
-    level: visibilityInputs.level,
-    behaviour_style: visibilityInputs.behaviour_style ?? null,
-    behavior_style: visibilityInputs.behaviour_style ?? null,
-    readiness: visibilityInputs.readiness ?? null,
-    pillar_scores: visibilityInputs.pillar_scores ?? null,
-  } as any);
+  const fullName = [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim();
+  const takerEmail = safeString(taker.email).toLowerCase();
 
-  const sections = normaliseSections(rawReport);
+  const submission =
+    (submissions || []).find((s: any) => safeString(s?.metadata?.taker_id) === taker.id) ||
+    (submissions || []).find(
+      (s: any) => safeString(s?.taker_email).toLowerCase() === takerEmail
+    ) ||
+    (submissions || []).find((s: any) => safeString(s?.taker_name) === fullName) ||
+    (submissions || [])[0] ||
+    null;
 
-  const fullName =
-    [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() ||
-    "Unknown test taker";
+  if (!submission?.id) return notFound();
+
+  const { data: result } = await vis
+    .from("results")
+    .select(
+      "id, created_at, tier, level, readiness, personality_type, pillar_scores, tier_counts, engine_key, version"
+    )
+    .eq("submission_id", submission.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!result) return notFound();
+
+  const input: ProfileExtendedReportInput = {
+    tier: normalizeTier(result.tier),
+    level: safeNumber(result.level, 1),
+    behaviour_style: normalizeStyle(result.personality_type),
+    readiness: normalizeReadiness(result.readiness),
+    pillar_scores: normalizePillarScores(result.pillar_scores),
+    tier_counts: normalizeTierCounts(result.tier_counts),
+  };
+
+  const assembled = await buildProfileExtendedReport(input);
+
+  const report = {
+    audience: "profile_extended_report",
+    meta: {
+      org_name: org.name,
+      test_name: test.name,
+      generated_at: result.created_at || null,
+      mode: "internal",
+      scoring_mode: "prime",
+      report_variant: "extended",
+    },
+    input,
+    signals: {
+      tier: input.tier,
+      level: input.level,
+      style: input.behaviour_style,
+      readiness: input.readiness,
+      pillar_scores: input.pillar_scores,
+    },
+    graphs: {
+      pillars: input.pillar_scores,
+      tier_counts: input.tier_counts,
+    },
+    sections: assembled.sections,
+  };
 
   return (
     <ProfileExtendedReportClient
-      orgSlug={slug}
-      takerId={takerId}
-      orgName={org.name || org.slug}
-      testName={test?.name || "Visibility Ladder"}
-      takerName={fullName}
-      takerEmail={taker.email || ""}
-      company={taker.company || ""}
-      roleTitle={taker.role_title || ""}
-      inputs={visibilityInputs}
-      sections={sections}
+      org={{
+        id: org.id,
+        slug: org.slug,
+        name: org.name,
+      }}
+      taker={{
+        id: taker.id,
+        fullName: fullName || "Unknown",
+        firstName: safeString(taker.first_name),
+        lastName: safeString(taker.last_name),
+        email: safeString(taker.email),
+        phone: safeString(taker.phone),
+        company: safeString(taker.company),
+        roleTitle: safeString(taker.role_title),
+        createdAt: taker.created_at || null,
+      }}
+      test={{
+        id: test.id,
+        name: test.name,
+        slug: test.slug,
+      }}
+      report={report}
+      backHref={`/portal/${slug}/database/${takerId}`}
     />
   );
 }

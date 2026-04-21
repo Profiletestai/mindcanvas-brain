@@ -1,198 +1,796 @@
 //apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/ProfileExtendedReportClient.tsx
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import Link from "next/link";
 
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
-type VisibilityInputs = {
-  tier: string;
-  level: number;
-  behaviour_style?: string | null;
-  readiness?: string | null;
-  pillar_scores?: Record<string, number> | null;
-  tier_counts?: Record<string, number> | null;
-  personality_points?: Record<string, number> | null;
+type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magnetic";
+type BehaviourStyle = "A" | "B" | "C" | "D";
+
+type ProfileExtendedPanel = {
+  panel_key: string;
+  title: string;
+  blocks: Array<Record<string, any>>;
+  matched_rows?: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, any>;
+  }>;
 };
 
-type ReportBlock = {
-  title?: string;
-  short_summary?: string;
-  paragraphs?: string[];
-  transition?: string;
+type ProfileExtendedSection = {
+  section_key: string;
+  heading: string;
+  panels: ProfileExtendedPanel[];
+  matched_rows?: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, any>;
+  }>;
 };
 
-type ReportSection = {
-  key: string;
-  title?: string;
-  blocks?: ReportBlock[];
+type ReportPayload = {
+  audience?: string;
+  meta?: {
+    org_name?: string | null;
+    org_logo_url?: string | null;
+    test_name?: string | null;
+    generated_at?: string | null;
+    mode?: string | null;
+    scoring_mode?: string | null;
+    report_variant?: string | null;
+  } | null;
+  input?: {
+    tier?: string | null;
+    level?: number | null;
+    behaviour_style?: string | null;
+    readiness?: string | null;
+    pillar_scores?: Record<string, number | null> | null;
+    tier_counts?: Record<string, number | null> | null;
+  } | null;
+  signals?: {
+    tier?: string | null;
+    level?: number | null;
+    style?: string | null;
+    readiness?: string | null;
+    overall_pct?: number | null;
+    pillar_scores?: Record<string, number | null> | null;
+    weakest_pillar?: string | null;
+    strongest_pillar?: string | null;
+  } | null;
+  graphs?: {
+    tier_counts?: Record<string, number | null> | null;
+    pillars?: Record<string, number | null> | null;
+    pillar_bands?: Record<string, string | null> | null;
+  } | null;
+  sections?: any[];
 };
 
-function safeString(x: any) {
-  return typeof x === "string" ? x.trim() : "";
+type Props = {
+  org: {
+    id: string;
+    slug: string;
+    name: string;
+  };
+  taker: {
+    id: string;
+    fullName: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    company: string;
+    roleTitle: string;
+    createdAt: string | null;
+  };
+  test: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  report: ReportPayload;
+  backHref: string;
+};
+
+const BRAND = {
+  pageBg: "#050914",
+  heroBg:
+    "radial-gradient(ellipse 83.33% 66.67% at 50% -10%, #113149 0%, #08121B 55%, #060E16 100%)",
+  border: "#E2E8F0",
+  blue: "#4F7DFF",
+  purple: "#8B5CF6",
+  teal: "#32D7C8",
+  green: "#0FCD5E",
+  red: "#E24B4A",
+  orange: "#EF9F27",
+  sky: "#4A9EDD",
+  slate: "#A7B3C7",
+} as const;
+
+const SECTION_LABELS: Array<{ key: string; label: string }> = [
+  { key: "result_at_a_glance", label: "Result at a glance" },
+  { key: "what_this_tier_means", label: "What this tier means" },
+  { key: "level_nuance", label: "Level nuance" },
+  { key: "pillars_and_signals", label: "Pillars and signals" },
+  { key: "behaviour_style", label: "Behaviour style" },
+  { key: "strategic_priority_now", label: "Strategic priority now" },
+  { key: "progression_roadmap", label: "Progression roadmap" },
+];
+
+function safeString(v: any): string {
+  return typeof v === "string" ? v.trim() : "";
 }
 
-function safeNumber(x: any, fallback = 0) {
-  const n = Number(x);
+function safeNumber(v: any, fallback = 0): number {
+  const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function sectionLabel(key: string, title?: string) {
-  if (safeString(title)) return title!;
-  const map: Record<string, string> = {
-    result_interpretation_scripts: "Result Interpretation",
-    level_progression_roadmap: "Level Progression Roadmap",
-    visibility_signal_framework: "Visibility Signal Framework",
-    visibility_audit_layer: "Visibility Audit Layer",
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function titleCase(input: string) {
+  return safeString(input)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function readinessLabel(value?: string | null) {
+  const v = safeString(value).toLowerCase();
+  if (v === "stabilise") return "Stabilise";
+  if (v === "ready_to_progress") return "Ready to progress";
+  return value ? titleCase(value) : "—";
+}
+
+function overallScore(report: ReportPayload) {
+  const direct = safeNumber(report?.signals?.overall_pct, -1);
+  if (direct >= 0) return direct;
+
+  const source =
+    report?.graphs?.pillars ||
+    report?.signals?.pillar_scores ||
+    report?.input?.pillar_scores ||
+    {};
+
+  const values = [
+    safeNumber((source as any)?.visibility, NaN),
+    safeNumber((source as any)?.trust, NaN),
+    safeNumber((source as any)?.authority, NaN),
+    safeNumber((source as any)?.dominance, NaN),
+  ].filter((n) => Number.isFinite(n));
+
+  if (!values.length) return 0;
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+}
+
+function getTier(report: ReportPayload): VisibilityTier {
+  const tier = safeString(report?.signals?.tier || report?.input?.tier);
+  if (
+    tier === "Invisible" ||
+    tier === "Emerging" ||
+    tier === "Established" ||
+    tier === "Magnetic"
+  ) {
+    return tier;
+  }
+  return "Invisible";
+}
+
+function getLevel(report: ReportPayload) {
+  return clamp(safeNumber(report?.signals?.level ?? report?.input?.level, 1), 1, 20);
+}
+
+function getStyle(report: ReportPayload): BehaviourStyle {
+  const value = safeString(
+    report?.signals?.style || report?.input?.behaviour_style
+  ).toUpperCase();
+  if (value === "A" || value === "B" || value === "C" || value === "D") return value;
+  return "A";
+}
+
+function getTierRange(tier: VisibilityTier) {
+  if (tier === "Invisible") return "1–5";
+  if (tier === "Emerging") return "6–10";
+  if (tier === "Established") return "11–15";
+  return "16–20";
+}
+
+function getTierColor(tier: VisibilityTier) {
+  if (tier === "Invisible") return BRAND.slate;
+  if (tier === "Emerging") return BRAND.blue;
+  if (tier === "Established") return BRAND.teal;
+  return BRAND.purple;
+}
+
+function getTierCounts(report: ReportPayload) {
+  const counts = report?.graphs?.tier_counts || {};
+  return {
+    Invisible: safeNumber((counts as any)?.Invisible, 0),
+    Emerging: safeNumber((counts as any)?.Emerging, 0),
+    Established: safeNumber((counts as any)?.Established, 0),
+    Magnetic: safeNumber((counts as any)?.Magnetic, 0),
   };
-  return map[key] || key.replace(/_/g, " ");
 }
 
-function sectionId(key: string) {
-  return `section-${key.replace(/[^a-z0-9_-]/gi, "-").toLowerCase()}`;
+function getPillarItems(report: ReportPayload) {
+  const source =
+    report?.graphs?.pillars ||
+    report?.signals?.pillar_scores ||
+    report?.input?.pillar_scores ||
+    {};
+
+  return [
+    {
+      key: "trust",
+      label: "Trust",
+      value: safeNumber((source as any)?.trust, 0),
+      color: BRAND.green,
+    },
+    {
+      key: "authority",
+      label: "Authority",
+      value: safeNumber((source as any)?.authority, 0),
+      color: BRAND.red,
+    },
+    {
+      key: "dominance",
+      label: "Dominance",
+      value: safeNumber((source as any)?.dominance, 0),
+      color: BRAND.sky,
+    },
+    {
+      key: "visibility",
+      label: "Visibility",
+      value: safeNumber((source as any)?.visibility, 0),
+      color: BRAND.orange,
+    },
+  ];
 }
 
-function colourForTier(tier: string) {
-  const t = safeString(tier).toLowerCase();
-  if (t === "invisible") return "#64748b";
-  if (t === "emerging") return "#3b82f6";
-  if (t === "established") return "#14b8a6";
-  if (t === "magnetic") return "#8b5cf6";
-  return "#64748b";
+function safeSectionId(sectionKey: any) {
+  const raw = safeString(sectionKey);
+  return raw ? raw.replace(/_/g, "-") : "section";
 }
 
-function normalisedPillars(scores?: Record<string, number> | null) {
-  const s = scores || {};
-  return Object.entries(s).map(([key, value]) => ({
-    key,
-    label: key.replace(/_/g, " "),
-    value: Math.max(0, Math.min(100, safeNumber(value))),
-  }));
+function collectSummary(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return "";
+  for (const block of panel.blocks || []) {
+    const shortSummary = safeString(block?.short_summary || block?.summary);
+    if (shortSummary) return shortSummary;
+  }
+  return "";
 }
 
-function tierRows(level: number) {
-  return Array.from({ length: 20 }, (_, i) => 20 - i).map((n) => ({
-    level: n,
-    active: n === level,
-    tier:
-      n <= 5
-        ? "Invisible"
-        : n <= 10
-          ? "Emerging"
-          : n <= 15
-            ? "Established"
-            : "Magnetic",
-  }));
+function collectParagraphs(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return [] as string[];
+  const out: string[] = [];
+  for (const block of panel.blocks || []) {
+    const paragraphs = Array.isArray(block?.paragraphs) ? block.paragraphs : [];
+    for (const p of paragraphs) {
+      const s = safeString(p);
+      if (s) out.push(s);
+    }
+  }
+  return out;
 }
 
-function TierLadderGraph({ tier, level }: { tier: string; level: number }) {
-  const rows = tierRows(level);
+function collectBullets(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return [] as string[];
+  const out: string[] = [];
+  for (const block of panel.blocks || []) {
+    const bullets = Array.isArray(block?.bullets) ? block.bullets : [];
+    for (const b of bullets) {
+      const s = safeString(b);
+      if (s) out.push(s);
+    }
+  }
+  return out;
+}
+
+function collectTransition(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return "";
+  for (const block of panel.blocks || []) {
+    const t = safeString(block?.transition);
+    if (t) return t;
+  }
+  return "";
+}
+
+function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
+  const mapped: Array<ProfileExtendedSection | null> = (rawSections || []).map(
+    (section: any) => {
+      const sectionKey = safeString(section?.section_key || section?.key);
+      if (!sectionKey) return null;
+
+      let panels: ProfileExtendedPanel[] = [];
+
+      if (Array.isArray(section?.panels)) {
+        panels = section.panels
+          .map((panel: any): ProfileExtendedPanel | null => {
+            const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
+            const title = safeString(panel?.title) || titleCase(panelKey);
+            const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
+
+            if (!panelKey) return null;
+            if (!blocks.length && !title) return null;
+
+            return {
+              panel_key: panelKey,
+              title,
+              blocks,
+              matched_rows: Array.isArray(panel?.matched_rows)
+                ? panel.matched_rows
+                : [],
+            };
+          })
+          .filter((panel: ProfileExtendedPanel | null): panel is ProfileExtendedPanel =>
+           panel !== null
+           );
+      } else if (Array.isArray(section?.blocks)) {
+        panels = [
+          {
+            panel_key: `${sectionKey}_legacy`,
+            title: safeString(section?.title) || titleCase(sectionKey),
+            blocks: section.blocks,
+            matched_rows: [],
+          },
+        ];
+      }
+
+      return {
+        section_key: sectionKey,
+        heading:
+          safeString(section?.heading || section?.title) || titleCase(sectionKey),
+        panels,
+        matched_rows: Array.isArray(section?.matched_rows)
+          ? section.matched_rows
+          : [],
+      };
+    }
+  );
+
+  return mapped.filter(
+    (section): section is ProfileExtendedSection =>
+      section !== null &&
+      !!section.section_key &&
+      Array.isArray(section.panels)
+  );
+}
+
+function PdfSection({ children }: { children: ReactNode }) {
+  return (
+    <section data-pdf-section="true" style={{ pageBreakAfter: "always" }}>
+      {children}
+    </section>
+  );
+}
+
+function WhiteCard({
+  title,
+  children,
+  id,
+}: {
+  title: string;
+  children: ReactNode;
+  id?: string;
+}) {
+  return (
+    <div
+      id={id}
+      className="rounded-[24px] bg-white shadow-sm"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="px-8 py-6 text-[24px] font-semibold leading-8 text-slate-900">
+        {title}
+      </div>
+      <div className="px-8 pb-8">{children}</div>
+    </div>
+  );
+}
+
+function PanelCard({
+  title,
+  panel,
+}: {
+  title: string;
+  panel?: ProfileExtendedPanel | null;
+}) {
+  const summary = collectSummary(panel);
+  const paragraphs = collectParagraphs(panel);
+  const bullets = collectBullets(panel);
+  const transition = collectTransition(panel);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        Ladder Position
+    <div
+      className="rounded-2xl bg-slate-50 p-6"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
+
+      {summary ? (
+        <div
+          className="mt-4 rounded-xl bg-white px-4 py-4"
+          style={{ outline: `1px solid ${BRAND.blue}` }}
+        >
+          <span className="font-semibold text-[#4F7DFF]">In short:</span>{" "}
+          <span className="text-slate-950">{summary}</span>
+        </div>
+      ) : null}
+
+      {paragraphs.length > 0 ? (
+        <div className="mt-4 space-y-3 text-[15px] leading-7 text-slate-700">
+          {paragraphs.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </div>
+      ) : null}
+
+      {bullets.length > 0 ? (
+        <ul className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
+          {bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {transition ? (
+        <div className="mt-4 text-[12px] italic leading-4 text-slate-500">
+          {transition}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SummaryHeader({
+  orgName,
+  backHref,
+  onDownload,
+  taker,
+  test,
+  report,
+}: {
+  orgName: string;
+  backHref: string;
+  onDownload: () => void;
+  taker: Props["taker"];
+  test: Props["test"];
+  report: ReportPayload;
+}) {
+  const tier = getTier(report);
+  const level = getLevel(report);
+  const style = getStyle(report);
+  const readiness = readinessLabel(
+    report?.signals?.readiness ?? report?.input?.readiness
+  );
+  const score = overallScore(report);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[20px] font-semibold text-white">{orgName}</div>
+        <Link href={backHref} className="text-sm text-white/80 underline">
+          Back to test taker profile
+        </Link>
       </div>
 
-      <div className="mt-4 space-y-1">
-        {rows.map((row) => {
-          const color = colourForTier(row.tier);
-          return (
-            <div key={row.level} className="flex items-center gap-3">
-              <div className="w-8 text-xs text-slate-500">{row.level}</div>
+      <div>
+        <div className="text-[26px] font-semibold leading-8 text-white">
+          Profile Extended Report
+        </div>
+        <div className="mt-1 text-[10px] text-white/85">
+          Internal-only extended interpretation layer for Visibility Ladder
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={onDownload}
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-[#050914]"
+        >
+          Download PDF
+        </button>
+      </div>
+
+      <div
+        className="rounded-[24px] bg-white p-5"
+        style={{ outline: `1px solid ${BRAND.border}` }}
+      >
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_620px]">
+          <div className="min-w-0">
+            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Internal Report
+            </div>
+
+            <div className="mt-4 text-[36px] font-semibold leading-10 text-slate-900">
+              {taker.fullName}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Pill text="WhatsWhat Prime" />
+              <Pill text="Visibility Ladder" />
+            </div>
+
+            <div className="mt-6 grid gap-2 text-[14px] text-slate-600">
+              {taker.email ? <div>{taker.email}</div> : null}
+              {taker.phone ? <div>{taker.phone}</div> : null}
+              {test.name ? <div>{test.name}</div> : null}
+              {taker.roleTitle ? <div>{taker.roleTitle}</div> : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <StatCard
+              label="Tier"
+              value={tier}
+              dotColor={getTierColor(tier)}
+              badge={tier === "Magnetic" ? "Top tier" : undefined}
+              badgeColor={getTierColor(tier)}
+            />
+            <StatCard label="Level" value={`${level}`} subValue="of 20" />
+            <StatCard label="Profile Style" value={style} />
+            <StatCard
+              label="Readiness"
+              value={readiness}
+              badge={`${score}% Score`}
+              badgeColor={BRAND.green}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Pill({ text }: { text: string }) {
+  return (
+    <div
+      className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
+      style={{
+        color: BRAND.blue,
+        background: "rgba(79,125,255,0.05)",
+        outline: "1px solid rgba(79,125,255,0.49)",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  subValue,
+  badge,
+  badgeColor,
+  dotColor,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+  badge?: string;
+  badgeColor?: string;
+  dotColor?: string;
+}) {
+  return (
+    <div
+      className="rounded-2xl bg-slate-50 p-4"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[12px] uppercase tracking-[0.02em] text-slate-500">
+          {label}
+        </div>
+        {badge ? (
+          <div
+            className="rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-white"
+            style={{ background: badgeColor || BRAND.blue }}
+          >
+            {badge}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        {dotColor ? (
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ background: dotColor }}
+          />
+        ) : null}
+        <div className="text-[25px] font-semibold leading-7 text-slate-950">
+          {value}
+        </div>
+      </div>
+
+      {subValue ? <div className="mt-1 text-[8px] text-slate-500">{subValue}</div> : null}
+    </div>
+  );
+}
+
+function ReportIndexCard({
+  sections,
+}: {
+  sections: ProfileExtendedSection[];
+}) {
+  const items = SECTION_LABELS.filter((item) =>
+    sections.some((section) => section.section_key === item.key)
+  );
+
+  return (
+    <div
+      className="rounded-2xl bg-white p-5 shadow-sm"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Report Index
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {items.map((item, idx) => (
+          <a
+            key={item.key}
+            href={`#${safeSectionId(item.key)}`}
+            className="block rounded-xl bg-slate-50 px-3 py-3 text-[14px] text-slate-950"
+            style={{ outline: `1px solid ${BRAND.border}` }}
+          >
+            <span className="mr-2 text-slate-400">{idx + 1}.</span>
+            {item.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LadderPositionCard({ report }: { report: ReportPayload }) {
+  const tier = getTier(report);
+  const level = getLevel(report);
+  const ordered: VisibilityTier[] = [
+    "Invisible",
+    "Emerging",
+    "Established",
+    "Magnetic",
+  ];
+
+  return (
+    <div
+      className="rounded-2xl bg-slate-50 p-5"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Ladder position
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {ordered.map((item) => {
+          const passed = ordered.indexOf(item) < ordered.indexOf(tier);
+          const current = item === tier;
+          const color = getTierColor(item);
+
+          return current ? (
+            <div key={item} className="flex items-start gap-3">
               <div
-                className="relative h-6 flex-1 rounded-full border"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F5F3FF] text-[13px] font-medium"
+                style={{ color: "#7C3AED", outline: "2px solid #8B5CF6" }}
+              >
+                {level}
+              </div>
+              <div
+                className="flex-1 rounded-xl p-4"
                 style={{
-                  borderColor: row.active ? color : "#e2e8f0",
-                  background: row.active ? `${color}22` : "#ffffff",
+                  background: item === "Magnetic" ? "#F5F3FF" : "#EFF6FF",
+                  outline: `1px solid ${color}`,
                 }}
               >
+                <div className="text-[16px] font-medium text-slate-950">{item}</div>
+                <div className="mt-1 flex items-center justify-between text-[14px]">
+                  <span style={{ color }}>{getTierRange(item).split("–")[0]}</span>
+                  <span style={{ color }}>{getTierRange(item).split("–")[1]}</span>
+                </div>
+                <div className="mt-3 h-1 rounded-full bg-white">
+                  <div
+                    className="h-1 rounded-full"
+                    style={{
+                      background: color,
+                      width: `${Math.max(
+                        8,
+                        Math.min(
+                          100,
+                          ((level - Number(getTierRange(item).split("–")[0])) /
+                            (Number(getTierRange(item).split("–")[1]) -
+                              Number(getTierRange(item).split("–")[0]) || 1)) *
+                            100
+                        )
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div key={item} className="flex items-center gap-3 opacity-70">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-full"
+                style={{
+                  background:
+                    item === "Invisible"
+                      ? "#F9FAFB"
+                      : item === "Emerging"
+                      ? "#EFF6FF"
+                      : item === "Established"
+                      ? "#F0FDF4"
+                      : "#F5F3FF",
+                  outline: `1px solid ${passed ? color : BRAND.border}`,
+                }}
+              >
+                <span className="text-[12px]" style={{ color }}>
+                  ✓
+                </span>
+              </div>
+              <div>
                 <div
-                  className="absolute inset-y-0 right-0 w-1 rounded-r-full"
-                  style={{ background: row.active ? color : "#cbd5e1" }}
-                />
+                  className={`text-[14px] ${passed ? "line-through" : ""}`}
+                  style={{ color }}
+                >
+                  {item}
+                </div>
+                <div className="text-[14px] text-slate-600">
+                  {getTierRange(item)} · {passed ? "Passed" : "Pending"}
+                </div>
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-4 text-sm text-slate-700">
-        <span className="font-semibold" style={{ color: colourForTier(tier) }}>
-          {tier}
-        </span>{" "}
-        • Level {level}
+      <div className="mt-5 border-t border-slate-200 pt-4">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ background: getTierColor(tier) }}
+          />
+          <div className="text-[17px] font-medium">
+            <span style={{ color: getTierColor(tier) }}>{tier}</span>
+            <span className="text-slate-700"> · Level {level}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function PillarGraph({ scores }: { scores?: Record<string, number> | null }) {
-  const pillars = normalisedPillars(scores);
+function PillarScoresCard({ report }: { report: ReportPayload }) {
+  const pillars = getPillarItems(report);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <div
+      className="rounded-2xl bg-slate-50 p-5"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
         Pillar Scores
       </div>
 
-      {pillars.length ? (
-        <div className="mt-4 space-y-4">
-          {pillars.map((pillar) => (
-            <div key={pillar.key}>
-              <div className="mb-1 flex items-center justify-between text-sm text-slate-700">
-                <span className="capitalize">{pillar.label}</span>
-                <span className="font-medium">{pillar.value}%</span>
-              </div>
-              <div className="h-3 rounded-full bg-slate-200">
-                <div
-                  className="h-3 rounded-full bg-slate-900"
-                  style={{ width: `${pillar.value}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-4 text-sm text-slate-500">
-          No pillar scores available.
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TierCountsGraph({ counts }: { counts?: Record<string, number> | null }) {
-  const c = counts || {};
-  const items = [
-    { key: "Invisible", label: "Invisible", value: safeNumber(c.Invisible) },
-    { key: "Emerging", label: "Emerging", value: safeNumber(c.Emerging) },
-    { key: "Established", label: "Established", value: safeNumber(c.Established) },
-    { key: "Magnetic", label: "Magnetic", value: safeNumber(c.Magnetic) },
-  ];
-  const max = Math.max(...items.map((i) => i.value), 1);
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        Tier Distribution
-      </div>
-
       <div className="mt-4 space-y-4">
-        {items.map((item) => (
-          <div key={item.key}>
-            <div className="mb-1 flex items-center justify-between text-sm text-slate-700">
-              <span>{item.label}</span>
-              <span>{item.value}</span>
+        {pillars.map((pillar) => (
+          <div key={pillar.key}>
+            <div className="mb-1 flex items-center justify-between text-[14px] text-slate-700">
+              <span className="capitalize">{pillar.label.toLowerCase()}</span>
+              <span className="font-medium">{pillar.value}%</span>
             </div>
             <div className="h-3 rounded-full bg-slate-200">
               <div
                 className="h-3 rounded-full"
                 style={{
-                  width: `${(item.value / max) * 100}%`,
-                  background: colourForTier(item.key),
+                  width: `${pillar.value}%`,
+                  background: pillar.color,
                 }}
               />
             </div>
@@ -203,310 +801,168 @@ function TierCountsGraph({ counts }: { counts?: Record<string, number> | null })
   );
 }
 
-export default function ProfileExtendedReportClient(props: {
-  orgSlug: string;
-  takerId: string;
-  orgName: string;
-  testName: string;
-  takerName: string;
-  takerEmail: string;
-  company: string;
-  roleTitle: string;
-  inputs: VisibilityInputs;
-  sections: ReportSection[];
-}) {
-  const reportRef = useRef<HTMLDivElement | null>(null);
+function TierDistributionCard({ report }: { report: ReportPayload }) {
+  const counts = getTierCounts(report);
+  const max = Math.max(...Object.values(counts), 0);
 
-  const pillarEntries = useMemo(() => {
-    const scores = props.inputs.pillar_scores || {};
-    return Object.entries(scores).map(([key, value]) => ({
-      key,
-      label: key.replace(/_/g, " "),
-      value: safeNumber(value),
-    }));
-  }, [props.inputs.pillar_scores]);
+  return (
+    <div
+      className="rounded-2xl bg-slate-50 p-5"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Tier Distribution
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {(Object.keys(counts) as VisibilityTier[]).map((tier) => {
+          const value = counts[tier];
+          const width = max > 0 ? (value / max) * 100 : 0;
+
+          return (
+            <div key={tier}>
+              <div className="mb-1 flex items-center justify-between text-[14px] text-slate-700">
+                <span>{tier}</span>
+                <span>{value}</span>
+              </div>
+              <div className="h-3 rounded-full bg-slate-200">
+                <div
+                  className="h-3 rounded-full"
+                  style={{
+                    width: `${width}%`,
+                    background: getTierColor(tier),
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <div className="space-y-5">
+        {section.panels.map((panel) => (
+          <PanelCard key={panel.panel_key} title={panel.title} panel={panel} />
+        ))}
+      </div>
+    </WhiteCard>
+  );
+}
+
+export default function ProfileExtendedReportClient({
+  org,
+  taker,
+  test,
+  report,
+  backHref,
+}: Props) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const sections = useMemo(
+    () => normalizeSections(report.sections || []),
+    [report.sections]
+  );
 
   async function downloadPdf() {
     try {
-      if (!reportRef.current) return;
+      const root = rootRef.current;
+      if (!root) return;
+
+      const sectionNodes = Array.from(
+        root.querySelectorAll("[data-pdf-section='true']")
+      ) as HTMLDivElement[];
+
+      if (!sectionNodes.length) return;
 
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
         html2canvasPromise(),
         jsPdfPromise(),
       ]);
 
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#f8fafc",
-      });
-
-      const imgData = canvas.toDataURL("image/png");
       const pdf = new JsPDF("p", "pt", "a4");
-
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
 
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      for (let i = 0; i < sectionNodes.length; i += 1) {
+        const node = sectionNodes[i];
+        const canvas = await html2canvas(node, {
+          backgroundColor: "#F1F5F9",
+          scale: 2,
+          useCORS: true,
+          windowWidth: node.scrollWidth,
+          windowHeight: node.scrollHeight,
+        });
 
-      let heightLeft = imgHeight;
-      let position = 0;
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
       }
 
-      const safeName = `${props.takerName || "Profile"}-Profile-Extended-Report`.replace(
-        /[^\w-]+/g,
+      const safeName = `${taker.fullName || "profile"}-profile-extended-report.pdf`.replace(
+        /[^\w\-]+/g,
         "_"
       );
-      pdf.save(`${safeName}.pdf`);
-    } catch (err) {
-      console.error("[profile-extended-report] pdf export failed", err);
-      alert("PDF export failed. Check the console for details.");
+      pdf.save(safeName);
+    } catch (e) {
+      console.error("[profile-extended] pdf export failed", e);
+      alert("PDF export failed.");
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link
-              href={`/portal/${props.orgSlug}/database/${props.takerId}`}
-              className="text-sm text-slate-600 hover:text-slate-900"
-            >
-              ← Back to test taker profile
-            </Link>
-            <h1 className="mt-3 text-3xl font-semibold text-slate-900">
-              Profile Extended Report
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Internal-only extended interpretation layer for Visibility Ladder
-            </p>
-          </div>
+    <div className="min-h-screen" style={{ background: BRAND.pageBg }}>
+      <div
+        className="min-h-[240px]"
+        style={{
+          background: BRAND.heroBg,
+        }}
+      >
+        <div className="mx-auto max-w-[1440px] px-5 py-4">
+          <SummaryHeader
+            orgName={org.name}
+            backHref={backHref}
+            onDownload={downloadPdf}
+            taker={taker}
+            test={test}
+            report={report}
+          />
 
-          <div className="flex gap-3">
-            <button
-              onClick={downloadPdf}
-              className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Download PDF
-            </button>
+          <div className="mt-4 text-[12px] text-white/50">
+            Database → {taker.fullName} →{" "}
+            <span className="text-white">Profile Extended Report</span>
           </div>
         </div>
+      </div>
 
-        <div ref={reportRef} className="space-y-6">
-          <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Internal Report
-                </div>
-                <h2 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
-                  {props.takerName}
-                </h2>
-                <div className="mt-3 space-y-1 text-sm text-slate-600">
-                  <div>{props.takerEmail || "—"}</div>
-                  <div>{props.company || "—"}</div>
-                  <div>{props.roleTitle || "—"}</div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:w-[420px]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Organisation
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {props.orgName}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Assessment
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {props.testName}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Tier
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-full"
-                      style={{ background: colourForTier(props.inputs.tier) }}
-                    />
-                    <span className="text-sm font-semibold text-slate-900">
-                      {props.inputs.tier}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Level
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {props.inputs.level}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Behaviour Style
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {props.inputs.behaviour_style || "—"}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Readiness
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-900">
-                    {props.inputs.readiness || "—"}
-                  </div>
-                </div>
-              </div>
+      <div className="bg-slate-100">
+        <div ref={rootRef} className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
+          <PdfSection>
+            <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
+              <LadderPositionCard report={report} />
+              <PillarScoresCard report={report} />
+              <TierDistributionCard report={report} />
             </div>
-          </section>
+          </PdfSection>
 
-          <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="space-y-6">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Report Index
-                </div>
+          <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
+            <div className="xl:sticky xl:top-5">
+              <ReportIndexCard sections={sections} />
+            </div>
 
-                <div className="mt-4 space-y-2">
-                  {props.sections.map((section, index) => (
-                    <a
-                      key={section.key}
-                      href={`#${sectionId(section.key)}`}
-                      className="block rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 hover:bg-slate-100"
-                    >
-                      <span className="mr-2 text-slate-400">{index + 1}.</span>
-                      {sectionLabel(section.key, section.title)}
-                    </a>
-                  ))}
-                </div>
-
-                {pillarEntries.length ? (
-                  <div className="mt-6">
-                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Pillar Scores
-                    </div>
-                    <div className="mt-3 space-y-3">
-                      {pillarEntries.map((pillar) => (
-                        <div key={pillar.key}>
-                          <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
-                            <span className="capitalize">{pillar.label}</span>
-                            <span>{pillar.value}%</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-slate-200">
-                            <div
-                              className="h-2 rounded-full bg-slate-900"
-                              style={{ width: `${Math.max(0, Math.min(100, pillar.value))}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </aside>
-
-            <main className="space-y-6">
-              <section className="grid gap-6 xl:grid-cols-3">
-                <TierLadderGraph
-                  tier={props.inputs.tier}
-                  level={props.inputs.level}
-                />
-                <PillarGraph scores={props.inputs.pillar_scores} />
-                <TierCountsGraph counts={props.inputs.tier_counts} />
-              </section>
-
-              {props.sections.length ? (
-                props.sections.map((section, index) => (
-                  <section
-                    key={section.key}
-                    id={sectionId(section.key)}
-                    className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm"
-                  >
-                    <div className="mb-6">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Section {index + 1}
-                      </div>
-                      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-                        {sectionLabel(section.key, section.title)}
-                      </h2>
-                    </div>
-
-                    <div className="space-y-5">
-                      {(section.blocks || []).map((block, blockIndex) => (
-                        <div
-                          key={`${section.key}-${blockIndex}`}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
-                        >
-                          {safeString(block.title) ? (
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {block.title}
-                            </h3>
-                          ) : null}
-
-                          {safeString(block.short_summary) ? (
-                            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                              <span className="font-semibold text-slate-900">
-                                In short:
-                              </span>{" "}
-                              {block.short_summary}
-                            </div>
-                          ) : null}
-
-                          {Array.isArray(block.paragraphs) && block.paragraphs.length ? (
-                            <div className="mt-4 space-y-4 text-[15px] leading-7 text-slate-700">
-                              {block.paragraphs.map((paragraph, pIndex) => (
-                                <p key={pIndex}>{paragraph}</p>
-                              ))}
-                            </div>
-                          ) : null}
-
-                          {safeString(block.transition) ? (
-                            <div className="mt-4 text-xs italic text-slate-500">
-                              {block.transition}
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ))
-              ) : (
-                <section className="rounded-3xl border border-amber-200 bg-amber-50 p-8">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    No report sections found
-                  </h2>
-                  <p className="mt-3 text-sm text-slate-700">
-                    The helper ran, but no matching Profile Extended Report blocks
-                    were returned from the knowledge base.
-                  </p>
-                </section>
-              )}
-            </main>
+            <div className="space-y-4">
+              {sections.map((section) => (
+                <PdfSection key={section.section_key}>
+                  <SectionRenderer section={section} />
+                </PdfSection>
+              ))}
+            </div>
           </div>
         </div>
       </div>
