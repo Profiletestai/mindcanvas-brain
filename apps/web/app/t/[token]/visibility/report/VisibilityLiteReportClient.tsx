@@ -1,4 +1,4 @@
-//apps/web/app/t/[token]/visibility/report/VisibilityLiteReportClient.tsx
+// apps/web/app/t/[token]/visibility/report/VisibilityLiteReportClient.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -76,6 +76,7 @@ type VisibilityKbReport = {
     mode?: "deterministic" | "ai" | string;
     ai_error?: string;
     scoring_mode?: string;
+    report_variant?: string | null;
   };
   signals?: Signals;
   graphs?: Graphs;
@@ -124,6 +125,10 @@ type PillarItem = {
   color: string;
 };
 
+type TierCounts = Record<Tier, number>;
+
+const html2canvasScale = 2;
+
 const BRAND = {
   bg: "#061A3A",
   border: "rgba(255,255,255,0.12)",
@@ -136,12 +141,25 @@ const BRAND = {
   teal: "#45E0D1",
   purple: "#8B5CF6",
   amber: "#F3B95C",
+  red: "#FF6B6B",
+  green: "#31D46B",
   tier: {
     Invisible: "#A7B3C7",
     Emerging: "#4F7DFF",
     Established: "#32D7C8",
     Magnetic: "#8B5CF6",
   } as Record<Tier, string>,
+};
+
+const REPORT_ICONS = {
+  result: "/images/visibility-report/icons/result.png",
+  distribution: "/images/visibility-report/icons/distribution.png",
+  snapshot: "/images/visibility-report/icons/snapshot.png",
+  pillars: "/images/visibility-report/icons/pillars.png",
+  insights: "/images/visibility-report/icons/insights.png",
+  strengths: "/images/visibility-report/icons/strengths.png",
+  friction: "/images/visibility-report/icons/friction.png",
+  opportunity: "/images/visibility-report/icons/opportunity.png",
 };
 
 function safeString(x: any): string {
@@ -286,9 +304,9 @@ function firstItems(arr: string[], count: number): string[] {
   return arr.filter(Boolean).slice(0, count);
 }
 
-function buildTierCounts(raw: Record<string, number> | undefined | null, dominantTier: Tier) {
+function buildTierCounts(raw: Record<string, number> | undefined | null, dominantTier: Tier): TierCounts {
   const source = raw || {};
-  const out: Record<Tier, number> = {
+  const out: TierCounts = {
     Invisible: safeNumber((source as any)?.Invisible, 0),
     Emerging: safeNumber((source as any)?.Emerging, 0),
     Established: safeNumber((source as any)?.Established, 0),
@@ -525,6 +543,68 @@ function Chip({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+function IconBadge({
+  src,
+  alt,
+  fallbackLabel,
+}: {
+  src?: string | null;
+  alt: string;
+  fallbackLabel?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+      style={{
+        background: "linear-gradient(180deg, rgba(76, 148, 255, 0.95), rgba(53, 96, 186, 0.9))",
+        border: `1px solid ${BRAND.border}`,
+        boxShadow: "0 10px 24px rgba(0,0,0,0.22)",
+      }}
+    >
+      {!failed && src ? (
+        <img
+          src={src}
+          alt={alt}
+          className="h-8 w-8 object-contain"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+          {fallbackLabel || alt.slice(0, 2)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CardTitleRow({
+  title,
+  subtitle,
+  iconSrc,
+  fallbackLabel,
+}: {
+  title: string;
+  subtitle?: string;
+  iconSrc?: string | null;
+  fallbackLabel?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <IconBadge src={iconSrc} alt={title} fallbackLabel={fallbackLabel} />
+      <div className="min-w-0">
+        <div className="text-[15px] font-semibold">{title}</div>
+        {subtitle ? (
+          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+            {subtitle}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -784,17 +864,14 @@ function LitePositionCard({
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <div className="text-[16px] md:text-[18px] font-semibold">
-        You are currently positioned at:{" "}
-        <span style={{ color: BRAND.tier[tier] }}>Level {level}</span>{" "}
-        <span style={{ color: BRAND.textDim }}>{tier} Tier</span>
-      </div>
+      <CardTitleRow
+        title={`You are currently positioned at: Level ${level} ${tier} Tier`}
+        subtitle={intro}
+        iconSrc={REPORT_ICONS.result}
+        fallbackLabel="R"
+      />
 
-      <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-        {intro}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-wrap gap-3">
         <InnerPanel className="px-4 py-3">
           <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
             Status
@@ -845,7 +922,7 @@ function LitePositionCard({
             <ul className="mt-2 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
               {caution.map((item, idx) => (
                 <li key={idx} className="flex gap-2">
-                  <span style={{ color: "#FF7A7A" }}>×</span>
+                  <span style={{ color: BRAND.red }}>×</span>
                   <span>{item}</span>
                 </li>
               ))}
@@ -860,7 +937,7 @@ function LitePositionCard({
 function DistributionChart({
   tierCounts,
 }: {
-  tierCounts: Record<Tier, number>;
+  tierCounts: TierCounts;
 }) {
   const items: Array<{ key: Tier; value: number; color: string }> = [
     { key: "Invisible", value: tierCounts.Invisible, color: BRAND.tier.Invisible },
@@ -872,11 +949,13 @@ function DistributionChart({
   const max = Math.max(...items.map((i) => i.value), 1);
 
   return (
-    <OuterCard className="p-4">
-      <div className="text-[15px] font-semibold">Signal distribution</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        These graphs show how your answers map across ladder tiers.
-      </div>
+    <OuterCard className="p-4 h-full">
+      <CardTitleRow
+        title="Signal distribution"
+        subtitle="These graphs show how your answers map across ladder tiers."
+        iconSrc={REPORT_ICONS.distribution}
+        fallbackLabel="D"
+      />
 
       <InnerPanel className="mt-4 p-4">
         <div className="flex h-[220px] items-end justify-between gap-4">
@@ -916,10 +995,12 @@ function SnapshotSummaryCard({
 }) {
   return (
     <OuterCard className="p-4 h-full">
-      <div className="text-[15px] font-semibold">Your visibility snapshot</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        A concise summary of where you currently stand.
-      </div>
+      <CardTitleRow
+        title="Your visibility snapshot"
+        subtitle="A concise summary of where you currently stand."
+        iconSrc={REPORT_ICONS.snapshot}
+        fallbackLabel="S"
+      />
 
       <InnerPanel className="mt-4 p-4">
         <div className="text-[13px] leading-7" style={{ color: BRAND.text }}>
@@ -947,11 +1028,13 @@ function PillarSnapshot({
   pillars: PillarItem[];
 }) {
   return (
-    <OuterCard className="p-4">
-      <div className="text-[15px] font-semibold">Your visibility pillars</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        A quick reading of the key signals shaping market response.
-      </div>
+    <OuterCard className="p-4 md:p-5">
+      <CardTitleRow
+        title="Your visibility pillars"
+        subtitle="A quick reading of the key signals shaping market response."
+        iconSrc={REPORT_ICONS.pillars}
+        fallbackLabel="P"
+      />
 
       <div className="mt-4 space-y-4">
         {pillars.map((pillar) => (
@@ -986,6 +1069,29 @@ function PillarSnapshot({
   );
 }
 
+function InsightMiniCard({
+  title,
+  iconSrc,
+  fallbackLabel,
+  children,
+}: {
+  title: string;
+  iconSrc?: string;
+  fallbackLabel?: string;
+  children: ReactNode;
+}) {
+  return (
+    <InnerPanel className="p-4 h-full">
+      <CardTitleRow
+        title={title}
+        iconSrc={iconSrc}
+        fallbackLabel={fallbackLabel}
+      />
+      <div className="mt-3">{children}</div>
+    </InnerPanel>
+  );
+}
+
 function InsightsSnapshot({
   ai,
   strengths,
@@ -1001,7 +1107,11 @@ function InsightsSnapshot({
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <div className="text-[15px] font-semibold">Insights</div>
+      <CardTitleRow
+        title="Insights"
+        iconSrc={REPORT_ICONS.insights}
+        fallbackLabel="I"
+      />
 
       <InnerPanel className="mt-4 p-4">
         <div className="text-[14px] font-semibold">Executive summary</div>
@@ -1019,9 +1129,12 @@ function InsightsSnapshot({
       </InnerPanel>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <InnerPanel className="p-4">
-          <div className="text-[14px] font-semibold">Strengths</div>
-          <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+        <InsightMiniCard
+          title="Strengths"
+          iconSrc={REPORT_ICONS.strengths}
+          fallbackLabel="St"
+        >
+          <ul className="space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
             {strengths.map((item, idx) => (
               <li key={idx} className="flex gap-2">
                 <span>•</span>
@@ -1029,11 +1142,14 @@ function InsightsSnapshot({
               </li>
             ))}
           </ul>
-        </InnerPanel>
+        </InsightMiniCard>
 
-        <InnerPanel className="p-4">
-          <div className="text-[14px] font-semibold">Friction</div>
-          <ul className="mt-3 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+        <InsightMiniCard
+          title="Friction"
+          iconSrc={REPORT_ICONS.friction}
+          fallbackLabel="F"
+        >
+          <ul className="space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
             {friction.map((item, idx) => (
               <li key={idx} className="flex gap-2">
                 <span>•</span>
@@ -1041,15 +1157,20 @@ function InsightsSnapshot({
               </li>
             ))}
           </ul>
-        </InnerPanel>
+        </InsightMiniCard>
       </div>
 
-      <InnerPanel className="mt-4 p-4">
-        <div className="text-[14px] font-semibold">Strategic opportunity</div>
-        <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-          {ai?.strategic_opportunity || opportunity}
-        </div>
-      </InnerPanel>
+      <div className="mt-4">
+        <InsightMiniCard
+          title="Strategic opportunity"
+          iconSrc={REPORT_ICONS.opportunity}
+          fallbackLabel="O"
+        >
+          <div className="text-[13px] leading-7" style={{ color: BRAND.text }}>
+            {ai?.strategic_opportunity || opportunity}
+          </div>
+        </InsightMiniCard>
+      </div>
 
       <OuterCard className="mt-4 p-4">
         <div className="text-[16px] font-semibold">Want the full Visibility Ladder report?</div>
@@ -1195,7 +1316,7 @@ export default function VisibilityLiteReportClient({
         const pageNode = pageNodes[i];
         const canvas = await html2canvas(pageNode, {
           backgroundColor: BRAND.bg,
-          scale: 2,
+          scale: html2canvasScale,
           useCORS: true,
           windowWidth: pageNode.scrollWidth,
           windowHeight: pageNode.scrollHeight,
@@ -1222,20 +1343,20 @@ export default function VisibilityLiteReportClient({
 
   if (loading) {
     return (
-      <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
+      <Shell>
         <div className="mx-auto max-w-[1560px] px-4 py-5">
           <div className="text-2xl font-semibold">Loading your snapshot…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Results Snapshot.
           </div>
         </div>
-      </div>
+      </Shell>
     );
   }
 
   if (err || !kbReport) {
     return (
-      <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
+      <Shell>
         <div className="mx-auto max-w-[1560px] px-4 py-5 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility snapshot</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
@@ -1255,7 +1376,7 @@ export default function VisibilityLiteReportClient({
             Go back
           </Link>
         </div>
-      </div>
+      </Shell>
     );
   }
 
