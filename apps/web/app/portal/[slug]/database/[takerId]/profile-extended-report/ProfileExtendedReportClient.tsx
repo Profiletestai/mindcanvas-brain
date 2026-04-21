@@ -10,10 +10,20 @@ const jsPdfPromise = () => import("jspdf");
 type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type BehaviourStyle = "A" | "B" | "C" | "D";
 
+type ProfileExtendedBlock = {
+  title?: string;
+  short_summary?: string;
+  paragraphs?: string[];
+  bullets?: string[];
+  items?: Array<Record<string, any>>;
+  transition?: string;
+  meta?: Record<string, any>;
+};
+
 type ProfileExtendedPanel = {
   panel_key: string;
   title: string;
-  blocks: Array<Record<string, any>>;
+  blocks: ProfileExtendedBlock[];
   matched_rows?: Array<{
     id: string;
     priority: number;
@@ -141,6 +151,15 @@ function titleCase(input: string) {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
+function normalizeText(input: string) {
+  return safeString(input)
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/[^\w\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function readinessLabel(value?: string | null) {
   const v = safeString(value).toLowerCase();
   if (v === "stabilise") return "Stabilise";
@@ -258,109 +277,51 @@ function safeSectionId(sectionKey: any) {
   return raw ? raw.replace(/_/g, "-") : "section";
 }
 
-function collectSummary(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return "";
-  for (const block of panel.blocks || []) {
-    const shortSummary = safeString(block?.short_summary || block?.summary);
-    if (shortSummary) return shortSummary;
-  }
-  return "";
-}
-
-function collectParagraphs(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return [] as string[];
-  const out: string[] = [];
-  for (const block of panel.blocks || []) {
-    const paragraphs = Array.isArray(block?.paragraphs) ? block.paragraphs : [];
-    for (const p of paragraphs) {
-      const s = safeString(p);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
-function collectBullets(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return [] as string[];
-  const out: string[] = [];
-  for (const block of panel.blocks || []) {
-    const bullets = Array.isArray(block?.bullets) ? block.bullets : [];
-    for (const b of bullets) {
-      const s = safeString(b);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
-function collectTransition(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return "";
-  for (const block of panel.blocks || []) {
-    const t = safeString(block?.transition);
-    if (t) return t;
-  }
-  return "";
-}
-
 function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
-  const mapped: Array<ProfileExtendedSection | null> = (rawSections || []).map(
-    (section: any) => {
-      const sectionKey = safeString(section?.section_key || section?.key);
-      if (!sectionKey) return null;
+  const out: ProfileExtendedSection[] = [];
 
-      let panels: ProfileExtendedPanel[] = [];
+  for (const section of rawSections || []) {
+    const sectionKey = safeString(section?.section_key || section?.key);
+    if (!sectionKey) continue;
 
-      if (Array.isArray(section?.panels)) {
-        panels = section.panels
-          .map((panel: any): ProfileExtendedPanel | null => {
-            const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
-            const title = safeString(panel?.title) || titleCase(panelKey);
-            const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
+    const panels: ProfileExtendedPanel[] = [];
 
-            if (!panelKey) return null;
-            if (!blocks.length && !title) return null;
+    if (Array.isArray(section?.panels)) {
+      for (const panel of section.panels) {
+        const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
+        const title = safeString(panel?.title) || titleCase(panelKey);
+        const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
 
-            return {
-              panel_key: panelKey,
-              title,
-              blocks,
-              matched_rows: Array.isArray(panel?.matched_rows)
-                ? panel.matched_rows
-                : [],
-            };
-          })
-          .filter((panel: ProfileExtendedPanel | null): panel is ProfileExtendedPanel =>
-           panel !== null
-           );
-      } else if (Array.isArray(section?.blocks)) {
-        panels = [
-          {
-            panel_key: `${sectionKey}_legacy`,
-            title: safeString(section?.title) || titleCase(sectionKey),
-            blocks: section.blocks,
-            matched_rows: [],
-          },
-        ];
+        if (!panelKey) continue;
+        if (!blocks.length && !title) continue;
+
+        panels.push({
+          panel_key: panelKey,
+          title,
+          blocks,
+          matched_rows: Array.isArray(panel?.matched_rows) ? panel.matched_rows : [],
+        });
       }
-
-      return {
-        section_key: sectionKey,
-        heading:
-          safeString(section?.heading || section?.title) || titleCase(sectionKey),
-        panels,
-        matched_rows: Array.isArray(section?.matched_rows)
-          ? section.matched_rows
-          : [],
-      };
+    } else if (Array.isArray(section?.blocks)) {
+      panels.push({
+        panel_key: `${sectionKey}_legacy`,
+        title: safeString(section?.title) || titleCase(sectionKey),
+        blocks: section.blocks,
+        matched_rows: [],
+      });
     }
-  );
 
-  return mapped.filter(
-    (section): section is ProfileExtendedSection =>
-      section !== null &&
-      !!section.section_key &&
-      Array.isArray(section.panels)
-  );
+    if (!panels.length) continue;
+
+    out.push({
+      section_key: sectionKey,
+      heading: safeString(section?.heading || section?.title) || titleCase(sectionKey),
+      panels,
+      matched_rows: Array.isArray(section?.matched_rows) ? section.matched_rows : [],
+    });
+  }
+
+  return out;
 }
 
 function PdfSection({ children }: { children: ReactNode }) {
@@ -394,6 +355,150 @@ function WhiteCard({
   );
 }
 
+function SummaryCallout({ summary }: { summary: string }) {
+  return (
+    <div
+      className="rounded-xl bg-white px-4 py-4"
+      style={{ outline: `1px solid ${BRAND.blue}` }}
+    >
+      <span className="font-semibold text-[#4F7DFF]">In short:</span>{" "}
+      <span className="text-slate-950">{summary}</span>
+    </div>
+  );
+}
+
+function ItemGrid({ items }: { items: Array<Record<string, any>> }) {
+  if (!items.length) return null;
+
+  const looksLikeLevelItems = items.some(
+    (item) =>
+      item &&
+      (item.level != null || item.market_position != null || item.immediate_focus != null)
+  );
+
+  if (looksLikeLevelItems) {
+    return (
+      <div className="grid gap-3 md:grid-cols-2">
+        {items.map((item, idx) => (
+          <div
+            key={idx}
+            className="rounded-xl bg-white p-4"
+            style={{ outline: `1px solid ${BRAND.border}` }}
+          >
+            {item.level != null ? (
+              <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Level {item.level}
+              </div>
+            ) : null}
+
+            {safeString(item.meaning) ? (
+              <div className="mt-2 text-[16px] font-semibold text-slate-900">
+                {safeString(item.meaning)}
+              </div>
+            ) : null}
+
+            {safeString(item.market_position) ? (
+              <div className="mt-3 text-[14px] leading-7 text-slate-700">
+                <span className="font-semibold text-slate-900">Typical market position:</span>{" "}
+                {safeString(item.market_position)}
+              </div>
+            ) : null}
+
+            {safeString(item.immediate_focus) ? (
+              <div className="mt-2 text-[14px] leading-7 text-slate-700">
+                <span className="font-semibold text-slate-900">Immediate focus:</span>{" "}
+                {safeString(item.immediate_focus)}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((item, idx) => {
+        const label = safeString(item.label || item.title || item.heading);
+        const value =
+          safeString(item.value) ||
+          safeString(item.summary) ||
+          safeString(item.text) ||
+          safeString(item.description);
+
+        return (
+          <div
+            key={idx}
+            className="rounded-xl bg-white p-4"
+            style={{ outline: `1px solid ${BRAND.border}` }}
+          >
+            {label ? (
+              <div className="text-[15px] font-semibold leading-7 text-slate-900">{label}</div>
+            ) : null}
+            {value ? (
+              <div className="mt-2 text-[14px] leading-7 text-slate-700">{value}</div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BlockRenderer({
+  block,
+  panelTitle,
+}: {
+  block: ProfileExtendedBlock;
+  panelTitle: string;
+}) {
+  const title = safeString(block?.title);
+  const summary = safeString(block?.short_summary);
+  const paragraphs = Array.isArray(block?.paragraphs) ? block.paragraphs.map(safeString).filter(Boolean) : [];
+  const bullets = Array.isArray(block?.bullets) ? block.bullets.map(safeString).filter(Boolean) : [];
+  const items = Array.isArray(block?.items) ? block.items.filter((item) => item && typeof item === "object") : [];
+  const transition = safeString(block?.transition);
+
+  const showTitle =
+    !!title && normalizeText(title) !== normalizeText(panelTitle);
+
+  if (!title && !summary && !paragraphs.length && !bullets.length && !items.length && !transition) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      {showTitle ? (
+        <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
+      ) : null}
+
+      {summary ? <SummaryCallout summary={summary} /> : null}
+
+      {paragraphs.length ? (
+        <div className="space-y-3 text-[15px] leading-7 text-slate-700">
+          {paragraphs.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </div>
+      ) : null}
+
+      {bullets.length ? (
+        <ul className="list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
+          {bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {items.length ? <ItemGrid items={items} /> : null}
+
+      {transition ? (
+        <div className="text-[12px] italic leading-4 text-slate-500">{transition}</div>
+      ) : null}
+    </div>
+  );
+}
+
 function PanelCard({
   title,
   panel,
@@ -401,10 +506,7 @@ function PanelCard({
   title: string;
   panel?: ProfileExtendedPanel | null;
 }) {
-  const summary = collectSummary(panel);
-  const paragraphs = collectParagraphs(panel);
-  const bullets = collectBullets(panel);
-  const transition = collectTransition(panel);
+  const blocks = Array.isArray(panel?.blocks) ? panel!.blocks : [];
 
   return (
     <div
@@ -413,37 +515,15 @@ function PanelCard({
     >
       <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
 
-      {summary ? (
-        <div
-          className="mt-4 rounded-xl bg-white px-4 py-4"
-          style={{ outline: `1px solid ${BRAND.blue}` }}
-        >
-          <span className="font-semibold text-[#4F7DFF]">In short:</span>{" "}
-          <span className="text-slate-950">{summary}</span>
-        </div>
-      ) : null}
-
-      {paragraphs.length > 0 ? (
-        <div className="mt-4 space-y-3 text-[15px] leading-7 text-slate-700">
-          {paragraphs.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      ) : null}
-
-      {bullets.length > 0 ? (
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
-          {bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      {transition ? (
-        <div className="mt-4 text-[12px] italic leading-4 text-slate-500">
-          {transition}
-        </div>
-      ) : null}
+      <div className="mt-4 space-y-5">
+        {blocks.map((block, index) => (
+          <BlockRenderer
+            key={`${panel?.panel_key || "panel"}-${index}`}
+            block={block}
+            panelTitle={title}
+          />
+        ))}
+      </div>
     </div>
   );
 }
