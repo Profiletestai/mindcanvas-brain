@@ -10,20 +10,10 @@ const jsPdfPromise = () => import("jspdf");
 type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type BehaviourStyle = "A" | "B" | "C" | "D";
 
-type ProfileExtendedBlock = {
-  title?: string;
-  short_summary?: string;
-  paragraphs?: string[];
-  bullets?: string[];
-  items?: Array<Record<string, any>>;
-  transition?: string;
-  meta?: Record<string, any>;
-};
-
 type ProfileExtendedPanel = {
   panel_key: string;
   title: string;
-  blocks: ProfileExtendedBlock[];
+  blocks: Array<Record<string, any>>;
   matched_rows?: Array<{
     id: string;
     priority: number;
@@ -120,6 +110,11 @@ const BRAND = {
   orange: "#EF9F27",
   sky: "#4A9EDD",
   slate: "#A7B3C7",
+  text: "#334155",
+  textSoft: "#64748B",
+  title: "#0F172A",
+  surface: "#F8FAFC",
+  white: "#FFFFFF",
 } as const;
 
 const SECTION_LABELS: Array<{ key: string; label: string }> = [
@@ -132,11 +127,11 @@ const SECTION_LABELS: Array<{ key: string; label: string }> = [
   { key: "progression_roadmap", label: "Progression roadmap" },
 ];
 
-function safeString(v: any): string {
+function safeString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-function safeNumber(v: any, fallback = 0): number {
+function safeNumber(v: unknown, fallback = 0): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -149,15 +144,6 @@ function titleCase(input: string) {
   return safeString(input)
     .replace(/_/g, " ")
     .replace(/\b\w/g, (m) => m.toUpperCase());
-}
-
-function normalizeText(input: string) {
-  return safeString(input)
-    .toLowerCase()
-    .replace(/[–—]/g, "-")
-    .replace(/[^\w\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function readinessLabel(value?: string | null) {
@@ -209,6 +195,7 @@ function getStyle(report: ReportPayload): BehaviourStyle {
   const value = safeString(
     report?.signals?.style || report?.input?.behaviour_style
   ).toUpperCase();
+
   if (value === "A" || value === "B" || value === "C" || value === "D") return value;
   return "A";
 }
@@ -228,7 +215,7 @@ function getTierColor(tier: VisibilityTier) {
 }
 
 function getTierCounts(report: ReportPayload) {
-  const counts = report?.graphs?.tier_counts || {};
+  const counts = report?.graphs?.tier_counts || report?.input?.tier_counts || {};
   return {
     Invisible: safeNumber((counts as any)?.Invisible, 0),
     Emerging: safeNumber((counts as any)?.Emerging, 0),
@@ -272,61 +259,152 @@ function getPillarItems(report: ReportPayload) {
   ];
 }
 
-function safeSectionId(sectionKey: any) {
+function safeSectionId(sectionKey: unknown) {
   const raw = safeString(sectionKey);
   return raw ? raw.replace(/_/g, "-") : "section";
 }
 
 function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
-  const out: ProfileExtendedSection[] = [];
-
-  for (const section of rawSections || []) {
+  const mapped: Array<ProfileExtendedSection | null> = (rawSections || []).map((section: any) => {
     const sectionKey = safeString(section?.section_key || section?.key);
-    if (!sectionKey) continue;
+    if (!sectionKey) return null;
 
-    const panels: ProfileExtendedPanel[] = [];
+    let panels: ProfileExtendedPanel[] = [];
 
     if (Array.isArray(section?.panels)) {
-      for (const panel of section.panels) {
-        const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
-        const title = safeString(panel?.title) || titleCase(panelKey);
-        const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
+      panels = section.panels
+        .map((panel: any): ProfileExtendedPanel | null => {
+          const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
+          const title = safeString(panel?.title) || titleCase(panelKey);
+          const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
 
-        if (!panelKey) continue;
-        if (!blocks.length && !title) continue;
+          if (!panelKey) return null;
 
-        panels.push({
-          panel_key: panelKey,
-          title,
-          blocks,
-          matched_rows: Array.isArray(panel?.matched_rows) ? panel.matched_rows : [],
-        });
-      }
+          return {
+            panel_key: panelKey,
+            title,
+            blocks,
+            matched_rows: Array.isArray(panel?.matched_rows) ? panel.matched_rows : [],
+          };
+        })
+        .filter((panel: ProfileExtendedPanel | null): panel is ProfileExtendedPanel => panel !== null);
     } else if (Array.isArray(section?.blocks)) {
-      panels.push({
-        panel_key: `${sectionKey}_legacy`,
-        title: safeString(section?.title) || titleCase(sectionKey),
-        blocks: section.blocks,
-        matched_rows: [],
-      });
+      panels = [
+        {
+          panel_key: `${sectionKey}_legacy`,
+          title: safeString(section?.title) || titleCase(sectionKey),
+          blocks: section.blocks,
+          matched_rows: [],
+        },
+      ];
     }
 
-    if (!panels.length) continue;
-
-    out.push({
+    return {
       section_key: sectionKey,
       heading: safeString(section?.heading || section?.title) || titleCase(sectionKey),
       panels,
       matched_rows: Array.isArray(section?.matched_rows) ? section.matched_rows : [],
-    });
-  }
+    };
+  });
 
+  return mapped.filter(
+    (section): section is ProfileExtendedSection =>
+      section !== null && !!section.section_key && Array.isArray(section.panels)
+  );
+}
+
+function getSection(
+  sections: ProfileExtendedSection[],
+  key: string
+): ProfileExtendedSection | null {
+  return sections.find((section) => section.section_key === key) || null;
+}
+
+function getPanel(
+  section: ProfileExtendedSection | null | undefined,
+  panelKey: string
+): ProfileExtendedPanel | null {
+  if (!section) return null;
+  return section.panels.find((panel) => panel.panel_key === panelKey) || null;
+}
+
+function getBlockTitle(block: Record<string, any> | undefined) {
+  return (
+    safeString(block?.title) ||
+    safeString(block?.heading) ||
+    safeString(block?.subheading) ||
+    ""
+  );
+}
+
+function getBlockSummary(block: Record<string, any> | undefined) {
+  return (
+    safeString(block?.short_summary) ||
+    safeString(block?.summary) ||
+    ""
+  );
+}
+
+function getBlockParagraphs(block: Record<string, any> | undefined): string[] {
+  const paragraphs = Array.isArray(block?.paragraphs) ? block?.paragraphs : [];
+  return paragraphs.map((p: unknown) => safeString(p)).filter(Boolean);
+}
+
+function getBlockBullets(block: Record<string, any> | undefined): string[] {
+  const bullets = Array.isArray(block?.bullets) ? block?.bullets : [];
+  return bullets.map((b: unknown) => safeString(b)).filter(Boolean);
+}
+
+function getBlockItems(block: Record<string, any> | undefined): Array<Record<string, any>> {
+  const items = Array.isArray(block?.items) ? block?.items : [];
+  return items.filter((item: unknown) => item && typeof item === "object") as Array<Record<string, any>>;
+}
+
+function getPanelSummary(panel?: ProfileExtendedPanel | null): string {
+  if (!panel) return "";
+  for (const block of panel.blocks) {
+    const summary = getBlockSummary(block);
+    if (summary) return summary;
+  }
+  return "";
+}
+
+function getPanelParagraphs(panel?: ProfileExtendedPanel | null): string[] {
+  if (!panel) return [];
+  const out: string[] = [];
+  for (const block of panel.blocks) {
+    out.push(...getBlockParagraphs(block));
+  }
   return out;
 }
 
-function PdfSection({ children }: { children: ReactNode }) {
+function getPanelBullets(panel?: ProfileExtendedPanel | null): string[] {
+  if (!panel) return [];
+  const out: string[] = [];
+  for (const block of panel.blocks) {
+    out.push(...getBlockBullets(block));
+  }
+  return out;
+}
+
+function getPanelItems(panel?: ProfileExtendedPanel | null): Array<Record<string, any>> {
+  if (!panel) return [];
+  const out: Array<Record<string, any>> = [];
+  for (const block of panel.blocks) {
+    out.push(...getBlockItems(block));
+  }
+  return out;
+}
+
+function PdfSection({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <section data-pdf-section="true" style={{ pageBreakAfter: "always" }}>
+    <section data-pdf-section="true" className={className} style={{ pageBreakAfter: "always" }}>
       {children}
     </section>
   );
@@ -355,175 +433,156 @@ function WhiteCard({
   );
 }
 
-function SummaryCallout({ summary }: { summary: string }) {
-  return (
-    <div
-      className="rounded-xl bg-white px-4 py-4"
-      style={{ outline: `1px solid ${BRAND.blue}` }}
-    >
-      <span className="font-semibold text-[#4F7DFF]">In short:</span>{" "}
-      <span className="text-slate-950">{summary}</span>
-    </div>
-  );
-}
-
-function ItemGrid({ items }: { items: Array<Record<string, any>> }) {
-  if (!items.length) return null;
-
-  const looksLikeLevelItems = items.some(
-    (item) =>
-      item &&
-      (item.level != null || item.market_position != null || item.immediate_focus != null)
-  );
-
-  if (looksLikeLevelItems) {
-    return (
-      <div className="grid gap-3 md:grid-cols-2">
-        {items.map((item, idx) => (
-          <div
-            key={idx}
-            className="rounded-xl bg-white p-4"
-            style={{ outline: `1px solid ${BRAND.border}` }}
-          >
-            {item.level != null ? (
-              <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Level {item.level}
-              </div>
-            ) : null}
-
-            {safeString(item.meaning) ? (
-              <div className="mt-2 text-[16px] font-semibold text-slate-900">
-                {safeString(item.meaning)}
-              </div>
-            ) : null}
-
-            {safeString(item.market_position) ? (
-              <div className="mt-3 text-[14px] leading-7 text-slate-700">
-                <span className="font-semibold text-slate-900">Typical market position:</span>{" "}
-                {safeString(item.market_position)}
-              </div>
-            ) : null}
-
-            {safeString(item.immediate_focus) ? (
-              <div className="mt-2 text-[14px] leading-7 text-slate-700">
-                <span className="font-semibold text-slate-900">Immediate focus:</span>{" "}
-                {safeString(item.immediate_focus)}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {items.map((item, idx) => {
-        const label = safeString(item.label || item.title || item.heading);
-        const value =
-          safeString(item.value) ||
-          safeString(item.summary) ||
-          safeString(item.text) ||
-          safeString(item.description);
-
-        return (
-          <div
-            key={idx}
-            className="rounded-xl bg-white p-4"
-            style={{ outline: `1px solid ${BRAND.border}` }}
-          >
-            {label ? (
-              <div className="text-[15px] font-semibold leading-7 text-slate-900">{label}</div>
-            ) : null}
-            {value ? (
-              <div className="mt-2 text-[14px] leading-7 text-slate-700">{value}</div>
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function BlockRenderer({
-  block,
-  panelTitle,
-}: {
-  block: ProfileExtendedBlock;
-  panelTitle: string;
-}) {
-  const title = safeString(block?.title);
-  const summary = safeString(block?.short_summary);
-  const paragraphs = Array.isArray(block?.paragraphs) ? block.paragraphs.map(safeString).filter(Boolean) : [];
-  const bullets = Array.isArray(block?.bullets) ? block.bullets.map(safeString).filter(Boolean) : [];
-  const items = Array.isArray(block?.items) ? block.items.filter((item) => item && typeof item === "object") : [];
-  const transition = safeString(block?.transition);
-
-  const showTitle =
-    !!title && normalizeText(title) !== normalizeText(panelTitle);
-
-  if (!title && !summary && !paragraphs.length && !bullets.length && !items.length && !transition) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-4">
-      {showTitle ? (
-        <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
-      ) : null}
-
-      {summary ? <SummaryCallout summary={summary} /> : null}
-
-      {paragraphs.length ? (
-        <div className="space-y-3 text-[15px] leading-7 text-slate-700">
-          {paragraphs.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      ) : null}
-
-      {bullets.length ? (
-        <ul className="list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
-          {bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      {items.length ? <ItemGrid items={items} /> : null}
-
-      {transition ? (
-        <div className="text-[12px] italic leading-4 text-slate-500">{transition}</div>
-      ) : null}
-    </div>
-  );
-}
-
-function PanelCard({
+function SoftPanel({
   title,
-  panel,
+  children,
 }: {
   title: string;
-  panel?: ProfileExtendedPanel | null;
+  children: ReactNode;
 }) {
-  const blocks = Array.isArray(panel?.blocks) ? panel!.blocks : [];
-
   return (
     <div
       className="rounded-2xl bg-slate-50 p-6"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
 
-      <div className="mt-4 space-y-5">
-        {blocks.map((block, index) => (
-          <BlockRenderer
-            key={`${panel?.panel_key || "panel"}-${index}`}
-            block={block}
-            panelTitle={title}
-          />
-        ))}
+function SummaryBox({ text }: { text: string }) {
+  if (!safeString(text)) return null;
+
+  return (
+    <div
+      className="rounded-xl bg-white px-4 py-4"
+      style={{ outline: `1px solid ${BRAND.blue}` }}
+    >
+      <span className="font-semibold text-[#4F7DFF]">In short:</span>{" "}
+      <span className="text-slate-950">{text}</span>
+    </div>
+  );
+}
+
+function ParagraphStack({ items }: { items: string[] }) {
+  if (!items.length) return null;
+
+  return (
+    <div className="space-y-3 text-[15px] leading-7 text-slate-700">
+      {items.map((p, i) => (
+        <p key={i}>{p}</p>
+      ))}
+    </div>
+  );
+}
+
+function BulletStack({ items }: { items: string[] }) {
+  if (!items.length) return null;
+
+  return (
+    <ul className="list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
+      {items.map((b, i) => (
+        <li key={i}>{b}</li>
+      ))}
+    </ul>
+  );
+}
+
+function DescriptorRows({
+  blocks,
+}: {
+  blocks: Array<Record<string, any>>;
+}) {
+  const rows = blocks
+    .map((block) => ({
+      title: getBlockTitle(block),
+      summary: getBlockSummary(block),
+      paragraphs: getBlockParagraphs(block),
+      bullets: getBlockBullets(block),
+    }))
+    .filter(
+      (row) =>
+        row.title || row.summary || row.paragraphs.length > 0 || row.bullets.length > 0
+    );
+
+  if (!rows.length) return null;
+
+  return (
+    <div className="space-y-5">
+      {rows.map((row, idx) => (
+        <div key={`${row.title}-${idx}`} className="space-y-3">
+          {row.title ? (
+            <div className="text-[15px] font-semibold leading-7 text-slate-900">
+              {row.title}
+            </div>
+          ) : null}
+          {row.summary ? <SummaryBox text={row.summary} /> : null}
+          {row.paragraphs.length ? <ParagraphStack items={row.paragraphs} /> : null}
+          {row.bullets.length ? <BulletStack items={row.bullets} /> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Pill({ text }: { text: string }) {
+  return (
+    <div
+      className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
+      style={{
+        color: BRAND.blue,
+        background: "rgba(79,125,255,0.05)",
+        outline: "1px solid rgba(79,125,255,0.49)",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  subValue,
+  badge,
+  badgeColor,
+  dotColor,
+}: {
+  label: string;
+  value: string;
+  subValue?: string;
+  badge?: string;
+  badgeColor?: string;
+  dotColor?: string;
+}) {
+  return (
+    <div
+      className="rounded-2xl bg-slate-50 p-4"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[12px] uppercase tracking-[0.02em] text-slate-500">
+          {label}
+        </div>
+        {badge ? (
+          <div
+            className="rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-white"
+            style={{ background: badgeColor || BRAND.blue }}
+          >
+            {badge}
+          </div>
+        ) : null}
       </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        {dotColor ? (
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: dotColor }} />
+        ) : null}
+        <div className="text-[25px] font-semibold leading-7 text-slate-950">{value}</div>
+      </div>
+
+      {subValue ? <div className="mt-1 text-[10px] text-slate-500">{subValue}</div> : null}
     </div>
   );
 }
@@ -546,9 +605,7 @@ function SummaryHeader({
   const tier = getTier(report);
   const level = getLevel(report);
   const style = getStyle(report);
-  const readiness = readinessLabel(
-    report?.signals?.readiness ?? report?.input?.readiness
-  );
+  const readiness = readinessLabel(report?.signals?.readiness ?? report?.input?.readiness);
   const score = overallScore(report);
 
   return (
@@ -628,77 +685,7 @@ function SummaryHeader({
   );
 }
 
-function Pill({ text }: { text: string }) {
-  return (
-    <div
-      className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
-      style={{
-        color: BRAND.blue,
-        background: "rgba(79,125,255,0.05)",
-        outline: "1px solid rgba(79,125,255,0.49)",
-      }}
-    >
-      {text}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  subValue,
-  badge,
-  badgeColor,
-  dotColor,
-}: {
-  label: string;
-  value: string;
-  subValue?: string;
-  badge?: string;
-  badgeColor?: string;
-  dotColor?: string;
-}) {
-  return (
-    <div
-      className="rounded-2xl bg-slate-50 p-4"
-      style={{ outline: `1px solid ${BRAND.border}` }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="text-[12px] uppercase tracking-[0.02em] text-slate-500">
-          {label}
-        </div>
-        {badge ? (
-          <div
-            className="rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-white"
-            style={{ background: badgeColor || BRAND.blue }}
-          >
-            {badge}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        {dotColor ? (
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: dotColor }}
-          />
-        ) : null}
-        <div className="text-[25px] font-semibold leading-7 text-slate-950">
-          {value}
-        </div>
-      </div>
-
-      {subValue ? <div className="mt-1 text-[8px] text-slate-500">{subValue}</div> : null}
-    </div>
-  );
-}
-
-function ReportIndexCard({
-  sections,
-}: {
-  sections: ProfileExtendedSection[];
-}) {
+function ReportIndexCard({ sections }: { sections: ProfileExtendedSection[] }) {
   const items = SECTION_LABELS.filter((item) =>
     sections.some((section) => section.section_key === item.key)
   );
@@ -732,12 +719,7 @@ function ReportIndexCard({
 function LadderPositionCard({ report }: { report: ReportPayload }) {
   const tier = getTier(report);
   const level = getLevel(report);
-  const ordered: VisibilityTier[] = [
-    "Invisible",
-    "Emerging",
-    "Established",
-    "Magnetic",
-  ];
+  const ordered: VisibilityTier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
 
   return (
     <div
@@ -815,10 +797,7 @@ function LadderPositionCard({ report }: { report: ReportPayload }) {
                 </span>
               </div>
               <div>
-                <div
-                  className={`text-[14px] ${passed ? "line-through" : ""}`}
-                  style={{ color }}
-                >
+                <div className={`text-[14px] ${passed ? "line-through" : ""}`} style={{ color }}>
                   {item}
                 </div>
                 <div className="text-[14px] text-slate-600">
@@ -922,12 +901,375 @@ function TierDistributionCard({ report }: { report: ReportPayload }) {
   );
 }
 
-function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
+function ResultAtAGlanceSection({
+  section,
+}: {
+  section: ProfileExtendedSection;
+}) {
+  const panel = getPanel(section, "plain_english_summary") || section.panels[0] || null;
+  const summary = getPanelSummary(panel);
+  const paragraphs = getPanelParagraphs(panel);
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <SoftPanel title={panel?.title || "Plain-English summary"}>
+        <div className="space-y-4">
+          {summary ? <SummaryBox text={summary} /> : null}
+          {paragraphs.length ? <ParagraphStack items={paragraphs} /> : null}
+        </div>
+      </SoftPanel>
+    </WhiteCard>
+  );
+}
+
+function WhatThisTierMeansSection({
+  section,
+}: {
+  section: ProfileExtendedSection;
+}) {
+  const coreDiagnosis = getPanel(section, "core_diagnosis");
+  const marketHappening = getPanel(section, "market_happening");
+  const coreReading = getPanel(section, "core_reading");
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <div className="space-y-5">
+        <SoftPanel title={coreDiagnosis?.title || "Core diagnosis"}>
+          <DescriptorRows blocks={coreDiagnosis?.blocks || []} />
+        </SoftPanel>
+
+        <SoftPanel title={marketHappening?.title || "What is likely happening in the market"}>
+          <DescriptorRows blocks={marketHappening?.blocks || []} />
+        </SoftPanel>
+
+        <SoftPanel title={coreReading?.title || "Core reading"}>
+          <DescriptorRows blocks={coreReading?.blocks || []} />
+        </SoftPanel>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function LevelMeaningCallout({ item }: { item: Record<string, any> }) {
+  const level = safeNumber(item?.level, 0);
+  const marketPosition = safeString(item?.market_position);
+  const immediateFocus = safeString(item?.immediate_focus);
+
+  if (!level && !marketPosition && !immediateFocus) return null;
+
+  return (
+    <div
+      className="max-w-[420px] rounded-xl bg-white px-5 py-4"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Level {level}
+      </div>
+      {marketPosition ? (
+        <div className="mt-3 text-[15px] leading-7 text-slate-700">
+          <span className="font-semibold text-slate-900">Typical market position:</span>{" "}
+          {marketPosition}
+        </div>
+      ) : null}
+      {immediateFocus ? (
+        <div className="mt-1 text-[15px] leading-7 text-slate-700">
+          <span className="font-semibold text-slate-900">Immediate focus:</span>{" "}
+          {immediateFocus}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LevelNuanceSection({
+  section,
+}: {
+  section: ProfileExtendedSection;
+}) {
+  const levelMeaning = getPanel(section, "level_meaning");
+  const meaningInPractice = getPanel(section, "meaning_in_practice");
+
+  const levelItems = getPanelItems(levelMeaning);
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <div className="space-y-5">
+        <SoftPanel title={levelMeaning?.title || "Level meaning"}>
+          <div className="space-y-4">
+            <DescriptorRows blocks={levelMeaning?.blocks || []} />
+            {levelItems.length ? <LevelMeaningCallout item={levelItems[0]} /> : null}
+          </div>
+        </SoftPanel>
+
+        <SoftPanel title={meaningInPractice?.title || "Meaning in practice"}>
+          <DescriptorRows blocks={meaningInPractice?.blocks || []} />
+        </SoftPanel>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function SignalCard({
+  title,
+  value,
+  color,
+  description,
+}: {
+  title: string;
+  value: number;
+  color: string;
+  description: string;
+}) {
+  return (
+    <div
+      className="rounded-xl bg-white p-4"
+      style={{ outline: `1px solid ${color}` }}
+    >
+      <div className="text-[15px] font-bold leading-7" style={{ color }}>
+        {title}
+      </div>
+      <div className="mt-3 text-[32px] font-bold leading-8" style={{ color }}>
+        {value}%
+      </div>
+      <div className="mt-4 text-[15px] leading-7 text-slate-700">{description}</div>
+    </div>
+  );
+}
+
+function FrameworkStageCard({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <div
+      className="rounded-xl bg-white p-4"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[15px] font-semibold leading-7 text-slate-900">{title}</div>
+      <div className="mt-3 space-y-3">
+        {rows.map((row, idx) => (
+          <div key={`${title}-${row.label}-${idx}`}>
+            <div className="text-[14px] font-semibold leading-5 text-slate-900">
+              {row.label}
+            </div>
+            <div className="mt-1 text-[14px] leading-6 text-slate-600">{row.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PillarsAndSignalsSection({
+  section,
+  report,
+}: {
+  section: ProfileExtendedSection;
+  report: ReportPayload;
+}) {
+  const currentSignal = getPanel(section, "current_signal_pattern");
+  const widerSignal = getPanel(section, "wider_signal_pathway");
+  const progressionPattern = getPanel(section, "progression_pattern");
+  const pillars = getPillarItems(report);
+
+  const descriptions: Record<string, string> = {
+    trust: "This reflects whether the business feels credible and proven once found.",
+    authority: "This reflects whether the business is seen as a clear expert rather than just capable.",
+    dominance: "This suggests how strongly the business is beginning to lead attention and preference in the market.",
+    visibility: "This is about how reliably the market can find and recognise the business.",
+  };
+
+  const widerBlocks = widerSignal?.blocks || [];
+  const introBlock = widerBlocks.find(
+    (block) => getBlockTitle(block).toLowerCase().includes("wider signal pathway")
+  );
+  const stageBlocks = widerBlocks.filter((block) => getBlockItems(block).length > 0);
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <div className="space-y-5">
+        <SoftPanel title={currentSignal?.title || "Current signal pattern"}>
+          <div className="space-y-5">
+            <DescriptorRows blocks={currentSignal?.blocks || []} />
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {pillars.map((pillar) => (
+                <SignalCard
+                  key={pillar.key}
+                  title={pillar.label}
+                  value={pillar.value}
+                  color={pillar.color}
+                  description={descriptions[pillar.key] || ""}
+                />
+              ))}
+            </div>
+          </div>
+        </SoftPanel>
+
+        <SoftPanel title={widerSignal?.title || "The wider signal pathway"}>
+          <div className="space-y-5">
+            {introBlock ? <SummaryBox text={getBlockSummary(introBlock)} /> : null}
+
+            {progressionPattern ? (
+              <DescriptorRows blocks={progressionPattern.blocks || []} />
+            ) : null}
+
+            {stageBlocks.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {stageBlocks.map((block, idx) => (
+                  <FrameworkStageCard
+                    key={`${getBlockTitle(block)}-${idx}`}
+                    title={getBlockTitle(block)}
+                    rows={getBlockItems(block).map((item) => ({
+                      label: safeString(item?.label),
+                      value: safeString(item?.value),
+                    }))}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </SoftPanel>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function BehaviourCard({
+  title,
+  summary,
+}: {
+  title: string;
+  summary: string;
+}) {
+  return (
+    <div
+      className="rounded-xl bg-white p-4"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      <div className="text-[15px] font-bold leading-7 text-slate-900">{title}</div>
+      <div className="mt-3 text-[15px] leading-7 text-slate-700">{summary}</div>
+    </div>
+  );
+}
+
+function BehaviourStyleSection({
+  section,
+}: {
+  section: ProfileExtendedSection;
+}) {
+  const typeInterpretation = getPanel(section, "type_interpretation");
+  const howToUse = getPanel(section, "how_to_use_this_layer");
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <div className="space-y-5">
+        <SoftPanel title={typeInterpretation?.title || "Type interpretation"}>
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-3">
+              {(typeInterpretation?.blocks || []).map((block, idx) => (
+                <BehaviourCard
+                  key={`${getBlockTitle(block)}-${idx}`}
+                  title={getBlockTitle(block)}
+                  summary={getBlockSummary(block)}
+                />
+              ))}
+            </div>
+          </div>
+        </SoftPanel>
+
+        <SoftPanel title={howToUse?.title || "How to use this layer"}>
+          <DescriptorRows blocks={howToUse?.blocks || []} />
+        </SoftPanel>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function StrategicPrioritySection({
+  section,
+}: {
+  section: ProfileExtendedSection;
+}) {
+  const focusPanel = getPanel(section, "what_to_focus_on_now") || section.panels[0] || null;
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <SoftPanel title={focusPanel?.title || "What to focus on now"}>
+        <DescriptorRows blocks={focusPanel?.blocks || []} />
+      </SoftPanel>
+    </WhiteCard>
+  );
+}
+
+function ProgressionRoadmapSection({
+  section,
+}: {
+  section: ProfileExtendedSection;
+}) {
+  const nextPanel = getPanel(section, "what_progression_looks_like_next");
+  const readinessPanel = getPanel(section, "how_to_recognise_readiness");
+
+  return (
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
+      <div className="space-y-5">
+        <SoftPanel title={nextPanel?.title || "What progression looks like next"}>
+          <DescriptorRows blocks={nextPanel?.blocks || []} />
+        </SoftPanel>
+
+        <SoftPanel title={readinessPanel?.title || "How to recognise readiness"}>
+          <DescriptorRows blocks={readinessPanel?.blocks || []} />
+        </SoftPanel>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function SectionRenderer({
+  section,
+  report,
+}: {
+  section: ProfileExtendedSection;
+  report: ReportPayload;
+}) {
+  if (section.section_key === "result_at_a_glance") {
+    return <ResultAtAGlanceSection section={section} />;
+  }
+
+  if (section.section_key === "what_this_tier_means") {
+    return <WhatThisTierMeansSection section={section} />;
+  }
+
+  if (section.section_key === "level_nuance") {
+    return <LevelNuanceSection section={section} />;
+  }
+
+  if (section.section_key === "pillars_and_signals") {
+    return <PillarsAndSignalsSection section={section} report={report} />;
+  }
+
+  if (section.section_key === "behaviour_style") {
+    return <BehaviourStyleSection section={section} />;
+  }
+
+  if (section.section_key === "strategic_priority_now") {
+    return <StrategicPrioritySection section={section} />;
+  }
+
+  if (section.section_key === "progression_roadmap") {
+    return <ProgressionRoadmapSection section={section} />;
+  }
+
   return (
     <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
       <div className="space-y-5">
         {section.panels.map((panel) => (
-          <PanelCard key={panel.panel_key} title={panel.title} panel={panel} />
+          <SoftPanel key={panel.panel_key} title={panel.title}>
+            <DescriptorRows blocks={panel.blocks || []} />
+          </SoftPanel>
         ))}
       </div>
     </WhiteCard>
@@ -1029,17 +1371,21 @@ export default function ProfileExtendedReportClient({
               <PillarScoresCard report={report} />
               <TierDistributionCard report={report} />
             </div>
+
+            <div className="mt-4 xl:hidden">
+              <ReportIndexCard sections={sections} />
+            </div>
           </PdfSection>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
-            <div className="xl:sticky xl:top-5">
+            <div className="hidden xl:block xl:sticky xl:top-5">
               <ReportIndexCard sections={sections} />
             </div>
 
             <div className="space-y-4">
               {sections.map((section) => (
                 <PdfSection key={section.section_key}>
-                  <SectionRenderer section={section} />
+                  <SectionRenderer section={section} report={report} />
                 </PdfSection>
               ))}
             </div>
