@@ -5,21 +5,13 @@ export type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magneti
 export type BehaviourStyle = "A" | "B" | "C" | "D";
 export type Readiness = "stabilise" | "ready_to_progress";
 
-export type VisibilityPillarKey =
-  | "discoverability"
-  | "trust"
-  | "conversion"
-  | "visibility"
-  | "authority"
-  | "dominance";
-
 export type ProfileExtendedReportInput = {
   tier: VisibilityTier;
   level: number;
   behaviour_style: BehaviourStyle;
   readiness?: Readiness | null;
-  pillar_scores?: Partial<Record<VisibilityPillarKey, number | null>> | null;
-  tier_counts?: Partial<Record<VisibilityTier, number | null>> | null;
+  pillar_scores?: Record<string, number | null> | null;
+  tier_counts?: Record<string, number | null> | null;
 };
 
 export type KbBlockRow = {
@@ -31,15 +23,6 @@ export type KbBlockRow = {
   content: Record<string, any> | null;
   is_active: boolean;
 };
-
-export type ProfileExtendedSectionKey =
-  | "result_at_a_glance"
-  | "what_this_tier_means"
-  | "level_nuance"
-  | "pillars_and_signals"
-  | "behaviour_style"
-  | "strategic_priority_now"
-  | "progression_roadmap";
 
 export type ProfileExtendedPanelKey =
   | "plain_english_summary"
@@ -57,10 +40,29 @@ export type ProfileExtendedPanelKey =
   | "what_progression_looks_like_next"
   | "how_to_recognise_readiness";
 
+export type ProfileExtendedSectionKey =
+  | "result_at_a_glance"
+  | "what_this_tier_means"
+  | "level_nuance"
+  | "pillars_and_signals"
+  | "behaviour_style"
+  | "strategic_priority_now"
+  | "progression_roadmap";
+
+export type AssembledProfileExtendedBlock = {
+  title?: string;
+  short_summary?: string;
+  paragraphs?: string[];
+  bullets?: string[];
+  items?: Array<Record<string, any>>;
+  transition?: string;
+  meta?: Record<string, any>;
+};
+
 export type AssembledProfileExtendedPanel = {
   panel_key: ProfileExtendedPanelKey;
   title: string;
-  blocks: Array<Record<string, any>>;
+  blocks: AssembledProfileExtendedBlock[];
   matched_rows: Array<{
     id: string;
     priority: number;
@@ -87,7 +89,7 @@ export type AssembledProfileExtendedReport = {
   sections: AssembledProfileExtendedSection[];
 };
 
-const REPORT_STRUCTURE: Array<{
+const STRUCTURE: Array<{
   section_key: ProfileExtendedSectionKey;
   heading: string;
   panels: Array<{ panel_key: ProfileExtendedPanelKey; title: string }>;
@@ -95,17 +97,16 @@ const REPORT_STRUCTURE: Array<{
   {
     section_key: "result_at_a_glance",
     heading: "Result at a glance",
-    panels: [{ panel_key: "plain_english_summary", title: "Plain-English summary" }],
+    panels: [
+      { panel_key: "plain_english_summary", title: "Plain-English summary" },
+    ],
   },
   {
     section_key: "what_this_tier_means",
     heading: "What this tier means",
     panels: [
       { panel_key: "core_diagnosis", title: "Core diagnosis" },
-      {
-        panel_key: "market_happening",
-        title: "What is likely happening in the market",
-      },
+      { panel_key: "market_happening", title: "What is likely happening in the market" },
       { panel_key: "core_reading", title: "Core reading" },
     ],
   },
@@ -113,7 +114,7 @@ const REPORT_STRUCTURE: Array<{
     section_key: "level_nuance",
     heading: "Level nuance",
     panels: [
-      { panel_key: "level_meaning", title: "Level meaning" },
+      { panel_key: "level_meaning", title: `Level meaning` },
       { panel_key: "meaning_in_practice", title: "Meaning in practice" },
     ],
   },
@@ -137,7 +138,9 @@ const REPORT_STRUCTURE: Array<{
   {
     section_key: "strategic_priority_now",
     heading: "Strategic priority now",
-    panels: [{ panel_key: "what_to_focus_on_now", title: "What to focus on now" }],
+    panels: [
+      { panel_key: "what_to_focus_on_now", title: "What to focus on now" },
+    ],
   },
   {
     section_key: "progression_roadmap",
@@ -154,43 +157,6 @@ const REPORT_STRUCTURE: Array<{
     ],
   },
 ];
-
-const LEVEL_LABELS: Record<number, string> = {
-  1: "Foundational",
-  2: "Early visibility",
-  3: "Emerging recognition",
-  4: "Initial traction",
-  5: "Visible but inconsistent",
-  6: "Early market movement",
-  7: "Growing credibility",
-  8: "More consistent demand",
-  9: "Increasing trust",
-  10: "Stabilising recognition",
-  11: "Established presence",
-  12: "Respected and recognised",
-  13: "Trusted category participant",
-  14: "Recognised authority",
-  15: "Leadership edge forming",
-  16: "Authority with pull",
-  17: "Preferred provider",
-  18: "Recognised market leader",
-  19: "Category influence",
-  20: "Category-shaping authority",
-};
-
-const STYLE_SUMMARIES: Record<BehaviourStyle, string> = {
-  A: "Momentum, visibility comfort, experimentation.",
-  B: "Relationship-led influence, trust-building, connection.",
-  C: "Structure, consistency, process-led credibility.",
-  D: "Authority focus, control, decisive positioning.",
-};
-
-const STYLE_USAGE: Record<BehaviourStyle, string> = {
-  A: "Use the tier to choose the right strategic problem. Use the behaviour style to choose the delivery style and the type of work the client is most likely to sustain.",
-  B: "Relationship-driven clients sustain strategies that build trust and visibility through consistent connection, proof, and conversation-led momentum.",
-  C: "Structure-driven clients sustain strategies that rely on systems, repeatability, process discipline, and clear operational follow-through.",
-  D: "Authority-driven clients sustain strategies that reinforce expertise, positioning, standards, and category leadership.",
-};
 
 function getServiceRoleKey() {
   return (
@@ -235,6 +201,37 @@ function normalizeText(value: unknown): string {
     .trim();
 }
 
+function titleCase(value: string): string {
+  return safeString(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function uniqueRows(
+  rows: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, any>;
+  }>
+) {
+  const seen = new Set<string>();
+  const out: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, any>;
+  }> = [];
+
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+
+  return out;
+}
+
 function matchesArrayTrigger<T>(value: T | null | undefined, allowed?: T[]): boolean {
   if (!allowed || allowed.length === 0) return true;
   if (value == null) return false;
@@ -268,106 +265,71 @@ function rowMatchesInput(row: KbBlockRow, input: ProfileExtendedReportInput): bo
   return true;
 }
 
-function makeBlock(src?: Record<string, any> | null): Record<string, any> {
-  const item = src || {};
+function rowRef(row: KbBlockRow) {
   return {
-    ...item,
+    id: row.id,
+    priority: row.priority,
+    source_section_key: row.section_key,
+    triggers: row.triggers || {},
+  };
+}
+
+function makeBlock(src?: Record<string, any> | null): AssembledProfileExtendedBlock {
+  const item = src || {};
+
+  const paragraphs = Array.isArray(item.paragraphs)
+    ? item.paragraphs.map((p: any) => safeString(p)).filter(Boolean)
+    : [];
+
+  const bullets = Array.isArray(item.bullets)
+    ? item.bullets.map((b: any) => safeString(b)).filter(Boolean)
+    : [];
+
+  const items = Array.isArray(item.items)
+    ? item.items.filter((x: any) => x && typeof x === "object")
+    : [];
+
+  return {
     title:
       safeString(item.title) ||
       safeString(item.heading) ||
       safeString(item.subheading) ||
-      "",
+      undefined,
     short_summary:
       safeString(item.short_summary) ||
       safeString(item.summary) ||
       undefined,
-    paragraphs: Array.isArray(item.paragraphs)
-      ? item.paragraphs.map((p: any) => safeString(p)).filter(Boolean)
-      : [],
-    bullets: Array.isArray(item.bullets)
-      ? item.bullets.map((b: any) => safeString(b)).filter(Boolean)
-      : [],
-    transition: safeString(item.transition) || undefined,
-  };
-}
-
-function extractBlocks(row: KbBlockRow): Record<string, any>[] {
-  const content = row.content || {};
-
-  if (Array.isArray(content.blocks)) {
-    return content.blocks
-      .filter((b): b is Record<string, any> => !!b && typeof b === "object")
-      .map((b) => makeBlock(b));
-  }
-
-  const single = makeBlock(content);
-  const hasContent =
-    single.title ||
-    single.short_summary ||
-    single.paragraphs.length ||
-    single.bullets.length ||
-    single.transition;
-
-  return hasContent ? [single] : [];
-}
-
-function strongestWeakest(input: ProfileExtendedReportInput) {
-  const scores = input.pillar_scores || {};
-  const items = [
-    { key: "visibility", label: "Visibility", value: safeNumber(scores.visibility) },
-    { key: "trust", label: "Trust", value: safeNumber(scores.trust) },
-    { key: "authority", label: "Authority", value: safeNumber(scores.authority) },
-    { key: "dominance", label: "Dominance", value: safeNumber(scores.dominance) },
-  ];
-
-  const sorted = [...items].sort((a, b) => b.value - a.value);
-  return {
-    strongest: sorted[0],
-    weakest: sorted[sorted.length - 1],
+    paragraphs,
+    bullets,
     items,
+    transition: safeString(item.transition) || undefined,
+    meta: item.meta && typeof item.meta === "object" ? item.meta : undefined,
   };
 }
 
-function defaultPanelTitle(panelKey: ProfileExtendedPanelKey): string {
-  for (const section of REPORT_STRUCTURE) {
-    const panel = section.panels.find((p) => p.panel_key === panelKey);
-    if (panel) return panel.title;
-  }
-  return panelKey;
+function makeSimpleBlock(
+  title: string,
+  summary?: string,
+  extras?: Partial<AssembledProfileExtendedBlock>
+): AssembledProfileExtendedBlock {
+  return {
+    title,
+    short_summary: safeString(summary) || undefined,
+    paragraphs: extras?.paragraphs || [],
+    bullets: extras?.bullets || [],
+    items: extras?.items || [],
+    transition: extras?.transition,
+    meta: extras?.meta,
+  };
 }
 
-function uniqueRows(
-  rows: Array<{
-    id: string;
-    priority: number;
-    source_section_key: string;
-    triggers: Record<string, any>;
-  }>
-) {
-  const seen = new Set<string>();
-  const out: Array<{
-    id: string;
-    priority: number;
-    source_section_key: string;
-    triggers: Record<string, any>;
-  }> = [];
-
-  for (const row of rows) {
-    if (seen.has(row.id)) continue;
-    seen.add(row.id);
-    out.push(row);
-  }
-
-  return out;
-}
-
-function pushBucket(
+function pushPanel(
   buckets: Map<
     ProfileExtendedPanelKey,
-    Array<{ block: Record<string, any>; row: KbBlockRow | null }>
+    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
   >,
   panelKey: ProfileExtendedPanelKey,
-  block: Record<string, any>,
+  block: AssembledProfileExtendedBlock,
   row: KbBlockRow | null
 ) {
   const current = buckets.get(panelKey) || [];
@@ -375,79 +337,41 @@ function pushBucket(
   buckets.set(panelKey, current);
 }
 
-function classifyBlock(
-  row: KbBlockRow,
-  block: Record<string, any>
-): ProfileExtendedPanelKey | null {
-  const source = row.section_key;
-  const title = normalizeText(block.title);
-  const rowHeading = normalizeText(row.content?.heading);
-  const rowSubheading = normalizeText(row.content?.subheading);
+function selectedLevelItem(row: KbBlockRow, level: number) {
+  const content = row.content || {};
+  const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+  const levelsBlock = blocks.find(
+    (b: any) => normalizeText(b?.heading) === "levels" && Array.isArray(b?.items)
+  );
 
-  if (source === "result_interpretation_scripts") {
-    if (title.includes("what is usually happening in the market")) {
-      return "market_happening";
-    }
-    if (title.includes("core reading")) {
-      return "core_reading";
-    }
-    if (
-      title.includes("best fit strategic focus") ||
-      title.includes("what usually helps") ||
-      title.includes("what usually does not help") ||
-      title.includes("signs the business is ready")
-    ) {
-      return "what_to_focus_on_now";
-    }
-    return "core_diagnosis";
-  }
+  if (!levelsBlock) return null;
 
-  if (source === "level_progression_roadmap") {
-    if (rowHeading.includes("progression roadmap language")) {
-      return "what_progression_looks_like_next";
-    }
-    if (title.includes("readiness")) {
-      return "how_to_recognise_readiness";
-    }
-    if (rowSubheading.includes("levels")) {
-      return "level_meaning";
-    }
-    return "level_meaning";
-  }
-
-  if (source === "visibility_signal_framework") {
-    if (
-      rowSubheading === "discoverability" ||
-      rowSubheading === "credibility" ||
-      rowSubheading === "authority" ||
-      rowSubheading === "positioning" ||
-      rowSubheading === "influence"
-    ) {
-      return "wider_signal_pathway";
-    }
-    if (title.includes("progression pattern")) {
-      return "progression_pattern";
-    }
-    return "current_signal_pattern";
-  }
-
-  if (source === "visibility_audit_layer") {
-    if (rowHeading.includes("behaviour strategy by tier")) {
-      return "how_to_use_this_layer";
-    }
-    if (rowHeading.includes("behaviour style layer")) {
-      return "type_interpretation";
-    }
-    if (rowHeading.includes("pillar reading guidance")) {
-      return "current_signal_pattern";
-    }
-    return "type_interpretation";
-  }
-
-  return null;
+  const items = Array.isArray(levelsBlock.items) ? levelsBlock.items : [];
+  return items.find((item: any) => safeNumber(item?.level, -1) === level) || null;
 }
 
-function buildSyntheticAtAGlance(input: ProfileExtendedReportInput): Record<string, any> {
+function strongestWeakest(input: ProfileExtendedReportInput) {
+  const scores = input.pillar_scores || {};
+  const items = [
+    { key: "visibility", label: "Visibility", value: safeNumber(scores.visibility, 0) },
+    { key: "trust", label: "Trust", value: safeNumber(scores.trust, 0) },
+    { key: "authority", label: "Authority", value: safeNumber(scores.authority, 0) },
+    { key: "dominance", label: "Dominance", value: safeNumber(scores.dominance, 0) },
+  ].sort((a, b) => b.value - a.value);
+
+  return {
+    strongest: items[0],
+    weakest: items[items.length - 1],
+  };
+}
+
+function addSyntheticBlocks(
+  buckets: Map<
+    ProfileExtendedPanelKey,
+    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
+  >,
+  input: ProfileExtendedReportInput
+) {
   const readiness =
     input.readiness === "ready_to_progress"
       ? "Ready to progress"
@@ -455,227 +379,39 @@ function buildSyntheticAtAGlance(input: ProfileExtendedReportInput): Record<stri
       ? "Stabilise"
       : "Stabilise";
 
-  return makeBlock({
-    title: "Plain-English summary",
-    summary: `You are in the ${input.tier} tier at Level ${input.level}, with behaviour style ${input.behaviour_style} and readiness set to ${readiness}.`,
-    paragraphs: [
-      "Tier explains the current stage of market visibility. Level explains how stable or advanced that stage currently is.",
-      "Behaviour style shows how this person is most likely to implement strategy consistently, while readiness guides how aggressive the next move should be.",
-    ],
-    transition:
-      "This section anchors the internal interpretation before moving into deeper diagnosis.",
-  });
-}
+  pushPanel(
+    buckets,
+    "plain_english_summary",
+    makeSimpleBlock(
+      "Plain-English summary",
+      `You are in the ${input.tier} tier at Level ${input.level}, with behaviour style ${input.behaviour_style} and readiness set to ${readiness}.`,
+      {
+        paragraphs: [
+          "Tier explains the current stage of market visibility.",
+          "Level explains how stable or advanced that stage currently is.",
+          "Behaviour style shows how this person is most likely to implement strategy consistently.",
+        ],
+        transition:
+          "This gives the report its structural truth: tier explains the stage, while level explains how stable or advanced that stage currently is.",
+      }
+    ),
+    null
+  );
 
-function buildSyntheticCurrentSignalPattern(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
   const { strongest, weakest } = strongestWeakest(input);
-
-  return makeBlock({
-    title: "Current signal pattern",
-    summary: `${strongest.label} is currently the strongest visible signal, while ${weakest.label} looks like the main limiting factor.`,
-    paragraphs: [
-      "Pillar percentages should be used as interpretive clues rather than isolated verdicts.",
-      "A lower pillar usually points to missing or weak signals that need strengthening before the next step will hold.",
-    ],
-    transition:
-      "The same low pillar can mean different things at different levels, so the pillar pattern should always be read together with the tier and level.",
-  });
-}
-
-function buildSyntheticProgressionPattern(): Record<string, any> {
-  return makeBlock({
-    title: "Progression pattern",
-    summary: "Discoverability → Credibility → Authority → Positioning → Influence",
-    paragraphs: [
-      "Each stage builds on the one before it.",
-      "Businesses that try to skip a stage usually create unstable growth.",
-    ],
-  });
-}
-
-function buildSyntheticLevelMeaning(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  return makeBlock({
-    title: `Level ${input.level} meaning`,
-    summary: LEVEL_LABELS[input.level] || `Level ${input.level}`,
-    paragraphs: [
-      `Inside the ${input.tier} tier, Level ${input.level} shows how stable and advanced this stage currently is.`,
-      "The level acts as the precision layer. It shows not just where the business is, but how developed that stage currently is.",
-    ],
-  });
-}
-
-function buildSyntheticMeaningInPractice(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  const summary =
-    input.tier === "Invisible"
-      ? "Visibility is still fragile and inconsistent."
-      : input.tier === "Emerging"
-      ? "The business is gaining recognition but is not yet the default choice."
-      : input.tier === "Established"
-      ? "The business is respected and recognised."
-      : "The business has visible authority and category pull.";
-
-  return makeBlock({
-    title: "Meaning in practice",
-    summary,
-  });
-}
-
-function buildSyntheticTypeInterpretation(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  return makeBlock({
-    title: `Type ${input.behaviour_style} interpretation`,
-    summary: STYLE_SUMMARIES[input.behaviour_style],
-  });
-}
-
-function buildSyntheticHowToUseLayer(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  return makeBlock({
-    title: "How to use this layer",
-    summary: STYLE_USAGE[input.behaviour_style],
-  });
-}
-
-function buildSyntheticStrategicPriority(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  const summary =
-    input.tier === "Invisible"
-      ? "Build discoverability and credibility first."
-      : input.tier === "Emerging"
-      ? "Strengthen trust and conversion consistency."
-      : input.tier === "Established"
-      ? "Consolidate authority into visible leadership and influence."
-      : "Protect authority while scaling category impact.";
-
-  return makeBlock({
-    title: "What to focus on now",
-    summary,
-    paragraphs: [
-      "The goal is not to do more everywhere. It is to strengthen the part of the system that is currently limiting progress.",
-    ],
-  });
-}
-
-function buildSyntheticNextProgression(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  const next =
-    input.tier === "Invisible"
-      ? "Emerging"
-      : input.tier === "Emerging"
-      ? "Established"
-      : input.tier === "Established"
-      ? "Magnetic"
-      : "Expanded influence";
-
-  return makeBlock({
-    title: "What progression looks like next",
-    summary: next,
-    paragraphs: [
-      "A useful report should explain movement, not just diagnosis.",
-    ],
-  });
-}
-
-function buildSyntheticReadiness(
-  input: ProfileExtendedReportInput
-): Record<string, any> {
-  const summary =
-    input.readiness === "ready_to_progress"
-      ? "The current pattern suggests the next-stage signals are beginning to consolidate."
-      : "The current pattern suggests that the base still needs to stabilise before aggressive next-stage moves will hold.";
-
-  return makeBlock({
-    title: "How to recognise readiness",
-    summary,
-    paragraphs: [
-      "Readiness is there to guide how aggressive the next move should be.",
-      "Stabilise means strengthen the base first. Ready to progress means the next-stage signals are beginning to consolidate.",
-    ],
-  });
-}
-
-function ensureRequiredPanels(
-  buckets: Map<
-    ProfileExtendedPanelKey,
-    Array<{ block: Record<string, any>; row: KbBlockRow | null }>
-  >,
-  input: ProfileExtendedReportInput
-) {
-  if (!(buckets.get("plain_english_summary") || []).length) {
-    pushBucket(buckets, "plain_english_summary", buildSyntheticAtAGlance(input), null);
-  }
-  if (!(buckets.get("current_signal_pattern") || []).length) {
-    pushBucket(
-      buckets,
-      "current_signal_pattern",
-      buildSyntheticCurrentSignalPattern(input),
-      null
-    );
-  }
-  if (!(buckets.get("progression_pattern") || []).length) {
-    pushBucket(buckets, "progression_pattern", buildSyntheticProgressionPattern(), null);
-  }
-  if (!(buckets.get("level_meaning") || []).length) {
-    pushBucket(buckets, "level_meaning", buildSyntheticLevelMeaning(input), null);
-  }
-  if (!(buckets.get("meaning_in_practice") || []).length) {
-    pushBucket(
-      buckets,
-      "meaning_in_practice",
-      buildSyntheticMeaningInPractice(input),
-      null
-    );
-  }
-  if (!(buckets.get("type_interpretation") || []).length) {
-    pushBucket(
-      buckets,
-      "type_interpretation",
-      buildSyntheticTypeInterpretation(input),
-      null
-    );
-  }
-  if (!(buckets.get("how_to_use_this_layer") || []).length) {
-    pushBucket(
-      buckets,
-      "how_to_use_this_layer",
-      buildSyntheticHowToUseLayer(input),
-      null
-    );
-  }
-  if (!(buckets.get("what_to_focus_on_now") || []).length) {
-    pushBucket(
-      buckets,
-      "what_to_focus_on_now",
-      buildSyntheticStrategicPriority(input),
-      null
-    );
-  }
-  if (!(buckets.get("what_progression_looks_like_next") || []).length) {
-    pushBucket(
-      buckets,
-      "what_progression_looks_like_next",
-      buildSyntheticNextProgression(input),
-      null
-    );
-  }
-  if (!(buckets.get("how_to_recognise_readiness") || []).length) {
-    pushBucket(
-      buckets,
-      "how_to_recognise_readiness",
-      buildSyntheticReadiness(input),
-      null
-    );
-  }
+  pushPanel(
+    buckets,
+    "current_signal_pattern",
+    makeSimpleBlock(
+      "Current signal pattern",
+      `${strongest.label} is currently the strongest visible signal, while ${weakest.label} looks like the main limiting factor.`,
+      {
+        transition:
+          "The same low pillar can mean different things at different levels, so the pillar pattern should always be read together with the tier and level.",
+      }
+    ),
+    null
+  );
 }
 
 async function fetchKbRows(sb?: VisibilityDbClient): Promise<KbBlockRow[]> {
@@ -699,69 +435,254 @@ export function assembleProfileExtendedReport(
   rows: KbBlockRow[],
   input: ProfileExtendedReportInput
 ): AssembledProfileExtendedReport {
-  const matchedRows = rows.filter((row) => rowMatchesInput(row, input));
-
+  const matched = rows.filter((row) => rowMatchesInput(row, input));
   const buckets = new Map<
     ProfileExtendedPanelKey,
-    Array<{ block: Record<string, any>; row: KbBlockRow | null }>
+    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
   >();
 
-  for (const row of matchedRows) {
-    const blocks = extractBlocks(row);
-    for (const block of blocks) {
-      const panelKey = classifyBlock(row, block);
-      if (!panelKey) continue;
-      pushBucket(buckets, panelKey, block, row);
+  const resultRow = matched.find((row) => row.section_key === "result_interpretation_scripts") || null;
+  const levelRow =
+    matched.find(
+      (row) =>
+        row.section_key === "level_progression_roadmap" &&
+        normalizeText(row.content?.heading) === "level progression roadmap"
+    ) || null;
+  const roadmapRow =
+    matched.find(
+      (row) =>
+        row.section_key === "level_progression_roadmap" &&
+        normalizeText(row.content?.heading) === "progression roadmap language"
+    ) || null;
+  const frameworkIntroRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_signal_framework" &&
+        safeString(row.content?.subheading) === ""
+    ) || null;
+  const frameworkRows = matched.filter(
+    (row) =>
+      row.section_key === "visibility_signal_framework" &&
+      safeString(row.content?.subheading) !== ""
+  );
+  const behaviourTypeRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_audit_layer" &&
+        normalizeText(row.content?.heading) === "behaviour style layer"
+    ) || null;
+  const behaviourTierRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_audit_layer" &&
+        normalizeText(row.content?.heading) === "behaviour strategy by tier"
+    ) || null;
+  const pillarGuidanceRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_audit_layer" &&
+        normalizeText(row.content?.heading) === "pillar reading guidance"
+    ) || null;
+
+  addSyntheticBlocks(buckets, input);
+
+  if (resultRow) {
+    const blocks = Array.isArray(resultRow.content?.blocks) ? resultRow.content?.blocks : [];
+    for (const raw of blocks) {
+      const block = makeBlock(raw);
+      const h = normalizeText(raw?.heading);
+
+      if (h === "core reading") {
+        pushPanel(buckets, "core_diagnosis", block, resultRow);
+        continue;
+      }
+
+      if (h === "what is usually happening in the market") {
+        pushPanel(buckets, "market_happening", block, resultRow);
+        continue;
+      }
+
+      if (h === "why businesses tend to get stuck here" || h === "report writing cue") {
+        pushPanel(buckets, "core_reading", block, resultRow);
+        continue;
+      }
+
+      if (
+        h === "best fit strategic focus" ||
+        h === "what usually helps most at this stage" ||
+        h === "what usually does not help yet"
+      ) {
+        pushPanel(buckets, "what_to_focus_on_now", block, resultRow);
+        continue;
+      }
+
+      if (h === "signs the business is ready to progress") {
+        pushPanel(buckets, "how_to_recognise_readiness", block, resultRow);
+        continue;
+      }
     }
   }
 
-  ensureRequiredPanels(buckets, input);
+  if (levelRow) {
+    const blocks = Array.isArray(levelRow.content?.blocks) ? levelRow.content?.blocks : [];
+    const selected = selectedLevelItem(levelRow, input.level);
 
-  const sections: AssembledProfileExtendedSection[] = [];
+    for (const raw of blocks) {
+      const h = normalizeText(raw?.heading);
 
-  for (const sectionDef of REPORT_STRUCTURE) {
-    const panels: AssembledProfileExtendedPanel[] = [];
+      if (h === "meaning in practice") {
+        pushPanel(buckets, "meaning_in_practice", makeBlock(raw), levelRow);
+        continue;
+      }
 
-    for (const panelDef of sectionDef.panels) {
-      const bucket = buckets.get(panelDef.panel_key) || [];
-      if (!bucket.length) continue;
+      if (h === "consultant read") {
+        pushPanel(buckets, "level_meaning", makeBlock(raw), levelRow);
+        continue;
+      }
 
-      const blocks: Array<Record<string, any>> = bucket.map((item) =>
-        makeBlock({
-          ...item.block,
-          title: safeString(item.block.title) || panelDef.title,
-        })
+      if (h === "levels" && selected) {
+        pushPanel(
+          buckets,
+          "level_meaning",
+          makeSimpleBlock(
+            `Level ${safeNumber(selected.level, input.level)} meaning`,
+            safeString(selected.meaning),
+            {
+              items: [
+                {
+                  level: safeNumber(selected.level, input.level),
+                  market_position: safeString(selected.market_position),
+                  immediate_focus: safeString(selected.immediate_focus),
+                },
+              ],
+            }
+          ),
+          levelRow
+        );
+      }
+    }
+  }
+
+  if (roadmapRow) {
+    const blocks = Array.isArray(roadmapRow.content?.blocks) ? roadmapRow.content?.blocks : [];
+    for (const raw of blocks) {
+      pushPanel(buckets, "what_progression_looks_like_next", makeBlock(raw), roadmapRow);
+    }
+  }
+
+  if (frameworkIntroRow) {
+    const rowSummary = safeString(frameworkIntroRow.content?.summary);
+    if (rowSummary) {
+      pushPanel(
+        buckets,
+        "wider_signal_pathway",
+        makeSimpleBlock("The wider signal pathway", rowSummary),
+        frameworkIntroRow
       );
-
-      const rowRefs = bucket
-        .filter((item) => item.row !== null)
-        .map((item) => {
-          const row = item.row as KbBlockRow;
-          return {
-            id: row.id,
-            priority: row.priority,
-            source_section_key: row.section_key,
-            triggers: row.triggers || {},
-          };
-        });
-
-      panels.push({
-        panel_key: panelDef.panel_key,
-        title: defaultPanelTitle(panelDef.panel_key),
-        blocks,
-        matched_rows: uniqueRows(rowRefs),
-      });
     }
 
-    if (!panels.length) continue;
+    const blocks = Array.isArray(frameworkIntroRow.content?.blocks)
+      ? frameworkIntroRow.content?.blocks
+      : [];
 
-    sections.push({
+    for (const raw of blocks) {
+      const h = normalizeText(raw?.heading);
+      if (h === "progression pattern" || h === "interpretation") {
+        pushPanel(buckets, "progression_pattern", makeBlock(raw), frameworkIntroRow);
+      } else {
+        pushPanel(buckets, "wider_signal_pathway", makeBlock(raw), frameworkIntroRow);
+      }
+    }
+  }
+
+  for (const row of frameworkRows) {
+    const subheading = safeString(row.content?.subheading);
+    const blocks = Array.isArray(row.content?.blocks) ? row.content?.blocks : [];
+
+    const introSummary = makeSimpleBlock(subheading, undefined, {
+      items: blocks.map((b: any) => ({
+        label: safeString(b?.heading),
+        value: safeString(b?.summary),
+      })),
+    });
+
+    pushPanel(buckets, "wider_signal_pathway", introSummary, row);
+  }
+
+  if (behaviourTypeRow) {
+    const blocks = Array.isArray(behaviourTypeRow.content?.blocks)
+      ? behaviourTypeRow.content?.blocks
+      : [];
+
+    for (const raw of blocks) {
+      pushPanel(buckets, "type_interpretation", makeBlock(raw), behaviourTypeRow);
+    }
+  }
+
+  if (behaviourTierRow) {
+    const blocks = Array.isArray(behaviourTierRow.content?.blocks)
+      ? behaviourTierRow.content?.blocks
+      : [];
+
+    for (const raw of blocks) {
+      pushPanel(buckets, "how_to_use_this_layer", makeBlock(raw), behaviourTierRow);
+    }
+  }
+
+  if (pillarGuidanceRow) {
+    const rowSummary = safeString(pillarGuidanceRow.content?.summary);
+    if (rowSummary) {
+      pushPanel(
+        buckets,
+        "current_signal_pattern",
+        makeSimpleBlock("Pillar reading guidance", rowSummary),
+        pillarGuidanceRow
+      );
+    }
+
+    const blocks = Array.isArray(pillarGuidanceRow.content?.blocks)
+      ? pillarGuidanceRow.content?.blocks
+      : [];
+
+    for (const raw of blocks) {
+      pushPanel(buckets, "current_signal_pattern", makeBlock(raw), pillarGuidanceRow);
+    }
+  }
+
+  const sections: AssembledProfileExtendedSection[] = STRUCTURE.map((sectionDef) => {
+    const panels: AssembledProfileExtendedPanel[] = sectionDef.panels
+      .map((panelDef) => {
+        const bucket = buckets.get(panelDef.panel_key) || [];
+        if (!bucket.length) return null;
+
+        return {
+          panel_key: panelDef.panel_key,
+          title: panelDef.title,
+          blocks: bucket.map((item) => item.block),
+          matched_rows: uniqueRows(
+            bucket
+              .filter((item) => item.row !== null)
+              .map((item) => rowRef(item.row as KbBlockRow))
+          ),
+        };
+      })
+      .filter(
+        (panel): panel is AssembledProfileExtendedPanel => panel !== null
+      );
+
+    if (!panels.length) {
+      return null;
+    }
+
+    return {
       section_key: sectionDef.section_key,
       heading: sectionDef.heading,
       panels,
-      matched_rows: uniqueRows(panels.flatMap((panel) => panel.matched_rows)),
-    });
-  }
+      matched_rows: uniqueRows(panels.flatMap((p) => p.matched_rows)),
+    };
+  }).filter(
+    (section): section is AssembledProfileExtendedSection => section !== null
+  );
 
   return {
     audience: "profile_extended_report",
