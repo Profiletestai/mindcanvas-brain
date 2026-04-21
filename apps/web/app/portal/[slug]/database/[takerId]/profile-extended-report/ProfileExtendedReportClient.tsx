@@ -1,7 +1,7 @@
 //apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/ProfileExtendedReportClient.tsx
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import Link from "next/link";
 
 const html2canvasPromise = () => import("html2canvas");
@@ -68,7 +68,7 @@ type ReportPayload = {
     pillars?: Record<string, number | null> | null;
     pillar_bands?: Record<string, string | null> | null;
   } | null;
-  sections?: ProfileExtendedSection[];
+  sections?: any[];
 };
 
 type Props = {
@@ -102,11 +102,6 @@ const BRAND = {
   heroBg:
     "radial-gradient(ellipse 83.33% 66.67% at 50% -10%, #113149 0%, #08121B 55%, #060E16 100%)",
   border: "#E2E8F0",
-  text: "#0F172A",
-  textSoft: "#334155",
-  textMuted: "#64748B",
-  white: "#FFFFFF",
-  panel: "#F8FAFC",
   blue: "#4F7DFF",
   purple: "#8B5CF6",
   teal: "#32D7C8",
@@ -141,7 +136,7 @@ function clamp(n: number, min: number, max: number) {
 }
 
 function titleCase(input: string) {
-  return input
+  return safeString(input)
     .replace(/_/g, " ")
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
@@ -192,7 +187,9 @@ function getLevel(report: ReportPayload) {
 }
 
 function getStyle(report: ReportPayload): BehaviourStyle {
-  const value = safeString(report?.signals?.style || report?.input?.behaviour_style).toUpperCase();
+  const value = safeString(
+    report?.signals?.style || report?.input?.behaviour_style
+  ).toUpperCase();
   if (value === "A" || value === "B" || value === "C" || value === "D") return value;
   return "A";
 }
@@ -256,8 +253,9 @@ function getPillarItems(report: ReportPayload) {
   ];
 }
 
-function sectionId(sectionKey: string) {
-  return sectionKey.replace(/_/g, "-");
+function safeSectionId(sectionKey: any) {
+  const raw = safeString(sectionKey);
+  return raw ? raw.replace(/_/g, "-") : "section";
 }
 
 function collectSummary(panel?: ProfileExtendedPanel | null) {
@@ -304,11 +302,68 @@ function collectTransition(panel?: ProfileExtendedPanel | null) {
   return "";
 }
 
-function PdfSection({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
+  const mapped: Array<ProfileExtendedSection | null> = (rawSections || []).map(
+    (section: any) => {
+      const sectionKey = safeString(section?.section_key || section?.key);
+      if (!sectionKey) return null;
+
+      let panels: ProfileExtendedPanel[] = [];
+
+      if (Array.isArray(section?.panels)) {
+        panels = section.panels
+          .map((panel: any): ProfileExtendedPanel | null => {
+            const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
+            const title = safeString(panel?.title) || titleCase(panelKey);
+            const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
+
+            if (!panelKey) return null;
+            if (!blocks.length && !title) return null;
+
+            return {
+              panel_key: panelKey,
+              title,
+              blocks,
+              matched_rows: Array.isArray(panel?.matched_rows)
+                ? panel.matched_rows
+                : [],
+            };
+          })
+          .filter((panel: ProfileExtendedPanel | null): panel is ProfileExtendedPanel =>
+           panel !== null
+           );
+      } else if (Array.isArray(section?.blocks)) {
+        panels = [
+          {
+            panel_key: `${sectionKey}_legacy`,
+            title: safeString(section?.title) || titleCase(sectionKey),
+            blocks: section.blocks,
+            matched_rows: [],
+          },
+        ];
+      }
+
+      return {
+        section_key: sectionKey,
+        heading:
+          safeString(section?.heading || section?.title) || titleCase(sectionKey),
+        panels,
+        matched_rows: Array.isArray(section?.matched_rows)
+          ? section.matched_rows
+          : [],
+      };
+    }
+  );
+
+  return mapped.filter(
+    (section): section is ProfileExtendedSection =>
+      section !== null &&
+      !!section.section_key &&
+      Array.isArray(section.panels)
+  );
+}
+
+function PdfSection({ children }: { children: ReactNode }) {
   return (
     <section data-pdf-section="true" style={{ pageBreakAfter: "always" }}>
       {children}
@@ -322,7 +377,7 @@ function WhiteCard({
   id,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   id?: string;
 }) {
   return (
@@ -385,7 +440,9 @@ function PanelCard({
       ) : null}
 
       {transition ? (
-        <div className="mt-4 text-[12px] italic leading-4 text-slate-500">{transition}</div>
+        <div className="mt-4 text-[12px] italic leading-4 text-slate-500">
+          {transition}
+        </div>
       ) : null}
     </div>
   );
@@ -409,7 +466,9 @@ function SummaryHeader({
   const tier = getTier(report);
   const level = getLevel(report);
   const style = getStyle(report);
-  const readiness = readinessLabel(report?.signals?.readiness ?? report?.input?.readiness);
+  const readiness = readinessLabel(
+    report?.signals?.readiness ?? report?.input?.readiness
+  );
   const score = overallScore(report);
 
   return (
@@ -489,11 +548,7 @@ function SummaryHeader({
   );
 }
 
-function Pill({
-  text,
-}: {
-  text: string;
-}) {
+function Pill({ text }: { text: string }) {
   return (
     <div
       className="rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -529,7 +584,9 @@ function StatCard({
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="text-[12px] uppercase tracking-[0.02em] text-slate-500">{label}</div>
+        <div className="text-[12px] uppercase tracking-[0.02em] text-slate-500">
+          {label}
+        </div>
         {badge ? (
           <div
             className="rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-white"
@@ -547,7 +604,9 @@ function StatCard({
             style={{ background: dotColor }}
           />
         ) : null}
-        <div className="text-[25px] font-semibold leading-7 text-slate-950">{value}</div>
+        <div className="text-[25px] font-semibold leading-7 text-slate-950">
+          {value}
+        </div>
       </div>
 
       {subValue ? <div className="mt-1 text-[8px] text-slate-500">{subValue}</div> : null}
@@ -577,7 +636,7 @@ function ReportIndexCard({
         {items.map((item, idx) => (
           <a
             key={item.key}
-            href={`#${sectionId(item.key)}`}
+            href={`#${safeSectionId(item.key)}`}
             className="block rounded-xl bg-slate-50 px-3 py-3 text-[14px] text-slate-950"
             style={{ outline: `1px solid ${BRAND.border}` }}
           >
@@ -590,15 +649,15 @@ function ReportIndexCard({
   );
 }
 
-function LadderPositionCard({
-  report,
-}: {
-  report: ReportPayload;
-}) {
+function LadderPositionCard({ report }: { report: ReportPayload }) {
   const tier = getTier(report);
   const level = getLevel(report);
-
-  const ordered: VisibilityTier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
+  const ordered: VisibilityTier[] = [
+    "Invisible",
+    "Emerging",
+    "Established",
+    "Magnetic",
+  ];
 
   return (
     <div
@@ -707,11 +766,7 @@ function LadderPositionCard({
   );
 }
 
-function PillarScoresCard({
-  report,
-}: {
-  report: ReportPayload;
-}) {
+function PillarScoresCard({ report }: { report: ReportPayload }) {
   const pillars = getPillarItems(report);
 
   return (
@@ -746,11 +801,7 @@ function PillarScoresCard({
   );
 }
 
-function TierDistributionCard({
-  report,
-}: {
-  report: ReportPayload;
-}) {
+function TierDistributionCard({ report }: { report: ReportPayload }) {
   const counts = getTierCounts(report);
   const max = Math.max(...Object.values(counts), 0);
 
@@ -791,13 +842,9 @@ function TierDistributionCard({
   );
 }
 
-function SectionRenderer({
-  section,
-}: {
-  section: ProfileExtendedSection;
-}) {
+function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
   return (
-    <WhiteCard id={sectionId(section.section_key)} title={section.heading}>
+    <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
       <div className="space-y-5">
         {section.panels.map((panel) => (
           <PanelCard key={panel.panel_key} title={panel.title} panel={panel} />
@@ -816,7 +863,10 @@ export default function ProfileExtendedReportClient({
 }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  const sections = useMemo(() => report.sections || [], [report.sections]);
+  const sections = useMemo(
+    () => normalizeSections(report.sections || []),
+    [report.sections]
+  );
 
   async function downloadPdf() {
     try {
