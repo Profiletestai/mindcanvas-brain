@@ -27,6 +27,7 @@ import {
 import { ReportPage, Shell } from "@/components/visibility/report/VisibilityReportPrimitives";
 import { VISIBILITY_REPORT_ASSETS } from "@/components/visibility/report/VisibilityReportAssets";
 import VisibilityReportHeader from "@/components/visibility/report/VisibilityReportHeader";
+import VisibilityHeroSection from "@/components/visibility/report/VisibilityHeroSection";
 import VisibilityLadderPanel from "@/components/visibility/report/VisibilityLadderPanel";
 import VisibilityVideoSection from "@/components/visibility/report/VisibilityVideoSection";
 
@@ -147,106 +148,6 @@ function IconBadge({
         }}
       />
     </div>
-  );
-}
-
-function LiteHeroCard({
-  tier,
-  level,
-  readiness,
-  intro,
-  marketCan,
-  caution,
-}: {
-  tier: Tier;
-  level: number;
-  readiness?: Readiness;
-  intro: string;
-  marketCan: string[];
-  caution: string[];
-}) {
-  return (
-    <OuterCard className="p-5">
-      <div className="flex items-start gap-4">
-        <IconBadge
-          src={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
-          alt="Result icon"
-        />
-
-        <div className="min-w-0 flex-1">
-          <div className="text-[18px] md:text-[20px] font-semibold leading-tight">
-            You are currently positioned at:{" "}
-            <span style={{ color: BRAND.tier[tier] }}>
-              Level {level} {tier} Tier
-            </span>
-          </div>
-
-          <div className="mt-2 text-[14px] leading-7" style={{ color: BRAND.text }}>
-            {intro}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <InnerPanel className="px-4 py-3">
-              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                Status
-              </div>
-              <div className="mt-1.5 text-[14px] font-semibold">
-                {readinessLabel(readiness)}
-              </div>
-            </InnerPanel>
-
-            <InnerPanel className="px-4 py-3">
-              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-                Tier range
-              </div>
-              <div className="mt-1.5 text-[14px] font-semibold">
-                {tier === "Invisible"
-                  ? "1–5"
-                  : tier === "Emerging"
-                  ? "6–10"
-                  : tier === "Established"
-                  ? "11–15"
-                  : "16–20"}
-              </div>
-            </InnerPanel>
-          </div>
-        </div>
-      </div>
-
-      <InnerPanel className="mt-5 p-4">
-        <div className="text-[15px] font-semibold">What this means in reality</div>
-
-        <div className="mt-4 grid gap-5 md:grid-cols-2">
-          <div>
-            <div className="text-[12px] font-semibold" style={{ color: BRAND.textDim }}>
-              The market can:
-            </div>
-            <ul className="mt-2 space-y-2 text-[14px] leading-7" style={{ color: BRAND.text }}>
-              {marketCan.map((item, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span style={{ color: BRAND.teal }}>✓</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <div className="text-[12px] font-semibold" style={{ color: BRAND.textDim }}>
-              But when it matters:
-            </div>
-            <ul className="mt-2 space-y-2 text-[14px] leading-7" style={{ color: BRAND.text }}>
-              {caution.map((item, idx) => (
-                <li key={idx} className="flex gap-2">
-                  <span style={{ color: "#FF7A7A" }}>×</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </InnerPanel>
-    </OuterCard>
   );
 }
 
@@ -433,6 +334,52 @@ function PillarSnapshot({
   );
 }
 
+function TopButton({
+  children,
+  onClick,
+  href,
+  variant = "dark",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  variant?: "dark" | "gradient";
+}) {
+  const className =
+    "inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold";
+  const style =
+    variant === "gradient"
+      ? ({
+          background: "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
+          color: "#071C36",
+        } as const)
+      : ({
+          background: "rgba(8,22,43,0.72)",
+          color: BRAND.white,
+          border: `1px solid ${BRAND.border}`,
+        } as const);
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        style={style}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <button className={className} style={style} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
 function InsightsSnapshot({
   ai,
   strengths,
@@ -524,52 +471,6 @@ function InsightsSnapshot({
         </div>
       </OuterCard>
     </OuterCard>
-  );
-}
-
-function TopButton({
-  children,
-  onClick,
-  href,
-  variant = "dark",
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  href?: string;
-  variant?: "dark" | "gradient";
-}) {
-  const className =
-    "inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold";
-  const style =
-    variant === "gradient"
-      ? ({
-          background: "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
-          color: "#071C36",
-        } as const)
-      : ({
-          background: "rgba(8,22,43,0.72)",
-          color: BRAND.white,
-          border: `1px solid ${BRAND.border}`,
-        } as const);
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-        style={style}
-      >
-        {children}
-      </a>
-    );
-  }
-
-  return (
-    <button className={className} style={style} onClick={onClick}>
-      {children}
-    </button>
   );
 }
 
@@ -699,6 +600,17 @@ export default function VisibilityLiteReportClient({
   const pillars = buildPillars(
     (kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores) as Record<string, number>
   );
+
+  const weakest = safeString(kbReport?.signals?.weakest_pillar).toLowerCase() || null;
+  const strongest = safeString(kbReport?.signals?.strongest_pillar).toLowerCase() || null;
+
+  const overallPct = (() => {
+    const direct = safeNumber(kbReport?.signals?.overall_pct, -1);
+    if (direct >= 0) return direct;
+    if (!pillars.length) return 0;
+    return Math.round(pillars.reduce((sum, pillar) => sum + pillar.value, 0) / pillars.length);
+  })();
+
   const tierCounts = buildTierCounts(kbReport?.graphs?.tier_counts, tier);
 
   const sectionMap = useMemo(() => {
@@ -713,8 +625,39 @@ export default function VisibilityLiteReportClient({
   const secStrengths = sectionMap.get("strengths") || null;
   const secFriction = sectionMap.get("friction") || null;
   const secSnapshot = sectionMap.get("snapshot") || null;
+  const secLevelMeaning = sectionMap.get("level_meaning") || null;
 
   const reality = realityForTier(tier);
+
+  const heroCopy =
+    sectionSummary(secLevelMeaning) ||
+    sectionSummary(secSnapshot) ||
+    (tier === "Invisible"
+      ? "You are in the Invisible tier — your market signals are still too weak or inconsistent to create reliable response."
+      : tier === "Emerging"
+      ? "You are in the Emerging tier — people can see you, but you are not yet the default choice."
+      : tier === "Established"
+      ? "You are in the Established tier — your market can recognise your value, but stronger authority is still needed."
+      : "You are in the Magnetic tier — your market sees you as a recognised authority with strong pull and influence.");
+
+  const currentPositionCopy =
+    tier === "Invisible"
+      ? "You are visible in some places, but not yet enough to create reliable market confidence."
+      : tier === "Emerging"
+      ? "You are visible in market terms, but this level is about strengthening structural consistency."
+      : tier === "Established"
+      ? "You are recognised and trusted, but this level is about consolidating leadership signals."
+      : "You are in a leadership position — the focus here is sustaining authority and protecting consistency.";
+
+  const tierRangeCopy =
+    tier === "Invisible"
+      ? "Levels 1–5. Early market signals are present, but they are not yet stable enough to drive predictable response."
+      : tier === "Emerging"
+      ? "Levels 6–10. Movement inside the tier reflects how stable your market position is."
+      : tier === "Established"
+      ? "Levels 11–15. The market recognises your value, but stronger consistency still separates expert from authority."
+      : "Levels 16–20. This range reflects strong authority, stronger pull, and greater market recognition.";
+
   const snapshotSummary =
     sectionSummary(secSnapshot) ||
     sectionSummary(secMarketExperience) ||
@@ -842,37 +785,44 @@ export default function VisibilityLiteReportClient({
             onDownload={downloadPdf}
           />
 
-          <VisibilityVideoSection
-            title="Welcome Video"
-            videoSrc={SHORT_VIDEO_URL}
-            posterSrc={SHORT_VIDEO_POSTER_URL || undefined}
-            helperText="Watch this short introduction before reviewing your snapshot."
-          />
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_270px] items-start">
+            <div className="space-y-4">
+              <VisibilityHeroSection
+                takerName={takerName}
+                tier={tier}
+                level={level}
+                overallPct={overallPct}
+                readiness={readiness}
+                heroCopy={heroCopy}
+                currentPositionCopy={currentPositionCopy}
+                tierRangeCopy={tierRangeCopy}
+                pillars={pillars}
+                weakest={weakest}
+                strongest={strongest}
+              />
+            </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
             <div className="self-start">
               <VisibilityLadderPanel tier={tier} level={level} />
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <LiteHeroCard
-                tier={tier}
-                level={level}
-                readiness={readiness}
-                intro={reality.intro}
-                marketCan={reality.marketCan}
-                caution={reality.caution}
-              />
+          <div className="mt-4">
+            <VisibilityVideoSection
+              title="Welcome Video"
+              videoSrc={SHORT_VIDEO_URL}
+              posterSrc={SHORT_VIDEO_POSTER_URL || undefined}
+              helperText="Watch this short introduction before reviewing your snapshot."
+            />
+          </div>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] items-stretch">
-                <DistributionChart tierCounts={tierCounts} />
-                <SnapshotSummaryCard
-                  tier={tier}
-                  level={level}
-                  summary={snapshotSummary}
-                />
-              </div>
-            </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px] items-stretch">
+            <DistributionChart tierCounts={tierCounts} />
+            <SnapshotSummaryCard
+              tier={tier}
+              level={level}
+              summary={snapshotSummary}
+            />
           </div>
         </ReportPage>
 
