@@ -4,52 +4,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type {
+  PortalReportResponse,
+  Section,
+  Tier,
+  VisibilityKbApiResponse,
+  VisibilityKbReport,
+} from "@/components/visibility/report/VisibilityReportTypes";
+import {
+  BRAND,
+  buildPillars,
+  clamp,
+  firstItems,
+  formatDate,
+  fullName,
+  safeNumber,
+  safeString,
+  safeText,
+  sectionBullets,
+  sectionSummary,
+} from "@/components/visibility/report/VisibilityReportUtils";
+import { ReportPage, Shell } from "@/components/visibility/report/VisibilityReportPrimitives";
+import { VISIBILITY_REPORT_ASSETS } from "@/components/visibility/report/VisibilityReportAssets";
 import VisibilityReportHeader from "@/components/visibility/report/VisibilityReportHeader";
+import VisibilityLadderPanel from "@/components/visibility/report/VisibilityLadderPanel";
 import VisibilityVideoSection from "@/components/visibility/report/VisibilityVideoSection";
 
 const html2canvasPromise = () => import("html2canvas");
 const jsPdfPromise = () => import("jspdf");
 
-type Tier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type Readiness = "stabilise" | "ready_to_progress";
-
-type Signals = {
-  tier?: Tier;
-  level?: number;
-  style?: string;
-  readiness?: Readiness;
-  pillar_scores?: Record<string, number>;
-  pillar_band?: Record<string, string>;
-  pillar_bands?: Record<string, string>;
-  weakest_pillar?: string | null;
-  strongest_pillar?: string | null;
-  pattern_tags?: string[];
-  overall_pct?: number | null;
-};
-
-type Graphs = {
-  tier_counts?: Record<string, number>;
-  personality_points?: Record<string, number> | null;
-  ladder?: { tier?: Tier; level?: number };
-  pillars?: Record<string, number>;
-  pillar_band?: Record<string, string>;
-  pillar_bands?: Record<string, string>;
-  pillar_model?: string;
-};
-
-type ContentBlock = {
-  title?: string;
-  short_summary?: string;
-  paragraphs?: string[];
-  bullets?: string[];
-  transition?: string;
-};
-
-type Section = {
-  key: string;
-  title?: string;
-  blocks?: ContentBlock[];
-};
 
 type AiInsights = {
   executive_summary: string;
@@ -62,62 +46,6 @@ type AiInsights = {
   closing_note: string;
 };
 
-type VisibilityKbReport = {
-  token: string;
-  tid: string | null;
-  sid?: string | null;
-  submission_id?: string | null;
-  engine_key?: string;
-  version?: number;
-  audience?: string;
-  meta?: {
-    org_name?: string | null;
-    org_logo_url?: string | null;
-    test_name?: string | null;
-    generated_at?: string | null;
-    mode?: "deterministic" | "ai" | string;
-    ai_error?: string;
-    scoring_mode?: string;
-  };
-  signals?: Signals;
-  graphs?: Graphs;
-  sections?: Section[];
-  ai?: AiInsights | null;
-  ai_meta?: any;
-};
-
-type VisibilityKbApiResponse = {
-  ok: boolean;
-  data?: VisibilityKbReport;
-  error?: string;
-  __meta?: any;
-};
-
-type PortalReportResponse = {
-  ok: boolean;
-  data?: {
-    org_slug?: string;
-    org_name?: string | null;
-    org_logo_url?: string | null;
-    test_name?: string;
-    taker?: {
-      id: string;
-      first_name?: string | null;
-      last_name?: string | null;
-      email?: string | null;
-    };
-    link?: {
-      next_steps_url?: string | null;
-      show_results?: boolean | null;
-      redirect_url?: string | null;
-      hidden_results_message?: string | null;
-      email_report?: boolean | null;
-      meta?: any;
-    };
-  };
-  error?: string;
-};
-
 type PillarItem = {
   key: string;
   label: string;
@@ -126,30 +54,11 @@ type PillarItem = {
   color: string;
 };
 
-const BRAND = {
-  bg: "#061A3A",
-  border: "rgba(255,255,255,0.12)",
-  borderSoft: "rgba(255,255,255,0.08)",
-  text: "rgba(255,255,255,0.94)",
-  textDim: "rgba(255,255,255,0.76)",
-  textFaint: "rgba(255,255,255,0.56)",
-  white: "#F8FAFC",
-  blue: "#4F7DFF",
-  teal: "#45E0D1",
-  purple: "#8B5CF6",
-  amber: "#F3B95C",
-  tier: {
-    Invisible: "#A7B3C7",
-    Emerging: "#4F7DFF",
-    Established: "#32D7C8",
-    Magnetic: "#8B5CF6",
-  } as Record<Tier, string>,
-};
-
 const SHORT_VIDEO_URL =
   "https://xciojwhnamsspmxpipzn.supabase.co/storage/v1/object/public/report-videos/Visibility%20Ladder%20Short.mp4";
 
 const SHORT_VIDEO_POSTER_URL = "";
+const WHATSWHAT_LOGO = "/images/visibility-report/logo/Whatswhat-logo.png";
 
 async function fetchJson<T = any>(url: string): Promise<T> {
   const r = await fetch(url, { cache: "no-store" });
@@ -163,226 +72,10 @@ async function fetchJson<T = any>(url: string): Promise<T> {
   return j as T;
 }
 
-function safeString(x: any): string {
-  return typeof x === "string" ? x.trim() : "";
-}
-
-function safeNumber(x: any, fallback = 0): number {
-  const n = Number(x);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function safeText(x: any): string {
-  if (typeof x === "string") return x;
-  if (Array.isArray(x)) return x.map(String).join(" ");
-  if (x == null) return "";
-  return String(x);
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function fullName(taker?: any): string {
-  const n = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
-  return n || "Your";
-}
-
 function readinessLabel(r?: Readiness): string {
   if (r === "ready_to_progress") return "Ready to progress";
   if (r === "stabilise") return "Stabilise";
   return "—";
-}
-
-function formatDate(d?: string | null): string {
-  const dt = d ? new Date(d) : new Date();
-  if (Number.isNaN(dt.getTime())) return "";
-  return dt.toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function tierBand(level: number): Tier {
-  if (level <= 5) return "Invisible";
-  if (level <= 10) return "Emerging";
-  if (level <= 15) return "Established";
-  return "Magnetic";
-}
-
-function getPillarColor(key: string): string {
-  const k = key.toLowerCase();
-  if (k === "visibility" || k === "discoverability") return BRAND.blue;
-  if (k === "trust" || k === "credibility") return BRAND.teal;
-  if (k === "authority" || k === "conversion") return BRAND.amber;
-  if (k === "dominance" || k === "influence") return BRAND.purple;
-  return BRAND.blue;
-}
-
-function getPillarLabel(key: string): string {
-  const k = key.toLowerCase();
-  if (k === "visibility") return "Visibility";
-  if (k === "discoverability") return "Discoverability";
-  if (k === "trust") return "Trust";
-  if (k === "credibility") return "Credibility";
-  if (k === "authority") return "Authority";
-  if (k === "conversion") return "Conversion";
-  if (k === "dominance") return "Dominance";
-  if (k === "influence") return "Influence";
-  return key;
-}
-
-function bandFromValue(value: number): string {
-  if (value >= 75) return "Strong";
-  if (value >= 50) return "Developing";
-  return "Weak";
-}
-
-function buildPillars(raw: Record<string, number> | undefined | null): PillarItem[] {
-  const source = raw || {};
-  const keys = Object.keys(source).map((k) => k.toLowerCase());
-  const isPrime =
-    keys.includes("visibility") || keys.includes("authority") || keys.includes("dominance");
-
-  const order = isPrime
-    ? ["visibility", "trust", "authority", "dominance"]
-    : ["discoverability", "trust", "conversion"];
-
-  return order.map((key) => {
-    const value = clamp(safeNumber((source as any)?.[key]), 0, 100);
-    return {
-      key,
-      label: getPillarLabel(key),
-      value,
-      band: bandFromValue(value),
-      color: getPillarColor(key),
-    };
-  });
-}
-
-function sectionSummary(section?: Section | null): string {
-  if (!section) return "";
-  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-  for (const block of blocks) {
-    const short = safeString(block.short_summary);
-    if (short) return short;
-    const para = (Array.isArray(block.paragraphs) ? block.paragraphs : [])
-      .map((p) => safeString(p))
-      .find(Boolean);
-    if (para) return para;
-  }
-  return "";
-}
-
-function sectionBullets(section?: Section | null): string[] {
-  if (!section) return [];
-  const out: string[] = [];
-  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-  for (const block of blocks) {
-    const bullets = Array.isArray(block.bullets) ? block.bullets : [];
-    for (const b of bullets) {
-      const s = safeString(b);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
-function firstItems(arr: string[], count: number): string[] {
-  return arr.filter(Boolean).slice(0, count);
-}
-
-function buildTierCounts(raw: Record<string, number> | undefined | null, dominantTier: Tier) {
-  const source = raw || {};
-  const out: Record<Tier, number> = {
-    Invisible: safeNumber((source as any)?.Invisible, 0),
-    Emerging: safeNumber((source as any)?.Emerging, 0),
-    Established: safeNumber((source as any)?.Established, 0),
-    Magnetic: safeNumber((source as any)?.Magnetic, 0),
-  };
-
-  const total = out.Invisible + out.Emerging + out.Established + out.Magnetic;
-  if (total > 0) return out;
-
-  return {
-    Invisible: dominantTier === "Invisible" ? 5 : 1,
-    Emerging: dominantTier === "Emerging" ? 5 : 1,
-    Established: dominantTier === "Established" ? 5 : 1,
-    Magnetic: dominantTier === "Magnetic" ? 5 : 1,
-  };
-}
-
-function realityForTier(tier: Tier) {
-  switch (tier) {
-    case "Invisible":
-      return {
-        intro:
-          "Your business is beginning to appear, but the market still experiences inconsistency and uncertainty.",
-        marketCan: [
-          "Occasionally notice your presence",
-          "See early signs of value",
-          "Begin recognising your offer",
-        ],
-        caution: [
-          "You are not yet easy to find",
-          "Trust is not yet automatic",
-          "Interest can stall before action",
-        ],
-      };
-    case "Emerging":
-      return {
-        intro:
-          "Your business is visible and gaining notice, but it is not yet the obvious choice in the market.",
-        marketCan: [
-          "Find you more consistently",
-          "Understand your offer more clearly",
-          "See growing signs of credibility",
-        ],
-        caution: [
-          "You may still be compared against alternatives",
-          "Trust is not yet fully settled",
-          "Momentum can slow before conversion",
-        ],
-      };
-    case "Established":
-      return {
-        intro:
-          "Your business is recognised and trusted enough to create stronger confidence, but there is still room to deepen authority.",
-        marketCan: ["Find you", "Understand what you do", "Recognise your value"],
-        caution: [
-          "You are not always the obvious choice",
-          "Trust may still require reassurance",
-          "Growth can flatten without stronger authority cues",
-        ],
-      };
-    case "Magnetic":
-    default:
-      return {
-        intro:
-          "Your business carries strong market pull. Visibility, trust, and authority are working together at a high level.",
-        marketCan: [
-          "Recognise you quickly",
-          "Trust your position with confidence",
-          "Move toward action with less persuasion",
-        ],
-        caution: [
-          "Consistency still needs protecting",
-          "Strong reputation must be sustained",
-          "Leadership signals need to remain visible",
-        ],
-      };
-  }
-}
-
-function pillarInterpretation(pillar: PillarItem): string {
-  if (pillar.band === "Strong") {
-    return `${pillar.label} is strong — this signal is helping the market respond to you with greater confidence and consistency.`;
-  }
-  if (pillar.band === "Developing") {
-    return `${pillar.label} is developing — this signal is present, but it still needs strengthening to become more reliable.`;
-  }
-  return `${pillar.label} is weak — this is currently one of the areas most likely to create hesitation or friction in the market response.`;
 }
 
 function OuterCard({
@@ -429,243 +122,35 @@ function InnerPanel({
   );
 }
 
-function ReportPage({
-  children,
-  id,
+function IconBadge({
+  src,
+  alt,
 }: {
-  children: ReactNode;
-  id?: string;
+  src: string;
+  alt: string;
 }) {
   return (
-    <section
-      id={id}
-      data-pdf-page="true"
-      className="block w-full"
-      style={{ pageBreakAfter: "always" }}
+    <div
+      className="h-12 w-12 shrink-0 rounded-2xl overflow-hidden"
+      style={{
+        border: `1px solid ${BRAND.border}`,
+        background: "linear-gradient(180deg, rgba(87,146,255,0.95), rgba(69,118,225,0.92))",
+        boxShadow: "0 10px 24px rgba(47,106,214,0.28)",
+      }}
     >
-      <div className="flex flex-col gap-4">{children}</div>
-    </section>
-  );
-}
-
-function TopButton({
-  children,
-  onClick,
-  href,
-  variant = "dark",
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  href?: string;
-  variant?: "dark" | "gradient";
-}) {
-  const className =
-    "inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold";
-  const style =
-    variant === "gradient"
-      ? ({
-          background: "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
-          color: "#071C36",
-        } as const)
-      : ({
-          background: "rgba(8,22,43,0.72)",
-          color: BRAND.white,
-          border: `1px solid ${BRAND.border}`,
-        } as const);
-
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={className}
-        style={style}
-      >
-        {children}
-      </a>
-    );
-  }
-
-  return (
-    <button className={className} style={style} onClick={onClick}>
-      {children}
-    </button>
-  );
-}
-
-function Shell({ children }: { children: ReactNode }) {
-  return (
-    <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
-      <div className="pointer-events-none fixed inset-0">
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(1000px 520px at 12% 12%, rgba(79,125,255,0.22), transparent 58%)," +
-              "radial-gradient(860px 460px at 86% 18%, rgba(69,224,209,0.12), transparent 56%)," +
-              "radial-gradient(720px 520px at 50% 92%, rgba(139,92,246,0.10), transparent 60%)",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
-      </div>
-      <div className="relative">{children}</div>
+      <img
+        src={src}
+        alt={alt}
+        className="h-full w-full object-cover"
+        onError={(e: any) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
     </div>
   );
 }
 
-function LadderSidebar({
-  tier,
-  level,
-  nextStepsUrl,
-  onDownload,
-}: {
-  tier: Tier;
-  level: number;
-  nextStepsUrl?: string;
-  onDownload: () => void;
-}) {
-  const levels = Array.from({ length: 20 }, (_, i) => 20 - i);
-  const groups: Array<{
-    tier: Tier;
-    startRow: number;
-    span: number;
-  }> = [
-    { tier: "Magnetic", startRow: 1, span: 5 },
-    { tier: "Established", startRow: 6, span: 5 },
-    { tier: "Emerging", startRow: 11, span: 5 },
-    { tier: "Invisible", startRow: 16, span: 5 },
-  ];
-
-  return (
-    <div className="space-y-3">
-      <OuterCard className="p-3.5">
-        <div
-          className="text-[10px] uppercase tracking-[0.24em]"
-          style={{ color: BRAND.textFaint }}
-        >
-          Ladder Position
-        </div>
-
-        <div className="mt-3 grid grid-cols-[38px_minmax(0,1fr)] gap-2.5">
-          <div
-            className="grid"
-            style={{
-              gridTemplateRows: "repeat(20, 28px)",
-              rowGap: "6px",
-            }}
-          >
-            {groups.map((g) => (
-              <div
-                key={g.tier}
-                className="relative flex items-center justify-center overflow-hidden rounded-[12px]"
-                style={{
-                  gridRow: `${g.startRow} / span ${g.span}`,
-                  background: `${BRAND.tier[g.tier]}20`,
-                  border: `1px solid ${BRAND.border}`,
-                }}
-              >
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-[5px] rounded-r-full"
-                  style={{ background: BRAND.tier[g.tier] }}
-                />
-                <div
-                  className="rotate-[-90deg] whitespace-nowrap text-[10px] font-semibold"
-                  style={{ color: BRAND.tier[g.tier] }}
-                >
-                  {g.tier}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div
-            className="grid"
-            style={{
-              gridTemplateRows: "repeat(20, 28px)",
-              rowGap: "6px",
-            }}
-          >
-            {levels.map((n) => {
-              const active = n === level;
-              const band = tierBand(n);
-              const bandColor = BRAND.tier[band];
-
-              return (
-                <div
-                  key={n}
-                  className="relative rounded-[10px] border flex items-center justify-center text-[12px]"
-                  style={{
-                    borderColor: active ? bandColor : "rgba(255,255,255,0.10)",
-                    background: active
-                      ? `linear-gradient(90deg, ${bandColor}cc, rgba(255,255,255,0.14))`
-                      : "rgba(7,22,43,0.34)",
-                    color: "rgba(255,255,255,0.92)",
-                    boxShadow: active ? `0 0 18px ${bandColor}44` : "none",
-                  }}
-                >
-                  {n}
-                  <div
-                    className="absolute right-0 top-0 bottom-0 w-[4px] rounded-r-[10px]"
-                    style={{ background: bandColor }}
-                  />
-                  {active ? (
-                    <div
-                      className="absolute -right-2.5 h-5 w-5 rounded-full"
-                      style={{
-                        background: bandColor,
-                        opacity: 0.86,
-                      }}
-                    />
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-y-1.5 text-[12px]">
-          <div>Magnetic</div>
-          <div className="text-right" style={{ color: BRAND.textDim }}>
-            16–20
-          </div>
-          <div>Established</div>
-          <div className="text-right" style={{ color: BRAND.textDim }}>
-            11–15
-          </div>
-          <div>Emerging</div>
-          <div className="text-right" style={{ color: BRAND.textDim }}>
-            6–10
-          </div>
-          <div>Invisible</div>
-          <div className="text-right" style={{ color: BRAND.textDim }}>
-            1–5
-          </div>
-        </div>
-      </OuterCard>
-
-      <OuterCard className="p-3.5">
-        <div className="space-y-2">
-          <TopButton onClick={onDownload}>Download PDF</TopButton>
-          {nextStepsUrl ? (
-            <TopButton href={nextStepsUrl} variant="gradient">
-              Next steps
-            </TopButton>
-          ) : null}
-        </div>
-      </OuterCard>
-    </div>
-  );
-}
-
-function LitePositionCard({
+function LiteHeroCard({
   tier,
   level,
   readiness,
@@ -681,52 +166,62 @@ function LitePositionCard({
   caution: string[];
 }) {
   return (
-    <OuterCard className="p-4 md:p-5">
-      <div className="text-[16px] md:text-[18px] font-semibold">
-        You are currently positioned at:{" "}
-        <span style={{ color: BRAND.tier[tier] }}>Level {level}</span>{" "}
-        <span style={{ color: BRAND.textDim }}>{tier} Tier</span>
+    <OuterCard className="p-5">
+      <div className="flex items-start gap-4">
+        <IconBadge
+          src={VISIBILITY_REPORT_ASSETS.sections.marketExperience}
+          alt="Result icon"
+        />
+
+        <div className="min-w-0 flex-1">
+          <div className="text-[18px] md:text-[20px] font-semibold leading-tight">
+            You are currently positioned at:{" "}
+            <span style={{ color: BRAND.tier[tier] }}>
+              Level {level} {tier} Tier
+            </span>
+          </div>
+
+          <div className="mt-2 text-[14px] leading-7" style={{ color: BRAND.text }}>
+            {intro}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <InnerPanel className="px-4 py-3">
+              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+                Status
+              </div>
+              <div className="mt-1.5 text-[14px] font-semibold">
+                {readinessLabel(readiness)}
+              </div>
+            </InnerPanel>
+
+            <InnerPanel className="px-4 py-3">
+              <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
+                Tier range
+              </div>
+              <div className="mt-1.5 text-[14px] font-semibold">
+                {tier === "Invisible"
+                  ? "1–5"
+                  : tier === "Emerging"
+                  ? "6–10"
+                  : tier === "Established"
+                  ? "11–15"
+                  : "16–20"}
+              </div>
+            </InnerPanel>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-3 text-[13px] leading-7" style={{ color: BRAND.text }}>
-        {intro}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-3">
-        <InnerPanel className="px-4 py-3">
-          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-            Status
-          </div>
-          <div className="mt-1.5 text-[14px] font-semibold">
-            {readinessLabel(readiness)}
-          </div>
-        </InnerPanel>
-
-        <InnerPanel className="px-4 py-3">
-          <div className="text-[10px]" style={{ color: BRAND.textFaint }}>
-            Tier range
-          </div>
-          <div className="mt-1.5 text-[14px] font-semibold">
-            {tier === "Invisible"
-              ? "1–5"
-              : tier === "Emerging"
-              ? "6–10"
-              : tier === "Established"
-              ? "11–15"
-              : "16–20"}
-          </div>
-        </InnerPanel>
-      </div>
-
-      <InnerPanel className="mt-4 p-4">
-        <div className="text-[14px] font-semibold">What this means in reality</div>
+      <InnerPanel className="mt-5 p-4">
+        <div className="text-[15px] font-semibold">What this means in reality</div>
 
         <div className="mt-4 grid gap-5 md:grid-cols-2">
           <div>
             <div className="text-[12px] font-semibold" style={{ color: BRAND.textDim }}>
               The market can:
             </div>
-            <ul className="mt-2 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+            <ul className="mt-2 space-y-2 text-[14px] leading-7" style={{ color: BRAND.text }}>
               {marketCan.map((item, idx) => (
                 <li key={idx} className="flex gap-2">
                   <span style={{ color: BRAND.teal }}>✓</span>
@@ -740,7 +235,7 @@ function LitePositionCard({
             <div className="text-[12px] font-semibold" style={{ color: BRAND.textDim }}>
               But when it matters:
             </div>
-            <ul className="mt-2 space-y-2 text-[13px] leading-7" style={{ color: BRAND.text }}>
+            <ul className="mt-2 space-y-2 text-[14px] leading-7" style={{ color: BRAND.text }}>
               {caution.map((item, idx) => (
                 <li key={idx} className="flex gap-2">
                   <span style={{ color: "#FF7A7A" }}>×</span>
@@ -753,6 +248,26 @@ function LitePositionCard({
       </InnerPanel>
     </OuterCard>
   );
+}
+
+function buildTierCounts(raw: Record<string, number> | undefined | null, dominantTier: Tier) {
+  const source = raw || {};
+  const out: Record<Tier, number> = {
+    Invisible: safeNumber((source as any)?.Invisible, 0),
+    Emerging: safeNumber((source as any)?.Emerging, 0),
+    Established: safeNumber((source as any)?.Established, 0),
+    Magnetic: safeNumber((source as any)?.Magnetic, 0),
+  };
+
+  const total = out.Invisible + out.Emerging + out.Established + out.Magnetic;
+  if (total > 0) return out;
+
+  return {
+    Invisible: dominantTier === "Invisible" ? 5 : 1,
+    Emerging: dominantTier === "Emerging" ? 5 : 1,
+    Established: dominantTier === "Established" ? 5 : 1,
+    Magnetic: dominantTier === "Magnetic" ? 5 : 1,
+  };
 }
 
 function DistributionChart({
@@ -770,10 +285,18 @@ function DistributionChart({
   const max = Math.max(...items.map((i) => i.value), 1);
 
   return (
-    <OuterCard className="p-4">
-      <div className="text-[15px] font-semibold">Signal distribution</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        These graphs show how your answers map across ladder tiers.
+    <OuterCard className="p-4 h-full">
+      <div className="flex items-start gap-4">
+        <IconBadge
+          src={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
+          alt="Signal distribution"
+        />
+        <div>
+          <div className="text-[15px] font-semibold">Signal distribution</div>
+          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+            These graphs show how your answers map across ladder tiers.
+          </div>
+        </div>
       </div>
 
       <InnerPanel className="mt-4 p-4">
@@ -814,13 +337,21 @@ function SnapshotSummaryCard({
 }) {
   return (
     <OuterCard className="p-4 h-full">
-      <div className="text-[15px] font-semibold">Your visibility snapshot</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        A concise summary of where you currently stand.
+      <div className="flex items-start gap-4">
+        <IconBadge
+          src={VISIBILITY_REPORT_ASSETS.insights.opportunity}
+          alt="Visibility snapshot"
+        />
+        <div>
+          <div className="text-[15px] font-semibold">Your visibility snapshot</div>
+          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+            A concise summary of where you currently stand.
+          </div>
+        </div>
       </div>
 
       <InnerPanel className="mt-4 p-4">
-        <div className="text-[13px] leading-7" style={{ color: BRAND.text }}>
+        <div className="text-[14px] leading-7" style={{ color: BRAND.text }}>
           <span className="font-semibold" style={{ color: BRAND.tier[tier] }}>
             Level {level} — {tier}
           </span>
@@ -839,6 +370,16 @@ function SnapshotSummaryCard({
   );
 }
 
+function pillarInterpretation(pillar: PillarItem): string {
+  if (pillar.band === "Strong") {
+    return `${pillar.label} is strong — this signal is helping the market respond to you with greater confidence and consistency.`;
+  }
+  if (pillar.band === "Developing") {
+    return `${pillar.label} is developing — this signal is present, but it still needs strengthening to become more reliable.`;
+  }
+  return `${pillar.label} is weak — this is currently one of the areas most likely to create hesitation or friction in the market response.`;
+}
+
 function PillarSnapshot({
   pillars,
 }: {
@@ -846,9 +387,17 @@ function PillarSnapshot({
 }) {
   return (
     <OuterCard className="p-4">
-      <div className="text-[15px] font-semibold">Your visibility pillars</div>
-      <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
-        A quick reading of the key signals shaping market response.
+      <div className="flex items-start gap-4">
+        <IconBadge
+          src={VISIBILITY_REPORT_ASSETS.sections.signalGraph}
+          alt="Pillar snapshot"
+        />
+        <div>
+          <div className="text-[15px] font-semibold">Your visibility pillars</div>
+          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+            A quick reading of the key signals shaping market response.
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 space-y-4">
@@ -899,7 +448,18 @@ function InsightsSnapshot({
 }) {
   return (
     <OuterCard className="p-4 md:p-5">
-      <div className="text-[15px] font-semibold">Insights</div>
+      <div className="flex items-start gap-4">
+        <IconBadge
+          src={VISIBILITY_REPORT_ASSETS.sections.coaching}
+          alt="Coaching insight"
+        />
+        <div>
+          <div className="text-[15px] font-semibold">Coaching insight</div>
+          <div className="mt-1 text-[12px]" style={{ color: BRAND.textDim }}>
+            An additional interpretation layer built from your scored signals and narrative blocks.
+          </div>
+        </div>
+      </div>
 
       <InnerPanel className="mt-4 p-4">
         <div className="text-[14px] font-semibold">Executive summary</div>
@@ -967,6 +527,114 @@ function InsightsSnapshot({
   );
 }
 
+function TopButton({
+  children,
+  onClick,
+  href,
+  variant = "dark",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  variant?: "dark" | "gradient";
+}) {
+  const className =
+    "inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold";
+  const style =
+    variant === "gradient"
+      ? ({
+          background: "linear-gradient(90deg, #45E0D1 0%, #4F7DFF 50%, #8B5CF6 100%)",
+          color: "#071C36",
+        } as const)
+      : ({
+          background: "rgba(8,22,43,0.72)",
+          color: BRAND.white,
+          border: `1px solid ${BRAND.border}`,
+        } as const);
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+        style={style}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <button className={className} style={style} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function realityForTier(tier: Tier) {
+  switch (tier) {
+    case "Invisible":
+      return {
+        intro:
+          "Your business is beginning to appear, but the market still experiences inconsistency and uncertainty.",
+        marketCan: [
+          "Occasionally notice your presence",
+          "See early signs of value",
+          "Begin recognising your offer",
+        ],
+        caution: [
+          "You are not yet easy to find",
+          "Trust is not yet automatic",
+          "Interest can stall before action",
+        ],
+      };
+    case "Emerging":
+      return {
+        intro:
+          "Your business is visible and gaining notice, but it is not yet the obvious choice in the market.",
+        marketCan: [
+          "Find you more consistently",
+          "Understand your offer more clearly",
+          "See growing signs of credibility",
+        ],
+        caution: [
+          "You may still be compared against alternatives",
+          "Trust is not yet fully settled",
+          "Momentum can slow before conversion",
+        ],
+      };
+    case "Established":
+      return {
+        intro:
+          "Your business is recognised and trusted enough to create stronger confidence, but there is still room to deepen authority.",
+        marketCan: ["Find you", "Understand what you do", "Recognise your value"],
+        caution: [
+          "You are not always the obvious choice",
+          "Trust may still require reassurance",
+          "Growth can flatten without stronger authority cues",
+        ],
+      };
+    case "Magnetic":
+    default:
+      return {
+        intro:
+          "Your business carries strong market pull. Visibility, trust, and authority are working together at a high level.",
+        marketCan: [
+          "Recognise you quickly",
+          "Trust your position with confidence",
+          "Move toward action with less persuasion",
+        ],
+        caution: [
+          "Consistency still needs protecting",
+          "Strong reputation must be sustained",
+          "Leadership signals need to remain visible",
+        ],
+      };
+  }
+}
+
 export default function VisibilityLiteReportClient({
   token,
   tid,
@@ -1020,16 +688,17 @@ export default function VisibilityLiteReportClient({
     };
   }, [token, tid, src]);
 
-  const orgLogoUrl = portalMeta?.org_logo_url || kbReport?.meta?.org_logo_url || null;
   const takerName = fullName(portalMeta?.taker);
   const reportDate = formatDate(kbReport?.meta?.generated_at);
   const nextStepsUrl = safeString(portalMeta?.link?.next_steps_url);
 
   const tier = ((kbReport?.signals?.tier as Tier) || "Invisible") as Tier;
   const level = clamp(safeNumber(kbReport?.signals?.level, 1), 1, 20);
-  const readiness = kbReport?.signals?.readiness;
+  const readiness = kbReport?.signals?.readiness as Readiness | undefined;
 
-  const pillars = buildPillars(kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores);
+  const pillars = buildPillars(
+    (kbReport?.graphs?.pillars || kbReport?.signals?.pillar_scores) as Record<string, number>
+  );
   const tierCounts = buildTierCounts(kbReport?.graphs?.tier_counts, tier);
 
   const sectionMap = useMemo(() => {
@@ -1120,20 +789,20 @@ export default function VisibilityLiteReportClient({
 
   if (loading) {
     return (
-      <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
+      <Shell>
         <div className="mx-auto max-w-[1560px] px-4 py-5">
           <div className="text-2xl font-semibold">Loading your snapshot…</div>
           <div className="mt-2 text-sm" style={{ color: BRAND.textDim }}>
             Preparing your Results Snapshot.
           </div>
         </div>
-      </div>
+      </Shell>
     );
   }
 
   if (err || !kbReport) {
     return (
-      <div className="min-h-screen text-white" style={{ background: BRAND.bg }}>
+      <Shell>
         <div className="mx-auto max-w-[1560px] px-4 py-5 space-y-4">
           <div className="text-2xl font-semibold">Couldn’t load Visibility snapshot</div>
           <p className="text-sm" style={{ color: "rgba(248,113,113,0.95)" }}>
@@ -1153,7 +822,7 @@ export default function VisibilityLiteReportClient({
             Go back
           </Link>
         </div>
-      </div>
+      </Shell>
     );
   }
 
@@ -1165,7 +834,7 @@ export default function VisibilityLiteReportClient({
       >
         <ReportPage id="ladder-position">
           <VisibilityReportHeader
-            orgLogoUrl={orgLogoUrl}
+            orgLogoUrl={WHATSWHAT_LOGO}
             takerName={takerName}
             reportDate={reportDate || formatDate(null)}
             frameworkName="WhatsWhat Prime"
@@ -1182,16 +851,11 @@ export default function VisibilityLiteReportClient({
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] items-start">
             <div className="self-start">
-              <LadderSidebar
-                tier={tier}
-                level={level}
-                nextStepsUrl={nextStepsUrl}
-                onDownload={downloadPdf}
-              />
+              <VisibilityLadderPanel tier={tier} level={level} />
             </div>
 
             <div className="space-y-4">
-              <LitePositionCard
+              <LiteHeroCard
                 tier={tier}
                 level={level}
                 readiness={readiness}
@@ -1218,7 +882,7 @@ export default function VisibilityLiteReportClient({
 
         <ReportPage id="results-snapshot">
           <InsightsSnapshot
-            ai={kbReport.ai}
+            ai={kbReport.ai as AiInsights | null | undefined}
             strengths={strengths}
             friction={friction}
             opportunity={opportunity}
