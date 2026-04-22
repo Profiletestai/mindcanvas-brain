@@ -5,8 +5,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
-import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
-import { getBaseUrl } from "@/lib/baseUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +32,6 @@ function asPercentMap(values: Record<string, number>): Record<string, number> {
       k,
       Math.round(((Number(v) || 0) / sum) * 100),
     ])
-  );
-}
-
-function asDecimalMap(values: Record<string, number>): Record<string, number> {
-  const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
-  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
-  return Object.fromEntries(
-    Object.entries(values).map(([k, v]) => [k, (Number(v) || 0) / sum])
   );
 }
 
@@ -86,47 +76,6 @@ function BarRow({
 }
 
 type QscAudience = "entrepreneur" | "leader";
-
-async function fetchVisibilityInternalSnapshot(args: {
-  orgSlug: string;
-  takerId: string;
-}) {
-  const { orgSlug, takerId } = args;
-
-  try {
-    const origin = getBaseUrl();
-    const url = `${origin}/api/portal/visibility/taker/${encodeURIComponent(
-      takerId
-    )}/snapshot?org=${encodeURIComponent(orgSlug)}&audience=internal_snapshot`;
-
-    const res = await fetch(url, { cache: "no-store" });
-    const ct = res.headers.get("content-type") || "";
-    if (!ct.includes("application/json")) return null;
-
-    const j = await res.json().catch(() => null);
-    if (!res.ok || !j?.ok) return null;
-    return j?.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function prettyTier(t?: string | null) {
-  const s = String(t || "").trim();
-  return s || "—";
-}
-
-function prettyStyle(s?: string | null) {
-  const t = String(s || "").trim().toUpperCase();
-  return t || "—";
-}
-
-function prettyReadiness(r?: string | null) {
-  const t = String(r || "").trim().toLowerCase();
-  if (t === "ready_to_progress") return "Ready to progress";
-  if (t === "stabilise") return "Stabilise";
-  return t || "—";
-}
 
 export default async function TakerDetail({
   params,
@@ -309,61 +258,6 @@ export default async function TakerDetail({
   const profilePct = asPercentMap(profileScores);
   const topProfile = sortDesc(profileScores)[0] as [string, number] | undefined;
 
-  const freqDec = asDecimalMap(frequencyScores);
-  const profileDec = asDecimalMap(profileScores);
-
-  const freqLabelArray = (["A", "B", "C", "D"] as const).map((code) => ({
-    code,
-    name: freqLabels[code] || code,
-  }));
-
-  const topFreqEntry = sortDesc(freqDec)[0];
-  const topFreqCode = (topFreqEntry ? topFreqEntry[0].toUpperCase() : "A") as
-    | "A"
-    | "B"
-    | "C"
-    | "D";
-
-  const sortedProfileDec = sortDesc(profileDec);
-  const primaryDec = sortedProfileDec[0]
-    ? { code: "", name: sortedProfileDec[0][0], pct: sortedProfileDec[0][1] }
-    : undefined;
-  const secondaryDec = sortedProfileDec[1]
-    ? { code: "", name: sortedProfileDec[1][0], pct: sortedProfileDec[1][1] }
-    : undefined;
-  const tertiaryDec = sortedProfileDec[2]
-    ? { code: "", name: sortedProfileDec[2][0], pct: sortedProfileDec[2][1] }
-    : undefined;
-
-  const hasScores =
-    Object.values(frequencyScores).some((v) => v > 0) ||
-    Object.values(profileScores).some((v) => v > 0);
-
-  const coachSummary = hasScores
-    ? buildCoachSummary({
-        participant: {
-          firstName: taker.first_name || undefined,
-          role: taker.role_title || undefined,
-          company: taker.company || undefined,
-        },
-        organisation: {
-          name: org.name,
-        },
-        frequencies: {
-          labels: freqLabelArray,
-          percentages: freqDec as Record<"A" | "B" | "C" | "D", number>,
-          topCode: topFreqCode,
-        },
-        profiles: {
-          labels: profiles.map((p) => ({ code: p.code || "", name: p.name })),
-          percentages: profileDec,
-          primary: primaryDec,
-          secondary: secondaryDec,
-          tertiary: tertiaryDec,
-        },
-      })
-    : "";
-
   const fullName =
     [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
 
@@ -447,30 +341,23 @@ export default async function TakerDetail({
     gedStrategicUrl = `${base}/entrepreneur${query}`;
   }
 
-   let reportUrl: string | null = null;
+  let reportUrl: string | null = null;
 
-   if (isVisibility && taker.link_token) {
+  if (isVisibility && taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
-    taker.link_token
-   )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-   } else if (isGed) {
+      taker.link_token
+    )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+  } else if (isGed) {
     reportUrl = gedStrategicUrl;
-   } else if (isQsc) {
+  } else if (isQsc) {
     reportUrl = qscStrategicUrl;
-   } else if (taker.link_token) {
+  } else if (taker.link_token) {
     reportUrl = `/t/${encodeURIComponent(
-    taker.link_token
-   )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-   } else if (taker.last_result_url) {
+      taker.link_token
+    )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+  } else if (taker.last_result_url) {
     reportUrl = String(taker.last_result_url);
-   }
-
-  const freqDefs: any[] = freqSource || [];
-
-  const visibilitySnapshot = await fetchVisibilityInternalSnapshot({
-    orgSlug: slug,
-    takerId: taker.id,
-  });
+  }
 
   const profileExtendedReportUrl =
     isVisibility && latest?.id
@@ -520,16 +407,33 @@ export default async function TakerDetail({
         </dl>
       </section>
 
-      {visibilitySnapshot && (
-        <section className="rounded-xl border p-4 bg-white space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-medium">Visibility Snapshot</h2>
-              <p className="text-sm text-gray-500">
-                Internal summary (KB-driven)
-              </p>
-            </div>
+      <section className="rounded-xl border p-4 bg-white space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-medium">Latest Result</h2>
+            <dl className="mt-1 grid grid-cols-3 gap-2 text-sm">
+              <dt className="text-gray-500">Test</dt>
+              <dd className="col-span-2">{test?.name || "—"}</dd>
 
+              <dt className="text-gray-500">Completed</dt>
+              <dd className="col-span-2">
+                {latest?.created_at
+                  ? new Date(latest.created_at as any).toLocaleString()
+                  : "—"}
+              </dd>
+
+              {!isVisibility && (
+                <>
+                  <dt className="text-gray-500">Top profile</dt>
+                  <dd className="col-span-2">
+                    {topProfile ? `${topProfile[0]} (${topProfile[1]})` : "—"}
+                  </dd>
+                </>
+              )}
+            </dl>
+          </div>
+
+          <div className="flex flex-col items-end gap-2">
             <div className="flex flex-wrap gap-2">
               {profileExtendedReportUrl ? (
                 <Link
@@ -542,168 +446,6 @@ export default async function TakerDetail({
                 </Link>
               ) : null}
 
-              {taker.link_token && (
-                <Link
-                  href={`/t/${encodeURIComponent(
-                    taker.link_token
-                  )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
-                >
-                  Open Visibility Report
-                </Link>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Tier
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {prettyTier(visibilitySnapshot?.signals?.tier)}
-              </div>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Level
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {Number(visibilitySnapshot?.signals?.level ?? 0) || "—"}
-              </div>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Style
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {prettyStyle(visibilitySnapshot?.signals?.style)}
-              </div>
-            </div>
-
-            <div className="rounded-lg border bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">
-                Readiness
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {prettyReadiness(visibilitySnapshot?.signals?.readiness)}
-              </div>
-            </div>
-          </div>
-
-          {visibilitySnapshot?.summary && (
-            <div className="rounded-lg border bg-white p-3">
-              <div className="text-sm font-medium">Quick take</div>
-              <div className="mt-2 grid gap-2 md:grid-cols-2 text-sm text-slate-700">
-                {visibilitySnapshot.summary.snapshot ? (
-                  <p>
-                    <span className="font-semibold">Snapshot:</span>{" "}
-                    {visibilitySnapshot.summary.snapshot}
-                  </p>
-                ) : null}
-                {visibilitySnapshot.summary.pillars ? (
-                  <p>
-                    <span className="font-semibold">Pillars:</span>{" "}
-                    {visibilitySnapshot.summary.pillars}
-                  </p>
-                ) : null}
-                {visibilitySnapshot.summary.opportunity ? (
-                  <p>
-                    <span className="font-semibold">Opportunity:</span>{" "}
-                    {visibilitySnapshot.summary.opportunity}
-                  </p>
-                ) : null}
-                {visibilitySnapshot.summary.next_move ? (
-                  <p>
-                    <span className="font-semibold">Next move:</span>{" "}
-                    {visibilitySnapshot.summary.next_move}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {Array.isArray(visibilitySnapshot?.sections) &&
-            visibilitySnapshot.sections.length > 0 && (
-              <div className="space-y-2">
-                {visibilitySnapshot.sections.map((sec: any) => (
-                  <details
-                    key={sec.key}
-                    className="rounded-lg border bg-white p-3"
-                  >
-                    <summary className="cursor-pointer font-medium">
-                      {sec.title || sec.key}
-                    </summary>
-                    <div className="mt-3 space-y-3 text-sm text-slate-700">
-                      {(sec.blocks || []).map((b: any, idx: number) => (
-                        <div key={idx} className="space-y-2">
-                          {b?.paragraphs && Array.isArray(b.paragraphs) ? (
-                            b.paragraphs
-                              .map((p: any) => String(p || "").trim())
-                              .filter(Boolean)
-                              .map((p: string, i: number) => (
-                                <p key={i} className="leading-relaxed">
-                                  {p}
-                                </p>
-                              ))
-                          ) : b?.short_summary ? (
-                            <p className="leading-relaxed">
-                              {String(b.short_summary)}
-                            </p>
-                          ) : null}
-
-                          {b?.bullets && Array.isArray(b.bullets) && b.bullets.length ? (
-                            <ul className="list-disc pl-5 space-y-1">
-                              {b.bullets
-                                .map((x: any) => String(x || "").trim())
-                                .filter(Boolean)
-                                .map((x: string, i: number) => (
-                                  <li key={i}>{x}</li>
-                                ))}
-                            </ul>
-                          ) : null}
-
-                          {b?.transition ? (
-                            <p className="text-slate-500 italic">
-                              {String(b.transition)}
-                            </p>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
-        </section>
-      )}
-
-      <section className="rounded-xl border p-4 bg-white space-y-4">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="font-medium">Latest Result</h2>
-            <dl className="mt-1 grid grid-cols-3 gap-2 text-sm">
-              <dt className="text-gray-500">Test</dt>
-              <dd className="col-span-2">{test?.name || "—"}</dd>
-              <dt className="text-gray-500">Completed</dt>
-              <dd className="col-span-2">
-                {latest?.created_at
-                  ? new Date(latest.created_at as any).toLocaleString()
-                  : "—"}
-              </dd>
-              <dt className="text-gray-500">Top profile</dt>
-              <dd className="col-span-2">
-                {topProfile ? `${topProfile[0]} (${topProfile[1]})` : "—"}
-              </dd>
-            </dl>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex flex-wrap gap-2">
               {reportUrl && (
                 <Link
                   href={reportUrl}
@@ -711,7 +453,9 @@ export default async function TakerDetail({
                   rel="noopener noreferrer"
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
                 >
-                  Open test-taker report in new tab
+                  {isVisibility
+                    ? "Open Visibility Report"
+                    : "Open test-taker report in new tab"}
                 </Link>
               )}
             </div>
@@ -792,86 +536,75 @@ export default async function TakerDetail({
           </div>
         )}
 
-        <div className="space-y-2 pt-4">
-          <h3 className="font-medium">Frequency mix</h3>
-          {["A", "B", "C", "D"].map((f) => (
-            <BarRow
-              key={f}
-              label={
-                (freqDefs.find(
-                  (x: any) => String(x?.code).toUpperCase() === f
-                )?.label as string) ||
-                freqLabels[f] ||
-                f
-              }
-              note={`(${f})`}
-              pct={freqPct[f] ?? 0}
-            />
-          ))}
-        </div>
-
-        <div className="space-y-2">
-          <h3 className="font-medium">Profile mix</h3>
-          {Object.keys(profilePct).length ? (
-            sortDesc(profilePct).map(([name, pct]) => {
-              const p = profiles.find((x) => x.name === name);
-              const short = codeToPShort(p?.code || "");
-              return (
+        {!isVisibility && (
+          <>
+            <div className="space-y-2 pt-4">
+              <h3 className="font-medium">Frequency mix</h3>
+              {["A", "B", "C", "D"].map((f) => (
                 <BarRow
-                  key={name}
-                  label={name}
-                  note={short ? `(${short})` : undefined}
-                  pct={pct}
+                  key={f}
+                  label={
+                    (freqSource.find(
+                      (x: any) => String(x?.code).toUpperCase() === f
+                    )?.label as string) ||
+                    freqLabels[f] ||
+                    f
+                  }
+                  note={`(${f})`}
+                  pct={freqPct[f] ?? 0}
                 />
-              );
-            })
-          ) : (
-            <p className="text-sm text-gray-500">
-              Profile-level scores aren’t available for this result (only
-              frequencies were stored).
-            </p>
-          )}
-        </div>
-
-        {topThreeProfiles.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-3 pt-4">
-            {topThreeProfiles.map((p, idx) => (
-              <div
-                key={p.name}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {labels[idx] || "Profile"}
-                </p>
-                <h3 className="mt-1 text-base font-semibold text-slate-900">
-                  {p.name}
-                </h3>
-                {p.code && (
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                    {p.code}
-                  </p>
-                )}
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {p.pct}% match
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {coachSummary && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h3 className="font-medium mb-2">Coach summary</h3>
-            <div className="space-y-2 text-sm leading-relaxed text-gray-700">
-              {coachSummary
-                .split(/\n{2,}/)
-                .map((p) => p.trim())
-                .filter(Boolean)
-                .map((p, idx) => (
-                  <p key={idx}>{p}</p>
-                ))}
+              ))}
             </div>
-          </div>
+
+            <div className="space-y-2">
+              <h3 className="font-medium">Profile mix</h3>
+              {Object.keys(profilePct).length ? (
+                sortDesc(profilePct).map(([name, pct]) => {
+                  const p = profiles.find((x) => x.name === name);
+                  const short = codeToPShort(p?.code || "");
+                  return (
+                    <BarRow
+                      key={name}
+                      label={name}
+                      note={short ? `(${short})` : undefined}
+                      pct={pct}
+                    />
+                  );
+                })
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Profile-level scores aren’t available for this result (only
+                  frequencies were stored).
+                </p>
+              )}
+            </div>
+
+            {topThreeProfiles.length > 0 && (
+              <div className="grid gap-4 md:grid-cols-3 pt-4">
+                {topThreeProfiles.map((p, idx) => (
+                  <div
+                    key={p.name}
+                    className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      {labels[idx] || "Profile"}
+                    </p>
+                    <h3 className="mt-1 text-base font-semibold text-slate-900">
+                      {p.name}
+                    </h3>
+                    {p.code && (
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        {p.code}
+                      </p>
+                    )}
+                    <p className="mt-2 text-sm font-medium text-slate-800">
+                      {p.pct}% match
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -879,7 +612,9 @@ export default async function TakerDetail({
         <section className="rounded-xl border bg-white overflow-hidden">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div>
-              <h2 className="font-medium">Embedded Report</h2>
+              <h2 className="font-medium">
+                {isVisibility ? "Embedded Visibility Report" : "Embedded Report"}
+              </h2>
               <p className="text-sm text-gray-500">
                 View the test-taker report directly inside this profile
               </p>
