@@ -386,8 +386,13 @@ function readFrequencyRatio(data: ResultData, code: AB) {
 }
 
 function frequencyDisplayValue(data: ResultData, code: AB) {
+  const totals = FREQUENCY_ORDER.map((c) => readFrequencyTotal(data, c));
+  const max = Math.max(...totals);
+  const sum = totals.reduce((a, b) => a + b, 0);
   const total = readFrequencyTotal(data, code);
-  if (total > 0) return Math.round(total);
+
+  if (sum > 0 && max <= 100 && sum <= 120) return Math.round(total);
+
   return Math.round(readFrequencyRatio(data, code) * 100);
 }
 
@@ -492,23 +497,23 @@ function SectionShell({
   return (
     <section
       id={id}
-      className="rounded-[24px] border border-white/10 p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="rounded-[22px] border border-white/10 p-[16px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
       style={{ background: DARK_PANEL }}
     >
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F5EFEA] text-lg text-[#0C203A] shadow-sm">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#F5EFEA] text-base text-[#0C203A] shadow-sm">
           {icon.src ? (
             <ImageWithFallback
               src={icon.src}
               alt=""
-              className="flex h-11 w-11 items-center justify-center rounded-[14px] object-contain p-1.5"
-              fallback={<span className="flex h-11 w-11 items-center justify-center">{icon.fallback}</span>}
+              className="flex h-9 w-9 items-center justify-center rounded-[12px] object-contain p-1.5"
+              fallback={<span className="flex h-9 w-9 items-center justify-center">{icon.fallback}</span>}
             />
           ) : (
             icon.fallback
           )}
         </div>
-        <h2 className="text-[15px] font-bold leading-[22px] text-white">{title}</h2>
+        <h2 className="text-[14px] font-bold leading-[20px] text-white">{title}</h2>
       </div>
 
       {children}
@@ -518,7 +523,7 @@ function SectionShell({
 
 function WhitePanel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[20px] border border-white/10 bg-[#F6F7FA] text-[#313C52] shadow-sm ${className}`}>
+    <div className={`rounded-[18px] border border-white/10 bg-[#F6F7FA] text-[#313C52] shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -538,8 +543,8 @@ function DashboardOuterCard({
       className="flex h-full flex-col rounded-[20px] border border-white/10 p-4 shadow-[0_14px_42px_rgba(0,0,0,0.25)]"
       style={{ background: DARK_PANEL }}
     >
-      <h3 className="text-[16px] font-bold text-white">{title}</h3>
-      <p className="mt-2 max-w-[620px] text-[12px] leading-6 text-white/85">{description}</p>
+      <h3 className="text-[15px] font-bold text-white">{title}</h3>
+      <p className="mt-2 max-w-[620px] text-[11px] leading-5 text-white/85">{description}</p>
       <div className="mt-4 flex-1">{children}</div>
     </section>
   );
@@ -547,9 +552,9 @@ function DashboardOuterCard({
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[168px] rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
-      <p className="text-[10px] font-medium leading-none text-white/55">{label}</p>
-      <p className="mt-2 text-[15px] font-bold leading-tight text-white">{value}</p>
+    <div className="min-w-[140px] rounded-[14px] border border-white/10 bg-white/5 px-3 py-2.5">
+      <p className="text-[9px] font-medium leading-none text-white/55">{label}</p>
+      <p className="mt-1.5 text-[12px] font-bold leading-tight text-white">{value}</p>
     </div>
   );
 }
@@ -567,48 +572,48 @@ function TopHeader({
 }) {
   return (
     <section
-      className="rounded-[24px] border border-white/10 px-5 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="rounded-[22px] border border-white/10 px-5 py-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
       style={{ background: DARK_PANEL }}
     >
-      <div className="grid gap-5 xl:grid-cols-[1fr_auto]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-white/15 bg-white/10">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-white/15 bg-white/10">
             <ImageWithFallback
               src={ASSETS.logo}
               alt="5D Leadership"
-              className="flex h-10 w-10 items-center justify-center rounded-[14px] object-contain p-1"
-              fallback={<span className="flex h-10 w-10 items-center justify-center text-[10px] font-black">5D</span>}
+              className="flex h-9 w-9 items-center justify-center rounded-[12px] object-contain p-1"
+              fallback={<span className="flex h-9 w-9 items-center justify-center text-[10px] font-black">5D</span>}
             />
           </div>
 
           <div>
-            <p className="text-[28px] font-black uppercase leading-none tracking-[0.14em] text-white md:text-[32px]">
+            <p className="text-[24px] font-black uppercase leading-none tracking-[0.14em] text-white md:text-[28px]">
               Personalised Report
             </p>
-            <p className="mt-2 text-[12px] font-bold uppercase tracking-[0.28em] text-white/75">
+            <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.28em] text-white/75">
               5D Leadership Compass
             </p>
-            <p className="mt-6 inline-flex rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/85">
+            <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/85">
               Powered by Profiletest.ai
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-start justify-start gap-2 xl:justify-end">
+        <div className="flex flex-wrap items-start justify-start gap-2 lg:justify-end">
           <button
             onClick={onDownload}
-            className="rounded-lg border border-white/10 bg-[#08162B]/80 px-4 py-2.5 text-[12px] font-bold text-white shadow-sm hover:bg-[#08162B]"
+            className="rounded-lg border border-white/10 bg-[#08162B]/80 px-3 py-2 text-[10px] font-bold text-white shadow-sm hover:bg-[#08162B]"
           >
             Download PDF
           </button>
           <button
             onClick={onNext}
-            className="rounded-lg bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-4 py-2.5 text-[12px] font-black text-[#071C36] shadow-sm"
+            className="rounded-lg bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-3 py-2 text-[10px] font-black text-[#071C36] shadow-sm"
           >
             Next steps
           </button>
 
-          <div className="mt-2 flex w-full flex-wrap gap-2 xl:mt-0 xl:w-auto">
+          <div className="mt-1 flex w-full flex-wrap gap-2 lg:mt-0 lg:w-auto">
             <InfoPill label="Prepared for" value={participant} />
             <InfoPill label="Date" value={reportDate} />
             <InfoPill label="Framework" value="The 5D Leadership Compass" />
@@ -636,28 +641,28 @@ function HeroHeader({
   const topMeta = PROFILE_META[topCode] || PROFILE_META.P1;
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[1fr_300px]">
+    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div
-        className="rounded-[24px] border border-white/10 p-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+        className="rounded-[22px] border border-white/10 p-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
         style={{ background: DARK_PANEL }}
       >
-        <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-          <div className="py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-white/55">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_285px]">
+          <div className="py-1">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.26em] text-white/55">
               The 5D Leadership Compass
             </p>
 
-            <h1 className="mt-4 text-[42px] font-black leading-[0.95] tracking-[-0.04em] text-white md:text-[48px]">
+            <h1 className="mt-4 text-[38px] font-black leading-[0.95] tracking-[-0.04em] text-white md:text-[46px]">
               {participant}
             </h1>
 
-            <p className="mt-6 max-w-[640px] text-[14px] leading-7 text-white/90">
+            <p className="mt-5 max-w-[620px] text-[13px] leading-6 text-white/90">
               “Navigating Leadership Strengths in Logistics, Supply Chain, and Operations” — {topMeta.description}
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-2">
               <span
-                className="inline-flex items-center rounded-full border px-4 py-2 text-[12px] font-black"
+                className="inline-flex items-center rounded-full border px-3 py-2 text-[11px] font-black"
                 style={{
                   borderColor: `${topMeta.color}55`,
                   background: `${topMeta.color}1F`,
@@ -667,24 +672,24 @@ function HeroHeader({
                 ⚡ Profile {profileNumber(topCode)} · {topName}
               </span>
 
-              <span className="inline-flex items-center rounded-full border border-[#0FCD5E]/25 bg-[#0FCD5E]/10 px-4 py-2 text-[12px] font-black text-[#0FCD5E]">
+              <span className="inline-flex items-center rounded-full border border-[#0FCD5E]/25 bg-[#0FCD5E]/10 px-3 py-2 text-[11px] font-black text-[#0FCD5E]">
                 <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#0FCD5E]" />
                 {topFreq} · {topFreqMeta.dimension} Dimension
               </span>
             </div>
 
-            <div className="mt-7 grid max-w-[560px] overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.04] md:grid-cols-2">
-              <div className="border-b border-white/10 p-5 md:border-b-0 md:border-r">
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#5A6A88]">Dimension</p>
-                <p className="mt-2 text-[20px] font-black text-white">{topFreqMeta.dimension}</p>
-                <p className="mt-1 text-[12px] text-[#8FA0BC]">{topFreqMeta.subtitle}</p>
+            <div className="mt-5 grid max-w-[560px] overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.04] md:grid-cols-2">
+              <div className="border-b border-white/10 p-4 md:border-b-0 md:border-r">
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#5A6A88]">Dimension</p>
+                <p className="mt-2 text-[18px] font-black text-white">{topFreqMeta.dimension}</p>
+                <p className="mt-1 text-[11px] text-[#8FA0BC]">{topFreqMeta.subtitle}</p>
               </div>
-              <div className="p-5">
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#5A6A88]">
+              <div className="p-4">
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#5A6A88]">
                   Leadership Style
                 </p>
-                <p className="mt-2 text-[20px] font-black text-white">{topName}</p>
-                <p className="mt-1 text-[12px] text-[#8FA0BC]">{topMeta.shortDimension}</p>
+                <p className="mt-2 text-[18px] font-black text-white">{topName}</p>
+                <p className="mt-1 text-[11px] text-[#8FA0BC]">{topMeta.shortDimension}</p>
               </div>
             </div>
           </div>
@@ -703,10 +708,10 @@ function HeroProfileList({ data }: { data: ResultData }) {
 
   return (
     <div
-      className="rounded-[24px] border border-white/10 p-4 shadow-[0_14px_42px_rgba(0,0,0,0.22)]"
+      className="rounded-[20px] border border-white/10 p-3 shadow-[0_14px_42px_rgba(0,0,0,0.22)]"
       style={{ background: DARK_PANEL }}
     >
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {PROFILE_ORDER.map((code, idx) => {
           const meta = PROFILE_META[code];
           const active = code === topCode;
@@ -714,18 +719,18 @@ function HeroProfileList({ data }: { data: ResultData }) {
           return (
             <div
               key={code}
-              className="grid grid-cols-[20px_9px_1fr_auto] items-center gap-2 rounded-lg border px-3 py-2.5 text-[11px]"
+              className="grid grid-cols-[18px_8px_1fr_auto] items-center gap-2 rounded-lg border px-2.5 py-2 text-[10px]"
               style={{
                 borderColor: active ? `${meta.color}66` : "rgba(255,255,255,0.06)",
                 background: active ? `${meta.color}24` : "rgba(255,255,255,0.035)",
               }}
             >
-              <span className="text-[10px] text-white/35">{idx + 1}</span>
+              <span className="text-[9px] text-white/35">{idx + 1}</span>
               <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} />
               <span className={active ? "font-bold text-[#0FCD5E]" : "font-semibold text-[#E4EAF8]"}>
                 {meta.name}
               </span>
-              <span className={active ? "text-[9px] text-[#0FCD5E]" : "text-[9px] text-white/35"}>
+              <span className={active ? "text-[8px] text-[#0FCD5E]" : "text-[8px] text-white/35"}>
                 {meta.shortDimension}
               </span>
             </div>
@@ -738,22 +743,22 @@ function HeroProfileList({ data }: { data: ResultData }) {
 
 function RaisonScoreCard({ score }: { score: number }) {
   return (
-    <div className="rounded-[24px] bg-[#624585] p-7 text-center text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
-      <p className="mx-auto inline-flex rounded-full border border-white/55 px-8 py-2 text-[11px] font-black uppercase leading-tight tracking-[0.18em] text-white">
+    <div className="rounded-[22px] bg-[#624585] p-6 text-center text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
+      <p className="mx-auto inline-flex rounded-full border border-white/55 px-6 py-2 text-[10px] font-black uppercase leading-tight tracking-[0.18em] text-white">
         The 5th
         <br />
         Dimension
       </p>
 
-      <p className="mt-12 text-[64px] font-black leading-none tracking-[-0.06em]">{score}%</p>
+      <p className="mt-10 text-[58px] font-black leading-none tracking-[-0.06em]">{score}%</p>
 
-      <p className="mt-5 text-[20px] font-black uppercase leading-tight tracking-[0.16em]">
+      <p className="mt-5 text-[18px] font-black uppercase leading-tight tracking-[0.16em]">
         Your Raison
         <br />
         d&apos;être Score
       </p>
 
-      <p className="mx-auto mt-10 max-w-[220px] text-[13px] leading-6 text-white/86">
+      <p className="mx-auto mt-8 max-w-[200px] text-[12px] leading-5 text-white/86">
         The underlying passions, drivers and direction that defines how leaders find fulfillment.
       </p>
     </div>
@@ -762,7 +767,7 @@ function RaisonScoreCard({ score }: { score: number }) {
 
 function OverviewDashboard({ data }: { data: ResultData }) {
   return (
-    <section className="grid items-stretch gap-5 xl:grid-cols-2">
+    <section className="grid items-stretch gap-5 lg:grid-cols-2">
       <DimensionScorePanel data={data} />
       <ProfileMapPanel data={data} />
     </section>
@@ -775,7 +780,7 @@ function DimensionScorePanel({ data }: { data: ResultData }) {
       title="Dimensions"
       description="The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about."
     >
-      <WhitePanel className="h-full min-h-[330px] p-4 md:p-5">
+      <WhitePanel className="h-full min-h-[300px] p-4">
         <DimensionBarChart data={data} />
       </WhitePanel>
     </DashboardOuterCard>
@@ -783,26 +788,29 @@ function DimensionScorePanel({ data }: { data: ResultData }) {
 }
 
 function DimensionBarChart({ data }: { data: ResultData }) {
-  const items = FREQUENCY_ORDER.map((code) => ({
-    code,
-    value: frequencyDisplayValue(data, code),
-    ratio: readFrequencyRatio(data, code),
-    meta: FREQUENCY_META[code],
-  }));
+  const items = FREQUENCY_ORDER.map((code) => {
+    const value = frequencyDisplayValue(data, code);
+    return {
+      code,
+      value,
+      fillPct: Math.max(Math.min(value, 100), 4),
+      meta: FREQUENCY_META[code],
+    };
+  });
 
   const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
 
   return (
     <div className="rounded-[14px] border border-[#D7DEE8] bg-[#EEF2F6] p-4">
-      <div className="grid grid-cols-[28px_1fr] gap-3">
-        <div className="relative h-[244px]">
+      <div className="grid grid-cols-[26px_1fr] gap-3">
+        <div className="relative h-[228px]">
           {ticks.map((tick) => {
             const y = ((100 - tick) / 100) * 100;
 
             return (
               <span
                 key={tick}
-                className="absolute left-0 -translate-y-1/2 text-[10px] text-[#7C8AA3]"
+                className="absolute left-0 -translate-y-1/2 text-[9px] text-[#7C8AA3]"
                 style={{ top: `${y}%` }}
               >
                 {tick}
@@ -811,7 +819,7 @@ function DimensionBarChart({ data }: { data: ResultData }) {
           })}
         </div>
 
-        <div className="relative h-[244px]">
+        <div className="relative h-[228px]">
           {ticks.map((tick) => {
             const y = ((100 - tick) / 100) * 100;
             return (
@@ -824,28 +832,24 @@ function DimensionBarChart({ data }: { data: ResultData }) {
           })}
 
           <div className="grid h-full grid-cols-4 gap-2 md:gap-3">
-            {items.map((item) => {
-              const fillPct = Math.max(item.ratio * 100, 4);
+            {items.map((item) => (
+              <div key={item.code} className="flex h-full flex-col items-center justify-end">
+                <p className="mb-2 text-[12px] font-bold text-[#445067]">{item.value}</p>
 
-              return (
-                <div key={item.code} className="flex h-full flex-col items-center justify-end">
-                  <p className="mb-3 text-[14px] font-bold text-[#445067]">{item.value}</p>
-
-                  <div className="flex h-[205px] w-full max-w-[76px] items-end overflow-hidden rounded-[6px] border border-[#D3DAE3] bg-[#F7F8FA]">
-                    <div
-                      className="w-full rounded-[4px]"
-                      style={{
-                        height: `${fillPct}%`,
-                        background: item.meta.chartColor,
-                      }}
-                    />
-                  </div>
-
-                  <p className="mt-3 text-[14px] font-black text-[#182640]">{item.code}</p>
-                  <p className="mt-1 text-center text-[10px] leading-4 text-[#5E6E88]">{item.meta.label}</p>
+                <div className="flex h-[188px] w-full max-w-[72px] items-end overflow-hidden rounded-[6px] border border-[#D3DAE3] bg-[#F7F8FA]">
+                  <div
+                    className="w-full rounded-[4px]"
+                    style={{
+                      height: `${item.fillPct}%`,
+                      background: item.meta.chartColor,
+                    }}
+                  />
                 </div>
-              );
-            })}
+
+                <p className="mt-2 text-[12px] font-black text-[#182640]">{item.code}</p>
+                <p className="mt-1 text-center text-[9px] leading-3 text-[#5E6E88]">{item.meta.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -859,10 +863,10 @@ function ProfileMapPanel({ data }: { data: ResultData }) {
       title="Your Personality Map (Profile)"
       description="This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk)."
     >
-      <WhitePanel className="h-full min-h-[330px] p-4 md:p-5">
+      <WhitePanel className="h-full min-h-[300px] p-4">
         <div className="mb-2 flex items-center justify-between gap-4">
-          <p className="text-[14px] font-black text-[#1D2B44]">Your Personality Map (Profiles)</p>
-          <p className="text-[11px] text-[#7B879B]">Higher = stronger pattern</p>
+          <p className="text-[13px] font-black text-[#1D2B44]">Your Personality Map (Profiles)</p>
+          <p className="text-[10px] text-[#7B879B]">Higher = stronger pattern</p>
         </div>
 
         <ProfileRadar data={data} />
@@ -882,13 +886,11 @@ function polygonPoints(cx: number, cy: number, radius: number, count: number) {
 
 function ProfileRadar({ data }: { data: ResultData }) {
   const width = 470;
-  const height = 340;
+  const height = 315;
   const cx = width / 2;
-  const cy = height / 2 + 8;
-  const maxRadius = 132;
+  const cy = height / 2 + 4;
+  const maxRadius = 118;
 
-  // Designer-style zoom:
-  // The outer ring represents 60%, not 100%, so lower results show with more visible coverage.
   const radarMaxPercent = 60;
   const rings = [10, 20, 30, 40, 50, 60];
 
@@ -901,19 +903,17 @@ function ProfileRadar({ data }: { data: ResultData }) {
     const x = cx + Math.cos(angle) * radius;
     const y = cy + Math.sin(angle) * radius;
 
-    const percentLabelDistance = actualPercent <= 0 ? 20 : 14;
+    const percentLabelDistance = actualPercent <= 0 ? 18 : 12;
 
     return {
       code,
       actualPercent,
-      scaledRatio,
-      angle,
       x,
       y,
       ax: cx + Math.cos(angle) * maxRadius,
       ay: cy + Math.sin(angle) * maxRadius,
-      lx: cx + Math.cos(angle) * (maxRadius + 24),
-      ly: cy + Math.sin(angle) * (maxRadius + 24),
+      lx: cx + Math.cos(angle) * (maxRadius + 22),
+      ly: cy + Math.sin(angle) * (maxRadius + 22),
       percentX: x + Math.cos(angle) * percentLabelDistance,
       percentY: y + Math.sin(angle) * percentLabelDistance + 4,
     };
@@ -922,8 +922,8 @@ function ProfileRadar({ data }: { data: ResultData }) {
   const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="flex h-[285px] items-center justify-center">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full max-w-[520px]">
+    <div className="flex h-[255px] items-center justify-center">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full max-w-[510px]">
         {rings.map((ring) => {
           const radius = (ring / radarMaxPercent) * maxRadius;
 
@@ -933,14 +933,14 @@ function ProfileRadar({ data }: { data: ResultData }) {
                 points={polygonPoints(cx, cy, radius, PROFILE_ORDER.length)}
                 fill="none"
                 stroke="#CBD4E0"
-                strokeWidth="1.2"
+                strokeWidth="1.1"
               />
               <text
-                x={cx + 8}
+                x={cx + 7}
                 y={cy - radius + 4}
                 textAnchor="start"
                 dominantBaseline="middle"
-                fontSize="9"
+                fontSize="8.5"
                 fill="#8A96A9"
               >
                 {ring}%
@@ -950,10 +950,10 @@ function ProfileRadar({ data }: { data: ResultData }) {
         })}
 
         {points.map((p) => (
-          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D0D8E3" strokeWidth="1.1" />
+          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D0D8E3" strokeWidth="1" />
         ))}
 
-        <polygon points={polygon} fill="rgba(29,197,197,0.16)" stroke="#14BFC0" strokeWidth="2.8" />
+        <polygon points={polygon} fill="rgba(29,197,197,0.16)" stroke="#14BFC0" strokeWidth="2.6" />
 
         {points.map((p) => (
           <g key={p.code}>
@@ -962,21 +962,21 @@ function ProfileRadar({ data }: { data: ResultData }) {
               y={p.ly}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="12"
+              fontSize="11"
               fontWeight="800"
               fill="#4C5668"
             >
               {p.code}
             </text>
 
-            <circle cx={p.x} cy={p.y} r="5" fill="#14BFC0" />
+            <circle cx={p.x} cy={p.y} r="4.6" fill="#14BFC0" />
 
             <text
               x={p.percentX}
               y={p.percentY}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="10"
+              fontSize="9.5"
               fontWeight="700"
               fill="#2C7F88"
             >
@@ -1008,12 +1008,12 @@ function ReportIndex({
 }) {
   return (
     <aside
-      className="sticky top-4 self-start rounded-[20px] border border-white/10 p-4 text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="sticky top-4 self-start rounded-[18px] border border-white/10 p-3 text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
       style={{ background: DARK_PANEL }}
     >
-      <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-white/35">Report Index</p>
+      <p className="text-[8px] font-semibold uppercase tracking-[0.32em] text-white/35">Report Index</p>
 
-      <div className="mt-4 max-h-[72vh] space-y-2 overflow-auto pr-1">
+      <div className="mt-3 max-h-[72vh] space-y-1.5 overflow-auto pr-1">
         {sections.map((section, idx) => (
           <button
             key={`${section.id}-${idx}`}
@@ -1023,23 +1023,23 @@ function ReportIndex({
                 block: "start",
               })
             }
-            className="block w-full rounded-[10px] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-[11px] leading-5 text-white/92 hover:bg-white/[0.06]"
+            className="block w-full rounded-[9px] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left text-[10px] leading-4 text-white/92 hover:bg-white/[0.06]"
           >
             <span className="font-bold text-white">{idx + 1}.</span> {section.title}
           </button>
         ))}
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-4 space-y-2">
         <button
           onClick={onDownload}
-          className="w-full rounded-[10px] border border-white/15 bg-[#071629] px-3 py-2.5 text-left text-[11px] font-bold text-white"
+          className="w-full rounded-[9px] border border-white/15 bg-[#071629] px-3 py-2 text-left text-[10px] font-bold text-white"
         >
           Download PDF
         </button>
         <button
           onClick={onNext}
-          className="w-full rounded-[10px] bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-3 py-2.5 text-left text-[11px] font-bold text-[#071C36]"
+          className="w-full rounded-[9px] bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-3 py-2 text-left text-[10px] font-bold text-[#071C36]"
         >
           Next step
         </button>
@@ -1254,21 +1254,21 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
-    return <p className="mb-4 text-[13px] leading-7 text-[#313C52] last:mb-0">{text}</p>;
+    return <p className="mb-3 text-[12px] leading-6 text-[#313C52] last:mb-0">{text}</p>;
   }
 
   if (type === "h1" || type === "h2" || type === "heading") {
     const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
-    return <h3 className="mb-4 mt-6 text-[24px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h3>;
+    return <h3 className="mb-3 mt-5 text-[20px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h3>;
   }
 
   if (type === "h3") {
     const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
-    return <h4 className="mb-3 mt-5 text-[18px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h4>;
+    return <h4 className="mb-2 mt-4 text-[16px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h4>;
   }
 
   if (type === "h4") {
@@ -1276,7 +1276,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     if (!text) return null;
 
     return (
-      <h5 className="mb-2 mt-4 text-[14px] font-black uppercase tracking-[0.08em] text-[#5B4380] first:mt-0">
+      <h5 className="mb-2 mt-4 text-[12px] font-black uppercase tracking-[0.08em] text-[#5B4380] first:mt-0">
         {text}
       </h5>
     );
@@ -1287,7 +1287,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     if (!items.length) return null;
 
     return (
-      <ul className="mb-5 ml-5 list-disc space-y-2 text-[13px] leading-6 text-[#313C52]">
+      <ul className="mb-4 ml-5 list-disc space-y-1.5 text-[12px] leading-5 text-[#313C52]">
         {items.map((item: unknown, idx: number) => (
           <li key={idx}>{renderListItem(item, ctx)}</li>
         ))}
@@ -1300,7 +1300,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     if (!items.length) return null;
 
     return (
-      <ol className="mb-5 ml-5 list-decimal space-y-2 text-[13px] leading-6 text-[#313C52]">
+      <ol className="mb-4 ml-5 list-decimal space-y-1.5 text-[12px] leading-5 text-[#313C52]">
         {items.map((item: unknown, idx: number) => (
           <li key={idx}>{renderListItem(item, ctx)}</li>
         ))}
@@ -1315,15 +1315,15 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     if (!text) return null;
 
     return (
-      <blockquote className="my-6 rounded-2xl border-l-4 border-[#5B4380] bg-[#F5F0FA] p-5 text-[14px] italic leading-7 text-[#313C52]">
+      <blockquote className="my-5 rounded-2xl border-l-4 border-[#5B4380] bg-[#F5F0FA] p-4 text-[13px] italic leading-6 text-[#313C52]">
         “{text}”
-        {cite ? <footer className="mt-3 text-[12px] font-bold not-italic text-[#5B4380]">— {cite}</footer> : null}
+        {cite ? <footer className="mt-3 text-[11px] font-bold not-italic text-[#5B4380]">— {cite}</footer> : null}
       </blockquote>
     );
   }
 
   if (type === "divider") {
-    return <hr className="my-7 border-slate-200" />;
+    return <hr className="my-5 border-slate-200" />;
   }
 
   if (type === "image") {
@@ -1334,7 +1334,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     const maxHeightValue = typeof maxHeight === "number" ? `${maxHeight}px` : undefined;
 
     return (
-      <figure className={`my-6 max-w-full ${alignClass(blockValue(block, "align") as "left" | "center" | "right")}`}>
+      <figure className={`my-5 max-w-full ${alignClass(blockValue(block, "align") as "left" | "center" | "right")}`}>
         <img
           src={src}
           alt={safeText(blockValue(block, "alt")) || ""}
@@ -1345,7 +1345,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
           style={{ maxHeight: maxHeightValue }}
         />
         {blockValue(block, "caption") ? (
-          <figcaption className="mt-2 text-center text-[11px] text-slate-500">
+          <figcaption className="mt-2 text-center text-[10px] text-slate-500">
             {replaceMacros(blockValue(block, "caption"), ctx)}
           </figcaption>
         ) : null}
@@ -1359,7 +1359,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 
     return (
       <div
-        className="report-html mb-5 text-[13px] leading-7 text-[#313C52]"
+        className="report-html mb-4 text-[12px] leading-6 text-[#313C52]"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
@@ -1372,9 +1372,9 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     if (!title && !text) return null;
 
     return (
-      <div className="my-5 rounded-2xl border border-[#D8DDEC] bg-[#F7F9FC] p-5">
-        {title ? <p className="text-[14px] font-black text-[#0C203A]">{title}</p> : null}
-        {text ? <p className="mt-2 text-[13px] leading-6 text-[#313C52]">{text}</p> : null}
+      <div className="my-4 rounded-2xl border border-[#D8DDEC] bg-[#F7F9FC] p-4">
+        {title ? <p className="text-[13px] font-black text-[#0C203A]">{title}</p> : null}
+        {text ? <p className="mt-2 text-[12px] leading-5 text-[#313C52]">{text}</p> : null}
       </div>
     );
   }
@@ -1388,11 +1388,11 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 
   if (fallbackTitle || fallbackText || fallbackItems.length) {
     return (
-      <div className="my-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-        {fallbackTitle ? <p className="text-[14px] font-black text-[#0C203A]">{fallbackTitle}</p> : null}
-        {fallbackText ? <p className="mt-2 text-[13px] leading-6 text-[#313C52]">{fallbackText}</p> : null}
+      <div className="my-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        {fallbackTitle ? <p className="text-[13px] font-black text-[#0C203A]">{fallbackTitle}</p> : null}
+        {fallbackText ? <p className="mt-2 text-[12px] leading-5 text-[#313C52]">{fallbackText}</p> : null}
         {fallbackItems.length ? (
-          <ul className="mt-3 ml-5 list-disc space-y-2 text-[13px] leading-6 text-[#313C52]">
+          <ul className="mt-3 ml-5 list-disc space-y-1.5 text-[12px] leading-5 text-[#313C52]">
             {fallbackItems.map((item: unknown, idx: number) => (
               <li key={idx}>{renderListItem(item, ctx)}</li>
             ))}
@@ -1407,12 +1407,12 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 
 function FiveDimensionsVisual() {
   return (
-    <div className="mt-4">
-      <div className="mb-8 flex min-h-[340px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
+    <div className="mt-3">
+      <div className="mb-6 flex min-h-[330px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
         <img
           src={ASSETS.fiveDimensionsCompass}
           alt="The Five Dimensions of Leadership"
-          className="h-auto w-full max-w-[760px] scale-[1.18] object-contain"
+          className="h-auto w-full max-w-[760px] scale-[1.14] object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1427,29 +1427,29 @@ function FiveDimensionsVisual() {
           return (
             <div
               key={code}
-              className="rounded-[14px] border bg-white p-5"
+              className="rounded-[14px] border bg-white p-4"
               style={{ borderColor: meta.cardColor }}
             >
-              <p className="text-[14px] font-black" style={{ color: meta.cardColor }}>
+              <p className="text-[13px] font-black" style={{ color: meta.cardColor }}>
                 {code} · {meta.dimension} Dimension
               </p>
-              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: meta.cardColor }}>
+              <p className="mt-2 text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: meta.cardColor }}>
                 {meta.subtitle}
               </p>
-              <p className="mt-4 text-[13px] leading-7 text-[#313C52]">{meta.description}</p>
+              <p className="mt-3 text-[12px] leading-6 text-[#313C52]">{meta.description}</p>
             </div>
           );
         })}
 
-        <div className="rounded-[14px] border border-[#8758D7] bg-white p-5 md:col-span-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#54457F]">
+        <div className="rounded-[14px] border border-[#8758D7] bg-white p-4 md:col-span-2">
+          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#54457F]">
             E. The Fifth Dimension · The Differentiator
           </p>
-          <p className="mt-3 text-[22px] font-black text-[#6A45A0]">Raison d&apos;être</p>
-          <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#54457F]">
+          <p className="mt-3 text-[20px] font-black text-[#6A45A0]">Raison d&apos;être</p>
+          <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#54457F]">
             The Motivational Foundation
           </p>
-          <p className="mt-4 text-[13px] leading-7 text-[#313C52]">
+          <p className="mt-3 text-[12px] leading-6 text-[#313C52]">
             The underlying passions, drivers and direction that defines how leaders find fulfillment in their work and
             life.
           </p>
@@ -1463,12 +1463,12 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
   const topCode = normalizeProfileCode(data.top_profile_code);
 
   return (
-    <div className="mt-4">
-      <div className="mb-8 flex min-h-[430px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
+    <div className="mt-3">
+      <div className="mb-6 flex min-h-[420px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
         <img
           src={ASSETS.eightLeadershipProfilesMap}
           alt="The Eight Leadership Profiles"
-          className="h-auto w-full max-w-[760px] scale-[1.12] object-contain"
+          className="h-auto w-full max-w-[760px] scale-[1.1] object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1476,7 +1476,7 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {PROFILE_ORDER.map((code) => {
           const meta = PROFILE_META[code];
           const active = code === topCode;
@@ -1492,15 +1492,15 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
 
               <div className="relative flex justify-center">
                 <div
-                  className="absolute -top-7 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#F3EDE5] shadow-[0_4px_10px_rgba(15,23,42,0.16)]"
+                  className="absolute -top-7 flex h-[68px] w-[68px] items-center justify-center rounded-full bg-[#F3EDE5] shadow-[0_4px_10px_rgba(15,23,42,0.16)]"
                   style={{ border: `4px solid ${meta.ringColor}` }}
                 >
                   <ImageWithFallback
                     src={meta.icon}
                     alt={meta.name}
-                    className="h-[34px] w-[34px] object-contain"
+                    className="h-[32px] w-[32px] object-contain"
                     fallback={
-                      <span className="flex h-[34px] w-[34px] items-center justify-center text-[12px] font-black text-[#7A5A3D]">
+                      <span className="flex h-[32px] w-[32px] items-center justify-center text-[12px] font-black text-[#7A5A3D]">
                         {code}
                       </span>
                     }
@@ -1508,15 +1508,15 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
                 </div>
               </div>
 
-              <div className="px-4 pb-5 pt-12 text-center">
-                <p className="text-[13px] font-black text-[#102640]">{meta.name}</p>
-                <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#66758D]">
+              <div className="px-3.5 pb-4 pt-11 text-center">
+                <p className="text-[12px] font-black text-[#102640]">{meta.name}</p>
+                <p className="mt-2 text-[8px] font-black uppercase tracking-[0.16em] text-[#66758D]">
                   {meta.dimension}
                 </p>
-                <p className="mt-4 text-[11px] leading-5 text-[#313C52]">{meta.description}</p>
+                <p className="mt-3 text-[10px] leading-4 text-[#313C52]">{meta.description}</p>
 
                 {active ? (
-                  <p className="mx-auto mt-4 inline-flex rounded-full bg-[#6E4AA2] px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-white">
+                  <p className="mx-auto mt-3 inline-flex rounded-full bg-[#6E4AA2] px-3 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-white">
                     Your Profile
                   </p>
                 ) : null}
@@ -1534,34 +1534,34 @@ function ResultsVisual({ data, raisonScore }: { data: ResultData; raisonScore: n
   const topName = cleanProfileName(data.top_profile_name, topCode);
 
   return (
-    <div className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr]">
-      <div className="rounded-[18px] bg-[#0C203A] p-6 text-white">
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/50">Your Profile</p>
-        <h3 className="mt-4 text-[28px] font-black leading-tight">{topName}</h3>
+    <div className="mt-5 grid gap-4 lg:grid-cols-[240px_1fr]">
+      <div className="rounded-[18px] bg-[#0C203A] p-5 text-white">
+        <p className="text-[9px] font-black uppercase tracking-[0.24em] text-white/50">Your Profile</p>
+        <h3 className="mt-4 text-[24px] font-black leading-tight">{topName}</h3>
         <p className="mt-1 text-sm font-semibold text-white/70">{topCode}</p>
 
-        <div className="mt-6 rounded-[14px] bg-[#624585] p-5">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/60">Raison d’être</p>
-          <p className="mt-3 text-[44px] font-black">{raisonScore}%</p>
+        <div className="mt-5 rounded-[14px] bg-[#624585] p-4">
+          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-white/60">Raison d’être</p>
+          <p className="mt-3 text-[38px] font-black">{raisonScore}%</p>
         </div>
       </div>
 
-      <WhitePanel className="p-6">
+      <WhitePanel className="p-5">
         {PROFILE_ORDER.map((code) => {
           const meta = PROFILE_META[code];
           const value = readProfileRatio(data, code);
 
           return (
-            <div key={code} className="mb-4 last:mb-0">
-              <div className="flex justify-between text-[13px]">
+            <div key={code} className="mb-3 last:mb-0">
+              <div className="flex justify-between text-[12px]">
                 <span className="font-black text-[#313C52]">
                   {code} · {meta.shortName}
                 </span>
                 <span className="font-black text-[#313C52]">{pctLabelFromRatio(value)}</span>
               </div>
-              <div className="mt-1.5 h-2.5 rounded-full bg-slate-100">
+              <div className="mt-1.5 h-2 rounded-full bg-slate-100">
                 <div
-                  className="h-2.5 rounded-full"
+                  className="h-2 rounded-full"
                   style={{
                     width: percentWidth(value),
                     background: meta.color,
@@ -1578,16 +1578,16 @@ function ResultsVisual({ data, raisonScore }: { data: ResultData; raisonScore: n
 
 function SignatureBlock() {
   return (
-    <div className="mt-8 flex items-center gap-4">
-      <div className="flex h-[63px] w-[63px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-2xl">
+    <div className="mt-7 flex items-center gap-4">
+      <div className="flex h-[54px] w-[54px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xl">
         <ImageWithFallback
           src={ASSETS.brett}
           alt="Brett Gordon"
-          className="flex h-[63px] w-[63px] items-center justify-center rounded-full object-cover"
-          fallback={<span className="flex h-[63px] w-[63px] items-center justify-center">BG</span>}
+          className="flex h-[54px] w-[54px] items-center justify-center rounded-full object-cover"
+          fallback={<span className="flex h-[54px] w-[54px] items-center justify-center">BG</span>}
         />
       </div>
-      <div className="text-[13px] leading-6 text-[#313C52]">
+      <div className="text-[12px] leading-5 text-[#313C52]">
         <p>Warm regards</p>
         <p className="font-bold">Brett Gordon</p>
         <p>Founder, Businesses Are People Too</p>
@@ -1612,7 +1612,7 @@ function ContentSection({
 
   return (
     <SectionShell id={section.id} title={section.title}>
-      <WhitePanel className="p-7">
+      <WhitePanel className="p-5">
         {section.blocks.length ? (
           <div>
             {section.blocks.map((block, idx) => (
@@ -1641,23 +1641,23 @@ function NextStepsPanel({
 }) {
   return (
     <SectionShell id="next-steps-section" title="Your Next Steps">
-      <WhitePanel className="p-7">
+      <WhitePanel className="p-5">
         <div className="grid gap-4 md:grid-cols-2">
           <button
             onClick={onDownload}
-            className="rounded-xl bg-[#0C203A] px-4 py-4 text-sm font-black text-white shadow-sm"
+            className="rounded-xl bg-[#0C203A] px-4 py-3 text-sm font-black text-white shadow-sm"
           >
             Download PDF
           </button>
           <button
             onClick={onNext}
-            className="rounded-xl bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-4 py-4 text-sm font-black text-[#071C36] shadow-sm"
+            className="rounded-xl bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-4 py-3 text-sm font-black text-[#071C36] shadow-sm"
           >
             Next step
           </button>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-5 text-center text-xs text-slate-500">
           The 5D Leadership Compass · Personalised report for {participant}
         </p>
       </WhitePanel>
@@ -1715,7 +1715,7 @@ export default function FiveDLeadershipReportClient(props: {
         allowTaint: true,
         backgroundColor: "#061A3A",
         scrollY: -window.scrollY,
-        windowWidth: element.scrollWidth,
+        windowWidth: Math.max(element.scrollWidth, 1180),
         windowHeight: element.scrollHeight,
       });
 
@@ -1768,7 +1768,7 @@ export default function FiveDLeadershipReportClient(props: {
         }}
       />
 
-      <div ref={reportRef} className="relative mx-auto flex max-w-[1040px] flex-col gap-5 px-4">
+      <div ref={reportRef} className="relative mx-auto flex max-w-[1180px] flex-col gap-5 px-4">
         <TopHeader
           participant={participant}
           reportDate={reportDate}
@@ -1780,7 +1780,7 @@ export default function FiveDLeadershipReportClient(props: {
 
         <OverviewDashboard data={data} />
 
-        <section className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <section className="grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)]">
           <ReportIndex sections={sections} onDownload={handleDownloadPdf} onNext={openNextSteps} />
 
           <main className="flex min-w-0 flex-col gap-5">
