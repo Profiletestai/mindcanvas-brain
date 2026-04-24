@@ -1,7 +1,7 @@
 //apps/web/app/t/[token]/report/FiveDLeadershipReportClient.tsx
 "use client";
 
-import { useMemo, useRef, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -97,7 +97,13 @@ type RenderContext = {
   raisonScore: number;
 };
 
+type SectionIconChoice = {
+  srcs: string[];
+  fallback: string;
+};
+
 const ASSET_BASE = "/images/5d-leadership-compass";
+const SECTION_ICON_BASE = `${ASSET_BASE}/section-icons`;
 
 const ASSETS = {
   logo: `${ASSET_BASE}/5d-logo.png`,
@@ -277,6 +283,14 @@ const FREQUENCY_META: Record<
     chartColor: "#1E7AE0",
   },
 };
+
+function sectionIconSources(file: string) {
+  return [`${SECTION_ICON_BASE}/${file}`, `${ASSET_BASE}/${file}`];
+}
+
+function sectionIconSourcesMany(files: string[]) {
+  return files.flatMap((file) => sectionIconSources(file));
+}
 
 function safeText(x: unknown): string {
   if (typeof x === "string") return x;
@@ -467,20 +481,104 @@ function ImageWithFallback({
   );
 }
 
-function sectionIconFor(title: string) {
+function MultiImageWithFallback({
+  srcs,
+  alt,
+  className,
+  fallback,
+}: {
+  srcs: string[];
+  alt: string;
+  className?: string;
+  fallback?: ReactNode;
+}) {
+  const [idx, setIdx] = useState(0);
+  const current = srcs[idx];
+
+  if (!current) {
+    return <span className={className}>{fallback || null}</span>;
+  }
+
+  return (
+    <span className="inline-flex">
+      <img
+        key={current}
+        src={current}
+        alt={alt}
+        className={className}
+        crossOrigin="anonymous"
+        onError={() => {
+          setIdx((currentIdx) => currentIdx + 1);
+        }}
+      />
+    </span>
+  );
+}
+
+function sectionIconFor(title: string): SectionIconChoice {
   const t = title.toLowerCase();
 
-  if (t.includes("welcome")) return { src: ASSETS.iconWelcome, fallback: "✉" };
-  if (t.includes("dimension")) return { src: ASSETS.iconCompass, fallback: "🧭" };
-  if (t.includes("profile")) return { src: ASSETS.iconProfiles, fallback: "👥" };
-  if (t.includes("result") || t.includes("score")) return { src: ASSETS.iconResults, fallback: "📌" };
-  if (t.includes("use")) return { src: undefined, fallback: "📖" };
-  if (t.includes("role")) return { src: undefined, fallback: "🎯" };
-  if (t.includes("development") || t.includes("growth")) return { src: undefined, fallback: "🚀" };
-  if (t.includes("case")) return { src: undefined, fallback: "📚" };
-  if (t.includes("final")) return { src: undefined, fallback: "✨" };
+  if (t.includes("your next steps")) {
+    return { srcs: sectionIconSources("your-next-steps.png"), fallback: "🚀" };
+  }
 
-  return { src: undefined, fallback: "✦" };
+  if (t.includes("introduction to the") && t.includes("profile")) {
+    return { srcs: sectionIconSources("introduction-to-the-profile.png"), fallback: "👤" };
+  }
+
+  if (t.includes("core characteristics")) {
+    return { srcs: sectionIconSources("core-characteristics.png"), fallback: "✦" };
+  }
+
+  if (t.includes("leads in logistics")) {
+    return { srcs: sectionIconSources("how-leads-in-logistics.png"), fallback: "🧭" };
+  }
+
+  if (t.includes("success factors")) {
+    return { srcs: sectionIconSources("success-factors-for-in-logistics.png"), fallback: "✓" };
+  }
+
+  if (t.includes("ideal roles")) {
+    return { srcs: sectionIconSources("ideal-roles-in-logistics-supply-chain.png"), fallback: "🎯" };
+  }
+
+  if (t.includes("roles that will be challenging")) {
+    return { srcs: sectionIconSources("roles-that-will-be-challenging.png"), fallback: "⚠" };
+  }
+
+  if (t.includes("enhancing") || t.includes("enhance") || t.includes("development")) {
+    return { srcs: sectionIconSources("enhancing-the-development.png"), fallback: "↗" };
+  }
+
+  if (t.includes("final thoughts on") && t.includes("profile")) {
+    return { srcs: sectionIconSources("final-thoughts-on-the-profile.png"), fallback: "✨" };
+  }
+
+  if (t.includes("raison")) {
+    return {
+      srcs: sectionIconSourcesMany([
+        "the-raison-d_être-dimension.png",
+        "the-raison-d’être-dimension.png",
+        "the-raison-detre-dimension.png",
+        "the-raison-d_etre-dimension.png",
+      ]),
+      fallback: "◈",
+    };
+  }
+
+  if (t.includes("final thoughts")) {
+    return { srcs: sectionIconSources("final-thoughts.png"), fallback: "✨" };
+  }
+
+  if (t.includes("welcome")) return { srcs: [ASSETS.iconWelcome], fallback: "✉" };
+  if (t.includes("dimension")) return { srcs: [ASSETS.iconCompass], fallback: "🧭" };
+  if (t.includes("profile")) return { srcs: [ASSETS.iconProfiles], fallback: "👥" };
+  if (t.includes("result") || t.includes("score")) return { srcs: [ASSETS.iconResults], fallback: "📌" };
+  if (t.includes("use")) return { srcs: [], fallback: "📖" };
+  if (t.includes("role")) return { srcs: [], fallback: "🎯" };
+  if (t.includes("case")) return { srcs: [], fallback: "📚" };
+
+  return { srcs: [], fallback: "✦" };
 }
 
 function SectionShell({
@@ -502,9 +600,9 @@ function SectionShell({
     >
       <div className="mb-4 flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#F5EFEA] text-base text-[#0C203A] shadow-sm">
-          {icon.src ? (
-            <ImageWithFallback
-              src={icon.src}
+          {icon.srcs.length ? (
+            <MultiImageWithFallback
+              srcs={icon.srcs}
               alt=""
               className="flex h-9 w-9 items-center justify-center rounded-[12px] object-contain p-1.5"
               fallback={<span className="flex h-9 w-9 items-center justify-center">{icon.fallback}</span>}
@@ -1247,6 +1345,15 @@ function blockValue(block: SectionBlock, key: string) {
   return (block as Record<string, unknown>)[key];
 }
 
+function isHeadingBlock(block: SectionBlock) {
+  const type = safeText(block.type).toLowerCase();
+  return type === "h1" || type === "h2" || type === "h3" || type === "h4" || type === "heading";
+}
+
+function blockPlainText(block: SectionBlock, ctx: RenderContext) {
+  return replaceMacros(blockValue(block, "text") ?? blockValue(block, "content") ?? blockValue(block, "title"), ctx);
+}
+
 function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext }) {
   const type = safeText(block.type).toLowerCase();
 
@@ -1407,7 +1514,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 
 function FiveDimensionsVisual() {
   return (
-    <div className="mt-3">
+    <div className="mt-1">
       <div className="mb-6 flex min-h-[330px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
         <img
           src={ASSETS.fiveDimensionsCompass}
@@ -1463,7 +1570,7 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
   const topCode = normalizeProfileCode(data.top_profile_code);
 
   return (
-    <div className="mt-3">
+    <div className="mt-1">
       <div className="mb-6 flex min-h-[420px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
         <img
           src={ASSETS.eightLeadershipProfilesMap}
@@ -1597,6 +1704,133 @@ function SignatureBlock() {
   );
 }
 
+function ProfileIntroBadge({ ctx }: { ctx: RenderContext }) {
+  const meta = PROFILE_META[ctx.topCode] || PROFILE_META.P1;
+
+  return (
+    <div className="mb-5 flex items-center gap-4 rounded-[16px] border border-[#DDE3EC] bg-white p-4">
+      <div
+        className="flex h-[74px] w-[74px] shrink-0 items-center justify-center rounded-full bg-[#F3EDE5] shadow-[0_4px_10px_rgba(15,23,42,0.16)]"
+        style={{ border: `4px solid ${meta.ringColor}` }}
+      >
+        <ImageWithFallback
+          src={meta.icon}
+          alt={meta.name}
+          className="h-[36px] w-[36px] object-contain"
+          fallback={
+            <span className="flex h-[36px] w-[36px] items-center justify-center text-[12px] font-black text-[#7A5A3D]">
+              {ctx.topCode}
+            </span>
+          }
+        />
+      </div>
+
+      <div>
+        <p className="text-[16px] font-black text-[#102640]">{meta.name}</p>
+        <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#66758D]">
+          {meta.dimension}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CaseStudyCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const hasHeadings = blocks.some(isHeadingBlock);
+
+  if (hasHeadings) {
+    const cards: Array<{ title: string; blocks: SectionBlock[] }> = [];
+    let current: { title: string; blocks: SectionBlock[] } | null = null;
+
+    for (const block of blocks) {
+      if (isHeadingBlock(block)) {
+        if (current) cards.push(current);
+        current = {
+          title: blockPlainText(block, ctx) || "Industry Example",
+          blocks: [],
+        };
+      } else {
+        if (!current) {
+          current = { title: "Industry Example", blocks: [] };
+        }
+        current.blocks.push(block);
+      }
+    }
+
+    if (current) cards.push(current);
+
+    return (
+      <div className="grid gap-4 md:grid-cols-2">
+        {cards.map((card, idx) => (
+          <div key={`${card.title}-${idx}`} className="rounded-[16px] border border-[#D8DDEC] bg-white p-4 shadow-sm">
+            <p className="text-[13px] font-black text-[#0C203A]">{card.title}</p>
+            <div className="mt-3">
+              {card.blocks.map((block, blockIdx) => (
+                <BlockRenderer key={blockIdx} block={block} ctx={ctx} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const listBlock = blocks.find((block) => {
+    const type = safeText(block.type).toLowerCase();
+    return type === "ul" || type === "ol" || type === "list" || type === "bullet_list" || type === "numbered_list";
+  });
+
+  const listItems = listBlock && Array.isArray(blockValue(listBlock, "items")) ? (blockValue(listBlock, "items") as unknown[]) : [];
+
+  if (listItems.length > 1) {
+    const introBlocks = blocks.filter((block) => block !== listBlock);
+
+    return (
+      <div>
+        {introBlocks.length ? (
+          <div className="mb-4">
+            {introBlocks.map((block, idx) => (
+              <BlockRenderer key={idx} block={block} ctx={ctx} />
+            ))}
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {listItems.map((item, idx) => (
+            <div key={idx} className="rounded-[16px] border border-[#D8DDEC] bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#66758D]">
+                Example {idx + 1}
+              </p>
+              <p className="mt-3 text-[12px] leading-6 text-[#313C52]">{renderListItem(item, ctx)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {blocks.map((block, idx) => (
+        <div key={idx} className="rounded-[16px] border border-[#D8DDEC] bg-white p-4 shadow-sm">
+          <BlockRenderer block={block} ctx={ctx} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function shouldSuppressBlockInSection(block: SectionBlock, sectionTitle: string) {
+  const title = sectionTitle.toLowerCase();
+  const type = safeText(block.type).toLowerCase();
+
+  if (title.includes("introduction to the") && title.includes("profile") && type === "image") {
+    return true;
+  }
+
+  return false;
+}
+
 function ContentSection({
   section,
   ctx,
@@ -1609,16 +1843,28 @@ function ContentSection({
   const showProfiles = title.includes("eight leadership profiles");
   const showResults = title.includes("leadership results") || title.includes("your results");
   const showSignature = title.includes("welcome");
+  const showProfileIntroBadge = title.includes("introduction to the") && title.includes("profile");
+  const showCaseStudyCards = title.includes("case studies") || title.includes("industry examples");
+
+  const shouldRenderJsonBlocks = !showFiveDimensions && !showProfiles;
+
+  const visibleBlocks = section.blocks.filter((block) => !shouldSuppressBlockInSection(block, section.title));
 
   return (
     <SectionShell id={section.id} title={section.title}>
       <WhitePanel className="p-5">
-        {section.blocks.length ? (
-          <div>
-            {section.blocks.map((block, idx) => (
-              <BlockRenderer key={idx} block={block} ctx={ctx} />
-            ))}
-          </div>
+        {showProfileIntroBadge ? <ProfileIntroBadge ctx={ctx} /> : null}
+
+        {shouldRenderJsonBlocks && visibleBlocks.length ? (
+          showCaseStudyCards ? (
+            <CaseStudyCards blocks={visibleBlocks} ctx={ctx} />
+          ) : (
+            <div>
+              {visibleBlocks.map((block, idx) => (
+                <BlockRenderer key={idx} block={block} ctx={ctx} />
+              ))}
+            </div>
+          )
         ) : null}
 
         {showFiveDimensions ? <FiveDimensionsVisual /> : null}
