@@ -2083,9 +2083,7 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
 
   const strengthHeadingIdx = texts.findIndex((text) => text.toLowerCase().includes("key strengths"));
   const challengeHeadingIdx = texts.findIndex(
-    (text) =>
-      text.toLowerCase().includes("challenge") ||
-      text.toLowerCase().includes("development areas")
+    (text) => text.toLowerCase().includes("challenge") || text.toLowerCase().includes("development areas")
   );
 
   let strengthTexts: string[] = [];
@@ -2110,9 +2108,7 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
     <div className="rounded-[18px] border border-white/10 bg-[#12365B]/75 p-5">
       <div className="grid gap-5 lg:grid-cols-2">
         <div>
-          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white">
-            Key Strengths
-          </p>
+          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white">Key Strengths</p>
 
           <div className="space-y-2">
             {strengths.map((item, idx) => (
@@ -2120,13 +2116,9 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
                 key={`${item.title}-${idx}`}
                 className="rounded-[8px] border-l-4 border-[#2ECC71] bg-white px-4 py-3 shadow-sm"
               >
-                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#2ECC71]">
-                  Strength
-                </p>
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#2ECC71]">Strength</p>
                 <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                {item.description ? (
-                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
-                ) : null}
+                {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
               </div>
             ))}
           </div>
@@ -2150,9 +2142,7 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
                   Challenge
                 </p>
                 <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                {item.description ? (
-                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
-                ) : null}
+                {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
               </div>
             ))}
           </div>
@@ -2173,20 +2163,17 @@ function HowLeadsInLogisticsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ct
     primaryIdx >= 0 && strategiesIdx > primaryIdx
       ? texts.slice(primaryIdx + 1, strategiesIdx).filter(Boolean)
       : strategiesIdx > 0
-      ? texts.slice(0, strategiesIdx).filter((text) => !text.toLowerCase().includes("primary leadership"))
-      : [];
+        ? texts.slice(0, strategiesIdx).filter((text) => !text.toLowerCase().includes("primary leadership"))
+        : [];
 
   const strategyTexts =
     strategiesIdx >= 0 && pitfallsIdx > strategiesIdx
       ? texts.slice(strategiesIdx + 1, pitfallsIdx).filter(Boolean)
       : strategiesIdx >= 0
-      ? texts.slice(strategiesIdx + 1).filter(Boolean)
-      : [];
+        ? texts.slice(strategiesIdx + 1).filter(Boolean)
+        : [];
 
-  const pitfallTexts =
-    pitfallsIdx >= 0
-      ? texts.slice(pitfallsIdx + 1).filter(Boolean)
-      : [];
+  const pitfallTexts = pitfallsIdx >= 0 ? texts.slice(pitfallsIdx + 1).filter(Boolean) : [];
 
   const strategies = strategyTexts.map(splitTitleDescription).filter((item) => item.title);
   const pitfalls = pitfallTexts.map(splitTitleDescription).filter((item) => item.title);
@@ -2226,9 +2213,7 @@ function HowLeadsInLogisticsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ct
 
                 <div>
                   <p className="text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                  {item.description ? (
-                    <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
-                  ) : null}
+                  {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
                 </div>
               </div>
             ))}
@@ -2251,23 +2236,125 @@ function HowLeadsInLogisticsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ct
                   className="rounded-[8px] bg-[#ECECEC] px-4 py-3"
                   style={{ borderLeft: `3px solid ${color}` }}
                 >
-                  <p
-                    className="text-[8px] font-black uppercase tracking-[0.16em]"
-                    style={{ color }}
-                  >
+                  <p className="text-[8px] font-black uppercase tracking-[0.16em]" style={{ color }}>
                     Pitfall · {highImpact ? "High Impact" : "Medium Impact"}
                   </p>
 
                   <p className="mt-2 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
 
-                  {item.description ? (
-                    <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
-                  ) : null}
+                  {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
                 </div>
               );
             })}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SuccessFactorsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const texts = getPlainTextBlocks(blocks, ctx);
+
+  const drivesIdx = texts.findIndex((text) => text.toLowerCase().includes("what drives success"));
+  const environmentsIdx = texts.findIndex((text) => text.toLowerCase().includes("best work environments"));
+
+  const driveTexts =
+    drivesIdx >= 0 && environmentsIdx > drivesIdx
+      ? texts.slice(drivesIdx + 1, environmentsIdx).filter(Boolean)
+      : environmentsIdx > 0
+        ? texts.slice(0, environmentsIdx).filter((text) => !text.toLowerCase().includes("what drives success"))
+        : texts.filter((text) => !text.toLowerCase().includes("what drives success"));
+
+  const environmentTexts =
+    environmentsIdx >= 0
+      ? texts.slice(environmentsIdx + 1).filter(Boolean)
+      : [];
+
+  const environments = environmentTexts.map(splitTitleDescription).filter((item) => item.title);
+
+  return (
+    <div className="rounded-[14px] bg-white p-6 text-[#313C52]">
+      <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+        <div>
+          <p className="mb-4 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            What Drives Success?
+          </p>
+
+          <ul className="ml-4 list-disc space-y-6 text-[11px] leading-5 text-[#313C52]">
+            {driveTexts.map((text, idx) => (
+              <li key={idx}>{text}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div>
+          <p className="mb-4 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            Best Work Environments
+          </p>
+
+          <div className="space-y-3">
+            {environments.map((item, idx) => (
+              <div
+                key={`${item.title}-${idx}`}
+                className="rounded-[8px] border-l-4 border-[#2EA876] bg-[#ECECEC] px-4 py-3"
+              >
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#2EA876]">Environment</p>
+                <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
+                {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoleCardsLayout({
+  blocks,
+  ctx,
+  label,
+  challenge = false,
+}: {
+  blocks: SectionBlock[];
+  ctx: RenderContext;
+  label?: string;
+  challenge?: boolean;
+}) {
+  const texts = getPlainTextBlocks(blocks, ctx).filter(Boolean);
+  const items = texts
+    .filter((text) => {
+      const t = text.toLowerCase();
+      return !t.includes("ideal roles") && !t.includes("roles that will be challenging");
+    })
+    .map(splitTitleDescription)
+    .filter((item) => item.title);
+
+  return (
+    <div className="rounded-[18px] border border-white/10 bg-[#12365B]/75 p-5">
+      <div className="grid gap-3 md:grid-cols-2">
+        {items.map((item, idx) => {
+          const isLastOdd = items.length % 2 === 1 && idx === items.length - 1;
+          const color = challenge ? (idx <= 1 ? "#EF4444" : "#F59E0B") : "#2EA876";
+
+          return (
+            <div
+              key={`${item.title}-${idx}`}
+              className={`rounded-[8px] bg-white px-5 py-4 shadow-sm ${isLastOdd ? "md:col-span-2" : ""}`}
+              style={{ borderLeft: challenge ? `4px solid ${color}` : undefined }}
+            >
+              {label ? (
+                <p className="text-[8px] font-black uppercase tracking-[0.16em]" style={{ color }}>
+                  {label}
+                </p>
+              ) : null}
+
+              <p className="text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
+              {item.description ? <p className="mt-2 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -2301,6 +2388,9 @@ function ContentSection({
   const showEnhancingDevelopment = title.includes("enhancing") || title.includes("development");
   const showCoreCharacteristics = title.includes("core characteristics");
   const showHowLeadsInLogistics = title.includes("leads in logistics");
+  const showSuccessFactors = title.includes("success factors");
+  const showIdealRoles = title.includes("ideal roles");
+  const showChallengingRoles = title.includes("roles that will be challenging");
 
   const shouldRenderJsonBlocks = !showFiveDimensions && !showProfiles;
 
@@ -2316,6 +2406,12 @@ function ContentSection({
             <CoreCharacteristicsCards blocks={visibleBlocks} ctx={ctx} />
           ) : showHowLeadsInLogistics ? (
             <HowLeadsInLogisticsLayout blocks={visibleBlocks} ctx={ctx} />
+          ) : showSuccessFactors ? (
+            <SuccessFactorsLayout blocks={visibleBlocks} ctx={ctx} />
+          ) : showIdealRoles ? (
+            <RoleCardsLayout blocks={visibleBlocks} ctx={ctx} />
+          ) : showChallengingRoles ? (
+            <RoleCardsLayout blocks={visibleBlocks} ctx={ctx} label="Challenging Role" challenge />
           ) : showCaseStudyCards ? (
             <CaseStudyCards blocks={visibleBlocks} ctx={ctx} />
           ) : showEnhancingDevelopment ? (
