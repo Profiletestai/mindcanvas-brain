@@ -102,6 +102,17 @@ type SectionIconChoice = {
   fallback: string;
 };
 
+type CaseStudyCard = {
+  title: string;
+  subtitle: string;
+  blocks: SectionBlock[];
+};
+
+type SkillPathwayCard = {
+  title: string;
+  description: string;
+};
+
 const ASSET_BASE = "/images/5d-leadership-compass";
 const SECTION_ICON_BASE = `${ASSET_BASE}/section-icons`;
 
@@ -1354,6 +1365,30 @@ function blockPlainText(block: SectionBlock, ctx: RenderContext) {
   return replaceMacros(blockValue(block, "text") ?? blockValue(block, "content") ?? blockValue(block, "title"), ctx);
 }
 
+function getPlainTextBlocks(blocks: SectionBlock[], ctx: RenderContext) {
+  const out: string[] = [];
+
+  for (const block of blocks) {
+    const type = safeText(block.type).toLowerCase();
+
+    if (type === "ul" || type === "ol" || type === "list" || type === "bullet_list" || type === "numbered_list") {
+      const items = Array.isArray(blockValue(block, "items")) ? (blockValue(block, "items") as unknown[]) : [];
+      for (const item of items) {
+        const text = renderListItem(item, ctx).trim();
+        if (text) out.push(text);
+      }
+      continue;
+    }
+
+    if (type === "image" || type === "divider") continue;
+
+    const text = blockPlainText(block, ctx).trim();
+    if (text) out.push(text);
+  }
+
+  return out;
+}
+
 function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext }) {
   const type = safeText(block.type).toLowerCase();
 
@@ -1735,45 +1770,134 @@ function ProfileIntroBadge({ ctx }: { ctx: RenderContext }) {
   );
 }
 
-function CaseStudyCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+function splitCaseTitle(text: string) {
+  const cleaned = text.trim();
+  const match = cleaned.match(/^(.+?)\s*\((.+)\)\s*$/);
+
+  if (match) {
+    return {
+      title: match[1].trim(),
+      subtitle: match[2].trim(),
+    };
+  }
+
+  return {
+    title: cleaned,
+    subtitle: "",
+  };
+}
+
+function isLikelyCaseStudyTitle(text: string) {
+  const cleaned = text.trim();
+
+  if (!cleaned) return false;
+  if (cleaned.length > 105) return false;
+  if (cleaned.includes("?")) return false;
+  if (/\(.+\)/.test(cleaned)) return true;
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words.length <= 6 && /^[A-Z]/.test(words[0])) return true;
+
+  return false;
+}
+
+function initialsFromTitle(title: string) {
+  const words = title
+    .replace(/[^\w\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) return "5D";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+
+  return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
+}
+
+function buildCaseStudyCards(blocks: SectionBlock[], ctx: RenderContext): CaseStudyCard[] {
   const hasHeadings = blocks.some(isHeadingBlock);
 
   if (hasHeadings) {
-    const cards: Array<{ title: string; blocks: SectionBlock[] }> = [];
-    let current: { title: string; blocks: SectionBlock[] } | null = null;
+    const cards: CaseStudyCard[] = [];
+    let current: CaseStudyCard | null = null;
 
     for (const block of blocks) {
       if (isHeadingBlock(block)) {
         if (current) cards.push(current);
+
+        const split = splitCaseTitle(blockPlainText(block, ctx) || "Industry Example");
         current = {
-          title: blockPlainText(block, ctx) || "Industry Example",
+          title: split.title,
+          subtitle: split.subtitle,
           blocks: [],
         };
       } else {
         if (!current) {
-          current = { title: "Industry Example", blocks: [] };
+          current = { title: "Industry Example", subtitle: "", blocks: [] };
         }
         current.blocks.push(block);
       }
     }
 
     if (current) cards.push(current);
-
-    return (
-      <div className="grid gap-4 md:grid-cols-2">
-        {cards.map((card, idx) => (
-          <div key={`${card.title}-${idx}`} className="rounded-[16px] border border-[#D8DDEC] bg-white p-4 shadow-sm">
-            <p className="text-[13px] font-black text-[#0C203A]">{card.title}</p>
-            <div className="mt-3">
-              {card.blocks.map((block, blockIdx) => (
-                <BlockRenderer key={blockIdx} block={block} ctx={ctx} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return cards;
   }
+
+  const textBlocks = blocks.filter((block) => {
+    const type = safeText(block.type).toLowerCase();
+    return type !== "image" && type !== "divider";
+  });
+
+  const cards: CaseStudyCard[] = [];
+  let current: CaseStudyCard | null = null;
+
+  for (const block of textBlocks) {
+    const text = blockPlainText(block, ctx).trim();
+
+    if (isLikelyCaseStudyTitle(text)) {
+      if (current) cards.push(current);
+      const split = splitCaseTitle(text);
+      current = {
+        title: split.title,
+        subtitle: split.subtitle,
+        blocks: [],
+      };
+      continue;
+    }
+
+    const type = safeText(block.type).toLowerCase();
+    const items =
+      type === "ul" || type === "ol" || type === "list" || type === "bullet_list" || type === "numbered_list"
+        ? Array.isArray(blockValue(block, "items"))
+          ? (blockValue(block, "items") as unknown[])
+          : []
+        : [];
+
+    if (items.length) {
+      for (const item of items) {
+        const itemText = renderListItem(item, ctx).trim();
+
+        if (isLikelyCaseStudyTitle(itemText)) {
+          if (current) cards.push(current);
+          const split = splitCaseTitle(itemText);
+          current = { title: split.title, subtitle: split.subtitle, blocks: [] };
+        } else {
+          if (!current) current = { title: "Industry Example", subtitle: "", blocks: [] };
+          current.blocks.push({ type: "p", text: itemText });
+        }
+      }
+      continue;
+    }
+
+    if (!current) {
+      current = { title: "Industry Example", subtitle: "", blocks: [] };
+    }
+
+    current.blocks.push(block);
+  }
+
+  if (current) cards.push(current);
+
+  if (cards.length > 1) return cards;
 
   const listBlock = blocks.find((block) => {
     const type = safeText(block.type).toLowerCase();
@@ -1783,39 +1907,140 @@ function CaseStudyCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderCo
   const listItems = listBlock && Array.isArray(blockValue(listBlock, "items")) ? (blockValue(listBlock, "items") as unknown[]) : [];
 
   if (listItems.length > 1) {
-    const introBlocks = blocks.filter((block) => block !== listBlock);
+    return listItems.map((item, idx) => ({
+      title: `Industry Example ${idx + 1}`,
+      subtitle: "",
+      blocks: [{ type: "p", text: renderListItem(item, ctx) }],
+    }));
+  }
 
-    return (
-      <div>
-        {introBlocks.length ? (
-          <div className="mb-4">
-            {introBlocks.map((block, idx) => (
-              <BlockRenderer key={idx} block={block} ctx={ctx} />
-            ))}
-          </div>
-        ) : null}
+  return cards;
+}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {listItems.map((item, idx) => (
-            <div key={idx} className="rounded-[16px] border border-[#D8DDEC] bg-white p-4 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#66758D]">
-                Example {idx + 1}
-              </p>
-              <p className="mt-3 text-[12px] leading-6 text-[#313C52]">{renderListItem(item, ctx)}</p>
+function CaseStudyCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const cards = buildCaseStudyCards(blocks, ctx);
+
+  return (
+    <div className="rounded-[18px] border border-white/10 bg-[#12365B]/70 p-5">
+      <div className="grid gap-4 md:grid-cols-2">
+        {cards.map((card, idx) => (
+          <article
+            key={`${card.title}-${idx}`}
+            className="min-h-[220px] rounded-[10px] bg-white p-6 shadow-[0_8px_18px_rgba(15,23,42,0.12)]"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E8EDF5] text-[11px] font-black text-[#102640]">
+                {initialsFromTitle(card.title)}
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-[13px] font-black leading-5 text-[#102640]">{card.title}</p>
+                {card.subtitle ? <p className="mt-1 text-[10px] leading-4 text-[#66758D]">{card.subtitle}</p> : null}
+              </div>
             </div>
-          ))}
-        </div>
+
+            <div className="mt-4 space-y-3">
+              {card.blocks.map((block, blockIdx) => (
+                <BlockRenderer key={blockIdx} block={block} ctx={ctx} />
+              ))}
+            </div>
+          </article>
+        ))}
       </div>
+    </div>
+  );
+}
+
+function splitSkillPathwayItem(text: string): SkillPathwayCard {
+  const parts = text.split(":");
+  if (parts.length > 1) {
+    return {
+      title: parts.shift()?.trim() || "Development Focus",
+      description: parts.join(":").trim(),
+    };
+  }
+
+  return {
+    title: "Development Focus",
+    description: text.trim(),
+  };
+}
+
+function EnhancingDevelopmentCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const texts = getPlainTextBlocks(blocks, ctx);
+
+  const selfIdx = texts.findIndex((text) => text.toLowerCase().includes("self-assessment"));
+  const skillIdx = texts.findIndex((text) => text.toLowerCase().includes("skill development"));
+
+  let questionTexts: string[] = [];
+  let skillTexts: string[] = [];
+
+  if (selfIdx >= 0 && skillIdx >= 0) {
+    questionTexts = texts.slice(selfIdx + 1, skillIdx).filter(Boolean);
+    skillTexts = texts.slice(skillIdx + 1).filter(Boolean);
+  } else {
+    questionTexts = texts.filter((text) => text.trim().endsWith("?"));
+    skillTexts = texts.filter(
+      (text) =>
+        !text.trim().endsWith("?") &&
+        !text.toLowerCase().includes("self-assessment") &&
+        !text.toLowerCase().includes("skill development")
     );
   }
 
+  const pathwayCards = skillTexts.map(splitSkillPathwayItem).filter((card) => card.title || card.description);
+
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {blocks.map((block, idx) => (
-        <div key={idx} className="rounded-[16px] border border-[#D8DDEC] bg-white p-4 shadow-sm">
-          <BlockRenderer block={block} ctx={ctx} />
+    <div className="rounded-[18px] border border-white/10 bg-[#12365B]/75 p-5">
+      {questionTexts.length ? (
+        <>
+          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-white">Self-Assessment Questions</p>
+
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {questionTexts.map((question, idx) => (
+              <div key={idx} className="flex gap-3 rounded-[8px] bg-white px-4 py-3 shadow-sm">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EEF2F7] text-[11px] font-black text-[#526176]">
+                  ?
+                </span>
+                <p className="text-[11px] italic leading-5 text-[#313C52]">{question}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {pathwayCards.length ? (
+        <>
+          <p className="mt-6 text-[9px] font-black uppercase tracking-[0.24em] text-white">
+            Skill Development Pathway
+          </p>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            {pathwayCards.map((card, idx) => (
+              <div key={`${card.title}-${idx}`} className="min-h-[170px] rounded-[8px] bg-white p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border border-[#CBD4E0] bg-[#EEF2F7] text-[11px] font-black text-[#526176]">
+                    {idx + 1}
+                  </span>
+
+                  <div>
+                    <p className="text-[12px] font-black leading-5 text-[#102640]">{card.title}</p>
+                    <p className="mt-3 text-[11px] leading-5 text-[#313C52]">{card.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {!questionTexts.length && !pathwayCards.length ? (
+        <div>
+          {blocks.map((block, idx) => (
+            <BlockRenderer key={idx} block={block} ctx={ctx} />
+          ))}
         </div>
-      ))}
+      ) : null}
     </div>
   );
 }
@@ -1845,6 +2070,7 @@ function ContentSection({
   const showSignature = title.includes("welcome");
   const showProfileIntroBadge = title.includes("introduction to the") && title.includes("profile");
   const showCaseStudyCards = title.includes("case studies") || title.includes("industry examples");
+  const showEnhancingDevelopment = title.includes("enhancing") || title.includes("development");
 
   const shouldRenderJsonBlocks = !showFiveDimensions && !showProfiles;
 
@@ -1858,6 +2084,8 @@ function ContentSection({
         {shouldRenderJsonBlocks && visibleBlocks.length ? (
           showCaseStudyCards ? (
             <CaseStudyCards blocks={visibleBlocks} ctx={ctx} />
+          ) : showEnhancingDevelopment ? (
+            <EnhancingDevelopmentCards blocks={visibleBlocks} ctx={ctx} />
           ) : (
             <div>
               {visibleBlocks.map((block, idx) => (
@@ -1876,6 +2104,44 @@ function ContentSection({
   );
 }
 
+function NextStepsCard({
+  icon,
+  title,
+  text,
+  buttonLabel,
+  onClick,
+  primary = false,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  buttonLabel: string;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <div className="rounded-[10px] bg-white px-6 py-7 text-center shadow-[0_8px_18px_rgba(15,23,42,0.14)]">
+      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#F3EDE5] text-[20px] text-[#102640]">
+        {icon}
+      </div>
+
+      <p className="mt-5 text-[13px] font-black text-[#102640]">{title}</p>
+      <p className="mx-auto mt-4 max-w-[230px] text-[10px] leading-4 text-[#526176]">{text}</p>
+
+      <button
+        onClick={onClick}
+        className={`mt-5 w-full rounded-[6px] px-4 py-2 text-[10px] font-bold ${
+          primary
+            ? "bg-[#111827] text-white"
+            : "border border-[#111827] bg-white text-[#111827] hover:bg-[#F8FAFC]"
+        }`}
+      >
+        {buttonLabel}
+      </button>
+    </div>
+  );
+}
+
 function NextStepsPanel({
   participant,
   onDownload,
@@ -1887,26 +2153,34 @@ function NextStepsPanel({
 }) {
   return (
     <SectionShell id="next-steps-section" title="Your Next Steps">
-      <WhitePanel className="p-5">
-        <div className="grid gap-4 md:grid-cols-2">
-          <button
+      <div className="rounded-[18px] border border-white/10 bg-[#12365B]/75 p-5">
+        <div className="grid gap-4 md:grid-cols-3">
+          <NextStepsCard
+            icon="▤"
+            title="Download Your Report"
+            text="Save a PDF copy of your 5D Leadership Compass report for reference and sharing."
+            buttonLabel="Download PDF"
             onClick={onDownload}
-            className="rounded-xl bg-[#0C203A] px-4 py-3 text-sm font-black text-white shadow-sm"
-          >
-            Download PDF
-          </button>
-          <button
-            onClick={onNext}
-            className="rounded-xl bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-4 py-3 text-sm font-black text-[#071C36] shadow-sm"
-          >
-            Next step
-          </button>
-        </div>
+            primary
+          />
 
-        <p className="mt-5 text-center text-xs text-slate-500">
-          The 5D Leadership Compass · Personalised report for {participant}
-        </p>
-      </WhitePanel>
+          <NextStepsCard
+            icon="☵"
+            title="Discuss with Your Advisor"
+            text="The real value of this report comes when insights are discussed and translated into action with your advisor."
+            buttonLabel="Explore Now"
+            onClick={onNext}
+          />
+
+          <NextStepsCard
+            icon="⟳"
+            title="Visit Businesses Are People Too"
+            text="For more information and next steps, please visit businessesarepeopletoo.com"
+            buttonLabel="Visit Now"
+            onClick={onNext}
+          />
+        </div>
+      </div>
     </SectionShell>
   );
 }
