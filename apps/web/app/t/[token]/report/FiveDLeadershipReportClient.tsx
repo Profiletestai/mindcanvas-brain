@@ -136,7 +136,7 @@ const DESIGN_FONT =
   "'Inter', 'Montserrat', 'Avenir Next', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 const DARK_PANEL =
-  "linear-gradient(180deg, rgba(18,54,91,0.97) 0%, rgba(5,29,56,0.98) 100%)";
+  "linear-gradient(180deg, rgba(18,54,91,0.985) 0%, rgba(5,29,56,0.99) 100%)";
 
 const PAGE_BG =
   "radial-gradient(ellipse 69% 58% at 12% 12%, rgba(79,125,255,0.22) 0%, rgba(79,125,255,0) 58%), radial-gradient(ellipse 60% 51% at 86% 18%, rgba(69,224,209,0.12) 0%, rgba(69,224,209,0) 56%), radial-gradient(ellipse 50% 58% at 50% 92%, rgba(139,92,246,0.10) 0%, rgba(139,92,246,0) 60%), #061A3A";
@@ -611,7 +611,7 @@ function SectionShell({
   return (
     <section
       id={id}
-      className="rounded-[22px] border border-white/10 p-[16px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="rounded-[22px] border border-white/10 p-[14px] shadow-[0_12px_36px_rgba(0,0,0,0.30)]"
       style={{ background: DARK_PANEL }}
     >
       <div className="mb-4 flex items-center gap-3">
@@ -637,7 +637,9 @@ function SectionShell({
 
 function WhitePanel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[18px] border border-white/10 bg-[#F6F7FA] text-[#313C52] shadow-sm ${className}`}>
+    <div
+      className={`rounded-[18px] border border-[#EEF2F7] bg-[#F7F8FB] text-[#313C52] shadow-[0_8px_20px_rgba(15,23,42,0.10)] ${className}`}
+    >
       {children}
     </div>
   );
@@ -654,7 +656,7 @@ function DashboardOuterCard({
 }) {
   return (
     <section
-      className="flex h-full flex-col rounded-[20px] border border-white/10 p-4 shadow-[0_14px_42px_rgba(0,0,0,0.25)]"
+      className="flex h-full flex-col rounded-[20px] border border-white/10 p-4 shadow-[0_12px_36px_rgba(0,0,0,0.25)]"
       style={{ background: DARK_PANEL }}
     >
       <h3 className="text-[15px] font-bold text-white">{title}</h3>
@@ -686,25 +688,25 @@ function TopHeader({
 }) {
   return (
     <section
-      className="rounded-[22px] border border-white/10 px-5 py-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="rounded-[22px] border border-white/10 px-5 py-4 shadow-[0_12px_36px_rgba(0,0,0,0.30)]"
       style={{ background: DARK_PANEL }}
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex items-start gap-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-white/15 bg-white/10">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border border-white/15 bg-white/10">
             <ImageWithFallback
               src={ASSETS.logo}
               alt="5D Leadership"
-              className="flex h-9 w-9 items-center justify-center rounded-[12px] object-contain p-1"
-              fallback={<span className="flex h-9 w-9 items-center justify-center text-[10px] font-black">5D</span>}
+              className="flex h-10 w-10 items-center justify-center rounded-[12px] object-contain p-1"
+              fallback={<span className="flex h-10 w-10 items-center justify-center text-[10px] font-black">5D</span>}
             />
           </div>
 
           <div>
-            <p className="text-[24px] font-black uppercase leading-none tracking-[0.14em] text-white md:text-[28px]">
+            <p className="text-[25px] font-black uppercase leading-none tracking-[0.16em] text-white md:text-[31px]">
               Personalised Report
             </p>
-            <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.28em] text-white/75">
+            <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.3em] text-white/75">
               5D Leadership Compass
             </p>
             <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-white/85">
@@ -755,14 +757,14 @@ function HeroHeader({
   const topMeta = PROFILE_META[topCode] || PROFILE_META.P1;
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div
-        className="rounded-[22px] border border-white/10 p-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+        className="rounded-[22px] border border-white/10 p-5 shadow-[0_12px_36px_rgba(0,0,0,0.30)]"
         style={{ background: DARK_PANEL }}
       >
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_285px]">
           <div className="py-1">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.26em] text-white/55">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.28em] text-white/55">
               The 5D Leadership Compass
             </p>
 
@@ -822,7 +824,7 @@ function HeroProfileList({ data }: { data: ResultData }) {
 
   return (
     <div
-      className="rounded-[20px] border border-white/10 p-3 shadow-[0_14px_42px_rgba(0,0,0,0.22)]"
+      className="rounded-[20px] border border-white/10 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.22)]"
       style={{ background: DARK_PANEL }}
     >
       <div className="space-y-1.5">
@@ -857,7 +859,7 @@ function HeroProfileList({ data }: { data: ResultData }) {
 
 function RaisonScoreCard({ score }: { score: number }) {
   return (
-    <div className="rounded-[22px] bg-[#624585] p-6 text-center text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
+    <div className="rounded-[22px] bg-[#624585] p-6 text-center text-white shadow-[0_12px_36px_rgba(0,0,0,0.30)]">
       <p className="mx-auto inline-flex rounded-full border border-white/55 px-6 py-2 text-[10px] font-black uppercase leading-tight tracking-[0.18em] text-white">
         The 5th
         <br />
@@ -881,7 +883,7 @@ function RaisonScoreCard({ score }: { score: number }) {
 
 function OverviewDashboard({ data }: { data: ResultData }) {
   return (
-    <section className="grid items-stretch gap-5 lg:grid-cols-2">
+    <section className="grid items-stretch gap-4 lg:grid-cols-2">
       <DimensionScorePanel data={data} />
       <ProfileMapPanel data={data} />
     </section>
@@ -1122,7 +1124,7 @@ function ReportIndex({
 }) {
   return (
     <aside
-      className="sticky top-4 self-start rounded-[18px] border border-white/10 p-3 text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="sticky top-4 self-start rounded-[18px] border border-white/10 p-3 text-white shadow-[0_12px_36px_rgba(0,0,0,0.28)]"
       style={{ background: DARK_PANEL }}
     >
       <p className="text-[8px] font-semibold uppercase tracking-[0.32em] text-white/35">Report Index</p>
@@ -1137,7 +1139,7 @@ function ReportIndex({
                 block: "start",
               })
             }
-            className="block w-full rounded-[9px] border border-white/10 bg-white/[0.03] px-2.5 py-2 text-left text-[10px] leading-4 text-white/92 hover:bg-white/[0.06]"
+            className="block w-full rounded-[9px] border border-white/10 bg-white/[0.035] px-2.5 py-2 text-left text-[10px] leading-4 text-white/92 hover:bg-white/[0.06]"
           >
             <span className="font-bold text-white">{idx + 1}.</span> {section.title}
           </button>
@@ -1776,7 +1778,7 @@ function ResultsVisual({ data, raisonScore }: { data: ResultData; raisonScore: n
 
 function SignatureBlock() {
   return (
-    <div className="mt-7 flex items-center gap-4">
+    <div className="mt-7 flex items-center gap-4 rounded-[14px] border border-[#E4EAF2] bg-white px-4 py-3">
       <div className="flex h-[54px] w-[54px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xl">
         <ImageWithFallback
           src={ASSETS.brett}
@@ -1960,7 +1962,8 @@ function buildCaseStudyCards(blocks: SectionBlock[], ctx: RenderContext): CaseSt
     return type === "ul" || type === "ol" || type === "list" || type === "bullet_list" || type === "numbered_list";
   });
 
-  const listItems = listBlock && Array.isArray(blockValue(listBlock, "items")) ? (blockValue(listBlock, "items") as unknown[]) : [];
+  const listItems =
+    listBlock && Array.isArray(blockValue(listBlock, "items")) ? (blockValue(listBlock, "items") as unknown[]) : [];
 
   if (listItems.length > 1) {
     return listItems.map((item, idx) => ({
@@ -2105,7 +2108,9 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
   const texts = getPlainTextBlocks(blocks, ctx);
 
   const strengthHeadingIdx = texts.findIndex((text) => text.toLowerCase().includes("key strengths"));
-  const challengeHeadingIdx = texts.findIndex((text) => text.toLowerCase().includes("challenge") || text.toLowerCase().includes("development areas"));
+  const challengeHeadingIdx = texts.findIndex(
+    (text) => text.toLowerCase().includes("challenge") || text.toLowerCase().includes("development areas")
+  );
 
   let strengthTexts: string[] = [];
   let challengeTexts: string[] = [];
@@ -2139,7 +2144,9 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
               >
                 <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#2ECC71]">Strength</p>
                 <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+                {item.description ? (
+                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -2163,7 +2170,9 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
                   Challenge
                 </p>
                 <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+                {item.description ? (
+                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -2234,7 +2243,9 @@ function HowLeadsInLogisticsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ct
 
                 <div>
                   <p className="text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                  {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+                  {item.description ? (
+                    <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -2263,7 +2274,9 @@ function HowLeadsInLogisticsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ct
 
                   <p className="mt-2 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
 
-                  {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+                  {item.description ? (
+                    <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                  ) : null}
                 </div>
               );
             })}
@@ -2319,7 +2332,9 @@ function SuccessFactorsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Re
               >
                 <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#2EA876]">Environment</p>
                 <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-                {item.description ? <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+                {item.description ? (
+                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -2369,7 +2384,9 @@ function RoleCardsLayout({
               ) : null}
 
               <p className="text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
-              {item.description ? <p className="mt-2 text-[10px] leading-4 text-[#313C52]">{item.description}</p> : null}
+              {item.description ? (
+                <p className="mt-2 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+              ) : null}
             </div>
           );
         })}
@@ -2393,8 +2410,12 @@ function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Rende
 
   const powerIdx = texts.findIndex((text) => text.toLowerCase().includes("power of the 5d leader"));
   const whyIdx = texts.findIndex((text) => text.toLowerCase().includes("why the raison"));
-  const alignedIdx = texts.findIndex((text) => text.toLowerCase().includes("when you're aligned") || text.toLowerCase().includes("when you’re aligned"));
-  const transformationIdx = texts.findIndex((text) => text.toLowerCase().startsWith("that's how") || text.toLowerCase().startsWith("that’s how"));
+  const alignedIdx = texts.findIndex(
+    (text) => text.toLowerCase().includes("when you're aligned") || text.toLowerCase().includes("when you’re aligned")
+  );
+  const transformationIdx = texts.findIndex(
+    (text) => text.toLowerCase().startsWith("that's how") || text.toLowerCase().startsWith("that’s how")
+  );
   const looksIdx = texts.findIndex((text) => text.toLowerCase().includes("looks different"));
   const keyQuestionsIdx = texts.findIndex((text) => text.toLowerCase().includes("key questions"));
   const whyDimensionIdx = texts.findIndex((text) => text.toLowerCase().includes("why this dimension matters"));
@@ -2415,12 +2436,12 @@ function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Rende
         ? texts.slice(whyIdx + 1, looksIdx)
         : [];
 
-  const benefitEnd = transformationIdx >= 0 ? transformationIdx : looksIdx >= 0 ? looksIdx : keyQuestionsIdx >= 0 ? keyQuestionsIdx : texts.length;
+  const benefitEnd =
+    transformationIdx >= 0 ? transformationIdx : looksIdx >= 0 ? looksIdx : keyQuestionsIdx >= 0 ? keyQuestionsIdx : texts.length;
+
   const benefitTexts =
     alignedIdx >= 0
-      ? texts
-          .slice(alignedIdx + 1, benefitEnd)
-          .filter((text) => text.toLowerCase().startsWith("you "))
+      ? texts.slice(alignedIdx + 1, benefitEnd).filter((text) => text.toLowerCase().startsWith("you "))
       : [];
 
   const transformationText = transformationIdx >= 0 ? texts[transformationIdx] : "";
@@ -2442,18 +2463,14 @@ function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Rende
 
   const questionTexts =
     keyQuestionsIdx >= 0
-      ? texts
-          .slice(keyQuestionsIdx + 1, whyDimensionIdx >= 0 ? whyDimensionIdx : texts.length)
-          .filter((text) => text.includes("?"))
+      ? texts.slice(keyQuestionsIdx + 1, whyDimensionIdx >= 0 ? whyDimensionIdx : texts.length).filter((text) => text.includes("?"))
       : [];
 
   const whyDimensionBullets = whyDimensionIdx >= 0 ? texts.slice(whyDimensionIdx + 1).filter(Boolean) : [];
 
   return (
     <div className="rounded-[14px] bg-white p-6 text-[#313C52]">
-      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
-        {powerTitle}
-      </p>
+      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">{powerTitle}</p>
 
       <div className="mt-4 space-y-4">
         {powerParagraphs.map((text, idx) => (
@@ -2463,9 +2480,7 @@ function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Rende
         ))}
       </div>
 
-      <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
-        {whyTitle}
-      </p>
+      <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">{whyTitle}</p>
 
       <div className="mt-4 space-y-4">
         {whyParagraphs.map((text, idx) => (
@@ -2504,15 +2519,11 @@ function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Rende
         </div>
       ) : null}
 
-      {transformationText ? (
-        <p className="mt-4 text-[11px] leading-6 text-[#313C52]">{transformationText}</p>
-      ) : null}
+      {transformationText ? <p className="mt-4 text-[11px] leading-6 text-[#313C52]">{transformationText}</p> : null}
 
       {looksContent.length ? (
         <>
-          <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
-            {looksTitle}
-          </p>
+          <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">{looksTitle}</p>
 
           <div className="mt-4 space-y-4">
             {looksParagraphs.map((text, idx) => (
@@ -2537,9 +2548,7 @@ function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Rende
             </ul>
           ) : null}
 
-          {profileOutro ? (
-            <p className="mt-5 text-[11px] font-black leading-6 text-[#102640]">{profileOutro}</p>
-          ) : null}
+          {profileOutro ? <p className="mt-5 text-[11px] font-black leading-6 text-[#102640]">{profileOutro}</p> : null}
         </>
       ) : null}
 
@@ -2591,8 +2600,7 @@ function FinalFiveDThoughtsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx
   const restTexts = remainingTexts.slice(1);
 
   const firstContainsHowWhy =
-    firstText.toLowerCase().includes("profile gives you the how") &&
-    firstText.toLowerCase().includes("raison");
+    firstText.toLowerCase().includes("profile gives you the how") && firstText.toLowerCase().includes("raison");
 
   return (
     <div className="rounded-[14px] bg-white p-6 text-[#313C52]">
@@ -2621,9 +2629,7 @@ function FinalFiveDThoughtsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx
       </div>
 
       <div className="mt-7 rounded-[8px] border border-[#102640] px-5 py-4">
-        <p className="text-[22px] leading-8 tracking-[-0.02em] text-[#102640]">
-          {calloutText}
-        </p>
+        <p className="text-[22px] leading-8 tracking-[-0.02em] text-[#102640]">{calloutText}</p>
       </div>
     </div>
   );
@@ -2640,13 +2646,7 @@ function shouldSuppressBlockInSection(block: SectionBlock, sectionTitle: string)
   return false;
 }
 
-function ContentSection({
-  section,
-  ctx,
-}: {
-  section: RenderableSection;
-  ctx: RenderContext;
-}) {
+function ContentSection({ section, ctx }: { section: RenderableSection; ctx: RenderContext }) {
   const title = section.title.toLowerCase();
   const showFiveDimensions = title.includes("five dimensions");
   const showProfiles = title.includes("eight leadership profiles");
@@ -2670,7 +2670,7 @@ function ContentSection({
 
   return (
     <SectionShell id={section.id} title={section.title}>
-      <WhitePanel className="p-5">
+      <WhitePanel className="p-4 md:p-5">
         {showProfileIntroBadge ? <ProfileIntroBadge ctx={ctx} /> : null}
 
         {shouldRenderJsonBlocks && visibleBlocks.length ? (
@@ -2832,11 +2832,12 @@ export default function FiveDLeadershipReportClient(props: {
 
     const element = reportRef.current;
     const prevScroll = window.scrollY;
+
     window.scrollTo(0, 0);
 
     try {
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 1.45,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#061A3A",
@@ -2845,25 +2846,16 @@ export default function FiveDLeadershipReportClient(props: {
         windowHeight: element.scrollHeight,
       });
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
 
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [canvas.width, canvas.height],
+        compress: true,
+      });
 
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
+      pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
 
       pdf.save(`5d-leadership-compass-${participant.toLowerCase().replace(/\s+/g, "-")}.pdf`);
     } finally {
@@ -2894,7 +2886,7 @@ export default function FiveDLeadershipReportClient(props: {
         }}
       />
 
-      <div ref={reportRef} className="relative mx-auto flex max-w-[1180px] flex-col gap-5 px-4">
+      <div ref={reportRef} className="relative mx-auto flex max-w-[1180px] flex-col gap-4 px-4">
         <TopHeader
           participant={participant}
           reportDate={reportDate}
@@ -2906,10 +2898,10 @@ export default function FiveDLeadershipReportClient(props: {
 
         <OverviewDashboard data={data} />
 
-        <section className="grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)]">
+        <section className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
           <ReportIndex sections={sections} onDownload={handleDownloadPdf} onNext={openNextSteps} />
 
-          <main className="flex min-w-0 flex-col gap-5">
+          <main className="flex min-w-0 flex-col gap-4">
             {sections.map((section) => (
               <ContentSection key={section.id} section={section} ctx={ctx} />
             ))}
@@ -2918,7 +2910,7 @@ export default function FiveDLeadershipReportClient(props: {
           </main>
         </section>
 
-        <footer className="pb-8 text-center text-xs text-white/60">
+        <footer className="pb-8 pt-2 text-center text-xs text-white/60">
           The 5D Leadership Compass · Businesses Are People Too · Powered by Profiletest.ai
         </footer>
       </div>
