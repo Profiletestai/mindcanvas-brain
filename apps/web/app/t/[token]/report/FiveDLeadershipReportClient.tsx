@@ -37,7 +37,7 @@ type SectionBlock =
     }
   | { type: "html"; html?: string }
   | { type: "callout"; title?: string; text?: string; content?: string }
-  | { type: string; [k: string]: any };
+  | { type: string; [k: string]: unknown };
 
 type ReportSection = {
   id?: string;
@@ -78,7 +78,7 @@ type ResultData = {
     framework_path?: string | null;
   } | null;
 
-  debug?: any;
+  debug?: unknown;
   version?: string;
 };
 
@@ -131,6 +131,9 @@ const PROFILE_META: Record<
     shortDimension: string;
     description: string;
     color: string;
+    headerColor: string;
+    ringColor: string;
+    icon: string;
   }
 > = {
   P1: {
@@ -140,15 +143,21 @@ const PROFILE_META: Record<
     shortDimension: "Catalyst",
     description: "Visionary innovators who push boundaries and create industry-shifting change.",
     color: "#15C96F",
+    headerColor: "#3F845A",
+    ringColor: "#3F845A",
+    icon: `${ASSET_BASE}/profile-icons/p1-disruptor.png`,
   },
   P2: {
     name: "The Advocator",
     shortName: "Advocator",
-    dimension: "Catalyst–Communicator Dimension",
-    shortDimension: "Catalyst–Comm.",
+    dimension: "Catalyst-Communicator Dimension",
+    shortDimension: "Catalyst-Comm.",
     description:
       "High-energy leaders who thrive on engagement, motivation, and generating broad interest and buy-in.",
     color: "#7FA04A",
+    headerColor: "#789A45",
+    ringColor: "#789A45",
+    icon: `${ASSET_BASE}/profile-icons/p2-advocator.png`,
   },
   P3: {
     name: "The Mediator",
@@ -157,14 +166,20 @@ const PROFILE_META: Record<
     shortDimension: "Communicator",
     description: "Empathetic leaders who excel in team alignment, conflict resolution, and relationship-building.",
     color: "#D34B41",
+    headerColor: "#A24242",
+    ringColor: "#A24242",
+    icon: `${ASSET_BASE}/profile-icons/p3-mediator.png`,
   },
   P4: {
     name: "The Connector",
     shortName: "Connector",
-    dimension: "Communicator–Strategist Dimension",
-    shortDimension: "Comm.–Strategist",
+    dimension: "Communicator-Strategist Dimension",
+    shortDimension: "Comm.-Strategist",
     description: "Strategic networkers who leverage partnerships to drive business success.",
     color: "#C76932",
+    headerColor: "#A24242",
+    ringColor: "#A24242",
+    icon: `${ASSET_BASE}/profile-icons/p4-connector.png`,
   },
   P5: {
     name: "The Planner",
@@ -174,15 +189,21 @@ const PROFILE_META: Record<
     description:
       "Customer, market and mission-oriented leaders focused on service-driven planning and reliable logistics performance.",
     color: "#D68A1D",
+    headerColor: "#D48A28",
+    ringColor: "#B8741E",
+    icon: `${ASSET_BASE}/profile-icons/p5-planner.png`,
   },
   P6: {
     name: "The Forecaster",
     shortName: "Forecaster",
-    dimension: "Strategist–Stabilizer Dimension",
-    shortDimension: "Strat.–Stabilizer",
+    dimension: "Strategist-Stabilizer Dimension",
+    shortDimension: "Strat.-Stabilizer",
     description:
       "Risk-aware, detail-oriented leaders with foresight to anticipate upcoming opportunities and challenges.",
     color: "#5B80B4",
+    headerColor: "#D48A28",
+    ringColor: "#B8741E",
+    icon: `${ASSET_BASE}/profile-icons/p6-forecaster.png`,
   },
   P7: {
     name: "The Analyzer",
@@ -192,15 +213,21 @@ const PROFILE_META: Record<
     description:
       "Systems-oriented thinkers who use data-driven, systematic approaches to develop long-term business frameworks.",
     color: "#356AB9",
+    headerColor: "#A9C0C9",
+    ringColor: "#95AEBB",
+    icon: `${ASSET_BASE}/profile-icons/p7-analyzer.png`,
   },
   P8: {
     name: "The Optimizer",
     shortName: "Optimizer",
-    dimension: "Stabilizer–Disruptor Dimension",
-    shortDimension: "Stab.–Disruptor",
+    dimension: "Stabilizer-Disruptor Dimension",
+    shortDimension: "Stab.-Disruptor",
     description:
       "Precision-driven leaders who refine processes, integrate technology, implement automation, and make things better.",
     color: "#4A8F6C",
+    headerColor: "#A9C0C9",
+    ringColor: "#95AEBB",
+    icon: `${ASSET_BASE}/profile-icons/p8-optimizer.png`,
   },
 };
 
@@ -220,16 +247,16 @@ const FREQUENCY_META: Record<
     dimension: "Catalyst",
     subtitle: "Rapid Response & Innovation",
     description: "Action-oriented leaders who drive change and thrive in fast-moving environments.",
-    cardColor: "#2F9F67",
-    chartColor: "#35AD7C",
+    cardColor: "#1FA86A",
+    chartColor: "#FF383F",
   },
   B: {
     label: "Influence",
     dimension: "Communicator",
     subtitle: "Influence & Relationship-Driven Leadership",
     description: "People-focused leaders who build strong teams and partnerships.",
-    cardColor: "#C94440",
-    chartColor: "#45D6CC",
+    cardColor: "#E03D37",
+    chartColor: "#F8942F",
   },
   C: {
     label: "Implementation",
@@ -237,8 +264,8 @@ const FREQUENCY_META: Record<
     subtitle: "Customer Service & Mission Driven",
     description:
       "Structured leaders who ensure operational efficiency and reliability focused on balancing customer delight with operational effectiveness and reliability.",
-    cardColor: "#D7851F",
-    chartColor: "#4C74F6",
+    cardColor: "#D88721",
+    chartColor: "#0FB47A",
   },
   D: {
     label: "Insight",
@@ -246,8 +273,8 @@ const FREQUENCY_META: Record<
     subtitle: "Target Focused & Systems Thinking",
     description:
       "Analytical leaders who focus on longer-term, detailed analysis, optimization and future-proofing businesses.",
-    cardColor: "#336FBD",
-    chartColor: "#8E55EA",
+    cardColor: "#2E70C8",
+    chartColor: "#1E7AE0",
   },
 };
 
@@ -356,6 +383,12 @@ function readFrequencyRatio(data: ResultData, code: AB) {
   if (sum > 0) return Math.max(0, Math.min(1, total / sum));
 
   return 0;
+}
+
+function frequencyDisplayValue(data: ResultData, code: AB) {
+  const total = readFrequencyTotal(data, code);
+  if (total > 0) return Math.round(total);
+  return Math.round(readFrequencyRatio(data, code) * 100);
 }
 
 function percentFromScore(data: ResultData) {
@@ -502,12 +535,12 @@ function DashboardOuterCard({
 }) {
   return (
     <section
-      className="rounded-[20px] border border-white/10 p-4 shadow-[0_14px_42px_rgba(0,0,0,0.25)]"
+      className="flex h-full flex-col rounded-[20px] border border-white/10 p-4 shadow-[0_14px_42px_rgba(0,0,0,0.25)]"
       style={{ background: DARK_PANEL }}
     >
       <h3 className="text-[16px] font-bold text-white">{title}</h3>
       <p className="mt-2 max-w-[620px] text-[12px] leading-6 text-white/85">{description}</p>
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 flex-1">{children}</div>
     </section>
   );
 }
@@ -732,7 +765,7 @@ function RaisonScoreCard({ score }: { score: number }) {
 
 function OverviewDashboard({ data }: { data: ResultData }) {
   return (
-    <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+    <section className="grid items-stretch gap-5 xl:grid-cols-2">
       <DimensionScorePanel data={data} />
       <ProfileMapPanel data={data} />
     </section>
@@ -745,47 +778,81 @@ function DimensionScorePanel({ data }: { data: ResultData }) {
       title="Dimensions"
       description="The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about."
     >
-      <div className="rounded-[18px] bg-white px-8 py-8 text-[#102640]">
-        <div className="grid items-start gap-8 lg:grid-cols-[250px_1fr]">
-          <div>
-            <h3 className="text-[28px] font-black leading-tight text-[#102640]">Dimensions</h3>
-            <p className="mt-4 text-[14px] leading-7 text-[#5D6A82]">
-              The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access
-              more naturally; lower scores are patterns you may need to be more intentional about.
-            </p>
-          </div>
+      <WhitePanel className="h-full min-h-[330px] p-4 md:p-5">
+        <DimensionBarChart data={data} />
+      </WhitePanel>
+    </DashboardOuterCard>
+  );
+}
 
-          <div className="grid grid-cols-4 items-end gap-8">
-            {FREQUENCY_ORDER.map((code) => {
-              const ratio = readFrequencyRatio(data, code);
-              const percent = Math.round(ratio * 100);
-              const meta = FREQUENCY_META[code];
+function DimensionBarChart({ data }: { data: ResultData }) {
+  const items = FREQUENCY_ORDER.map((code) => ({
+    code,
+    value: frequencyDisplayValue(data, code),
+    ratio: readFrequencyRatio(data, code),
+    meta: FREQUENCY_META[code],
+  }));
+
+  const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
+
+  return (
+    <div className="rounded-[14px] border border-[#D7DEE8] bg-[#EEF2F6] p-4">
+      <div className="grid grid-cols-[28px_1fr] gap-3">
+        <div className="relative h-[244px]">
+          {ticks.map((tick) => {
+            const y = ((100 - tick) / 100) * 100;
+
+            return (
+              <span
+                key={tick}
+                className="absolute left-0 -translate-y-1/2 text-[10px] text-[#7C8AA3]"
+                style={{ top: `${y}%` }}
+              >
+                {tick}
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="relative h-[244px]">
+          {ticks.map((tick) => {
+            const y = ((100 - tick) / 100) * 100;
+            return (
+              <div
+                key={tick}
+                className="absolute left-0 right-0 border-t border-[#DCE3EC]"
+                style={{ top: `${y}%` }}
+              />
+            );
+          })}
+
+          <div className="grid h-full grid-cols-4 gap-2 md:gap-3">
+            {items.map((item) => {
+              const fillPct = Math.max(item.ratio * 100, 4);
 
               return (
-                <div key={code} className="flex flex-col items-center text-center">
-                  <p className="mb-3 text-[13px] font-black text-[#102640]">{percent}%</p>
+                <div key={item.code} className="flex h-full flex-col items-center justify-end">
+                  <p className="mb-3 text-[14px] font-bold text-[#445067]">{item.value}</p>
 
-                  <div className="flex h-[150px] w-[42px] items-end overflow-hidden rounded-full bg-[#EAF0F6]">
+                  <div className="flex h-[205px] w-full max-w-[86px] items-end overflow-hidden rounded-[6px] border border-[#D3DAE3] bg-[#F7F8FA]">
                     <div
-                      className="w-full rounded-full"
+                      className="w-full rounded-[4px]"
                       style={{
-                        height: `${Math.max(percent, 4)}%`,
-                        background: meta.chartColor,
+                        height: `${fillPct}%`,
+                        background: item.meta.chartColor,
                       }}
                     />
                   </div>
 
-                  <p className="mt-4 text-[15px] font-black text-[#102640]">{code}</p>
-                  <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#62708A]">
-                    {meta.label}
-                  </p>
+                  <p className="mt-3 text-[14px] font-black text-[#182640]">{item.code}</p>
+                  <p className="mt-1 text-center text-[11px] leading-4 text-[#5E6E88]">{item.meta.label}</p>
                 </div>
               );
             })}
           </div>
         </div>
       </div>
-    </DashboardOuterCard>
+    </div>
   );
 }
 
@@ -795,14 +862,14 @@ function ProfileMapPanel({ data }: { data: ResultData }) {
       title="Your Personality Map (Profile)"
       description="This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk)."
     >
-      <div className="rounded-[18px] bg-white px-8 py-7 text-[#102640]">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[14px] font-black text-[#18253D]">Your Personality Map (Profiles)</p>
+      <WhitePanel className="h-full min-h-[330px] p-4 md:p-5">
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <p className="text-[14px] font-black text-[#1D2B44]">Your Personality Map (Profiles)</p>
           <p className="text-[11px] text-[#7B879B]">Higher = stronger pattern</p>
         </div>
 
         <ProfileRadar data={data} />
-      </div>
+      </WhitePanel>
     </DashboardOuterCard>
   );
 }
@@ -817,11 +884,12 @@ function polygonPoints(cx: number, cy: number, radius: number, count: number) {
 }
 
 function ProfileRadar({ data }: { data: ResultData }) {
-  const size = 460;
-  const cx = size / 2;
-  const cy = size / 2;
-  const maxRadius = 155;
-  const rings = [0.17, 0.34, 0.51, 0.68, 0.85, 1];
+  const width = 470;
+  const height = 340;
+  const cx = width / 2;
+  const cy = height / 2 + 8;
+  const maxRadius = 138;
+  const rings = [1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1];
 
   const points = PROFILE_ORDER.map((code, index) => {
     const angle = -Math.PI / 2 + (index * Math.PI * 2) / PROFILE_ORDER.length;
@@ -835,55 +903,55 @@ function ProfileRadar({ data }: { data: ResultData }) {
       y: cy + Math.sin(angle) * radius,
       ax: cx + Math.cos(angle) * maxRadius,
       ay: cy + Math.sin(angle) * maxRadius,
-      lx: cx + Math.cos(angle) * (maxRadius + 32),
-      ly: cy + Math.sin(angle) * (maxRadius + 32),
-      tx: cx + Math.cos(angle) * (maxRadius + 14),
-      ty: cy + Math.sin(angle) * (maxRadius + 14),
+      lx: cx + Math.cos(angle) * (maxRadius + 28),
+      ly: cy + Math.sin(angle) * (maxRadius + 28),
+      px: cx + Math.cos(angle) * (maxRadius + 12),
+      py: cy + Math.sin(angle) * (maxRadius + 12),
     };
   });
 
   const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="mx-auto w-full max-w-[560px]">
-      <svg viewBox={`0 0 ${size} ${size}`} className="h-auto w-full">
+    <div className="flex h-[285px] items-center justify-center">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full max-w-[520px]">
         {rings.map((ring, idx) => (
           <polygon
             key={idx}
             points={polygonPoints(cx, cy, maxRadius * ring, PROFILE_ORDER.length)}
             fill="none"
-            stroke="#D7DCE5"
+            stroke="#CBD4E0"
             strokeWidth="1.2"
           />
         ))}
 
         {points.map((p) => (
-          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D7DCE5" strokeWidth="1.2" />
+          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D0D8E3" strokeWidth="1.1" />
         ))}
 
-        <polygon points={polygon} fill="rgba(36,214,220,0.18)" stroke="#16C7C6" strokeWidth="3" />
+        <polygon points={polygon} fill="rgba(29,197,197,0.14)" stroke="#14BFC0" strokeWidth="2.5" />
 
         {points.map((p) => (
           <g key={p.code}>
-            <circle cx={p.x} cy={p.y} r="5" fill="#16C7C6" />
+            <circle cx={p.x} cy={p.y} r="4.6" fill="#14BFC0" />
             <text
               x={p.lx}
               y={p.ly - 6}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="17"
-              fontWeight="800"
-              fill="#4B5565"
+              fontSize="11"
+              fontWeight="700"
+              fill="#4C5668"
             >
               {p.code}
             </text>
             <text
-              x={p.tx}
-              y={p.ty + 12}
+              x={p.px}
+              y={p.py + 10}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="12"
-              fill="#8A96A9"
+              fontSize="11"
+              fill="#7D899E"
             >
               {Math.round(p.ratio * 100)}%
             </text>
@@ -1148,32 +1216,36 @@ function renderListItem(item: unknown, ctx: RenderContext) {
   return safeText(item);
 }
 
+function blockValue(block: SectionBlock, key: string) {
+  return (block as Record<string, unknown>)[key];
+}
+
 function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext }) {
   const type = safeText(block.type).toLowerCase();
 
   if (type === "p" || type === "paragraph") {
-    const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
+    const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
     return <p className="mb-4 text-[13px] leading-7 text-[#313C52] last:mb-0">{text}</p>;
   }
 
   if (type === "h1" || type === "h2" || type === "heading") {
-    const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
+    const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
     return <h3 className="mb-4 mt-6 text-[24px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h3>;
   }
 
   if (type === "h3") {
-    const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
+    const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
     return <h4 className="mb-3 mt-5 text-[18px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h4>;
   }
 
   if (type === "h4") {
-    const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
+    const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
     if (!text) return null;
 
     return (
@@ -1184,7 +1256,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   }
 
   if (type === "ul" || type === "list" || type === "bullet_list") {
-    const items: unknown[] = Array.isArray((block as any).items) ? ((block as any).items as unknown[]) : [];
+    const items = Array.isArray(blockValue(block, "items")) ? (blockValue(block, "items") as unknown[]) : [];
     if (!items.length) return null;
 
     return (
@@ -1197,7 +1269,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   }
 
   if (type === "ol" || type === "numbered_list") {
-    const items: unknown[] = Array.isArray((block as any).items) ? ((block as any).items as unknown[]) : [];
+    const items = Array.isArray(blockValue(block, "items")) ? (blockValue(block, "items") as unknown[]) : [];
     if (!items.length) return null;
 
     return (
@@ -1210,8 +1282,8 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   }
 
   if (type === "quote") {
-    const text = replaceMacros((block as any).text, ctx);
-    const cite = replaceMacros((block as any).cite, ctx);
+    const text = replaceMacros(blockValue(block, "text"), ctx);
+    const cite = replaceMacros(blockValue(block, "cite"), ctx);
 
     if (!text) return null;
 
@@ -1228,21 +1300,26 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   }
 
   if (type === "image") {
-    const src = safeText((block as any).src);
+    const src = safeText(blockValue(block, "src"));
     if (!src) return null;
 
+    const maxHeight = blockValue(block, "max_h");
+    const maxHeightValue = typeof maxHeight === "number" ? `${maxHeight}px` : undefined;
+
     return (
-      <figure className={`my-6 max-w-full ${alignClass((block as any).align)}`}>
+      <figure className={`my-6 max-w-full ${alignClass(blockValue(block, "align") as "left" | "center" | "right")}`}>
         <img
           src={src}
-          alt={safeText((block as any).alt) || ""}
+          alt={safeText(blockValue(block, "alt")) || ""}
           crossOrigin="anonymous"
-          className={`h-auto max-w-full rounded-2xl object-contain ${alignClass((block as any).align)}`}
-          style={{ maxHeight: (block as any).max_h ? `${(block as any).max_h}px` : undefined }}
+          className={`h-auto max-w-full rounded-2xl object-contain ${alignClass(
+            blockValue(block, "align") as "left" | "center" | "right"
+          )}`}
+          style={{ maxHeight: maxHeightValue }}
         />
-        {(block as any).caption ? (
+        {blockValue(block, "caption") ? (
           <figcaption className="mt-2 text-center text-[11px] text-slate-500">
-            {replaceMacros((block as any).caption, ctx)}
+            {replaceMacros(blockValue(block, "caption"), ctx)}
           </figcaption>
         ) : null}
       </figure>
@@ -1250,7 +1327,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   }
 
   if (type === "html") {
-    const html = replaceMacros((block as any).html, ctx);
+    const html = replaceMacros(blockValue(block, "html"), ctx);
     if (!html) return null;
 
     return (
@@ -1262,8 +1339,8 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   }
 
   if (type === "callout") {
-    const title = replaceMacros((block as any).title, ctx);
-    const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
+    const title = replaceMacros(blockValue(block, "title"), ctx);
+    const text = replaceMacros(blockValue(block, "text") ?? blockValue(block, "content"), ctx);
 
     if (!title && !text) return null;
 
@@ -1275,11 +1352,12 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     );
   }
 
-  const fallbackTitle = replaceMacros((block as any).title, ctx);
-  const fallbackText = replaceMacros((block as any).text ?? (block as any).content ?? (block as any).description, ctx);
-  const fallbackItems: unknown[] = Array.isArray((block as any).items)
-    ? ((block as any).items as unknown[])
-    : [];
+  const fallbackTitle = replaceMacros(blockValue(block, "title"), ctx);
+  const fallbackText = replaceMacros(
+    blockValue(block, "text") ?? blockValue(block, "content") ?? blockValue(block, "description"),
+    ctx
+  );
+  const fallbackItems = Array.isArray(blockValue(block, "items")) ? (blockValue(block, "items") as unknown[]) : [];
 
   if (fallbackTitle || fallbackText || fallbackItems.length) {
     return (
@@ -1302,12 +1380,12 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 
 function FiveDimensionsVisual() {
   return (
-    <div className="mt-2">
-      <div className="mb-8 flex justify-center rounded-[18px] bg-white px-6 py-4">
+    <div className="mt-4">
+      <div className="mb-8 flex justify-center rounded-[18px] bg-[#F1F2F4] px-4 py-5 md:px-6">
         <img
           src={ASSETS.fiveDimensionsCompass}
           alt="The Five Dimensions of Leadership"
-          className="h-auto max-h-[380px] w-auto max-w-full object-contain"
+          className="h-auto w-full max-w-[760px] object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1322,7 +1400,7 @@ function FiveDimensionsVisual() {
           return (
             <div
               key={code}
-              className="rounded-[12px] border bg-white p-5"
+              className="rounded-[14px] border bg-white p-5"
               style={{ borderColor: meta.cardColor }}
             >
               <p className="text-[14px] font-black" style={{ color: meta.cardColor }}>
@@ -1331,12 +1409,12 @@ function FiveDimensionsVisual() {
               <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: meta.cardColor }}>
                 {meta.subtitle}
               </p>
-              <p className="mt-4 text-[13px] leading-6 text-[#313C52]">{meta.description}</p>
+              <p className="mt-4 text-[13px] leading-7 text-[#313C52]">{meta.description}</p>
             </div>
           );
         })}
 
-        <div className="rounded-[12px] border border-[#7C4BC6] bg-white p-5 md:col-span-2">
+        <div className="rounded-[14px] border border-[#8758D7] bg-white p-5 md:col-span-2">
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#54457F]">
             E. The Fifth Dimension · The Differentiator
           </p>
@@ -1344,7 +1422,7 @@ function FiveDimensionsVisual() {
           <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#54457F]">
             The Motivational Foundation
           </p>
-          <p className="mt-4 text-[13px] leading-6 text-[#313C52]">
+          <p className="mt-4 text-[13px] leading-7 text-[#313C52]">
             The underlying passions, drivers and direction that defines how leaders find fulfillment in their work and
             life.
           </p>
@@ -1358,12 +1436,12 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
   const topCode = normalizeProfileCode(data.top_profile_code);
 
   return (
-    <div className="mt-2">
-      <div className="mb-10 flex justify-center rounded-[18px] bg-white px-6 py-4">
+    <div className="mt-4">
+      <div className="mb-8 flex justify-center rounded-[18px] bg-[#F1F2F4] px-4 py-5 md:px-6">
         <img
           src={ASSETS.eightLeadershipProfilesMap}
           alt="The Eight Leadership Profiles"
-          className="h-auto max-h-[520px] w-auto max-w-full object-contain"
+          className="h-auto w-full max-w-[780px] object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1379,17 +1457,27 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
           return (
             <div
               key={code}
-              className={`relative overflow-hidden rounded-[14px] border bg-white pt-9 text-center shadow-[0_8px_18px_rgba(15,23,42,0.12)] ${
+              className={`relative overflow-hidden rounded-[16px] border bg-white shadow-[0_8px_18px_rgba(15,23,42,0.12)] ${
                 active ? "border-[#6E4AA2]" : "border-[#DDE3EC]"
               }`}
             >
-              <div className="absolute left-0 right-0 top-0 h-9" style={{ background: meta.color }} />
+              <div className="h-8" style={{ background: meta.headerColor }} />
 
-              <div className="relative mx-auto -mt-1 flex h-[74px] w-[74px] items-center justify-center rounded-full border-[6px] border-white bg-[#F5EFEA] shadow-[0_4px_10px_rgba(15,23,42,0.18)]">
-                <span className="text-[18px] font-black text-[#7A5A3D]">{code}</span>
+              <div className="relative flex justify-center">
+                <div
+                  className="absolute -top-7 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#F3EDE5] shadow-[0_4px_10px_rgba(15,23,42,0.16)]"
+                  style={{ border: `4px solid ${meta.ringColor}` }}
+                >
+                  <ImageWithFallback
+                    src={meta.icon}
+                    alt={meta.name}
+                    className="h-[34px] w-[34px] object-contain"
+                    fallback={<span className="text-[12px] font-black text-[#7A5A3D]">{code}</span>}
+                  />
+                </div>
               </div>
 
-              <div className="px-5 pb-6 pt-3">
+              <div className="px-4 pb-5 pt-12 text-center">
                 <p className="text-[13px] font-black text-[#102640]">{meta.name}</p>
                 <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#66758D]">
                   {meta.dimension}
@@ -1577,7 +1665,10 @@ export default function FiveDLeadershipReportClient(props: {
     raisonScore,
   };
 
-  const sections = useMemo(() => buildSections(data, ctx), [data, participant, topFreq, topCode, topName, raisonScore]);
+  const sections = useMemo(
+    () => buildSections(data, ctx),
+    [data, participant, topFreq, topCode, topName, raisonScore]
+  );
 
   async function handleDownloadPdf() {
     if (!reportRef.current) return;
