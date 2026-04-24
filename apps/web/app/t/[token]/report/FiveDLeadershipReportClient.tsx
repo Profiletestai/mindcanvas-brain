@@ -76,27 +76,135 @@ type ResultData = {
   version?: string;
 };
 
-const PROFILE_SHORT_NAMES: Record<string, string> = {
-  P1: "Disruptor",
-  P2: "Advocator",
-  P3: "Mediator",
-  P4: "Connector",
-  P5: "Planner",
-  P6: "Forecaster",
-  P7: "Analyzer",
-  P8: "Optimizer",
+const BG = "linear-gradient(180deg, rgba(27, 60, 99, 0.78) 0%, rgba(12, 32, 58, 0.84) 100%)";
+
+const DIMENSIONS: Record<
+  AB | "E",
+  {
+    title: string;
+    subtitle: string;
+    description: string;
+    color: string;
+    border: string;
+  }
+> = {
+  A: {
+    title: "A · Catalyst Dimension",
+    subtitle: "Rapid Response & Innovation",
+    description: "Action-oriented leaders who drive change and thrive in fast-moving environments.",
+    color: "#3AAB7A",
+    border: "#2E7D5E",
+  },
+  B: {
+    title: "B · Communicator Dimension",
+    subtitle: "Influence & Relationship-Driven Leadership",
+    description: "People-focused leaders who build strong teams and partnerships.",
+    color: "#B84040",
+    border: "#8B2A2A",
+  },
+  C: {
+    title: "C · Strategist Dimension",
+    subtitle: "Customer Service & Mission-Driven",
+    description:
+      "Structured leaders who ensure operational efficiency and reliability, balancing customer delight with operational effectiveness.",
+    color: "#C48A20",
+    border: "#8A6010",
+  },
+  D: {
+    title: "D · Stabilizer Dimension",
+    subtitle: "Target Focused & Systems Thinking",
+    description:
+      "Analytical leaders who focus on longer-term, detailed analysis, optimization and future-proofing businesses.",
+    color: "#4070B8",
+    border: "#2A4A7A",
+  },
+  E: {
+    title: "Raison d'être",
+    subtitle: "The Motivational Foundation",
+    description:
+      "The underlying passions, drivers and direction that defines how leaders find fulfillment in their work and life.",
+    color: "#63457E",
+    border: "#5A2A8A",
+  },
 };
 
-const PROFILE_DIMENSIONS: Record<string, string> = {
-  P1: "Catalyst",
-  P2: "Catalyst–Comm.",
-  P3: "Communicator",
-  P4: "Comm.–Strategist",
-  P5: "Strategist",
-  P6: "Strat.–Stabilizer",
-  P7: "Stabilizer",
-  P8: "Stab.–Disruptor",
-};
+const PROFILES: Array<{
+  code: string;
+  name: string;
+  dimension: string;
+  description: string;
+  color: string;
+  icon: string;
+}> = [
+  {
+    code: "P1",
+    name: "The Disruptor",
+    dimension: "Catalyst Dimension",
+    description:
+      "Visionary innovators who push boundaries and create industry-shifting change. Hard chargers that see the light at the end of the tunnel well before most others.",
+    color: "#457E58",
+    icon: "⚡",
+  },
+  {
+    code: "P2",
+    name: "The Advocator",
+    dimension: "Catalyst–Communicator Dimension",
+    description: "High-energy leaders who thrive on engagement, motivation, and generating broad interest and buy-in.",
+    color: "#457E58",
+    icon: "📣",
+  },
+  {
+    code: "P3",
+    name: "The Mediator",
+    dimension: "Communicator Dimension",
+    description: "Empathetic leaders who excel in team alignment, conflict resolution, and relationship-building.",
+    color: "#954444",
+    icon: "🤝",
+  },
+  {
+    code: "P4",
+    name: "The Connector",
+    dimension: "Communicator–Strategist Dimension",
+    description: "Strategic networkers who leverage partnerships to drive business success.",
+    color: "#954444",
+    icon: "🔗",
+  },
+  {
+    code: "P5",
+    name: "The Planner",
+    dimension: "Strategist Dimension",
+    description:
+      "Customer, market and mission-oriented leaders focused on service-driven planning and reliable logistics performance.",
+    color: "#CE8B0A",
+    icon: "🗂",
+  },
+  {
+    code: "P6",
+    name: "The Forecaster",
+    dimension: "Strategist–Stabilizer Dimension",
+    description: "Risk-averse, detail-oriented leaders with foresight to anticipate upcoming opportunities and challenges.",
+    color: "#CE8B0A",
+    icon: "🔭",
+  },
+  {
+    code: "P7",
+    name: "The Analyzer",
+    dimension: "Stabilizer Dimension",
+    description:
+      "Systems-oriented thinkers who leverage data-driven, systematic approaches to develop long-term business frameworks.",
+    color: "#B0C3CB",
+    icon: "📊",
+  },
+  {
+    code: "P8",
+    name: "The Optimizer",
+    dimension: "Stabilizer–Disruptor Dimension",
+    description:
+      "Precision-driven leaders who refine processes, integrate technology, implement automation, and find ways to make things better.",
+    color: "#B0C3CB",
+    icon: "⚙",
+  },
+];
 
 function safeText(x: any): string {
   if (typeof x === "string") return x;
@@ -167,14 +275,61 @@ function getSectionDomId(section: ReportSection, idx: number) {
   return `section-${idx + 1}`;
 }
 
-function stripProfileCode(name: string) {
-  return name.replace(/\s*\(P[1-8]\)\s*$/i, "").replace(/^P[1-8]:\s*/i, "").trim();
+function getProfileNameFromLive(data: ResultData, code: string) {
+  const normalized = normalizeProfileCode(code);
+  const live = data.profile_labels.find((p) => normalizeProfileCode(p.code) === normalized)?.name;
+  const fallback = PROFILES.find((p) => p.code === normalized)?.name;
+  return (live || fallback || normalized).replace(/^P[1-8]:\s*/i, "").trim();
 }
 
-function getProfileShortName(code: string, name?: string) {
-  const normalized = normalizeProfileCode(code);
-  const cleaned = stripProfileCode(name || "");
-  return cleaned || PROFILE_SHORT_NAMES[normalized] || normalized;
+function getTopProfile(data: ResultData) {
+  const code = normalizeProfileCode(data.top_profile_code);
+  const profile = PROFILES.find((p) => p.code === code);
+  return {
+    code,
+    name: getProfileNameFromLive(data, code),
+    dimension: profile?.dimension || "",
+    description: profile?.description || "",
+    color: profile?.color || "#0C203A",
+    icon: profile?.icon || "●",
+  };
+}
+
+function SectionShell({
+  id,
+  title,
+  icon,
+  children,
+}: {
+  id?: string;
+  title: string;
+  icon: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className="relative rounded-[24px] border border-white/10 p-[21px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      style={{ background: BG }}
+    >
+      <div className="mb-7 flex items-center gap-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-blue-400/20 bg-blue-400/10 text-lg">
+          {icon}
+        </div>
+        <h2 className="text-[15px] font-semibold leading-[22.5px] text-white">{title}</h2>
+      </div>
+
+      {children}
+    </section>
+  );
+}
+
+function WhitePanel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-[18px] border border-white/10 bg-white text-[#313C52] ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 function BlockRenderer({ block }: { block: SectionBlock }) {
@@ -212,7 +367,7 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   if (type === "ul") {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
-      <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-slate-700">
+      <ul className="list-disc space-y-1 pl-5 text-[13px] leading-7 text-[#313C52]">
         {items.map((item: any, idx: number) => (
           <li key={idx}>{safeText(item)}</li>
         ))}
@@ -223,7 +378,7 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   if (type === "ol") {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
-      <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-relaxed text-slate-700">
+      <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-7 text-[#313C52]">
         {items.map((item: any, idx: number) => (
           <li key={idx}>{safeText(item)}</li>
         ))}
@@ -234,142 +389,265 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   if (type === "quote") {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-[13px] italic leading-relaxed text-slate-700">“{safeText((block as any).text)}”</p>
+        <p className="text-[13px] italic leading-7 text-[#313C52]">“{safeText((block as any).text)}”</p>
         {(block as any).cite ? <p className="mt-2 text-[11px] font-semibold text-slate-500">— {safeText((block as any).cite)}</p> : null}
       </div>
     );
   }
 
-  return <p className="whitespace-pre-line text-[13px] leading-relaxed text-slate-700">{safeText((block as any).text)}</p>;
+  return <p className="whitespace-pre-line text-[13px] leading-7 text-[#313C52]">{safeText((block as any).text)}</p>;
 }
 
-function MiniProfileGrid({ data }: { data: ResultData }) {
-  const topCode = normalizeProfileCode(data.top_profile_code);
+function WelcomeSection({ participant }: { participant: string }) {
+  return (
+    <SectionShell title="Welcome to the 5D Leadership Compass" icon="✉">
+      <WhitePanel className="p-5">
+        <div className="text-[13px] leading-7 text-[#313C52]">
+          <p>Dear {participant},</p>
+          <p className="mt-3">
+            Welcome to the 5D Leadership Compass, a framework designed to help you unlock your leadership potential by
+            understanding your natural strengths, decision-making style, and how you best contribute to your team,
+            industry, and life.
+          </p>
+          <p className="mt-3">
+            In today&apos;s complex world of logistics, supply chain, and operations, leadership success goes beyond
+            experience or technical skill. It is about knowing how you lead, collaborate, and make an impact.
+          </p>
+          <p className="mt-3">
+            This guide will introduce the <strong>Five Dimensions of Leadership</strong> and the{" "}
+            <strong>Eight Leadership Profiles</strong>, giving you deeper insight into your leadership style and how to
+            thrive in any environment.
+          </p>
+          <p className="mt-3">
+            Explore your profile with an open mind. The more you understand how you lead, the more impactful you will
+            become.
+          </p>
+
+          <div className="mt-8 flex items-center gap-4">
+            <div className="flex h-[63px] w-[63px] items-center justify-center rounded-full bg-slate-100 text-2xl">
+              BG
+            </div>
+            <div>
+              <p>Warm regards</p>
+              <p className="font-bold">Brett Gordon</p>
+              <p>Founder, Businesses Are People Too</p>
+              <p>Creator of The 5D Leadership Compass</p>
+            </div>
+          </div>
+        </div>
+      </WhitePanel>
+    </SectionShell>
+  );
+}
+
+function IntroSection() {
+  return (
+    <SectionShell title="Introduction to the 5D Leadership Compass" icon="🧭">
+      <WhitePanel className="p-5">
+        <p className="text-[13px] leading-7 text-[#313C52]">
+          The 5D Leadership Compass is a dynamic framework that categorizes leadership into five core dimensions, with
+          four core dimensions representing a distinct approach to leadership and problem-solving. There is also the
+          powerful fifth overarching dimension, your internal compass, reflecting your reason for being, your whys and
+          meanings guiding your paths in leadership and life.
+        </p>
+      </WhitePanel>
+    </SectionShell>
+  );
+}
+
+function DimensionsSection({ data, raisonScore }: { data: ResultData; raisonScore: number }) {
+  const rows = (["A", "B", "C", "D"] as AB[]).map((code) => {
+    const label = data.frequency_labels.find((f) => f.code === code)?.name || DIMENSIONS[code].title;
+    const pct = percentWhole(data.frequency_percentages?.[code]);
+    return { code, label, pct, ...DIMENSIONS[code] };
+  });
 
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {data.profile_labels.slice(0, 8).map((p, i) => {
-        const code = normalizeProfileCode(p.code || `P${i + 1}`);
-        const active = code === topCode;
-
-        return (
-          <div
-            key={code}
-            className={`rounded-xl border px-3 py-2 ${
-              active ? "border-white bg-white text-[#06233f]" : "border-white/10 bg-white/5 text-white"
-            }`}
-          >
-            <div className={`text-[10px] font-black uppercase tracking-wide ${active ? "text-slate-500" : "text-white/45"}`}>
-              {code}
+    <SectionShell title="The Five Dimensions of Leadership" icon="🧭">
+      <WhitePanel className="p-6">
+        <div className="mx-auto flex h-[420px] max-w-[640px] items-center justify-center rounded-full bg-slate-50">
+          <div className="grid h-[360px] w-[360px] place-items-center rounded-full border-[28px] border-[#E7ECF3] bg-white text-center shadow-inner">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Your Compass</div>
+              <div className="mt-2 text-5xl font-black text-[#0C203A]">{data.top_freq}</div>
+              <div className="mt-2 text-sm font-bold text-[#313C52]">
+                {data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq}
+              </div>
+              <div className="mt-3 text-2xl font-black text-[#63457E]">{raisonScore}%</div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Raison d’être</div>
             </div>
-            <div className="mt-1 truncate text-xs font-black">{getProfileShortName(code, p.name)}</div>
           </div>
-        );
-      })}
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {rows.map((d) => (
+            <div
+              key={d.code}
+              className="rounded-[14px] border bg-white p-5"
+              style={{
+                borderColor: d.border,
+                borderTopWidth: 3,
+              }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold leading-6" style={{ color: d.color }}>
+                    {d.title}
+                  </h3>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-[1px]" style={{ color: d.border }}>
+                    {d.subtitle}
+                  </p>
+                </div>
+                <div className="text-xl font-black" style={{ color: d.color }}>
+                  {d.pct}%
+                </div>
+              </div>
+
+              <div className="mt-4 h-2.5 rounded-full bg-slate-100">
+                <div className="h-2.5 rounded-full" style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
+              </div>
+
+              <p className="mt-4 text-[13px] leading-[20.8px] text-[#313C52]">{d.description}</p>
+            </div>
+          ))}
+
+          <div
+            className="rounded-[14px] border bg-white p-6 md:col-span-2"
+            style={{ borderColor: DIMENSIONS.E.border, borderTopWidth: 3 }}
+          >
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[2.5px] text-[#313C52]">
+              E. The Fifth Dimension · The Differentiator
+            </p>
+            <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold leading-8 text-[#63457E]">Raison d&apos;être</h3>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[1.5px] text-[#313C52]">
+                  The Motivational Foundation
+                </p>
+              </div>
+              <div className="text-5xl font-black text-[#63457E]">{raisonScore}%</div>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#313C52]">{DIMENSIONS.E.description}</p>
+          </div>
+        </div>
+      </WhitePanel>
+    </SectionShell>
+  );
+}
+
+function ProfileCard({ profile, active }: { profile: (typeof PROFILES)[number]; active: boolean }) {
+  return (
+    <div className={`relative rounded-[18px] ${active ? "ring-4 ring-[#63457E]" : ""}`}>
+      <div className="h-[105px] rounded-t-[18px]" style={{ backgroundColor: profile.color }} />
+      <div className="min-h-[227px] bg-white px-4 pb-5 pt-[70px] text-center shadow-md">
+        <div className="absolute left-1/2 top-[18px] flex h-[91px] w-[89px] -translate-x-1/2 items-center justify-center bg-[#FAF1EA] text-4xl shadow-md">
+          {profile.icon}
+        </div>
+        <h3 className="text-xs font-semibold leading-[19.2px] text-[#111828]">{profile.name}</h3>
+        <p className="mt-2 text-[10px] font-normal uppercase leading-4 tracking-[1px] text-[#313C52]">
+          {profile.dimension}
+        </p>
+        <p className="mt-4 text-[11px] leading-[16.5px] text-[#313C52]">{profile.description}</p>
+      </div>
     </div>
   );
 }
 
-function DimensionsChart({ data }: { data: ResultData }) {
-  const rows = data.frequency_labels.map((f) => ({
-    ...f,
-    pct: percentWhole(data.frequency_percentages?.[f.code]),
+function ProfilesSection({ data }: { data: ResultData }) {
+  const topCode = normalizeProfileCode(data.top_profile_code);
+
+  return (
+    <SectionShell title="The Eight Leadership Profiles" icon="👥">
+      <WhitePanel className="p-6">
+        <div className="mx-auto flex h-[360px] max-w-[720px] items-center justify-center rounded-full bg-slate-50">
+          <div className="grid h-[300px] w-[300px] place-items-center rounded-full border-[24px] border-slate-200 bg-white text-center shadow-inner">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Top Profile</div>
+              <div className="mt-2 text-5xl font-black text-[#0C203A]">{topCode}</div>
+              <div className="mt-2 text-sm font-bold text-[#313C52]">{getProfileNameFromLive(data, topCode)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {PROFILES.map((profile) => (
+            <ProfileCard key={profile.code} profile={profile} active={profile.code === topCode} />
+          ))}
+        </div>
+      </WhitePanel>
+    </SectionShell>
+  );
+}
+
+function ResultsSection({ data, raisonScore }: { data: ResultData; raisonScore: number }) {
+  const top = getTopProfile(data);
+
+  const profileRows = PROFILES.map((p) => ({
+    ...p,
+    pct: percentWhole(readProfilePercent(data, p.code)),
   }));
 
   return (
-    <div className="rounded-[18px] bg-white p-4 text-slate-900">
-      <h2 className="text-lg font-black text-[#06233f]">Dimensions</h2>
-      <p className="mt-1 text-[11px] leading-snug text-slate-500">
-        The four drivers show the behavioural energy you use most often.
-      </p>
+    <SectionShell title="Your Leadership Results" icon="📌">
+      <WhitePanel className="p-6">
+        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+          <div className="rounded-[18px] bg-[#0C203A] p-6 text-white">
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">Your Profile</p>
+            <h3 className="mt-3 text-3xl font-black">{top.name}</h3>
+            <p className="mt-1 text-sm font-semibold text-white/75">
+              {top.code} · {top.dimension}
+            </p>
 
-      <div className="mt-4 space-y-3">
-        {rows.map((row) => (
-          <div key={row.code}>
-            <div className="flex items-center justify-between gap-3 text-[12px]">
-              <span className="font-black">
-                {row.name} <span className="text-slate-400">({row.code})</span>
-              </span>
-              <span className="font-black text-[#06233f]">{row.pct}%</span>
-            </div>
-            <div className="mt-1.5 h-2.5 rounded-full bg-slate-100">
-              <div className="h-2.5 rounded-full bg-[#06233f]" style={{ width: `${row.pct}%` }} />
+            <div className="mt-6 rounded-[14px] bg-[#63457E] p-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/70">Raison d’être</p>
+              <p className="mt-2 text-5xl font-black">{raisonScore}%</p>
             </div>
           </div>
-        ))}
-      </div>
-    </div>
+
+          <div className="space-y-4">
+            {profileRows.map((p) => {
+              const active = p.code === top.code;
+              return (
+                <div key={p.code}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className={`font-bold ${active ? "text-[#63457E]" : "text-[#313C52]"}`}>
+                      {p.code} · {p.name}
+                    </span>
+                    <span className="font-black text-[#313C52]">{p.pct}%</span>
+                  </div>
+                  <div className="mt-1.5 h-2.5 rounded-full bg-slate-100">
+                    <div
+                      className="h-2.5 rounded-full"
+                      style={{
+                        width: `${p.pct}%`,
+                        backgroundColor: active ? "#63457E" : "#0C203A",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </WhitePanel>
+    </SectionShell>
   );
 }
 
-function PersonalityMap({ data }: { data: ResultData }) {
-  const rows = [...data.profile_labels]
-    .map((p) => ({
-      ...p,
-      code: normalizeProfileCode(p.code),
-      pct: percentWhole(readProfilePercent(data, p.code)),
-    }))
-    .sort((a, b) => Number(a.code.replace(/\D/g, "")) - Number(b.code.replace(/\D/g, "")));
-
-  const topCode = normalizeProfileCode(data.top_profile_code);
+function DynamicContentSection({ section, idx }: { section: ReportSection; idx: number }) {
+  const id = getSectionDomId(section, idx);
+  const title = safeText(section.title);
 
   return (
-    <div className="rounded-[18px] bg-white p-4 text-slate-900">
-      <h2 className="text-lg font-black text-[#06233f]">Your Personality Map</h2>
-      <p className="mt-1 text-[11px] leading-snug text-slate-500">
-        Your overall pattern across profiles.
-      </p>
-
-      <div className="mt-4 grid grid-cols-4 gap-2">
-        {rows.map((p) => {
-          const active = p.code === topCode;
-
-          return (
-            <div
-              key={p.code}
-              className={`rounded-xl border p-2 ${
-                active ? "border-[#06233f] bg-[#06233f] text-white" : "border-slate-200 bg-slate-50 text-slate-900"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`text-[10px] font-black ${active ? "text-white/70" : "text-slate-500"}`}>{p.code}</span>
-                <span className="text-xs font-black">{p.pct}%</span>
-              </div>
-              <div className={`mt-1.5 h-1.5 rounded-full ${active ? "bg-white/20" : "bg-slate-200"}`}>
-                <div className={`h-1.5 rounded-full ${active ? "bg-white" : "bg-[#06233f]"}`} style={{ width: `${p.pct}%` }} />
-              </div>
-              <div className="mt-2 truncate text-[10px] font-black">{getProfileShortName(p.code, p.name)}</div>
-              <div className={`mt-0.5 truncate text-[9px] font-semibold ${active ? "text-white/65" : "text-slate-500"}`}>
-                {PROFILE_DIMENSIONS[p.code]}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ReportIndex({ items }: { items: Array<{ id: string; title: string }> }) {
-  return (
-    <aside className="rounded-[18px] bg-[#0c2b49] p-4 text-white">
-      <h2 className="text-base font-black">Report Index</h2>
-      <div className="mt-3 space-y-1.5">
-        {items.length ? (
-          items.slice(0, 20).map((item, idx) => (
-            <button
-              key={item.id}
-              onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth" })}
-              className="block w-full rounded-lg px-2 py-1.5 text-left text-[11px] leading-tight text-white/85 hover:bg-white/10"
-            >
-              <span className="font-black text-white">{idx + 1}.</span> {item.title}
-            </button>
-          ))
-        ) : (
-          <p className="text-[11px] leading-snug text-white/65">Report sections will appear once content is returned.</p>
-        )}
-      </div>
-    </aside>
+    <SectionShell id={id} title={title || `Report Section ${idx + 1}`} icon="📄">
+      <WhitePanel className="p-6">
+        <div className="space-y-4">
+          {(section.blocks || []).map((block, blockIdx) => (
+            <BlockRenderer key={blockIdx} block={block} />
+          ))}
+        </div>
+      </WhitePanel>
+    </SectionShell>
   );
 }
 
@@ -383,15 +661,6 @@ export default function FiveDLeadershipReportClient(props: {
   const reportRef = useRef<HTMLDivElement | null>(null);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
-  const reportDate = new Date().toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
-  const topCode = normalizeProfileCode(data.top_profile_code);
-  const topProfile = getProfileShortName(topCode, data.top_profile_name);
-  const topFreqName = data.frequency_labels.find((f) => f.code === data.top_freq)?.name || data.top_freq;
   const raisonScore = percentFromScore(data);
 
   const sections = useMemo(() => {
@@ -407,17 +676,6 @@ export default function FiveDLeadershipReportClient(props: {
       return true;
     });
   }, [data.sections]);
-
-  const indexItems = useMemo(
-    () =>
-      sections
-        .filter((s) => safeText(s.title).trim())
-        .map((s, idx) => ({
-          id: getSectionDomId(s, idx),
-          title: safeText(s.title),
-        })),
-    [sections]
-  );
 
   async function handleDownloadPdf() {
     if (!reportRef.current) return;
@@ -459,168 +717,34 @@ export default function FiveDLeadershipReportClient(props: {
     }
   }
 
-  function openNextSteps() {
-    const url = safeText(data.link?.next_steps_url).trim();
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    const el = document.getElementById("next-steps");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   return (
-    <div ref={reportRef} className="min-h-screen bg-[#061d34] text-white">
-      <div className="pointer-events-none fixed inset-0 opacity-25">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:46px_46px]" />
-      </div>
+    <div className="min-h-screen bg-[#061d34] py-8 text-white">
+      <div ref={reportRef} className="mx-auto flex max-w-[1139px] flex-col gap-6 px-4">
+        <div className="rounded-[24px] border border-white/10 p-8 shadow-[0_14px_42px_rgba(0,0,0,0.32)]" style={{ background: BG }}>
+          <p className="text-xs font-black uppercase tracking-[0.35em] text-white/70">Personalised Report</p>
+          <h1 className="mt-4 text-5xl font-black leading-none tracking-tight">5D Leadership Compass</h1>
+          <p className="mt-2 text-sm font-black uppercase tracking-[0.25em] text-white/70">Powered by Profiletest.ai</p>
 
-      <div className="relative mx-auto max-w-[1180px] px-4 py-8">
-        {/* Designer-style hero */}
-        <header className="rounded-[28px] border border-white/10 bg-[#0b2a49] p-6 shadow-2xl">
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.34em] text-white/70">Personalised Report</p>
-              <h1 className="mt-4 text-5xl font-black leading-none tracking-tight md:text-6xl">
-                5D Leadership Compass
-              </h1>
-              <p className="mt-3 text-sm font-black uppercase tracking-[0.28em] text-white/70">
-                powered by profiletest.ai
-              </p>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">Prepared for</p>
-                  <p className="mt-1 text-xl font-black">{participant}</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/55">Date</p>
-                  <p className="mt-1 text-xl font-black">{reportDate}</p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-3">
-                <button onClick={handleDownloadPdf} className="rounded-xl bg-white px-4 py-2 text-sm font-black text-[#061d34]">
-                  Download PDF
-                </button>
-                <button onClick={openNextSteps} className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white">
-                  Next steps
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-[24px] bg-white p-5 text-[#061d34]">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Framework</p>
-              <h2 className="mt-2 text-2xl font-black leading-tight">The 5D Leadership Compass</h2>
-
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">You</p>
-                <p className="mt-2 text-2xl font-black">{topProfile} ({topCode})</p>
-                <p className="mt-1 text-sm font-bold text-slate-600">{topFreqName} · {data.top_freq}</p>
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-[#061d34] p-4 text-white">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/60">Raison d’être</p>
-                <p className="mt-2 text-5xl font-black">{raisonScore}%</p>
-              </div>
-            </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button onClick={handleDownloadPdf} className="rounded-xl bg-white px-4 py-2 text-sm font-black text-[#061d34]">
+              Download PDF
+            </button>
           </div>
-        </header>
+        </div>
 
-        {/* Designer-style profile intro composition */}
-        <section className="mt-5 rounded-[28px] border border-white/10 bg-[#0b2a49] p-5">
-          <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
-            <div className="space-y-4">
-              <MiniProfileGrid data={data} />
+        <WelcomeSection participant={participant} />
+        <IntroSection />
+        <DimensionsSection data={data} raisonScore={raisonScore} />
+        <ProfilesSection data={data} />
+        <ResultsSection data={data} raisonScore={raisonScore} />
 
-              <div className="rounded-[20px] border border-white/10 bg-white/5 p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.26em] text-white/45">
-                  You · The 5D Leadership Compass
-                </p>
-                <h2 className="mt-3 text-3xl font-black">{topProfile}</h2>
-                <p className="mt-1 text-sm font-black text-cyan-100">
-                  {topCode} · {PROFILE_DIMENSIONS[topCode]}
-                </p>
-                <p className="mt-4 max-w-3xl text-sm leading-relaxed text-white/75">
-                  Your strongest leadership pattern sits in the {topFreqName}. This report explains how your profile shows up in your leadership style, strengths, development areas and practical next steps.
-                </p>
-              </div>
-            </div>
+        {sections.map((section, idx) => (
+          <DynamicContentSection key={getSectionDomId(section, idx)} section={section} idx={idx} />
+        ))}
 
-            <div className="rounded-[22px] bg-white p-5 text-[#061d34]">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">Raison d’être</p>
-              <p className="mt-4 text-6xl font-black">{raisonScore}%</p>
-              <p className="mt-3 text-xs leading-relaxed text-slate-600">
-                The deeper purpose score that sits alongside your leadership profile and frequency pattern.
-              </p>
-              <div className="mt-5 h-2.5 rounded-full bg-slate-100">
-                <div className="h-2.5 rounded-full bg-[#061d34]" style={{ width: `${raisonScore}%` }} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Main report composition */}
-        <section className="mt-5 grid gap-4 lg:grid-cols-[280px_1fr]">
-          <ReportIndex items={indexItems} />
-
-          <main className="space-y-4">
-            <div className="grid gap-4 xl:grid-cols-2">
-              <DimensionsChart data={data} />
-              <PersonalityMap data={data} />
-            </div>
-
-            {sections.map((section, idx) => {
-              const id = getSectionDomId(section, idx);
-              const title = safeText(section.title);
-
-              return (
-                <section key={id} id={id} className="rounded-[18px] bg-white p-6 text-slate-900">
-                  {title ? <h2 className="mb-4 text-2xl font-black text-[#061d34]">{title}</h2> : null}
-                  <div className="space-y-3">
-                    {(section.blocks || []).map((block, blockIdx) => (
-                      <BlockRenderer key={blockIdx} block={block} />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-
-            <section id="next-steps" className="rounded-[18px] bg-white p-6 text-slate-900">
-              <h2 className="text-2xl font-black text-[#061d34]">Your Next Steps</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="font-black">Download Your Report</h3>
-                  <p className="mt-2 text-sm text-slate-600">Save a PDF copy of your 5D Leadership Compass report.</p>
-                  <button onClick={handleDownloadPdf} className="mt-4 rounded-xl bg-[#061d34] px-4 py-2 text-sm font-black text-white">
-                    Download PDF
-                  </button>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="font-black">Discuss with Your Advisor</h3>
-                  <p className="mt-2 text-sm text-slate-600">Translate your insights into practical next actions.</p>
-                  <button onClick={openNextSteps} className="mt-4 rounded-xl bg-[#061d34] px-4 py-2 text-sm font-black text-white">
-                    Explore Now
-                  </button>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="font-black">Visit Businesses Are People Too</h3>
-                  <p className="mt-2 text-sm text-slate-600">Continue your leadership development journey.</p>
-                  <button onClick={openNextSteps} className="mt-4 rounded-xl bg-[#061d34] px-4 py-2 text-sm font-black text-white">
-                    Visit Now
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <footer className="pb-8 pt-2 text-center text-xs text-white/55">
-              The 5D Leadership Compass · Businesses Are People Too · Powered by Profiletest.ai
-            </footer>
-          </main>
-        </section>
+        <footer className="pb-8 text-center text-xs text-white/60">
+          The 5D Leadership Compass · Businesses Are People Too · Powered by Profiletest.ai
+        </footer>
       </div>
     </div>
   );
