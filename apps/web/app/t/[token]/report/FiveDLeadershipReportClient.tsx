@@ -113,6 +113,11 @@ type SkillPathwayCard = {
   description: string;
 };
 
+type SplitContentItem = {
+  title: string;
+  description: string;
+};
+
 const ASSET_BASE = "/images/5d-leadership-compass";
 const SECTION_ICON_BASE = `${ASSET_BASE}/section-icons`;
 
@@ -1389,6 +1394,34 @@ function getPlainTextBlocks(blocks: SectionBlock[], ctx: RenderContext) {
   return out;
 }
 
+function splitTitleDescription(text: string): SplitContentItem {
+  const cleaned = text.trim();
+
+  const separators = [" – ", " — ", " - ", "–", "—"];
+  for (const sep of separators) {
+    const idx = cleaned.indexOf(sep);
+    if (idx > 0) {
+      return {
+        title: cleaned.slice(0, idx).trim(),
+        description: cleaned.slice(idx + sep.length).trim(),
+      };
+    }
+  }
+
+  const colonIdx = cleaned.indexOf(":");
+  if (colonIdx > 0 && colonIdx < 80) {
+    return {
+      title: cleaned.slice(0, colonIdx).trim(),
+      description: cleaned.slice(colonIdx + 1).trim(),
+    };
+  }
+
+  return {
+    title: cleaned,
+    description: "",
+  };
+}
+
 function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext }) {
   const type = safeText(block.type).toLowerCase();
 
@@ -2045,6 +2078,201 @@ function EnhancingDevelopmentCards({ blocks, ctx }: { blocks: SectionBlock[]; ct
   );
 }
 
+function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const texts = getPlainTextBlocks(blocks, ctx);
+
+  const strengthHeadingIdx = texts.findIndex((text) => text.toLowerCase().includes("key strengths"));
+  const challengeHeadingIdx = texts.findIndex(
+    (text) =>
+      text.toLowerCase().includes("challenge") ||
+      text.toLowerCase().includes("development areas")
+  );
+
+  let strengthTexts: string[] = [];
+  let challengeTexts: string[] = [];
+
+  if (strengthHeadingIdx >= 0 && challengeHeadingIdx > strengthHeadingIdx) {
+    strengthTexts = texts.slice(strengthHeadingIdx + 1, challengeHeadingIdx).filter(Boolean);
+    challengeTexts = texts.slice(challengeHeadingIdx + 1).filter(Boolean);
+  } else if (challengeHeadingIdx >= 0) {
+    strengthTexts = texts.slice(0, challengeHeadingIdx).filter((text) => !text.toLowerCase().includes("key strengths"));
+    challengeTexts = texts.slice(challengeHeadingIdx + 1).filter(Boolean);
+  } else {
+    const midpoint = Math.ceil(texts.length / 2);
+    strengthTexts = texts.slice(0, midpoint);
+    challengeTexts = texts.slice(midpoint);
+  }
+
+  const strengths = strengthTexts.map(splitTitleDescription).filter((item) => item.title);
+  const challenges = challengeTexts.map(splitTitleDescription).filter((item) => item.title);
+
+  return (
+    <div className="rounded-[18px] border border-white/10 bg-[#12365B]/75 p-5">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div>
+          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white">
+            Key Strengths
+          </p>
+
+          <div className="space-y-2">
+            {strengths.map((item, idx) => (
+              <div
+                key={`${item.title}-${idx}`}
+                className="rounded-[8px] border-l-4 border-[#2ECC71] bg-white px-4 py-3 shadow-sm"
+              >
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#2ECC71]">
+                  Strength
+                </p>
+                <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
+                {item.description ? (
+                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white">
+            Challenges & Development Areas
+          </p>
+
+          <div className="space-y-2">
+            {challenges.map((item, idx) => (
+              <div
+                key={`${item.title}-${idx}`}
+                className="rounded-[8px] border-l-4 border-[#EF4444] bg-white px-4 py-3 shadow-sm"
+              >
+                <p
+                  className="text-[8px] font-black uppercase tracking-[0.16em]"
+                  style={{ color: idx <= 1 ? "#EF4444" : "#D8941E" }}
+                >
+                  Challenge
+                </p>
+                <p className="mt-1 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
+                {item.description ? (
+                  <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HowLeadsInLogisticsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const texts = getPlainTextBlocks(blocks, ctx);
+
+  const primaryIdx = texts.findIndex((text) => text.toLowerCase().includes("primary leadership"));
+  const strategiesIdx = texts.findIndex((text) => text.toLowerCase().includes("best leadership strategies"));
+  const pitfallsIdx = texts.findIndex((text) => text.toLowerCase().includes("common leadership pitfalls"));
+
+  const primaryTexts =
+    primaryIdx >= 0 && strategiesIdx > primaryIdx
+      ? texts.slice(primaryIdx + 1, strategiesIdx).filter(Boolean)
+      : strategiesIdx > 0
+      ? texts.slice(0, strategiesIdx).filter((text) => !text.toLowerCase().includes("primary leadership"))
+      : [];
+
+  const strategyTexts =
+    strategiesIdx >= 0 && pitfallsIdx > strategiesIdx
+      ? texts.slice(strategiesIdx + 1, pitfallsIdx).filter(Boolean)
+      : strategiesIdx >= 0
+      ? texts.slice(strategiesIdx + 1).filter(Boolean)
+      : [];
+
+  const pitfallTexts =
+    pitfallsIdx >= 0
+      ? texts.slice(pitfallsIdx + 1).filter(Boolean)
+      : [];
+
+  const strategies = strategyTexts.map(splitTitleDescription).filter((item) => item.title);
+  const pitfalls = pitfallTexts.map(splitTitleDescription).filter((item) => item.title);
+
+  return (
+    <div className="rounded-[14px] bg-white p-6 text-[#313C52]">
+      <div>
+        <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+          Primary Leadership Style
+        </p>
+
+        {primaryTexts.length ? (
+          <ul className="ml-4 list-disc space-y-2 text-[11px] leading-5 text-[#313C52]">
+            {primaryTexts.map((text, idx) => (
+              <li key={idx}>{text}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      <div className="mt-8 grid gap-7 lg:grid-cols-[1fr_1fr]">
+        <div>
+          <p className="mb-5 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            Best Leadership Strategies
+          </p>
+
+          <div className="relative space-y-4">
+            {strategies.map((item, idx) => (
+              <div key={`${item.title}-${idx}`} className="relative grid grid-cols-[34px_1fr] gap-4">
+                {idx < strategies.length - 1 ? (
+                  <div className="absolute left-[16px] top-8 h-[calc(100%+16px)] w-px bg-[#AAB7C8]" />
+                ) : null}
+
+                <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[#102640] bg-white text-[12px] font-bold text-[#102640]">
+                  {idx + 1}
+                </div>
+
+                <div>
+                  <p className="text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
+                  {item.description ? (
+                    <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-5 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            Common Leadership Pitfalls
+          </p>
+
+          <div className="space-y-2">
+            {pitfalls.map((item, idx) => {
+              const highImpact = idx <= 1;
+              const color = highImpact ? "#EF4444" : "#F59E0B";
+
+              return (
+                <div
+                  key={`${item.title}-${idx}`}
+                  className="rounded-[8px] bg-[#ECECEC] px-4 py-3"
+                  style={{ borderLeft: `3px solid ${color}` }}
+                >
+                  <p
+                    className="text-[8px] font-black uppercase tracking-[0.16em]"
+                    style={{ color }}
+                  >
+                    Pitfall · {highImpact ? "High Impact" : "Medium Impact"}
+                  </p>
+
+                  <p className="mt-2 text-[12px] font-black leading-5 text-[#102640]">{item.title}</p>
+
+                  {item.description ? (
+                    <p className="mt-1 text-[10px] leading-4 text-[#313C52]">{item.description}</p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function shouldSuppressBlockInSection(block: SectionBlock, sectionTitle: string) {
   const title = sectionTitle.toLowerCase();
   const type = safeText(block.type).toLowerCase();
@@ -2071,6 +2299,8 @@ function ContentSection({
   const showProfileIntroBadge = title.includes("introduction to the") && title.includes("profile");
   const showCaseStudyCards = title.includes("case studies") || title.includes("industry examples");
   const showEnhancingDevelopment = title.includes("enhancing") || title.includes("development");
+  const showCoreCharacteristics = title.includes("core characteristics");
+  const showHowLeadsInLogistics = title.includes("leads in logistics");
 
   const shouldRenderJsonBlocks = !showFiveDimensions && !showProfiles;
 
@@ -2082,7 +2312,11 @@ function ContentSection({
         {showProfileIntroBadge ? <ProfileIntroBadge ctx={ctx} /> : null}
 
         {shouldRenderJsonBlocks && visibleBlocks.length ? (
-          showCaseStudyCards ? (
+          showCoreCharacteristics ? (
+            <CoreCharacteristicsCards blocks={visibleBlocks} ctx={ctx} />
+          ) : showHowLeadsInLogistics ? (
+            <HowLeadsInLogisticsLayout blocks={visibleBlocks} ctx={ctx} />
+          ) : showCaseStudyCards ? (
             <CaseStudyCards blocks={visibleBlocks} ctx={ctx} />
           ) : showEnhancingDevelopment ? (
             <EnhancingDevelopmentCards blocks={visibleBlocks} ctx={ctx} />
