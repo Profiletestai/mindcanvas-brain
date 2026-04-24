@@ -3,17 +3,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-// ✅ Existing engines
 import NativeBlocksReportClient from "./NativeBlocksReportClient";
 import LegacyReportClient from "./LegacyReportClient";
-
-// ✅ Org-specific legacy engine (Team Puzzle / Competency Coach style)
 import LegacyOrgReportClient from "./LegacyOrgReportClient";
-
-// ✅ OperatingFrame special engine
 import OperatingFrameReportClient from "./OperatingFrameReportClient";
-
-// ✅ 5D Leadership custom report engine
 import FiveDLeadershipReportClient from "./FiveDLeadershipReportClient";
 
 type AB = "A" | "B" | "C" | "D";
@@ -78,9 +71,11 @@ function safeText(x: any): string {
 function supabasePublicFrameworkUrl(bucket: string, path: string) {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
   if (!base) return "";
+
   const cleanBucket = String(bucket || "framework").trim();
   const cleanPath = String(path || "").replace(/^\/+/, "");
   if (!cleanPath) return "";
+
   return `${base}/storage/v1/object/public/${cleanBucket}/${cleanPath}`;
 }
 
@@ -116,16 +111,19 @@ function isLegacyOrgForced(data: ResultData | null) {
 
 function isFiveDLeadership(data: ResultData | null) {
   const slug = String(data?.org_slug || "").toLowerCase().trim();
+  const orgName = String(data?.org_name || "").toLowerCase().trim();
   const testName = String(data?.test_name || "").toLowerCase().trim();
   const frameworkPath = String(data?.sections?.framework_path || data?.debug?.storageFrameworkPath || "")
     .toLowerCase()
     .trim();
 
   return (
-    slug === "5d-leadership" ||
-    slug === "5d leadership" ||
+    slug.includes("5d") ||
+    orgName.includes("5d") ||
+    testName.includes("5d leadership") ||
     testName.includes("5d leadership compass") ||
-    frameworkPath.includes("5dleadershipcompass")
+    frameworkPath.includes("5dleadershipcompass") ||
+    frameworkPath.includes("5d-leadership")
   );
 }
 
@@ -186,7 +184,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
           if (!fwUrl) {
             setOfErr(
-              "Missing NEXT_PUBLIC_SUPABASE_URL or storage framework path (cannot load OperatingFrame framework JSON)."
+              "Missing NEXT_PUBLIC_SUPABASE_URL or storage framework path."
             );
             setLoading(false);
             return;
@@ -225,10 +223,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
     };
   }, [token, tid, src]);
 
-  const useBlocksEngine = useMemo(() => {
-    return data?.debug?.useBlocksEngine === true;
-  }, [data?.debug]);
-
+  const useBlocksEngine = useMemo(() => data?.debug?.useBlocksEngine === true, [data?.debug]);
   const forcedLegacy = useMemo(() => isLegacyOrgForced(data), [data]);
   const isOF = useMemo(() => isOperatingFrame(data), [data]);
   const isFiveD = useMemo(() => isFiveDLeadership(data), [data]);
