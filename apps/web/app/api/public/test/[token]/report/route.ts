@@ -24,6 +24,8 @@ type MapEntry = { points: number; profile: string };
 
 type QuestionMapRow = {
   id: string;
+  idx: number | null;
+  category: string | null;
   profile_map: MapEntry[] | null;
   weights: any | null;
 };
@@ -177,9 +179,30 @@ function toPercentages<T extends string>(totals: Partial<Record<T, number>>): Re
   return out as Record<T, number>;
 }
 
+function normalizeProfileCode(input: any): string {
+  const s = String(input || "").trim().toUpperCase();
+  const m = s.match(/^P(?:ROFILE)?[_\s-]?([1-8])$/i);
+  if (m) return `P${m[1]}`;
+  return s;
+}
+
+function legacyProfileCode(input: any): string {
+  const p = normalizeProfileCode(input);
+  const m = p.match(/^P([1-8])$/i);
+  return m ? `PROFILE_${m[1]}` : p;
+}
+
+function getLookProfileName(look: any, code: string): string | undefined {
+  const normalized = normalizeProfileCode(code);
+  return (
+    look.profileByCode.get(normalized)?.name ||
+    look.profileByCode.get(legacyProfileCode(normalized))?.name
+  );
+}
+
 function profileCodeToAB(pcode: string): AB | null {
-  const pc = String(pcode || "").toUpperCase();
-  const m = pc.match(/^P(?:ROFILE)?[_\s-]?([1-8])$/);
+  const pc = normalizeProfileCode(pcode);
+  const m = pc.match(/^P([1-8])$/);
   if (!m) return null;
   const n = Number(m[1]);
   if (n <= 2) return "A";
@@ -198,12 +221,101 @@ function selectedIndex(a: any): number {
   return 0;
 }
 
+function resolveWeightedPoints(answer: any, weights: Record<string, any>): number | null {
+  const raw =
+    answer?.value ??
+    answer?.selected ??
+    answer?.selected_index ??
+    answer?.index ??
+    answer?.text ??
+    null;
+
+  if (raw == null) return null;
+
+  const exactKey = String(raw);
+  if (Object.prototype.hasOwnProperty.call(weights, exactKey)) {
+    const pts = Number(weights[exactKey]);
+    return Number.isFinite(pts) ? pts : null;
+  }
+
+  const n = Number(raw);
+  if (Number.isFinite(n)) {
+    const plusOne = String(n + 1);
+    if (Object.prototype.hasOwnProperty.call(weights, plusOne)) {
+      const pts = Number(weights[plusOne]);
+      return Number.isFinite(pts) ? pts : null;
+    }
+  }
+
+  return null;
+}
+
+function computeSecondaryMetrics(
+  answers: AnswerShape[] | null | undefined,
+  qmap: Map<string, QuestionMapRow>
+) {
+  const ansList = Array.isArray(answers) ? answers : [];
+  const ansByQid = new Map<string, any>();
+
+  for (const a of ansList) {
+    const qid = (a as any)?.question_id;
+    if (qid) ansByQid.set(String(qid), a);
+  }
+
+  let raw_score = 0;
+  let min_score = 0;
+  let max_score = 0;
+  let eligible_count = 0;
+  let answered_count = 0;
+
+  for (const row of qmap.values()) {
+    const hasProfileMap = Array.isArray(row.profile_map) && row.profile_map.length > 0;
+    const weights = row.weights && typeof row.weights === "object" ? row.weights : null;
+
+    if (hasProfileMap) continue;
+    if (!weights || Array.isArray(weights)) continue;
+
+    const numericValues = Object.values(weights)
+      .map((v) => Number(v))
+      .filter((n) => Number.isFinite(n));
+
+    if (numericValues.length === 0) continue;
+
+    eligible_count += 1;
+    min_score += Math.min(...numericValues);
+    max_score += Math.max(...numericValues);
+
+    const answer = ansByQid.get(String(row.id));
+    if (!answer) continue;
+
+    const pts = resolveWeightedPoints(answer, weights);
+    if (pts == null) continue;
+
+    raw_score += pts;
+    answered_count += 1;
+  }
+
+  const percentage =
+    answered_count > 0 && max_score > min_score
+      ? Math.round(((raw_score - min_score) / (max_score - min_score)) * 100)
+      : 0;
+
+  return {
+    raison_detre: {
+      raw_score,
+      percentage,
+      eligible_count,
+      answered_count,
+    },
+  };
+}
+
 function coerceMapEntries(x: any): MapEntry[] {
   if (Array.isArray(x)) {
     return x
       .map((e) => ({
         points: safeNumber((e as any)?.points, 0),
-        profile: String((e as any)?.profile || "").toUpperCase(),
+        profile: normalizeProfileCode((e as any)?.profile),
       }))
       .filter((e) => e.points > 0 && !!e.profile);
   }
@@ -247,7 +359,7 @@ function computeFromAnswers(answers: AnswerShape[] | null | undefined, qmap: Map
     if (!entry) continue;
 
     const pts = safeNumber(entry.points, 0);
-    const pcode = String(entry.profile || "").toUpperCase();
+    const pcode = normalizeProfileCode(entry.profile);
     if (pts <= 0 || !pcode) continue;
 
     usedAny = true;
@@ -263,8 +375,10 @@ function computeFromAnswers(answers: AnswerShape[] | null | undefined, qmap: Map
 function readSavedTotals(totals: any) {
   const raw = totals && typeof totals === "object" ? totals : {};
 
-  const nestedFreq = raw?.frequencies && typeof raw.frequencies === "object" ? raw.frequencies : null;
-  const nestedProfiles = raw?.profiles && typeof raw.profiles === "object" ? raw.profiles : null;
+  const nestedFreq =
+    raw?.frequencies && typeof raw.frequencies === "object" ? raw.frequencies : null;
+  const nestedProfiles =
+    raw?.profiles && typeof raw.profiles === "object" ? raw.profiles : null;
 
   const freqSrc = nestedFreq || raw;
   const freqTotals: Record<AB, number> = {
@@ -278,10 +392,12 @@ function readSavedTotals(totals: any) {
   const profSrc = nestedProfiles || raw;
   const profileTotals: Record<string, number> = {};
   for (const [k, v] of Object.entries(profSrc || {})) {
-    const key = String(k || "").toUpperCase().trim();
-    if (key.startsWith("PROFILE_")) profileTotals[key] = safeNumber(v, 0);
+    const key = normalizeProfileCode(k);
+    if (/^P[1-8]$/i.test(key)) profileTotals[key] = safeNumber(v, 0);
   }
   const profileSum = Object.values(profileTotals).reduce((a, b) => a + (Number(b) || 0), 0);
+
+  const raison = raw?.secondary_scores?.raison_detre || raw?.raison_detre || null;
 
   const meta = raw?.meta && typeof raw.meta === "object" ? raw.meta : null;
   const wrapper_test_id = typeof meta?.wrapper_test_id === "string" ? meta.wrapper_test_id : null;
@@ -292,6 +408,12 @@ function readSavedTotals(totals: any) {
     freqSum,
     profileTotals,
     profileSum,
+    raison_detre: {
+      raw_score: safeNumber(raison?.raw_score ?? raw?.raison_detre_raw_score, 0),
+      percentage: safeNumber(raison?.percentage ?? raw?.raison_detre_percentage, 0),
+      eligible_count: safeNumber(raison?.eligible_count, 0),
+      answered_count: safeNumber(raison?.answered_count, 0),
+    },
     wrapper_test_id,
     effective_test_id,
     shape: nestedFreq || nestedProfiles ? ("nested" as const) : ("flat" as const),
@@ -441,7 +563,7 @@ async function fetchQuestionMaps(test_id: string): Promise<Map<string, QuestionM
 
   const q = (await sb
     .from("test_questions")
-    .select("id, profile_map, weights")
+    .select("id, idx, category, profile_map, weights")
     .eq("test_id", test_id)
     .order("idx", { ascending: true })) as PostgrestSingleResponse<QuestionMapRow[]>;
 
@@ -491,7 +613,7 @@ async function fetchDbLabels(test_id: string): Promise<{
   const profiles =
     Array.isArray(profRes.data)
       ? (profRes.data as any[]).map((r) => ({
-          code: String(r.profile_code || "").toUpperCase(),
+          code: normalizeProfileCode(r.profile_code),
           name: String(r.profile_name || ""),
           frequency_code: r.frequency_code
             ? (String(r.frequency_code).toUpperCase() as AB)
@@ -996,13 +1118,36 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       return { code, name: fromDb || fromMeta || fromLegacy || `Frequency ${code}` };
     });
 
+    const profileNameMap = new Map<string, string>();
+
+    for (let i = 1; i <= 8; i++) {
+      profileNameMap.set(`P${i}`, `Profile ${i}`);
+    }
+
+    for (const p of dbLabels.profiles) {
+      const code = normalizeProfileCode(p.code);
+      if (code) profileNameMap.set(code, p.name);
+    }
+
+    for (const p of metaProfiles || []) {
+      const code = normalizeProfileCode(p.code);
+      if (code && p.name) profileNameMap.set(code, p.name);
+    }
+
+    for (const [k, v] of look.profileByCode.entries()) {
+      const code = normalizeProfileCode(k);
+      const name = safeText((v as any)?.name);
+      if (code && name && !profileNameMap.get(code)?.trim()) {
+        profileNameMap.set(code, name);
+      }
+    }
+
     const profile_labels = Array.from({ length: 8 }).map((_, i) => {
-      const n = i + 1;
-      const code = `PROFILE_${n}`;
-      const fromDb = dbLabels.profiles.find((p) => p.code === code)?.name;
-      const fromMeta = metaProfiles?.find((p) => String(p.code).toUpperCase() === code)?.name;
-      const fromLegacy = look.profileByCode.get(code)?.name;
-      return { code, name: fromDb || fromMeta || fromLegacy || `Profile ${n}` };
+      const code = `P${i + 1}`;
+      return {
+        code,
+        name: profileNameMap.get(code) || `Profile ${i + 1}`,
+      };
     });
 
     const taker = await fetchTakerRow(takerId);
@@ -1014,6 +1159,12 @@ export async function GET(req: Request, { params }: { params: { token: string } 
     const profileTotals: Record<string, number> =
       savedRead.profileSum > 0 ? savedRead.profileTotals : comp.profileTotals;
 
+    const secondary = computeSecondaryMetrics(sub.answers_json, qmap);
+    const raisonDetre =
+      savedRead.raison_detre?.raw_score > 0 || savedRead.raison_detre?.percentage > 0
+        ? savedRead.raison_detre
+        : secondary.raison_detre;
+
     const frequency_percentages = toPercentages<AB>(freqTotals);
     const profile_percentages = toPercentages<string>(profileTotals);
 
@@ -1022,19 +1173,19 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         .sort((a, b) => b[1] - a[1])[0]?.[0] || "A";
 
     const top_profile_entry =
-      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["PROFILE_1", 0];
-    const top_profile_code = String(top_profile_entry[0] || "PROFILE_1").toUpperCase();
+      Object.entries(profileTotals).sort((a, b) => b[1] - a[1])[0] || ["P1", 0];
+    const top_profile_code = normalizeProfileCode(String(top_profile_entry[0] || "P1"));
 
     const top_profile_name =
-      profile_labels.find((p) => p.code === top_profile_code)?.name ||
-      look.profileByCode.get(top_profile_code)?.name ||
+      profile_labels.find((p) => p.code === normalizeProfileCode(top_profile_code))?.name ||
+      getLookProfileName(look, top_profile_code) ||
       top_profile_code;
 
     const sortedProfiles = [...profile_labels]
       .map((p) => ({ ...p, pct: profile_percentages?.[p.code] ?? 0 }))
       .sort((a, b) => (b.pct || 0) - (a.pct || 0));
 
-    const secondary = sortedProfiles[1]?.name || "";
+    const secondaryProfile = sortedProfiles[1]?.name || "";
     const tertiary = sortedProfiles[2]?.name || "";
     const topFreqName = frequency_labels.find((f) => f.code === top_freq)?.name || top_freq;
 
@@ -1048,11 +1199,13 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       ORG_SLUG: orgSlug,
       PRIMARY_FREQ_NAME: topFreqName,
       PRIMARY_PROFILE_NAME: top_profile_name,
-      SECONDARY_PROFILE_NAME: secondary,
+      SECONDARY_PROFILE_NAME: secondaryProfile,
       TERTIARY_PROFILE_NAME: tertiary,
       PROFILE_IMAGE_PRIMARY: "",
       PROFILE_IMAGE_SECONDARY: "",
       PROFILE_IMAGE_TERTIARY: "",
+      RAISON_DETRE_RAW_SCORE: String(raisonDetre.raw_score || 0),
+      RAISON_DETRE_PERCENTAGE: String(raisonDetre.percentage || 0),
     };
 
     let sections: SectionsPayload | null = null;
@@ -1308,6 +1461,10 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         top_profile_code,
         top_profile_name,
 
+        raison_detre: raisonDetre,
+        raison_detre_raw_score: Number(raisonDetre.raw_score || 0),
+        raison_detre_percentage: Number(raisonDetre.percentage || 0),
+
         sections,
 
         debug: {
@@ -1335,8 +1492,8 @@ export async function GET(req: Request, { params }: { params: { token: string } 
         },
 
         version: useBlocksEngine
-          ? "portal-native-v2-blocks+effective_test_resolution"
-          : "portal-v1",
+          ? "portal-native-v2-blocks+effective_test_resolution+raison-detre"
+          : "portal-v1+raison-detre",
       },
     });
   } catch (e: any) {

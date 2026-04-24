@@ -52,6 +52,13 @@ type SectionsPayload = {
   framework_path?: string | null;
 };
 
+type RaisonDetreData = {
+  raw_score: number;
+  percentage: number;
+  eligible_count?: number;
+  answered_count?: number;
+};
+
 type ResultData = {
   org_slug: string;
   org_name?: string | null;
@@ -72,6 +79,11 @@ type ResultData = {
   top_freq: AB;
   top_profile_code: string;
   top_profile_name: string;
+
+  // ✅ optional secondary metric
+  raison_detre?: RaisonDetreData;
+  raison_detre_raw_score?: number;
+  raison_detre_percentage?: number;
 
   sections?: SectionsPayload | null;
 
@@ -120,6 +132,41 @@ function isNextStepsSection(s: ReportSection) {
   const id = (s.id || "").toLowerCase();
   const title = (s.title || "").toLowerCase();
   return id === "next-steps" || title === "next steps" || title.includes("next steps");
+}
+
+function getRaisonDetre(data?: ResultData | null): RaisonDetreData | null {
+  if (!data) return null;
+
+  const obj = data.raison_detre;
+  if (obj && typeof obj === "object") {
+    const percentage = Number(obj.percentage ?? 0);
+    const raw_score = Number(obj.raw_score ?? 0);
+    const eligible_count = Number(obj.eligible_count ?? 0);
+    const answered_count = Number(obj.answered_count ?? 0);
+
+    if (eligible_count > 0 || answered_count > 0 || raw_score > 0 || percentage > 0) {
+      return {
+        raw_score,
+        percentage,
+        eligible_count,
+        answered_count,
+      };
+    }
+  }
+
+  const raw_score = Number(data.raison_detre_raw_score ?? 0);
+  const percentage = Number(data.raison_detre_percentage ?? 0);
+
+  if (raw_score > 0 || percentage > 0) {
+    return {
+      raw_score,
+      percentage,
+      eligible_count: 0,
+      answered_count: 0,
+    };
+  }
+
+  return null;
 }
 
 /** ----------------- profile image helpers (fail-soft) ----------------- */
@@ -355,7 +402,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <p className="text-xs font-semibold text-amber-900">Unsupported block type: {String((block as any).type || "unknown")}</p>
+      <p className="text-xs font-semibold text-amber-900">
+        Unsupported block type: {String((block as any).type || "unknown")}
+      </p>
     </div>
   );
 }
@@ -418,7 +467,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
     const common = (data?.sections?.common || []) as ReportSection[];
     const profile = (data?.sections?.profile || []) as ReportSection[];
 
-    // IMPORTANT: preserve server order. No “Welcome-first” reshuffle.
     const combined = [...common, ...profile].filter(Boolean);
 
     const seen = new Set<string>();
@@ -571,7 +619,8 @@ export default function LegacyReportClient(props: { token: string; tid: string }
 
   const topFreqCode = data.top_freq;
   const topFreqPct = data.frequency_percentages?.[topFreqCode] ?? 0;
-  const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
+  const topFreqName =
+    data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
   const sortedProfiles = [...data.profile_labels]
     .map((p) => ({ ...p, pct: data.profile_percentages?.[p.code] ?? 0 }))
@@ -580,6 +629,10 @@ export default function LegacyReportClient(props: { token: string; tid: string }
   const primary = sortedProfiles[0];
   const secondary = sortedProfiles[1];
   const tertiary = sortedProfiles[2];
+
+  const raisonDetre = getRaisonDetre(data);
+  const hasRaisonDetre = !!raisonDetre;
+  const raisonPct = Math.max(0, Math.min(100, Number(raisonDetre?.percentage ?? 0)));
 
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
@@ -592,7 +645,9 @@ export default function LegacyReportClient(props: { token: string; tid: string }
             <ProfileImage candidates={profileImgCandidates} alt={data.top_profile_name} />
 
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Personalised report</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+                Personalised report
+              </p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight">{reportTitle}</h1>
               <p className="mt-2 text-sm text-slate-200">
                 For {participant} · Organisation: {orgName}
@@ -621,7 +676,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
         </div>
 
         {/* Top summary row */}
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className={`mt-6 grid gap-4 ${hasRaisonDetre ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           {/* Frequencies */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <h2 className="text-lg font-semibold">Frequencies</h2>
@@ -662,7 +717,10 @@ export default function LegacyReportClient(props: { token: string; tid: string }
                         <span className="text-slate-700">{pctLabel(p.pct)}</span>
                       </div>
                       <div className="mt-1 h-2 w-full rounded-full bg-slate-200">
-                        <div className="h-2 rounded-full bg-slate-900" style={{ width: `${Math.round(pct * 100)}%` }} />
+                        <div
+                          className="h-2 rounded-full bg-slate-900"
+                          style={{ width: `${Math.round(pct * 100)}%` }}
+                        />
                       </div>
                     </div>
                   );
@@ -670,12 +728,55 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               </div>
             </div>
           </div>
+
+          {/* Raison D'Etre */}
+          {hasRaisonDetre ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <h2 className="text-lg font-semibold">Raison D&apos;Etre Score</h2>
+              <p className="mt-2 text-sm text-slate-200">
+                A percentage measure of purpose, alignment, and clarity of your deeper “why”.
+              </p>
+
+              <div className="mt-4 rounded-xl bg-white p-4 text-slate-900">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Purpose alignment
+                    </div>
+                    <div className="mt-2 text-4xl font-bold tracking-tight">{raisonPct}%</div>
+                  </div>
+
+                  <div className="text-right text-xs text-slate-500">
+                    {raisonDetre?.answered_count ? (
+                      <div>
+                        {raisonDetre.answered_count}
+                        {raisonDetre.eligible_count ? ` / ${raisonDetre.eligible_count}` : ""} answered
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-4 h-3 w-full rounded-full bg-slate-200">
+                  <div
+                    className="h-3 rounded-full bg-slate-900"
+                    style={{ width: `${raisonPct}%` }}
+                  />
+                </div>
+
+                <p className="mt-3 text-sm text-slate-700">
+                  This score reflects how strongly your work is connected to purpose, meaning, and long-term direction.
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Body layout */}
         <div className="mt-6 grid gap-4 md:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Quick index</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              Quick index
+            </p>
             <p className="mt-1 text-xs text-slate-300">Jump straight to the section you need.</p>
 
             <div className="mt-4 space-y-2">
@@ -738,7 +839,9 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               </button>
             </div>
 
-            <footer className="pt-4 text-xs text-slate-400">© {new Date().getFullYear()} Powered by Profiletest.ai </footer>
+            <footer className="pt-4 text-xs text-slate-400">
+              © {new Date().getFullYear()} Powered by Profiletest.ai
+            </footer>
           </main>
         </div>
       </div>
