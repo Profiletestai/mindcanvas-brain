@@ -103,6 +103,7 @@ const ASSETS = {
   logo: `${ASSET_BASE}/5d-logo.png`,
   brett: `${ASSET_BASE}/brett-gordon.png`,
   fiveDimensionsCompass: `${ASSET_BASE}/five-dimensions-compass.png`,
+  eightLeadershipProfilesMap: `${ASSET_BASE}/eight-leadership-profiles-map.png`,
   iconWelcome: `${ASSET_BASE}/icon-welcome.png`,
   iconCompass: `${ASSET_BASE}/icon-compass.png`,
   iconProfiles: `${ASSET_BASE}/icon-profiles.png`,
@@ -220,7 +221,7 @@ const FREQUENCY_META: Record<
     subtitle: "Rapid Response & Innovation",
     description: "Action-oriented leaders who drive change and thrive in fast-moving environments.",
     cardColor: "#2F9F67",
-    chartColor: "#FF3742",
+    chartColor: "#35AD7C",
   },
   B: {
     label: "Influence",
@@ -228,7 +229,7 @@ const FREQUENCY_META: Record<
     subtitle: "Influence & Relationship-Driven Leadership",
     description: "People-focused leaders who build strong teams and partnerships.",
     cardColor: "#C94440",
-    chartColor: "#F59B2F",
+    chartColor: "#45D6CC",
   },
   C: {
     label: "Implementation",
@@ -237,7 +238,7 @@ const FREQUENCY_META: Record<
     description:
       "Structured leaders who ensure operational efficiency and reliability focused on balancing customer delight with operational effectiveness and reliability.",
     cardColor: "#D7851F",
-    chartColor: "#11B57B",
+    chartColor: "#4C74F6",
   },
   D: {
     label: "Insight",
@@ -246,7 +247,7 @@ const FREQUENCY_META: Record<
     description:
       "Analytical leaders who focus on longer-term, detailed analysis, optimization and future-proofing businesses.",
     cardColor: "#336FBD",
-    chartColor: "#1D7FE8",
+    chartColor: "#8E55EA",
   },
 };
 
@@ -271,8 +272,9 @@ function normalizeFrequency(input: unknown): AB {
 
 function normalizeProfileCode(input: unknown): string {
   const s = String(input || "").trim().toUpperCase();
-  const m = s.match(/^P(?:ROFILE)?[_\s-]?([1-8])$/i);
-  if (m) return `P${m[1]}`;
+
+  const p = s.match(/^P(?:ROFILE)?[_\s-]?([1-8])$/i);
+  if (p) return `P${p[1]}`;
 
   const legacy = s.match(/^PROFILE[_\s-]?([1-8])$/i);
   if (legacy) return `P${legacy[1]}`;
@@ -282,7 +284,7 @@ function normalizeProfileCode(input: unknown): string {
 
 function legacyProfileCode(input: unknown): string {
   const p = normalizeProfileCode(input);
-  const m = p.match(/^P([1-8])$/i);
+  const m = p.match(/^P([1-8])$/);
   return m ? `PROFILE_${m[1]}` : p;
 }
 
@@ -332,6 +334,7 @@ function readProfileRatio(data: ResultData, code: string) {
 
   const total = readProfileTotal(data, code);
   const sum = PROFILE_ORDER.reduce((acc, c) => acc + readProfileTotal(data, c), 0);
+
   if (sum > 0) return Math.max(0, Math.min(1, total / sum));
 
   return 0;
@@ -349,6 +352,7 @@ function readFrequencyRatio(data: ResultData, code: AB) {
 
   const total = readFrequencyTotal(data, code);
   const sum = FREQUENCY_ORDER.reduce((acc, c) => acc + readFrequencyTotal(data, c), 0);
+
   if (sum > 0) return Math.max(0, Math.min(1, total / sum));
 
   return 0;
@@ -502,7 +506,7 @@ function DashboardOuterCard({
       style={{ background: DARK_PANEL }}
     >
       <h3 className="text-[16px] font-bold text-white">{title}</h3>
-      <p className="mt-2 max-w-[540px] text-[12px] leading-6 text-white/85">{description}</p>
+      <p className="mt-2 max-w-[620px] text-[12px] leading-6 text-white/85">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -736,67 +740,48 @@ function OverviewDashboard({ data }: { data: ResultData }) {
 }
 
 function DimensionScorePanel({ data }: { data: ResultData }) {
-  const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
-
   return (
     <DashboardOuterCard
       title="Dimensions"
       description="The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about."
     >
-      <div className="rounded-[14px] border border-[#D6DDE7] bg-[#F5F7FA] p-4">
-        <div className="rounded-[12px] border border-[#D6DDE7] bg-[#EEF2F6] p-4">
-          <div className="grid grid-cols-[34px_1fr] gap-4">
-            <div className="relative h-[250px]">
-              {ticks.map((tick) => (
-                <div
-                  key={tick}
-                  className="absolute left-0 right-0 text-[10px] text-[#8A96A9]"
-                  style={{ bottom: `${tick}%`, transform: tick === 0 ? "translateY(0)" : "translateY(50%)" }}
-                >
-                  {tick}
+      <div className="rounded-[18px] bg-white px-8 py-8 text-[#102640]">
+        <div className="grid items-start gap-8 lg:grid-cols-[250px_1fr]">
+          <div>
+            <h3 className="text-[28px] font-black leading-tight text-[#102640]">Dimensions</h3>
+            <p className="mt-4 text-[14px] leading-7 text-[#5D6A82]">
+              The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access
+              more naturally; lower scores are patterns you may need to be more intentional about.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-4 items-end gap-8">
+            {FREQUENCY_ORDER.map((code) => {
+              const ratio = readFrequencyRatio(data, code);
+              const percent = Math.round(ratio * 100);
+              const meta = FREQUENCY_META[code];
+
+              return (
+                <div key={code} className="flex flex-col items-center text-center">
+                  <p className="mb-3 text-[13px] font-black text-[#102640]">{percent}%</p>
+
+                  <div className="flex h-[150px] w-[42px] items-end overflow-hidden rounded-full bg-[#EAF0F6]">
+                    <div
+                      className="w-full rounded-full"
+                      style={{
+                        height: `${Math.max(percent, 4)}%`,
+                        background: meta.chartColor,
+                      }}
+                    />
+                  </div>
+
+                  <p className="mt-4 text-[15px] font-black text-[#102640]">{code}</p>
+                  <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#62708A]">
+                    {meta.label}
+                  </p>
                 </div>
-              ))}
-            </div>
-
-            <div className="relative h-[250px]">
-              {ticks.map((tick) => (
-                <div
-                  key={tick}
-                  className="absolute left-0 right-0 border-t border-[#DDE4EC]"
-                  style={{ bottom: `${tick}%` }}
-                />
-              ))}
-
-              <div className="grid h-full grid-cols-4 gap-2 px-2 pt-2">
-                {FREQUENCY_ORDER.map((code) => {
-                  const ratio = readFrequencyRatio(data, code);
-                  const percent = Math.round(ratio * 100);
-                  const meta = FREQUENCY_META[code];
-
-                  return (
-                    <div key={code} className="flex h-full flex-col items-center justify-end">
-                      <div className="mb-2 text-[12px] font-bold text-[#5E6675]">{percent}</div>
-
-                      <div className="relative flex h-[206px] w-full max-w-[82px] items-end overflow-hidden rounded-[6px] border border-[#D2D9E2] bg-[#F3F3F3]">
-                        <div
-                          className="w-full rounded-b-[6px]"
-                          style={{
-                            height: `${percent}%`,
-                            minHeight: percent > 0 ? 8 : 0,
-                            background: meta.chartColor,
-                          }}
-                        />
-                      </div>
-
-                      <div className="mt-3 text-[14px] font-black text-[#13233C]">{code}</div>
-                      <div className="mt-1 text-center text-[10px] font-medium tracking-[0.04em] text-[#5E6E86]">
-                        {meta.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -810,11 +795,12 @@ function ProfileMapPanel({ data }: { data: ResultData }) {
       title="Your Personality Map (Profile)"
       description="This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk)."
     >
-      <div className="rounded-[14px] border border-[#D6DDE7] bg-[#F5F7FA] p-4">
-        <div className="flex items-center justify-between px-2 pb-2">
-          <p className="text-[14px] font-bold text-[#18253D]">Your Personality Map (Profiles)</p>
+      <div className="rounded-[18px] bg-white px-8 py-7 text-[#102640]">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[14px] font-black text-[#18253D]">Your Personality Map (Profiles)</p>
           <p className="text-[11px] text-[#7B879B]">Higher = stronger pattern</p>
         </div>
+
         <ProfileRadar data={data} />
       </div>
     </DashboardOuterCard>
@@ -831,10 +817,10 @@ function polygonPoints(cx: number, cy: number, radius: number, count: number) {
 }
 
 function ProfileRadar({ data }: { data: ResultData }) {
-  const size = 380;
+  const size = 460;
   const cx = size / 2;
-  const cy = 190;
-  const maxRadius = 110;
+  const cy = size / 2;
+  const maxRadius = 155;
   const rings = [0.17, 0.34, 0.51, 0.68, 0.85, 1];
 
   const points = PROFILE_ORDER.map((code, index) => {
@@ -849,54 +835,54 @@ function ProfileRadar({ data }: { data: ResultData }) {
       y: cy + Math.sin(angle) * radius,
       ax: cx + Math.cos(angle) * maxRadius,
       ay: cy + Math.sin(angle) * maxRadius,
-      lx: cx + Math.cos(angle) * (maxRadius + 22),
-      ly: cy + Math.sin(angle) * (maxRadius + 22),
-      tx: cx + Math.cos(angle) * (maxRadius + 6),
-      ty: cy + Math.sin(angle) * (maxRadius + 6),
+      lx: cx + Math.cos(angle) * (maxRadius + 32),
+      ly: cy + Math.sin(angle) * (maxRadius + 32),
+      tx: cx + Math.cos(angle) * (maxRadius + 14),
+      ty: cy + Math.sin(angle) * (maxRadius + 14),
     };
   });
 
   const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="mx-auto w-full max-w-[420px]">
-      <svg viewBox={`0 0 ${size} 360`} className="h-auto w-full">
+    <div className="mx-auto w-full max-w-[560px]">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-auto w-full">
         {rings.map((ring, idx) => (
           <polygon
             key={idx}
             points={polygonPoints(cx, cy, maxRadius * ring, PROFILE_ORDER.length)}
             fill="none"
             stroke="#D7DCE5"
-            strokeWidth="1"
+            strokeWidth="1.2"
           />
         ))}
 
         {points.map((p) => (
-          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D7DCE5" strokeWidth="1" />
+          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D7DCE5" strokeWidth="1.2" />
         ))}
 
-        <polygon points={polygon} fill="rgba(36,214,220,0.16)" stroke="#16C7C6" strokeWidth="2.5" />
+        <polygon points={polygon} fill="rgba(36,214,220,0.18)" stroke="#16C7C6" strokeWidth="3" />
 
         {points.map((p) => (
           <g key={p.code}>
-            <circle cx={p.x} cy={p.y} r="3.5" fill="#16C7C6" />
+            <circle cx={p.x} cy={p.y} r="5" fill="#16C7C6" />
             <text
               x={p.lx}
-              y={p.ly}
+              y={p.ly - 6}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="12"
-              fontWeight="700"
+              fontSize="17"
+              fontWeight="800"
               fill="#4B5565"
             >
               {p.code}
             </text>
             <text
               x={p.tx}
-              y={p.ty}
+              y={p.ty + 12}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="10"
+              fontSize="12"
               fill="#8A96A9"
             >
               {Math.round(p.ratio * 100)}%
@@ -1121,6 +1107,7 @@ function buildFallbackSections(ctx: RenderContext): RenderableSection[] {
 function buildSections(data: ResultData, ctx: RenderContext): RenderableSection[] {
   const common = Array.isArray(data.sections?.common) ? data.sections?.common || [] : [];
   const profile = Array.isArray(data.sections?.profile) ? data.sections?.profile || [] : [];
+
   const source = [...common, ...profile].filter((section) => {
     const title = safeText(section?.title).trim();
     const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
@@ -1144,15 +1131,20 @@ function alignClass(align?: "left" | "center" | "right") {
 
 function renderListItem(item: unknown, ctx: RenderContext) {
   if (typeof item === "string" || typeof item === "number") return replaceMacros(item, ctx);
+
   if (typeof item === "object" && item !== null) {
     const candidate = item as Record<string, unknown>;
+
     if (candidate.text) return replaceMacros(candidate.text, ctx);
+
     if (candidate.title && candidate.description) {
       return `${replaceMacros(candidate.title, ctx)} — ${replaceMacros(candidate.description, ctx)}`;
     }
+
     if (candidate.title) return replaceMacros(candidate.title, ctx);
     if (candidate.content) return replaceMacros(candidate.content, ctx);
   }
+
   return safeText(item);
 }
 
@@ -1162,24 +1154,28 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   if (type === "p" || type === "paragraph") {
     const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
     if (!text) return null;
+
     return <p className="mb-4 text-[13px] leading-7 text-[#313C52] last:mb-0">{text}</p>;
   }
 
   if (type === "h1" || type === "h2" || type === "heading") {
     const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
     if (!text) return null;
+
     return <h3 className="mb-4 mt-6 text-[24px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h3>;
   }
 
   if (type === "h3") {
     const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
     if (!text) return null;
+
     return <h4 className="mb-3 mt-5 text-[18px] font-black leading-tight text-[#0C203A] first:mt-0">{text}</h4>;
   }
 
   if (type === "h4") {
     const text = replaceMacros((block as any).text ?? (block as any).content, ctx);
     if (!text) return null;
+
     return (
       <h5 className="mb-2 mt-4 text-[14px] font-black uppercase tracking-[0.08em] text-[#5B4380] first:mt-0">
         {text}
@@ -1307,11 +1303,11 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 function FiveDimensionsVisual() {
   return (
     <div className="mt-2">
-      <div className="mb-8 flex justify-center">
+      <div className="mb-8 flex justify-center rounded-[18px] bg-white px-6 py-4">
         <img
           src={ASSETS.fiveDimensionsCompass}
           alt="The Five Dimensions of Leadership"
-          className="h-auto max-h-[360px] w-auto max-w-full object-contain"
+          className="h-auto max-h-[380px] w-auto max-w-full object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1322,35 +1318,33 @@ function FiveDimensionsVisual() {
       <div className="grid gap-4 md:grid-cols-2">
         {FREQUENCY_ORDER.map((code) => {
           const meta = FREQUENCY_META[code];
+
           return (
             <div
               key={code}
-              className="rounded-[16px] border bg-[#F8F8F8] p-5"
-              style={{ borderColor: `${meta.cardColor}AA` }}
+              className="rounded-[12px] border bg-white p-5"
+              style={{ borderColor: meta.cardColor }}
             >
-              <p className="text-[14px] font-black text-[#18304D]">
+              <p className="text-[14px] font-black" style={{ color: meta.cardColor }}>
                 {code} · {meta.dimension} Dimension
               </p>
-              <p
-                className="mt-1 text-[11px] font-bold uppercase tracking-[0.1em]"
-                style={{ color: meta.cardColor }}
-              >
+              <p className="mt-2 text-[10px] font-black uppercase tracking-[0.14em]" style={{ color: meta.cardColor }}>
                 {meta.subtitle}
               </p>
-              <p className="mt-4 text-[13px] leading-7 text-[#313C52]">{meta.description}</p>
+              <p className="mt-4 text-[13px] leading-6 text-[#313C52]">{meta.description}</p>
             </div>
           );
         })}
 
-        <div className="rounded-[16px] border border-[#8F61D1] bg-[#F4EFFB] p-5 md:col-span-2">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#54457F]">
+        <div className="rounded-[12px] border border-[#7C4BC6] bg-white p-5 md:col-span-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#54457F]">
             E. The Fifth Dimension · The Differentiator
           </p>
-          <p className="mt-3 text-[20px] font-black text-[#102640]">Raison d&apos;être</p>
-          <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#54457F]">
+          <p className="mt-3 text-[22px] font-black text-[#6A45A0]">Raison d&apos;être</p>
+          <p className="mt-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#54457F]">
             The Motivational Foundation
           </p>
-          <p className="mt-4 text-[13px] leading-7 text-[#313C52]">
+          <p className="mt-4 text-[13px] leading-6 text-[#313C52]">
             The underlying passions, drivers and direction that defines how leaders find fulfillment in their work and
             life.
           </p>
@@ -1364,31 +1358,54 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
   const topCode = normalizeProfileCode(data.top_profile_code);
 
   return (
-    <div className="mt-6 grid gap-4 md:grid-cols-2">
-      {PROFILE_ORDER.map((code) => {
-        const meta = PROFILE_META[code];
-        const active = code === topCode;
+    <div className="mt-2">
+      <div className="mb-10 flex justify-center rounded-[18px] bg-white px-6 py-4">
+        <img
+          src={ASSETS.eightLeadershipProfilesMap}
+          alt="The Eight Leadership Profiles"
+          className="h-auto max-h-[520px] w-auto max-w-full object-contain"
+          crossOrigin="anonymous"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      </div>
 
-        return (
-          <div
-            key={code}
-            className={`rounded-2xl border p-5 ${
-              active ? "border-[#5B4380] bg-[#F5F0FA]" : "border-slate-200 bg-slate-50"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ background: meta.color }} />
-              <div>
-                <p className="text-[15px] font-black text-[#0C203A]">{meta.name}</p>
-                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {PROFILE_ORDER.map((code) => {
+          const meta = PROFILE_META[code];
+          const active = code === topCode;
+
+          return (
+            <div
+              key={code}
+              className={`relative overflow-hidden rounded-[14px] border bg-white pt-9 text-center shadow-[0_8px_18px_rgba(15,23,42,0.12)] ${
+                active ? "border-[#6E4AA2]" : "border-[#DDE3EC]"
+              }`}
+            >
+              <div className="absolute left-0 right-0 top-0 h-9" style={{ background: meta.color }} />
+
+              <div className="relative mx-auto -mt-1 flex h-[74px] w-[74px] items-center justify-center rounded-full border-[6px] border-white bg-[#F5EFEA] shadow-[0_4px_10px_rgba(15,23,42,0.18)]">
+                <span className="text-[18px] font-black text-[#7A5A3D]">{code}</span>
+              </div>
+
+              <div className="px-5 pb-6 pt-3">
+                <p className="text-[13px] font-black text-[#102640]">{meta.name}</p>
+                <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#66758D]">
                   {meta.dimension}
                 </p>
-                <p className="mt-3 text-[13px] leading-6 text-[#313C52]">{meta.description}</p>
+                <p className="mt-4 text-[11px] leading-5 text-[#313C52]">{meta.description}</p>
+
+                {active ? (
+                  <p className="mx-auto mt-4 inline-flex rounded-full bg-[#6E4AA2] px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-white">
+                    Your Profile
+                  </p>
+                ) : null}
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
