@@ -666,6 +666,33 @@ async function downloadFrameworkJSON(bucket: string, path: string): Promise<any 
   }
 }
 
+function parseSupabaseStorageRef(input: string, fallbackBucket = "framework") {
+  const raw = String(input || "").trim();
+  if (!raw) return { bucket: fallbackBucket, path: "" };
+
+  try {
+    const url = new URL(raw);
+    const marker = "/storage/v1/object/public/";
+    const idx = url.pathname.indexOf(marker);
+
+    if (idx >= 0) {
+      const rest = decodeURIComponent(url.pathname.slice(idx + marker.length));
+      const parts = rest.split("/").filter(Boolean);
+      const bucket = parts.shift() || fallbackBucket;
+      const path = parts.join("/");
+      return { bucket, path };
+    }
+  } catch {
+    // Not a URL. Treat as a bucket path.
+  }
+
+  let path = raw.replace(/^\/+/, "");
+  const bucketPrefix = `${fallbackBucket}/`;
+  if (path.startsWith(bucketPrefix)) path = path.slice(bucketPrefix.length);
+
+  return { bucket: fallbackBucket, path };
+}
+
 function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
   const meta = (testMeta || {}) as any;
 
@@ -674,11 +701,11 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
     typeof meta.report_framework_bucket === "string" ? meta.report_framework_bucket.trim() : "";
 
   if (key) {
-    const bucket = bucketOverride || "framework";
+    const parsed = parseSupabaseStorageRef(key, bucketOverride || "framework");
     return {
       use: true as const,
-      bucket,
-      path: key,
+      bucket: parsed.bucket,
+      path: parsed.path,
       version:
         typeof meta.report_framework_version === "string" ? meta.report_framework_version : null,
       source: "meta.report_framework_key" as const,
@@ -686,13 +713,15 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
   }
 
   const rf: ReportFrameworkMeta | null = meta?.reportFramework || null;
-  const bucket = typeof rf?.bucket === "string" ? rf.bucket.trim() : "";
-  const path = typeof rf?.path === "string" ? rf.path.trim() : "";
-  if (bucket && path) {
+  const rawBucket = typeof rf?.bucket === "string" ? rf.bucket.trim() : "";
+  const rawPath = typeof rf?.path === "string" ? rf.path.trim() : "";
+
+  if (rawPath) {
+    const parsed = parseSupabaseStorageRef(rawPath, rawBucket || "framework");
     return {
       use: true as const,
-      bucket,
-      path,
+      bucket: parsed.bucket,
+      path: parsed.path,
       version: typeof rf?.version === "string" ? rf.version : null,
       source: "meta.reportFramework" as const,
     };
@@ -704,6 +733,132 @@ function resolveStorageFramework(testMeta: TestMeta | null | undefined) {
     path: "",
     version: null as any,
     source: "none" as const,
+  };
+}
+
+function normalizeReportSectionArray(input: any): ReportSection[] {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((section: any, index: number) => {
+      const s = section && typeof section === "object" ? section : {};
+      const blocks = Array.isArray(s.blocks) ? (s.blocks as ReportSectionBlock[]) : [];
+      const title = safeText(s.title).trim();
+      const id = safeText(s.id).trim() || (title ? sectionTitleToSafeId(title) : `section-${index + 1}`);
+
+      return {
+        id,
+        title: title || `Section ${index + 1}`,
+        blocks,
+      } as ReportSection;
+    })
+    .filter((section) => safeText(section.title).trim() || Array.isArray(section.blocks));
+}
+
+function sectionTitleToSafeId(title: string) {
+  return safeText(title)
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function findProfilePayloadInStorageFramework(fw: any, topProfileCode: string, topProfileName: string) {
+  const code = normalizeProfileCode(topProfileCode || "P1");
+  const legacy = legacyProfileCode(code);
+  const name = safeText(topProfileName).toLowerCase();
+
+  const profilesObj =
+    fw?.profiles && typeof fw.profiles === "object" && !Array.isArray(fw.profiles)
+      ? fw.profiles
+      : null;
+
+  if (profilesObj) {
+    const direct = profilesObj[code] || profilesObj[legacy] || profilesObj[String(code).toLowerCase()];
+    if (direct) return direct;
+
+    for (const value of Object.values(profilesObj)) {
+      const v = value && typeof value === "object" ? (value as any) : null;
+      if (!v) continue;
+
+      const candidateCode = normalizeProfileCode(v.profile_code || v.code || v.id || "");
+      const candidateName = safeText(v.profile_name || v.name || v.title).toLowerCase();
+
+      if (candidateCode === code || (!!name && candidateName.includes(name))) return v;
+    }
+  }
+
+  const profileList = Array.isArray(fw?.profile) ? fw.profile : [];
+  for (const item of profileList) {
+    const v = item && typeof item === "object" ? item : null;
+    if (!v) continue;
+
+    const candidateCode = normalizeProfileCode((v as any).profile_code || (v as any).code || (v as any).id || "");
+    const candidateTitle = safeText((v as any).profile_name || (v as any).name || (v as any).title).toLowerCase();
+
+    if (candidateCode === code || (!!name && candidateTitle.includes(name))) return v;
+  }
+
+  return null;
+}
+
+function buildStorageFrameworkSections(opts: {
+  fw: any;
+  top_profile_code: string;
+  top_profile_name: string;
+  tokenCtx: Record<string, string>;
+  frameworkId: string;
+  bucket: string | null;
+  path: string | null;
+  version: string | null;
+}): SectionsPayload | null {
+  const fw = opts.fw && typeof opts.fw === "object" ? opts.fw : null;
+  if (!fw) return null;
+
+  const common = normalizeReportSectionArray(fw.common);
+  const selectedProfilePayload = findProfilePayloadInStorageFramework(
+    fw,
+    opts.top_profile_code,
+    opts.top_profile_name
+  );
+
+  let profile: ReportSection[] = [];
+  if (selectedProfilePayload) {
+    if (Array.isArray((selectedProfilePayload as any).sections)) {
+      profile = normalizeReportSectionArray((selectedProfilePayload as any).sections);
+    } else if (Array.isArray((selectedProfilePayload as any).blocks)) {
+      profile = normalizeReportSectionArray([selectedProfilePayload]);
+    }
+  }
+
+  if (common.length === 0 && profile.length === 0) return null;
+
+  const replaced = replaceTokensDeep(
+    {
+      common,
+      profile,
+    },
+    opts.tokenCtx
+  ) as { common: ReportSection[]; profile: ReportSection[] };
+
+  return {
+    common: replaced.common,
+    profile: replaced.profile,
+    report_title: safeText(fw.report_title).trim() || null,
+    profile_missing: replaced.profile.length === 0,
+    framework_version:
+      safeText(fw?.meta?.version).trim() ||
+      safeText(fw.version).trim() ||
+      opts.version ||
+      null,
+    framework_bucket: opts.bucket,
+    framework_path: opts.path,
+    framework_id: opts.frameworkId || null,
+    framework_slug:
+      safeText(fw?.meta?.framework).trim() ||
+      safeText(fw.framework_slug).trim() ||
+      safeText(fw.slug).trim() ||
+      null,
   };
 }
 
@@ -1208,9 +1363,26 @@ export async function GET(req: Request, { params }: { params: { token: string } 
       RAISON_DETRE_PERCENTAGE: String(raisonDetre.percentage || 0),
     };
 
+    const storageReportSections =
+      useStorageFramework && storageChoice.bucket && storageChoice.path
+        ? buildStorageFrameworkSections({
+            fw,
+            top_profile_code,
+            top_profile_name,
+            tokenCtx,
+            frameworkId,
+            bucket: storageChoice.bucket,
+            path: storageChoice.path,
+            version: storageChoice.version,
+          })
+        : null;
+
     let sections: SectionsPayload | null = null;
 
-    if (useBlocksEngine) {
+    if (storageReportSections) {
+      sections = storageReportSections;
+      frameworkSource = "storage";
+    } else if (useBlocksEngine) {
       if (frameworkId) {
         const fwRow = await fetchFrameworkById(frameworkId);
         const structure =
@@ -1491,7 +1663,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           saved_effective_test_id: savedRead.effective_test_id || null,
         },
 
-        version: useBlocksEngine
+        version: storageReportSections
+          ? "portal-storage-framework-v2+selected-profile-sections+raison-detre"
+          : useBlocksEngine
           ? "portal-native-v2-blocks+effective_test_resolution+raison-detre"
           : "portal-v1+raison-detre",
       },
