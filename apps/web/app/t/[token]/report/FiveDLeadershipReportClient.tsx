@@ -492,7 +492,7 @@ function SectionShell({
   return (
     <section
       id={id}
-      className="rounded-[28px] border border-white/10 p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="rounded-[24px] border border-white/10 p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
       style={{ background: DARK_PANEL }}
     >
       <div className="mb-5 flex items-center gap-3">
@@ -636,28 +636,28 @@ function HeroHeader({
   const topMeta = PROFILE_META[topCode] || PROFILE_META.P1;
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[1fr_327px]">
+    <section className="grid gap-5 xl:grid-cols-[1fr_300px]">
       <div
         className="rounded-[24px] border border-white/10 p-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
         style={{ background: DARK_PANEL }}
       >
-        <div className="grid gap-6 lg:grid-cols-[1fr_353px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
           <div className="py-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-white/55">
               The 5D Leadership Compass
             </p>
 
-            <h1 className="mt-4 text-[44px] font-black leading-[0.95] tracking-[-0.04em] text-white md:text-[54px]">
+            <h1 className="mt-4 text-[42px] font-black leading-[0.95] tracking-[-0.04em] text-white md:text-[48px]">
               {participant}
             </h1>
 
-            <p className="mt-6 max-w-[800px] text-[15px] leading-7 text-white/90">
+            <p className="mt-6 max-w-[640px] text-[14px] leading-7 text-white/90">
               “Navigating Leadership Strengths in Logistics, Supply Chain, and Operations” — {topMeta.description}
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
               <span
-                className="inline-flex items-center rounded-full border px-4 py-2 text-[13px] font-black"
+                className="inline-flex items-center rounded-full border px-4 py-2 text-[12px] font-black"
                 style={{
                   borderColor: `${topMeta.color}55`,
                   background: `${topMeta.color}1F`,
@@ -667,23 +667,23 @@ function HeroHeader({
                 ⚡ Profile {profileNumber(topCode)} · {topName}
               </span>
 
-              <span className="inline-flex items-center rounded-full border border-[#0FCD5E]/25 bg-[#0FCD5E]/10 px-4 py-2 text-[13px] font-black text-[#0FCD5E]">
+              <span className="inline-flex items-center rounded-full border border-[#0FCD5E]/25 bg-[#0FCD5E]/10 px-4 py-2 text-[12px] font-black text-[#0FCD5E]">
                 <span className="mr-2 h-1.5 w-1.5 rounded-full bg-[#0FCD5E]" />
                 {topFreq} · {topFreqMeta.dimension} Dimension
               </span>
             </div>
 
-            <div className="mt-7 grid max-w-[640px] overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.04] md:grid-cols-2">
+            <div className="mt-7 grid max-w-[560px] overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.04] md:grid-cols-2">
               <div className="border-b border-white/10 p-5 md:border-b-0 md:border-r">
                 <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#5A6A88]">Dimension</p>
-                <p className="mt-2 text-[22px] font-black text-white">{topFreqMeta.dimension}</p>
+                <p className="mt-2 text-[20px] font-black text-white">{topFreqMeta.dimension}</p>
                 <p className="mt-1 text-[12px] text-[#8FA0BC]">{topFreqMeta.subtitle}</p>
               </div>
               <div className="p-5">
                 <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#5A6A88]">
                   Leadership Style
                 </p>
-                <p className="mt-2 text-[22px] font-black text-white">{topName}</p>
+                <p className="mt-2 text-[20px] font-black text-white">{topName}</p>
                 <p className="mt-1 text-[12px] text-[#8FA0BC]">{topMeta.shortDimension}</p>
               </div>
             </div>
@@ -714,23 +714,20 @@ function HeroProfileList({ data }: { data: ResultData }) {
           return (
             <div
               key={code}
-              className="grid grid-cols-[22px_10px_1fr_auto_auto] items-center gap-2 rounded-lg border px-3 py-2.5 text-[12px]"
+              className="grid grid-cols-[20px_9px_1fr_auto] items-center gap-2 rounded-lg border px-3 py-2.5 text-[11px]"
               style={{
                 borderColor: active ? `${meta.color}66` : "rgba(255,255,255,0.06)",
                 background: active ? `${meta.color}24` : "rgba(255,255,255,0.035)",
               }}
             >
-              <span className="text-[11px] text-white/35">{idx + 1}</span>
+              <span className="text-[10px] text-white/35">{idx + 1}</span>
               <span className="h-2 w-2 rounded-full" style={{ background: meta.color }} />
               <span className={active ? "font-bold text-[#0FCD5E]" : "font-semibold text-[#E4EAF8]"}>
                 {meta.name}
               </span>
-              <span className={active ? "text-[10px] text-[#0FCD5E]" : "text-[10px] text-white/35"}>
+              <span className={active ? "text-[9px] text-[#0FCD5E]" : "text-[9px] text-white/35"}>
                 {meta.shortDimension}
               </span>
-              {active ? (
-                <span className="rounded-full bg-[#0FCD5E] px-2 py-0.5 text-[9px] font-black text-white">You</span>
-              ) : null}
             </div>
           );
         })}
@@ -748,9 +745,9 @@ function RaisonScoreCard({ score }: { score: number }) {
         Dimension
       </p>
 
-      <p className="mt-12 text-[70px] font-black leading-none tracking-[-0.06em]">{score}%</p>
+      <p className="mt-12 text-[64px] font-black leading-none tracking-[-0.06em]">{score}%</p>
 
-      <p className="mt-5 text-[22px] font-black uppercase leading-tight tracking-[0.16em]">
+      <p className="mt-5 text-[20px] font-black uppercase leading-tight tracking-[0.16em]">
         Your Raison
         <br />
         d&apos;être Score
@@ -834,7 +831,7 @@ function DimensionBarChart({ data }: { data: ResultData }) {
                 <div key={item.code} className="flex h-full flex-col items-center justify-end">
                   <p className="mb-3 text-[14px] font-bold text-[#445067]">{item.value}</p>
 
-                  <div className="flex h-[205px] w-full max-w-[86px] items-end overflow-hidden rounded-[6px] border border-[#D3DAE3] bg-[#F7F8FA]">
+                  <div className="flex h-[205px] w-full max-w-[76px] items-end overflow-hidden rounded-[6px] border border-[#D3DAE3] bg-[#F7F8FA]">
                     <div
                       className="w-full rounded-[4px]"
                       style={{
@@ -845,7 +842,7 @@ function DimensionBarChart({ data }: { data: ResultData }) {
                   </div>
 
                   <p className="mt-3 text-[14px] font-black text-[#182640]">{item.code}</p>
-                  <p className="mt-1 text-center text-[11px] leading-4 text-[#5E6E88]">{item.meta.label}</p>
+                  <p className="mt-1 text-center text-[10px] leading-4 text-[#5E6E88]">{item.meta.label}</p>
                 </div>
               );
             })}
@@ -888,25 +885,37 @@ function ProfileRadar({ data }: { data: ResultData }) {
   const height = 340;
   const cx = width / 2;
   const cy = height / 2 + 8;
-  const maxRadius = 138;
-  const rings = [1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1];
+  const maxRadius = 132;
+
+  // Designer-style zoom:
+  // The outer ring represents 60%, not 100%, so lower results show with more visible coverage.
+  const radarMaxPercent = 60;
+  const rings = [10, 20, 30, 40, 50, 60];
 
   const points = PROFILE_ORDER.map((code, index) => {
     const angle = -Math.PI / 2 + (index * Math.PI * 2) / PROFILE_ORDER.length;
-    const ratio = readProfileRatio(data, code);
-    const radius = ratio * maxRadius;
+    const actualPercent = Math.round(readProfileRatio(data, code) * 100);
+    const scaledRatio = Math.min(actualPercent / radarMaxPercent, 1);
+    const radius = scaledRatio * maxRadius;
+
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+
+    const percentLabelDistance = actualPercent <= 0 ? 20 : 14;
 
     return {
       code,
-      ratio,
-      x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * radius,
+      actualPercent,
+      scaledRatio,
+      angle,
+      x,
+      y,
       ax: cx + Math.cos(angle) * maxRadius,
       ay: cy + Math.sin(angle) * maxRadius,
-      lx: cx + Math.cos(angle) * (maxRadius + 28),
-      ly: cy + Math.sin(angle) * (maxRadius + 28),
-      px: cx + Math.cos(angle) * (maxRadius + 12),
-      py: cy + Math.sin(angle) * (maxRadius + 12),
+      lx: cx + Math.cos(angle) * (maxRadius + 24),
+      ly: cy + Math.sin(angle) * (maxRadius + 24),
+      percentX: x + Math.cos(angle) * percentLabelDistance,
+      percentY: y + Math.sin(angle) * percentLabelDistance + 4,
     };
   });
 
@@ -915,45 +924,63 @@ function ProfileRadar({ data }: { data: ResultData }) {
   return (
     <div className="flex h-[285px] items-center justify-center">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full max-w-[520px]">
-        {rings.map((ring, idx) => (
-          <polygon
-            key={idx}
-            points={polygonPoints(cx, cy, maxRadius * ring, PROFILE_ORDER.length)}
-            fill="none"
-            stroke="#CBD4E0"
-            strokeWidth="1.2"
-          />
-        ))}
+        {rings.map((ring) => {
+          const radius = (ring / radarMaxPercent) * maxRadius;
+
+          return (
+            <g key={ring}>
+              <polygon
+                points={polygonPoints(cx, cy, radius, PROFILE_ORDER.length)}
+                fill="none"
+                stroke="#CBD4E0"
+                strokeWidth="1.2"
+              />
+              <text
+                x={cx + 8}
+                y={cy - radius + 4}
+                textAnchor="start"
+                dominantBaseline="middle"
+                fontSize="9"
+                fill="#8A96A9"
+              >
+                {ring}%
+              </text>
+            </g>
+          );
+        })}
 
         {points.map((p) => (
           <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D0D8E3" strokeWidth="1.1" />
         ))}
 
-        <polygon points={polygon} fill="rgba(29,197,197,0.14)" stroke="#14BFC0" strokeWidth="2.5" />
+        <polygon points={polygon} fill="rgba(29,197,197,0.16)" stroke="#14BFC0" strokeWidth="2.8" />
 
         {points.map((p) => (
           <g key={p.code}>
-            <circle cx={p.x} cy={p.y} r="4.6" fill="#14BFC0" />
             <text
               x={p.lx}
-              y={p.ly - 6}
+              y={p.ly}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="11"
-              fontWeight="700"
+              fontSize="12"
+              fontWeight="800"
               fill="#4C5668"
             >
               {p.code}
             </text>
+
+            <circle cx={p.x} cy={p.y} r="5" fill="#14BFC0" />
+
             <text
-              x={p.px}
-              y={p.py + 10}
+              x={p.percentX}
+              y={p.percentY}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="11"
-              fill="#7D899E"
+              fontSize="10"
+              fontWeight="700"
+              fill="#2C7F88"
             >
-              {Math.round(p.ratio * 100)}%
+              {p.actualPercent}%
             </text>
           </g>
         ))}
@@ -996,7 +1023,7 @@ function ReportIndex({
                 block: "start",
               })
             }
-            className="block w-full rounded-[10px] border border-white/8 bg-white/[0.03] px-3 py-2.5 text-left text-[11px] leading-5 text-white/92 hover:bg-white/[0.06]"
+            className="block w-full rounded-[10px] border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-[11px] leading-5 text-white/92 hover:bg-white/[0.06]"
           >
             <span className="font-bold text-white">{idx + 1}.</span> {section.title}
           </button>
@@ -1381,11 +1408,11 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 function FiveDimensionsVisual() {
   return (
     <div className="mt-4">
-      <div className="mb-8 flex justify-center rounded-[18px] bg-[#F1F2F4] px-4 py-5 md:px-6">
+      <div className="mb-8 flex min-h-[340px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
         <img
           src={ASSETS.fiveDimensionsCompass}
           alt="The Five Dimensions of Leadership"
-          className="h-auto w-full max-w-[760px] object-contain"
+          className="h-auto w-full max-w-[760px] scale-[1.18] object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1437,11 +1464,11 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
 
   return (
     <div className="mt-4">
-      <div className="mb-8 flex justify-center rounded-[18px] bg-[#F1F2F4] px-4 py-5 md:px-6">
+      <div className="mb-8 flex min-h-[430px] items-center justify-center overflow-hidden rounded-[18px] bg-[#F1F2F4] px-4 py-6 md:px-6">
         <img
           src={ASSETS.eightLeadershipProfilesMap}
           alt="The Eight Leadership Profiles"
-          className="h-auto w-full max-w-[780px] object-contain"
+          className="h-auto w-full max-w-[760px] scale-[1.12] object-contain"
           crossOrigin="anonymous"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -1472,7 +1499,11 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
                     src={meta.icon}
                     alt={meta.name}
                     className="h-[34px] w-[34px] object-contain"
-                    fallback={<span className="text-[12px] font-black text-[#7A5A3D]">{code}</span>}
+                    fallback={
+                      <span className="flex h-[34px] w-[34px] items-center justify-center text-[12px] font-black text-[#7A5A3D]">
+                        {code}
+                      </span>
+                    }
                   />
                 </div>
               </div>
@@ -1503,15 +1534,15 @@ function ResultsVisual({ data, raisonScore }: { data: ResultData; raisonScore: n
   const topName = cleanProfileName(data.top_profile_name, topCode);
 
   return (
-    <div className="mt-6 grid gap-4 lg:grid-cols-[300px_1fr]">
+    <div className="mt-6 grid gap-4 lg:grid-cols-[260px_1fr]">
       <div className="rounded-[18px] bg-[#0C203A] p-6 text-white">
         <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/50">Your Profile</p>
-        <h3 className="mt-4 text-[30px] font-black leading-tight">{topName}</h3>
+        <h3 className="mt-4 text-[28px] font-black leading-tight">{topName}</h3>
         <p className="mt-1 text-sm font-semibold text-white/70">{topCode}</p>
 
         <div className="mt-6 rounded-[14px] bg-[#624585] p-5">
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/60">Raison d’être</p>
-          <p className="mt-3 text-[48px] font-black">{raisonScore}%</p>
+          <p className="mt-3 text-[44px] font-black">{raisonScore}%</p>
         </div>
       </div>
 
@@ -1737,7 +1768,7 @@ export default function FiveDLeadershipReportClient(props: {
         }}
       />
 
-      <div ref={reportRef} className="relative mx-auto flex max-w-[1440px] flex-col gap-5 px-4">
+      <div ref={reportRef} className="relative mx-auto flex max-w-[1040px] flex-col gap-5 px-4">
         <TopHeader
           participant={participant}
           reportDate={reportDate}
@@ -1749,10 +1780,10 @@ export default function FiveDLeadershipReportClient(props: {
 
         <OverviewDashboard data={data} />
 
-        <section className="grid gap-5 lg:grid-cols-[190px_1fr]">
+        <section className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
           <ReportIndex sections={sections} onDownload={handleDownloadPdf} onNext={openNextSteps} />
 
-          <main className="flex flex-col gap-5">
+          <main className="flex min-w-0 flex-col gap-5">
             {sections.map((section) => (
               <ContentSection key={section.id} section={section} ctx={ctx} />
             ))}
