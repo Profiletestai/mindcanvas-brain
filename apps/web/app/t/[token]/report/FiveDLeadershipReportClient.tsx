@@ -21,8 +21,8 @@ type RaisonDetreData = {
 type SectionBlock =
   | { type: "p"; text?: string }
   | { type: "paragraph"; text?: string; content?: string }
-  | { type: "ul"; items?: any[] }
-  | { type: "ol"; items?: any[] }
+  | { type: "ul"; items?: unknown[] }
+  | { type: "ol"; items?: unknown[] }
   | { type: "quote"; text?: string; cite?: string }
   | { type: "divider" }
   | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
@@ -113,12 +113,13 @@ const DESIGN_FONT =
   "'Inter', 'Montserrat', 'Avenir Next', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 const DARK_PANEL =
-  "linear-gradient(180deg, rgba(27,60,99,0.82) 0%, rgba(12,32,58,0.94) 100%)";
+  "linear-gradient(180deg, rgba(18,54,91,0.97) 0%, rgba(5,29,56,0.98) 100%)";
 
 const PAGE_BG =
   "radial-gradient(ellipse 69% 58% at 12% 12%, rgba(79,125,255,0.22) 0%, rgba(79,125,255,0) 58%), radial-gradient(ellipse 60% 51% at 86% 18%, rgba(69,224,209,0.12) 0%, rgba(69,224,209,0) 56%), radial-gradient(ellipse 50% 58% at 50% 92%, rgba(139,92,246,0.10) 0%, rgba(139,92,246,0) 60%), #061A3A";
 
 const PROFILE_ORDER = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"];
+const FREQUENCY_ORDER: AB[] = ["A", "B", "C", "D"];
 
 const PROFILE_META: Record<
   string,
@@ -137,15 +138,16 @@ const PROFILE_META: Record<
     dimension: "Catalyst Dimension",
     shortDimension: "Catalyst",
     description: "Visionary innovators who push boundaries and create industry-shifting change.",
-    color: "#0FCD5E",
+    color: "#15C96F",
   },
   P2: {
     name: "The Advocator",
     shortName: "Advocator",
     dimension: "Catalyst–Communicator Dimension",
     shortDimension: "Catalyst–Comm.",
-    description: "High-energy leaders who thrive on engagement, motivation, and generating broad interest and buy-in.",
-    color: "#8A9A60",
+    description:
+      "High-energy leaders who thrive on engagement, motivation, and generating broad interest and buy-in.",
+    color: "#7FA04A",
   },
   P3: {
     name: "The Mediator",
@@ -153,7 +155,7 @@ const PROFILE_META: Record<
     dimension: "Communicator Dimension",
     shortDimension: "Communicator",
     description: "Empathetic leaders who excel in team alignment, conflict resolution, and relationship-building.",
-    color: "#B84040",
+    color: "#D34B41",
   },
   P4: {
     name: "The Connector",
@@ -161,7 +163,7 @@ const PROFILE_META: Record<
     dimension: "Communicator–Strategist Dimension",
     shortDimension: "Comm.–Strategist",
     description: "Strategic networkers who leverage partnerships to drive business success.",
-    color: "#C07030",
+    color: "#C76932",
   },
   P5: {
     name: "The Planner",
@@ -170,15 +172,16 @@ const PROFILE_META: Record<
     shortDimension: "Strategist",
     description:
       "Customer, market and mission-oriented leaders focused on service-driven planning and reliable logistics performance.",
-    color: "#C48A20",
+    color: "#D68A1D",
   },
   P6: {
     name: "The Forecaster",
     shortName: "Forecaster",
     dimension: "Strategist–Stabilizer Dimension",
     shortDimension: "Strat.–Stabilizer",
-    description: "Risk-aware, detail-oriented leaders with foresight to anticipate upcoming opportunities and challenges.",
-    color: "#5080B0",
+    description:
+      "Risk-aware, detail-oriented leaders with foresight to anticipate upcoming opportunities and challenges.",
+    color: "#5B80B4",
   },
   P7: {
     name: "The Analyzer",
@@ -187,7 +190,7 @@ const PROFILE_META: Record<
     shortDimension: "Stabilizer",
     description:
       "Systems-oriented thinkers who use data-driven, systematic approaches to develop long-term business frameworks.",
-    color: "#4070B8",
+    color: "#356AB9",
   },
   P8: {
     name: "The Optimizer",
@@ -196,7 +199,7 @@ const PROFILE_META: Record<
     shortDimension: "Stab.–Disruptor",
     description:
       "Precision-driven leaders who refine processes, integrate technology, implement automation, and make things better.",
-    color: "#50906A",
+    color: "#4A8F6C",
   },
 };
 
@@ -207,7 +210,8 @@ const FREQUENCY_META: Record<
     dimension: string;
     subtitle: string;
     description: string;
-    color: string;
+    cardColor: string;
+    chartColor: string;
   }
 > = {
   A: {
@@ -215,32 +219,38 @@ const FREQUENCY_META: Record<
     dimension: "Catalyst",
     subtitle: "Rapid Response & Innovation",
     description: "Action-oriented leaders who drive change and thrive in fast-moving environments.",
-    color: "#3AAB7A",
+    cardColor: "#2F9F67",
+    chartColor: "#FF3742",
   },
   B: {
     label: "Influence",
     dimension: "Communicator",
-    subtitle: "Influence & Relationship Driven Leadership",
-    description: "People-focused leaders who build strong teams, partnerships and trust.",
-    color: "#45E0D1",
+    subtitle: "Influence & Relationship-Driven Leadership",
+    description: "People-focused leaders who build strong teams and partnerships.",
+    cardColor: "#C94440",
+    chartColor: "#F59B2F",
   },
   C: {
     label: "Implementation",
     dimension: "Strategist",
     subtitle: "Customer Service & Mission Driven",
-    description: "Structured leaders who ensure operational efficiency, reliability and strong delivery.",
-    color: "#4F7DFF",
+    description:
+      "Structured leaders who ensure operational efficiency and reliability focused on balancing customer delight with operational effectiveness and reliability.",
+    cardColor: "#D7851F",
+    chartColor: "#11B57B",
   },
   D: {
     label: "Insight",
     dimension: "Stabilizer",
     subtitle: "Target Focused & Systems Thinking",
-    description: "Analytical leaders who focus on detail, optimisation and future-proofing.",
-    color: "#8B5CF6",
+    description:
+      "Analytical leaders who focus on longer-term, detailed analysis, optimization and future-proofing businesses.",
+    cardColor: "#336FBD",
+    chartColor: "#1D7FE8",
   },
 };
 
-function safeText(x: any): string {
+function safeText(x: unknown): string {
   if (typeof x === "string") return x;
   if (typeof x === "number") return String(x);
   if (Array.isArray(x)) return x.map(safeText).join(" ");
@@ -253,13 +263,13 @@ function fullName(first?: string | null, last?: string | null) {
   return out || "Participant";
 }
 
-function normalizeFrequency(input: any): AB {
+function normalizeFrequency(input: unknown): AB {
   const s = String(input || "").trim().toUpperCase();
   if (s === "A" || s === "B" || s === "C" || s === "D") return s;
   return "A";
 }
 
-function normalizeProfileCode(input: any): string {
+function normalizeProfileCode(input: unknown): string {
   const s = String(input || "").trim().toUpperCase();
   const m = s.match(/^P(?:ROFILE)?[_\s-]?([1-8])$/i);
   if (m) return `P${m[1]}`;
@@ -270,7 +280,7 @@ function normalizeProfileCode(input: any): string {
   return s;
 }
 
-function legacyProfileCode(input: any): string {
+function legacyProfileCode(input: unknown): string {
   const p = normalizeProfileCode(input);
   const m = p.match(/^P([1-8])$/i);
   return m ? `PROFILE_${m[1]}` : p;
@@ -281,10 +291,9 @@ function profileNumber(code: string) {
   return m ? m[1] : "";
 }
 
-function asRatio(value: any): number {
+function asRatio(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
-
   if (n < 0) return 0;
   if (n > 1) return Math.min(n / 100, 1);
   return Math.min(n, 1);
@@ -339,7 +348,7 @@ function readFrequencyRatio(data: ResultData, code: AB) {
   if (typeof val === "number" && Number.isFinite(val)) return asRatio(val);
 
   const total = readFrequencyTotal(data, code);
-  const sum = (["A", "B", "C", "D"] as AB[]).reduce((acc, c) => acc + readFrequencyTotal(data, c), 0);
+  const sum = FREQUENCY_ORDER.reduce((acc, c) => acc + readFrequencyTotal(data, c), 0);
   if (sum > 0) return Math.max(0, Math.min(1, total / sum));
 
   return 0;
@@ -362,7 +371,6 @@ function cleanProfileName(name: string, code: string) {
   const cleaned = safeText(name)
     .replace(/^P[1-8]:\s*/i, "")
     .replace(/^Profile\s*[1-8]:\s*/i, "")
-    .replace(/^The\s+/i, "The ")
     .replace(/\s*\(P[1-8]\)\s*$/i, "")
     .trim();
 
@@ -371,7 +379,7 @@ function cleanProfileName(name: string, code: string) {
   return cleaned.replace(/^The\s+/i, "");
 }
 
-function replaceMacros(input: any, ctx: RenderContext) {
+function replaceMacros(input: unknown, ctx: RenderContext) {
   const text = safeText(input);
   const topMeta = PROFILE_META[ctx.topCode];
 
@@ -447,23 +455,23 @@ function SectionShell({
   return (
     <section
       id={id}
-      className="rounded-[24px] border border-white/10 p-[20px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="rounded-[28px] border border-white/10 p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
       style={{ background: DARK_PANEL }}
     >
       <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-white/15 bg-white text-lg text-[#0C203A] shadow-sm">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#F5EFEA] text-lg text-[#0C203A] shadow-sm">
           {icon.src ? (
             <ImageWithFallback
               src={icon.src}
               alt=""
-              className="flex h-11 w-11 items-center justify-center rounded-[12px] object-contain p-1"
+              className="flex h-11 w-11 items-center justify-center rounded-[14px] object-contain p-1.5"
               fallback={<span className="flex h-11 w-11 items-center justify-center">{icon.fallback}</span>}
             />
           ) : (
             icon.fallback
           )}
         </div>
-        <h2 className="text-[16px] font-bold leading-[22px] text-white">{title}</h2>
+        <h2 className="text-[15px] font-bold leading-[22px] text-white">{title}</h2>
       </div>
 
       {children}
@@ -473,9 +481,30 @@ function SectionShell({
 
 function WhitePanel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[18px] border border-white/10 bg-white text-[#313C52] shadow-sm ${className}`}>
+    <div className={`rounded-[20px] border border-white/10 bg-[#F6F7FA] text-[#313C52] shadow-sm ${className}`}>
       {children}
     </div>
+  );
+}
+
+function DashboardOuterCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className="rounded-[20px] border border-white/10 p-4 shadow-[0_14px_42px_rgba(0,0,0,0.25)]"
+      style={{ background: DARK_PANEL }}
+    >
+      <h3 className="text-[16px] font-bold text-white">{title}</h3>
+      <p className="mt-2 max-w-[540px] text-[12px] leading-6 text-white/85">{description}</p>
+      <div className="mt-4">{children}</div>
+    </section>
   );
 }
 
@@ -537,7 +566,7 @@ function TopHeader({
           </button>
           <button
             onClick={onNext}
-            className="rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-2.5 text-[12px] font-black text-[#071C36] shadow-sm"
+            className="rounded-lg bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-4 py-2.5 text-[12px] font-black text-[#071C36] shadow-sm"
           >
             Next steps
           </button>
@@ -586,8 +615,7 @@ function HeroHeader({
             </h1>
 
             <p className="mt-6 max-w-[800px] text-[15px] leading-7 text-white/90">
-              “Navigating Leadership Strengths in Logistics, Supply Chain, and Operations” —{" "}
-              {topMeta.description}
+              “Navigating Leadership Strengths in Logistics, Supply Chain, and Operations” — {topMeta.description}
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -708,154 +736,184 @@ function OverviewDashboard({ data }: { data: ResultData }) {
 }
 
 function DimensionScorePanel({ data }: { data: ResultData }) {
-  const codes: AB[] = ["A", "B", "C", "D"];
+  const ticks = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0];
 
   return (
-    <WhitePanel className="p-7">
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div>
-          <h2 className="text-[28px] font-black leading-tight text-[#0C203A]">Dimensions</h2>
-          <p className="mt-3 max-w-[520px] text-[13px] leading-6 text-[#5A6478]">
-            The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more
-            naturally; lower scores are patterns you may need to be more intentional about.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-4 items-end gap-4">
-          {codes.map((code) => {
-            const meta = FREQUENCY_META[code];
-            const ratio = readFrequencyRatio(data, code);
-            const pct = Math.round(ratio * 100);
-
-            return (
-              <div key={code} className="text-center">
-                <p className="mb-2 text-[12px] font-black text-[#0C203A]">{pct}%</p>
-                <div className="mx-auto flex h-[150px] w-10 items-end rounded-full bg-slate-100">
-                  <div
-                    className="w-10 rounded-full"
-                    style={{
-                      height: percentWidth(ratio),
-                      minHeight: ratio > 0 ? 8 : 0,
-                      background: meta.color,
-                    }}
-                  />
+    <DashboardOuterCard
+      title="Dimensions"
+      description="The four Drivers show the behavioural energy you use most often. Higher scores are patterns you access more naturally; lower scores are patterns you may need to be more intentional about."
+    >
+      <div className="rounded-[14px] border border-[#D6DDE7] bg-[#F5F7FA] p-4">
+        <div className="rounded-[12px] border border-[#D6DDE7] bg-[#EEF2F6] p-4">
+          <div className="grid grid-cols-[34px_1fr] gap-4">
+            <div className="relative h-[250px]">
+              {ticks.map((tick) => (
+                <div
+                  key={tick}
+                  className="absolute left-0 right-0 text-[10px] text-[#8A96A9]"
+                  style={{ bottom: `${tick}%`, transform: tick === 0 ? "translateY(0)" : "translateY(50%)" }}
+                >
+                  {tick}
                 </div>
-                <p className="mt-3 text-[15px] font-black text-[#0C203A]">{code}</p>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  {meta.label}
-                </p>
+              ))}
+            </div>
+
+            <div className="relative h-[250px]">
+              {ticks.map((tick) => (
+                <div
+                  key={tick}
+                  className="absolute left-0 right-0 border-t border-[#DDE4EC]"
+                  style={{ bottom: `${tick}%` }}
+                />
+              ))}
+
+              <div className="grid h-full grid-cols-4 gap-2 px-2 pt-2">
+                {FREQUENCY_ORDER.map((code) => {
+                  const ratio = readFrequencyRatio(data, code);
+                  const percent = Math.round(ratio * 100);
+                  const meta = FREQUENCY_META[code];
+
+                  return (
+                    <div key={code} className="flex h-full flex-col items-center justify-end">
+                      <div className="mb-2 text-[12px] font-bold text-[#5E6675]">{percent}</div>
+
+                      <div className="relative flex h-[206px] w-full max-w-[82px] items-end overflow-hidden rounded-[6px] border border-[#D2D9E2] bg-[#F3F3F3]">
+                        <div
+                          className="w-full rounded-b-[6px]"
+                          style={{
+                            height: `${percent}%`,
+                            minHeight: percent > 0 ? 8 : 0,
+                            background: meta.chartColor,
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-3 text-[14px] font-black text-[#13233C]">{code}</div>
+                      <div className="mt-1 text-center text-[10px] font-medium tracking-[0.04em] text-[#5E6E86]">
+                        {meta.label}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          </div>
         </div>
       </div>
-    </WhitePanel>
+    </DashboardOuterCard>
   );
 }
 
 function ProfileMapPanel({ data }: { data: ResultData }) {
   return (
-    <WhitePanel className="p-7">
-      <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
-        <div>
-          <h2 className="text-[28px] font-black leading-tight text-[#0C203A]">Your Personality Map</h2>
-          <p className="mt-3 max-w-[520px] text-[13px] leading-6 text-[#5A6478]">
-            This map shows your overall pattern across Profiles. It helps you see what you naturally lean on as a
-            strength, and what may require support or structure.
-          </p>
-          <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            Higher = stronger pattern
-          </p>
+    <DashboardOuterCard
+      title="Your Personality Map (Profile)"
+      description="This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk)."
+    >
+      <div className="rounded-[14px] border border-[#D6DDE7] bg-[#F5F7FA] p-4">
+        <div className="flex items-center justify-between px-2 pb-2">
+          <p className="text-[14px] font-bold text-[#18253D]">Your Personality Map (Profiles)</p>
+          <p className="text-[11px] text-[#7B879B]">Higher = stronger pattern</p>
         </div>
-
         <ProfileRadar data={data} />
       </div>
-    </WhitePanel>
+    </DashboardOuterCard>
   );
 }
 
+function polygonPoints(cx: number, cy: number, radius: number, count: number) {
+  return Array.from({ length: count }, (_, idx) => {
+    const angle = -Math.PI / 2 + (idx * Math.PI * 2) / count;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    return `${x},${y}`;
+  }).join(" ");
+}
+
 function ProfileRadar({ data }: { data: ResultData }) {
-  const size = 310;
-  const center = size / 2;
-  const maxRadius = 102;
-  const rings = [0.2, 0.4, 0.6, 0.8, 1];
+  const size = 380;
+  const cx = size / 2;
+  const cy = 190;
+  const maxRadius = 110;
+  const rings = [0.17, 0.34, 0.51, 0.68, 0.85, 1];
 
   const points = PROFILE_ORDER.map((code, index) => {
     const angle = -Math.PI / 2 + (index * Math.PI * 2) / PROFILE_ORDER.length;
     const ratio = readProfileRatio(data, code);
-    const radius = 12 + ratio * maxRadius;
+    const radius = ratio * maxRadius;
 
     return {
       code,
       ratio,
-      x: center + Math.cos(angle) * radius,
-      y: center + Math.sin(angle) * radius,
-      lx: center + Math.cos(angle) * (maxRadius + 34),
-      ly: center + Math.sin(angle) * (maxRadius + 34),
+      x: cx + Math.cos(angle) * radius,
+      y: cy + Math.sin(angle) * radius,
+      ax: cx + Math.cos(angle) * maxRadius,
+      ay: cy + Math.sin(angle) * maxRadius,
+      lx: cx + Math.cos(angle) * (maxRadius + 22),
+      ly: cy + Math.sin(angle) * (maxRadius + 22),
+      tx: cx + Math.cos(angle) * (maxRadius + 6),
+      ty: cy + Math.sin(angle) * (maxRadius + 6),
     };
   });
 
   const polygon = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="mx-auto w-full max-w-[330px]">
-      <svg viewBox={`0 0 ${size} ${size}`} className="h-auto w-full">
-        {rings.map((ring) => (
-          <circle
-            key={ring}
-            cx={center}
-            cy={center}
-            r={ring * maxRadius + 12}
+    <div className="mx-auto w-full max-w-[420px]">
+      <svg viewBox={`0 0 ${size} 360`} className="h-auto w-full">
+        {rings.map((ring, idx) => (
+          <polygon
+            key={idx}
+            points={polygonPoints(cx, cy, maxRadius * ring, PROFILE_ORDER.length)}
             fill="none"
-            stroke="#E7EAF0"
+            stroke="#D7DCE5"
             strokeWidth="1"
           />
         ))}
 
-        {PROFILE_ORDER.map((code, index) => {
-          const angle = -Math.PI / 2 + (index * Math.PI * 2) / PROFILE_ORDER.length;
-          const x = center + Math.cos(angle) * (maxRadius + 12);
-          const y = center + Math.sin(angle) * (maxRadius + 12);
+        {points.map((p) => (
+          <line key={p.code} x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#D7DCE5" strokeWidth="1" />
+        ))}
 
-          return <line key={code} x1={center} y1={center} x2={x} y2={y} stroke="#E7EAF0" strokeWidth="1" />;
-        })}
+        <polygon points={polygon} fill="rgba(36,214,220,0.16)" stroke="#16C7C6" strokeWidth="2.5" />
 
-        <polygon points={polygon} fill="rgba(79,125,255,0.22)" stroke="#4F7DFF" strokeWidth="3" />
-
-        {points.map((p) => {
-          const meta = PROFILE_META[p.code];
-
-          return (
-            <g key={p.code}>
-              <circle cx={p.x} cy={p.y} r="5" fill={meta.color} />
-              <text
-                x={p.lx}
-                y={p.ly}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="13"
-                fontWeight="800"
-                fill="#0C203A"
-              >
-                {p.code}
-              </text>
-              <text
-                x={p.lx}
-                y={p.ly + 16}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="10"
-                fontWeight="700"
-                fill="#64748B"
-              >
-                {pctLabelFromRatio(p.ratio)}
-              </text>
-            </g>
-          );
-        })}
+        {points.map((p) => (
+          <g key={p.code}>
+            <circle cx={p.x} cy={p.y} r="3.5" fill="#16C7C6" />
+            <text
+              x={p.lx}
+              y={p.ly}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="12"
+              fontWeight="700"
+              fill="#4B5565"
+            >
+              {p.code}
+            </text>
+            <text
+              x={p.tx}
+              y={p.ty}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="10"
+              fill="#8A96A9"
+            >
+              {Math.round(p.ratio * 100)}%
+            </text>
+          </g>
+        ))}
       </svg>
     </div>
   );
+}
+
+function sectionTitleToId(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 function ReportIndex({
@@ -868,10 +926,13 @@ function ReportIndex({
   onNext: () => void;
 }) {
   return (
-    <aside className="sticky top-4 self-start rounded-[18px] bg-[#0A213D] p-5 text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
-      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-white/35">Report Index</p>
+    <aside
+      className="sticky top-4 self-start rounded-[20px] border border-white/10 p-4 text-white shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      style={{ background: DARK_PANEL }}
+    >
+      <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-white/35">Report Index</p>
 
-      <div className="mt-4 max-h-[70vh] space-y-2 overflow-auto pr-1">
+      <div className="mt-4 max-h-[72vh] space-y-2 overflow-auto pr-1">
         {sections.map((section, idx) => (
           <button
             key={`${section.id}-${idx}`}
@@ -881,23 +942,23 @@ function ReportIndex({
                 block: "start",
               })
             }
-            className="block w-full rounded-lg border border-white/5 bg-white/5 px-3 py-2 text-left text-[12px] leading-snug text-white/85 hover:bg-white/10"
+            className="block w-full rounded-[10px] border border-white/8 bg-white/[0.03] px-3 py-2.5 text-left text-[11px] leading-5 text-white/92 hover:bg-white/[0.06]"
           >
-            <span className="font-black text-white">{idx + 1}.</span> {section.title}
+            <span className="font-bold text-white">{idx + 1}.</span> {section.title}
           </button>
         ))}
       </div>
 
-      <div className="mt-6 flex flex-col gap-2">
+      <div className="mt-5 space-y-3">
         <button
           onClick={onDownload}
-          className="rounded-lg border border-white/10 bg-[#08162B]/90 px-4 py-2 text-[11px] font-black text-white"
+          className="w-full rounded-[10px] border border-white/15 bg-[#071629] px-3 py-2.5 text-left text-[11px] font-bold text-white"
         >
           Download PDF
         </button>
         <button
           onClick={onNext}
-          className="rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-2 text-[11px] font-black text-[#071C36]"
+          className="w-full rounded-[10px] bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-3 py-2.5 text-left text-[11px] font-bold text-[#071C36]"
         >
           Next step
         </button>
@@ -906,89 +967,155 @@ function ReportIndex({
   );
 }
 
-function fallbackSections(ctx: RenderContext): RenderableSection[] {
-  return [
-    {
-      id: "index-section-0",
-      title: "Welcome to the 5D Leadership Compass",
-      blocks: [
-        { type: "p", text: `Dear ${ctx.participant},` },
-        {
-          type: "p",
-          text:
-            "Welcome to the 5D Leadership Compass, a framework designed to help you unlock your leadership potential by understanding your natural strengths, decision-making style, and how you best contribute to your team, industry, and life.",
-        },
-        {
-          type: "p",
-          text:
-            "In today's complex world of logistics, supply chain, and operations, leadership success goes beyond experience or technical skill; it's about knowing how you lead, collaborate, and make an impact.",
-        },
-        {
-          type: "p",
-          text:
-            "This guide introduces the Five Dimensions of Leadership and the Eight Leadership Profiles, giving you deeper insight into your leadership style and how to thrive in any environment.",
-        },
-      ],
-    },
-    {
-      id: "index-section-1",
-      title: "Introduction to the 5D Leadership Compass",
-      blocks: [
-        {
-          type: "p",
-          text:
-            "The 5D Leadership Compass is a dynamic framework that categorises leadership into five core dimensions. Four dimensions represent distinct leadership behaviour patterns, while the fifth dimension — Raison d’être — reflects the deeper purpose and motivation behind leadership.",
-        },
-      ],
-    },
-    {
-      id: "index-section-2",
-      title: "The Five Dimensions of Leadership",
-      blocks: [],
-    },
-    {
-      id: "index-section-3",
-      title: "The Eight Leadership Profiles",
-      blocks: [],
-    },
-    {
-      id: "index-section-4",
-      title: "How to Use This Framework",
-      blocks: [
-        {
-          type: "p",
-          text: "Understanding your primary leadership profile helps you:",
-        },
-        {
-          type: "ul",
-          items: [
-            "Leverage your strengths to maximise leadership effectiveness.",
-            "Overcome challenges by recognising complementary skills in yourself and your team.",
-            "Align with the right roles that best fit your leadership dimension.",
-            "Build well-balanced teams by working with leaders who complement your profile.",
-            "Build high trust through clear communication and practical self-awareness.",
-          ],
-        },
-      ],
-    },
-    {
-      id: "index-section-5",
-      title: `Introduction to Your Profile: ${ctx.topName}`,
-      blocks: [
-        {
-          type: "p",
-          text:
-            PROFILE_META[ctx.topCode]?.description ||
-            "Your primary leadership profile shows the pattern you naturally lean on most often.",
-        },
-        {
-          type: "p",
-          text:
-            "Use this profile as a practical guide. It is not a box. It is a mirror that helps you understand your leadership strengths, your growth risks, and the environments where you can make your strongest contribution.",
-        },
-      ],
-    },
+function buildFallbackSections(ctx: RenderContext): RenderableSection[] {
+  const topMeta = PROFILE_META[ctx.topCode] || PROFILE_META.P1;
+  const topLabel = topMeta.name;
+
+  const titles = [
+    "Welcome to the 5D Leadership Compass",
+    "Introduction to the 5D Leadership Compass",
+    "The Five Dimensions of Leadership",
+    "The Eight Leadership Profiles",
+    "How to Use This Framework",
+    `Introduction to The ${topLabel} Profile`,
+    `Core Characteristics Of The ${topLabel}`,
+    `How The ${topLabel} Leads in Logistics`,
+    `Success Factors for The ${topLabel} in Logistics`,
+    "Ideal Roles in Logistics & Supply Chain",
+    "Roles That Will Be Challenging",
+    `Enhancing The ${topLabel}'s Development`,
+    `Case Studies & Industry Examples Of The ${topLabel}`,
+    `Final Thoughts on The ${topLabel} Profile`,
+    "The Raison d'être Dimension",
+    "Final Thoughts: The 5D Leader — Leading in Your Core, Living With Purpose",
   ];
+
+  const blocksByTitle: Record<string, SectionBlock[]> = {
+    "Welcome to the 5D Leadership Compass": [
+      { type: "p", text: `Dear ${ctx.participant},` },
+      {
+        type: "p",
+        text:
+          "Welcome to the 5D Leadership Compass, a framework designed to help you unlock your leadership potential by understanding your natural strengths, decision-making style, and how you best contribute to your team, industry, and life.",
+      },
+      {
+        type: "p",
+        text:
+          "This report gives you a practical way to understand your leadership pattern and apply it in logistics, supply chain, and operations environments.",
+      },
+    ],
+    "Introduction to the 5D Leadership Compass": [
+      {
+        type: "p",
+        text:
+          "The 5D Leadership Compass is a dynamic framework that categorises leadership into five core dimensions. Four dimensions represent distinct behavioural leadership patterns, while the fifth dimension — Raison d’être — reflects the deeper purpose and motivation behind leadership.",
+      },
+    ],
+    "How to Use This Framework": [
+      {
+        type: "ul",
+        items: [
+          "Use your top profile as a guide to your most natural leadership pattern.",
+          "Review the dimensions and note which behavioural energies are strongest.",
+          "Use the profile insights to understand strengths, risks, and growth opportunities.",
+          "Return to this report regularly to reflect on what is becoming more intentional.",
+        ],
+      },
+    ],
+    [`Introduction to The ${topLabel} Profile`]: [
+      {
+        type: "p",
+        text: `${topLabel} reflects a strong tendency toward ${topMeta.description.toLowerCase()}`,
+      },
+      {
+        type: "p",
+        text:
+          "Your profile is not a box — it is a guide. It shows where you naturally lead from and where greater awareness can improve consistency and influence.",
+      },
+    ],
+    [`Core Characteristics Of The ${topLabel}`]: [
+      {
+        type: "ul",
+        items: [
+          "Natural strengths and behavioural preferences",
+          "The leadership environments where this pattern performs best",
+          "Potential blind spots that can emerge under pressure",
+        ],
+      },
+    ],
+    [`How The ${topLabel} Leads in Logistics`]: [
+      {
+        type: "p",
+        text:
+          "In logistics, supply chain, and operational leadership, this profile often shows up through the way decisions are made, people are engaged, and systems are improved or protected.",
+      },
+    ],
+    [`Success Factors for The ${topLabel} in Logistics`]: [
+      {
+        type: "ul",
+        items: [
+          "Strong self-awareness",
+          "A clear understanding of role fit",
+          "The ability to complement your strengths with other leadership styles",
+        ],
+      },
+    ],
+    "Ideal Roles in Logistics & Supply Chain": [
+      {
+        type: "p",
+        text:
+          "The best-fit roles for any leadership profile are those that allow strengths to be expressed consistently while still offering the right amount of challenge and growth.",
+      },
+    ],
+    "Roles That Will Be Challenging": [
+      {
+        type: "p",
+        text:
+          "Every leadership profile has environments that may create strain. Knowing these in advance helps you build better support systems, team balance, and role alignment.",
+      },
+    ],
+    [`Enhancing The ${topLabel}'s Development`]: [
+      {
+        type: "p",
+        text:
+          "Development comes from leaning into your strengths while intentionally building awareness around your less natural patterns.",
+      },
+    ],
+    [`Case Studies & Industry Examples Of The ${topLabel}`]: [
+      {
+        type: "p",
+        text:
+          "Real-world examples help bring this profile to life and show how these leadership tendencies may appear across different operational and business environments.",
+      },
+    ],
+    [`Final Thoughts on The ${topLabel} Profile`]: [
+      {
+        type: "p",
+        text:
+          "The goal is not to become someone else — it is to become more effective, more self-aware, and more intentional in how you lead from your natural core.",
+      },
+    ],
+    "The Raison d'être Dimension": [
+      {
+        type: "p",
+        text:
+          "Raison d’être is the motivational foundation of the framework. It reflects the deeper passions, drivers, and direction that shape how you find fulfillment in leadership.",
+      },
+    ],
+    "Final Thoughts: The 5D Leader — Leading in Your Core, Living With Purpose": [
+      {
+        type: "p",
+        text:
+          "Sustainable leadership grows when behavioural strengths, profile awareness, and purpose all align. This is what makes leadership practical, powerful, and authentic.",
+      },
+    ],
+  };
+
+  return titles.map((title, index) => ({
+    id: `index-section-${index}-${sectionTitleToId(title)}`,
+    title,
+    blocks: blocksByTitle[title] || [],
+  }));
 }
 
 function buildSections(data: ResultData, ctx: RenderContext): RenderableSection[] {
@@ -1000,10 +1127,10 @@ function buildSections(data: ResultData, ctx: RenderContext): RenderableSection[
     return title || blocks.length > 0;
   });
 
-  if (!source.length) return fallbackSections(ctx);
+  if (!source.length) return buildFallbackSections(ctx);
 
   return source.map((section, index) => ({
-    id: `index-section-${index}`,
+    id: `index-section-${index}-${sectionTitleToId(safeText(section.title) || `section-${index + 1}`)}`,
     title: safeText(section.title).trim() || `Section ${index + 1}`,
     blocks: Array.isArray(section.blocks) ? section.blocks : [],
   }));
@@ -1015,12 +1142,17 @@ function alignClass(align?: "left" | "center" | "right") {
   return "mx-auto";
 }
 
-function renderListItem(item: any, ctx: RenderContext) {
+function renderListItem(item: unknown, ctx: RenderContext) {
   if (typeof item === "string" || typeof item === "number") return replaceMacros(item, ctx);
-  if (item?.text) return replaceMacros(item.text, ctx);
-  if (item?.title && item?.description) return `${replaceMacros(item.title, ctx)} — ${replaceMacros(item.description, ctx)}`;
-  if (item?.title) return replaceMacros(item.title, ctx);
-  if (item?.content) return replaceMacros(item.content, ctx);
+  if (typeof item === "object" && item !== null) {
+    const candidate = item as Record<string, unknown>;
+    if (candidate.text) return replaceMacros(candidate.text, ctx);
+    if (candidate.title && candidate.description) {
+      return `${replaceMacros(candidate.title, ctx)} — ${replaceMacros(candidate.description, ctx)}`;
+    }
+    if (candidate.title) return replaceMacros(candidate.title, ctx);
+    if (candidate.content) return replaceMacros(candidate.content, ctx);
+  }
   return safeText(item);
 }
 
@@ -1055,31 +1187,31 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
     );
   }
 
-   if (type === "ul" || type === "list" || type === "bullet_list") {
-  const items: unknown[] = Array.isArray((block as any).items) ? ((block as any).items as unknown[]) : [];
-  if (!items.length) return null;
+  if (type === "ul" || type === "list" || type === "bullet_list") {
+    const items: unknown[] = Array.isArray((block as any).items) ? ((block as any).items as unknown[]) : [];
+    if (!items.length) return null;
 
-  return (
-    <ul className="mb-5 ml-5 list-disc space-y-2 text-[13px] leading-6 text-[#313C52]">
-      {items.map((item: unknown, idx: number) => (
-        <li key={idx}>{renderListItem(item, ctx)}</li>
-      ))}
-    </ul>
-  );
-}
+    return (
+      <ul className="mb-5 ml-5 list-disc space-y-2 text-[13px] leading-6 text-[#313C52]">
+        {items.map((item: unknown, idx: number) => (
+          <li key={idx}>{renderListItem(item, ctx)}</li>
+        ))}
+      </ul>
+    );
+  }
 
   if (type === "ol" || type === "numbered_list") {
-  const items: unknown[] = Array.isArray((block as any).items) ? ((block as any).items as unknown[]) : [];
-  if (!items.length) return null;
+    const items: unknown[] = Array.isArray((block as any).items) ? ((block as any).items as unknown[]) : [];
+    if (!items.length) return null;
 
-  return (
-    <ol className="mb-5 ml-5 list-decimal space-y-2 text-[13px] leading-6 text-[#313C52]">
-      {items.map((item: unknown, idx: number) => (
-        <li key={idx}>{renderListItem(item, ctx)}</li>
-      ))}
-    </ol>
-  );
-}
+    return (
+      <ol className="mb-5 ml-5 list-decimal space-y-2 text-[13px] leading-6 text-[#313C52]">
+        {items.map((item: unknown, idx: number) => (
+          <li key={idx}>{renderListItem(item, ctx)}</li>
+        ))}
+      </ol>
+    );
+  }
 
   if (type === "quote") {
     const text = replaceMacros((block as any).text, ctx);
@@ -1150,8 +1282,8 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
   const fallbackTitle = replaceMacros((block as any).title, ctx);
   const fallbackText = replaceMacros((block as any).text ?? (block as any).content ?? (block as any).description, ctx);
   const fallbackItems: unknown[] = Array.isArray((block as any).items)
-  ? ((block as any).items as unknown[])
-  : [];
+    ? ((block as any).items as unknown[])
+    : [];
 
   if (fallbackTitle || fallbackText || fallbackItems.length) {
     return (
@@ -1160,7 +1292,7 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
         {fallbackText ? <p className="mt-2 text-[13px] leading-6 text-[#313C52]">{fallbackText}</p> : null}
         {fallbackItems.length ? (
           <ul className="mt-3 ml-5 list-disc space-y-2 text-[13px] leading-6 text-[#313C52]">
-            {fallbackItems.map((item, idx) => (
+            {fallbackItems.map((item: unknown, idx: number) => (
               <li key={idx}>{renderListItem(item, ctx)}</li>
             ))}
           </ul>
@@ -1173,33 +1305,56 @@ function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext
 }
 
 function FiveDimensionsVisual() {
-  const codes: AB[] = ["A", "B", "C", "D"];
-
   return (
-    <div className="mt-6 grid gap-4 md:grid-cols-2">
-      {codes.map((code) => {
-        const meta = FREQUENCY_META[code];
+    <div className="mt-2">
+      <div className="mb-8 flex justify-center">
+        <img
+          src={ASSETS.fiveDimensionsCompass}
+          alt="The Five Dimensions of Leadership"
+          className="h-auto max-h-[360px] w-auto max-w-full object-contain"
+          crossOrigin="anonymous"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      </div>
 
-        return (
-          <div key={code} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-[13px] font-black text-[#0C203A]">
-              {code} {meta.dimension} Dimension
-            </p>
-            <p className="mt-1 text-[12px] font-bold text-[#5B4380]">{meta.subtitle}</p>
-            <p className="mt-3 text-[13px] leading-6 text-[#313C52]">{meta.description}</p>
-          </div>
-        );
-      })}
+      <div className="grid gap-4 md:grid-cols-2">
+        {FREQUENCY_ORDER.map((code) => {
+          const meta = FREQUENCY_META[code];
+          return (
+            <div
+              key={code}
+              className="rounded-[16px] border bg-[#F8F8F8] p-5"
+              style={{ borderColor: `${meta.cardColor}AA` }}
+            >
+              <p className="text-[14px] font-black text-[#18304D]">
+                {code} · {meta.dimension} Dimension
+              </p>
+              <p
+                className="mt-1 text-[11px] font-bold uppercase tracking-[0.1em]"
+                style={{ color: meta.cardColor }}
+              >
+                {meta.subtitle}
+              </p>
+              <p className="mt-4 text-[13px] leading-7 text-[#313C52]">{meta.description}</p>
+            </div>
+          );
+        })}
 
-      <div className="rounded-2xl border border-[#5B4380]/20 bg-[#F5F0FA] p-5 md:col-span-2">
-        <p className="text-[13px] font-black uppercase tracking-[0.14em] text-[#5B4380]">
-          E. The Fifth Dimension — The Differentiator
-        </p>
-        <p className="mt-2 text-[20px] font-black text-[#0C203A]">Raison d’être</p>
-        <p className="mt-2 text-[13px] leading-6 text-[#313C52]">
-          The motivational foundation: the underlying passions, drivers and direction that defines how leaders find
-          fulfillment in their work and life.
-        </p>
+        <div className="rounded-[16px] border border-[#8F61D1] bg-[#F4EFFB] p-5 md:col-span-2">
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#54457F]">
+            E. The Fifth Dimension · The Differentiator
+          </p>
+          <p className="mt-3 text-[20px] font-black text-[#102640]">Raison d&apos;être</p>
+          <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-[#54457F]">
+            The Motivational Foundation
+          </p>
+          <p className="mt-4 text-[13px] leading-7 text-[#313C52]">
+            The underlying passions, drivers and direction that defines how leaders find fulfillment in their work and
+            life.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -1222,10 +1377,7 @@ function EightProfilesVisual({ data }: { data: ResultData }) {
             }`}
           >
             <div className="flex items-start gap-3">
-              <span
-                className="mt-1 h-3 w-3 shrink-0 rounded-full"
-                style={{ background: meta.color }}
-              />
+              <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ background: meta.color }} />
               <div>
                 <p className="text-[15px] font-black text-[#0C203A]">{meta.name}</p>
                 <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
@@ -1363,7 +1515,7 @@ function NextStepsPanel({
           </button>
           <button
             onClick={onNext}
-            className="rounded-xl bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-4 text-sm font-black text-[#071C36] shadow-sm"
+            className="rounded-xl bg-gradient-to-r from-[#24D6DC] via-[#2D8CFF] to-[#7857F6] px-4 py-4 text-sm font-black text-[#071C36] shadow-sm"
           >
             Next step
           </button>
@@ -1489,7 +1641,7 @@ export default function FiveDLeadershipReportClient(props: {
 
         <OverviewDashboard data={data} />
 
-        <section className="grid gap-5 lg:grid-cols-[280px_1fr]">
+        <section className="grid gap-5 lg:grid-cols-[190px_1fr]">
           <ReportIndex sections={sections} onDownload={handleDownloadPdf} onNext={openNextSteps} />
 
           <main className="flex flex-col gap-5">
