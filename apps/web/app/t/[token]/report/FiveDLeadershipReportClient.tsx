@@ -1422,6 +1422,29 @@ function splitTitleDescription(text: string): SplitContentItem {
   };
 }
 
+function splitBenefitText(text: string): SplitContentItem {
+  const cleaned = text.trim();
+  const lower = cleaned.toLowerCase();
+  const becauseIndex = lower.indexOf(" because ");
+
+  if (becauseIndex > 0) {
+    return {
+      title: cleaned.slice(0, becauseIndex).trim(),
+      description: cleaned.slice(becauseIndex).trim(),
+    };
+  }
+
+  const commaIndex = cleaned.indexOf(",");
+  if (commaIndex > 0 && commaIndex < 60) {
+    return {
+      title: cleaned.slice(0, commaIndex).trim(),
+      description: cleaned.slice(commaIndex + 1).trim(),
+    };
+  }
+
+  return splitTitleDescription(cleaned);
+}
+
 function BlockRenderer({ block, ctx }: { block: SectionBlock; ctx: RenderContext }) {
   const type = safeText(block.type).toLowerCase();
 
@@ -2082,9 +2105,7 @@ function CoreCharacteristicsCards({ blocks, ctx }: { blocks: SectionBlock[]; ctx
   const texts = getPlainTextBlocks(blocks, ctx);
 
   const strengthHeadingIdx = texts.findIndex((text) => text.toLowerCase().includes("key strengths"));
-  const challengeHeadingIdx = texts.findIndex(
-    (text) => text.toLowerCase().includes("challenge") || text.toLowerCase().includes("development areas")
-  );
+  const challengeHeadingIdx = texts.findIndex((text) => text.toLowerCase().includes("challenge") || text.toLowerCase().includes("development areas"));
 
   let strengthTexts: string[] = [];
   let challengeTexts: string[] = [];
@@ -2266,10 +2287,7 @@ function SuccessFactorsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: Re
         ? texts.slice(0, environmentsIdx).filter((text) => !text.toLowerCase().includes("what drives success"))
         : texts.filter((text) => !text.toLowerCase().includes("what drives success"));
 
-  const environmentTexts =
-    environmentsIdx >= 0
-      ? texts.slice(environmentsIdx + 1).filter(Boolean)
-      : [];
+  const environmentTexts = environmentsIdx >= 0 ? texts.slice(environmentsIdx + 1).filter(Boolean) : [];
 
   const environments = environmentTexts.map(splitTitleDescription).filter((item) => item.title);
 
@@ -2360,6 +2378,257 @@ function RoleCardsLayout({
   );
 }
 
+function RaisonDetreLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const texts = getPlainTextBlocks(blocks, ctx).filter(Boolean);
+
+  if (!texts.length) {
+    return (
+      <div>
+        {blocks.map((block, idx) => (
+          <BlockRenderer key={idx} block={block} ctx={ctx} />
+        ))}
+      </div>
+    );
+  }
+
+  const powerIdx = texts.findIndex((text) => text.toLowerCase().includes("power of the 5d leader"));
+  const whyIdx = texts.findIndex((text) => text.toLowerCase().includes("why the raison"));
+  const alignedIdx = texts.findIndex((text) => text.toLowerCase().includes("when you're aligned") || text.toLowerCase().includes("when you’re aligned"));
+  const transformationIdx = texts.findIndex((text) => text.toLowerCase().startsWith("that's how") || text.toLowerCase().startsWith("that’s how"));
+  const looksIdx = texts.findIndex((text) => text.toLowerCase().includes("looks different"));
+  const keyQuestionsIdx = texts.findIndex((text) => text.toLowerCase().includes("key questions"));
+  const whyDimensionIdx = texts.findIndex((text) => text.toLowerCase().includes("why this dimension matters"));
+
+  const powerTitle = powerIdx >= 0 ? texts[powerIdx] : "The Power of The 5D Leader";
+  const powerParagraphs =
+    powerIdx >= 0 && whyIdx > powerIdx
+      ? texts.slice(powerIdx + 1, whyIdx)
+      : whyIdx > 0
+        ? texts.slice(0, whyIdx)
+        : texts.slice(0, Math.min(3, texts.length));
+
+  const whyTitle = whyIdx >= 0 ? texts[whyIdx] : "Why The Raison d’être Matters Across All Profiles";
+  const whyParagraphs =
+    whyIdx >= 0 && alignedIdx > whyIdx
+      ? texts.slice(whyIdx + 1, alignedIdx)
+      : whyIdx >= 0 && looksIdx > whyIdx
+        ? texts.slice(whyIdx + 1, looksIdx)
+        : [];
+
+  const benefitEnd = transformationIdx >= 0 ? transformationIdx : looksIdx >= 0 ? looksIdx : keyQuestionsIdx >= 0 ? keyQuestionsIdx : texts.length;
+  const benefitTexts =
+    alignedIdx >= 0
+      ? texts
+          .slice(alignedIdx + 1, benefitEnd)
+          .filter((text) => text.toLowerCase().startsWith("you "))
+      : [];
+
+  const transformationText = transformationIdx >= 0 ? texts[transformationIdx] : "";
+
+  const looksTitle = looksIdx >= 0 ? texts[looksIdx] : "The Raison d’être Looks Different for Everyone, And That’s the Point.";
+  const looksEnd = keyQuestionsIdx >= 0 ? keyQuestionsIdx : whyDimensionIdx >= 0 ? whyDimensionIdx : texts.length;
+  const looksContent = looksIdx >= 0 ? texts.slice(looksIdx + 1, looksEnd) : [];
+
+  const profileBulletStart = looksContent.findIndex((text) =>
+    /^(disruptors|advocators|connectors|planners|analyzers)/i.test(text.trim())
+  );
+
+  const looksParagraphs = profileBulletStart >= 0 ? looksContent.slice(0, profileBulletStart) : looksContent;
+  const profileTexts = profileBulletStart >= 0 ? looksContent.slice(profileBulletStart) : [];
+  const profileOutroIdx = profileTexts.findIndex((text) => text.toLowerCase().includes("every profile becomes"));
+
+  const profileBullets = profileOutroIdx >= 0 ? profileTexts.slice(0, profileOutroIdx) : profileTexts;
+  const profileOutro = profileOutroIdx >= 0 ? profileTexts[profileOutroIdx] : "";
+
+  const questionTexts =
+    keyQuestionsIdx >= 0
+      ? texts
+          .slice(keyQuestionsIdx + 1, whyDimensionIdx >= 0 ? whyDimensionIdx : texts.length)
+          .filter((text) => text.includes("?"))
+      : [];
+
+  const whyDimensionBullets = whyDimensionIdx >= 0 ? texts.slice(whyDimensionIdx + 1).filter(Boolean) : [];
+
+  return (
+    <div className="rounded-[14px] bg-white p-6 text-[#313C52]">
+      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+        {powerTitle}
+      </p>
+
+      <div className="mt-4 space-y-4">
+        {powerParagraphs.map((text, idx) => (
+          <p key={idx} className="text-[11px] leading-6 text-[#313C52]">
+            {text}
+          </p>
+        ))}
+      </div>
+
+      <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+        {whyTitle}
+      </p>
+
+      <div className="mt-4 space-y-4">
+        {whyParagraphs.map((text, idx) => (
+          <p key={idx} className="text-[11px] leading-6 text-[#313C52]">
+            {text}
+          </p>
+        ))}
+      </div>
+
+      {benefitTexts.length ? (
+        <div className="my-6 grid gap-5 rounded-[8px] bg-[#6A4A85] p-5 text-white md:grid-cols-[240px_1fr]">
+          <div className="flex items-center">
+            <p className="text-[24px] font-black leading-tight tracking-[-0.02em]">
+              When you&apos;re
+              <br />
+              aligned with your
+              <br />
+              raison d&apos;être:
+            </p>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            {benefitTexts.map((text, idx) => {
+              const item = splitBenefitText(text);
+
+              return (
+                <div key={idx} className="rounded-[8px] border-t border-white/80 bg-white/12 px-4 py-3">
+                  <p className="text-[11px] font-black leading-4 text-white">{item.title}</p>
+                  {item.description ? (
+                    <p className="mt-1 text-[10px] leading-4 text-white/88">{item.description}</p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {transformationText ? (
+        <p className="mt-4 text-[11px] leading-6 text-[#313C52]">{transformationText}</p>
+      ) : null}
+
+      {looksContent.length ? (
+        <>
+          <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            {looksTitle}
+          </p>
+
+          <div className="mt-4 space-y-4">
+            {looksParagraphs.map((text, idx) => (
+              <p key={idx} className="text-[11px] leading-6 text-[#313C52]">
+                {text}
+              </p>
+            ))}
+          </div>
+
+          {profileBullets.length ? (
+            <ul className="mt-4 ml-4 list-disc space-y-2 text-[11px] leading-5 text-[#313C52]">
+              {profileBullets.map((text, idx) => {
+                const item = splitTitleDescription(text);
+
+                return (
+                  <li key={idx}>
+                    {item.title ? <strong>{item.title}</strong> : null}
+                    {item.description ? ` ${item.description}` : !item.description && !item.title ? text : ""}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+
+          {profileOutro ? (
+            <p className="mt-5 text-[11px] font-black leading-6 text-[#102640]">{profileOutro}</p>
+          ) : null}
+        </>
+      ) : null}
+
+      {questionTexts.length ? (
+        <>
+          <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            Key Questions for Leaders in This Dimension:
+          </p>
+
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {questionTexts.map((question, idx) => (
+              <div key={idx} className="flex gap-3 rounded-[7px] bg-[#E9E9E9] px-4 py-3">
+                <span className="text-[12px] font-black text-[#526176]">?</span>
+                <p className="text-[11px] italic leading-5 text-[#313C52]">{question}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {whyDimensionBullets.length ? (
+        <>
+          <p className="mt-7 text-[9px] font-black uppercase tracking-[0.24em] text-[#102640]">
+            Why This Dimension Matters:
+          </p>
+
+          <ul className="mt-3 ml-4 list-disc space-y-2 text-[11px] leading-5 text-[#313C52]">
+            {whyDimensionBullets.map((text, idx) => (
+              <li key={idx}>{text}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function FinalFiveDThoughtsLayout({ blocks, ctx }: { blocks: SectionBlock[]; ctx: RenderContext }) {
+  const texts = getPlainTextBlocks(blocks, ctx).filter(Boolean);
+
+  const calloutIdx = texts.findIndex((text) => text.toLowerCase().includes("you build better lives"));
+  const calloutText =
+    calloutIdx >= 0
+      ? texts[calloutIdx]
+      : "You build better lives for You, Your Teams, Your Family and for the World Around You.";
+
+  const remainingTexts = texts.filter((_, idx) => idx !== calloutIdx);
+  const firstText = remainingTexts[0] || "";
+  const restTexts = remainingTexts.slice(1);
+
+  const firstContainsHowWhy =
+    firstText.toLowerCase().includes("profile gives you the how") &&
+    firstText.toLowerCase().includes("raison");
+
+  return (
+    <div className="rounded-[14px] bg-white p-6 text-[#313C52]">
+      {firstContainsHowWhy ? (
+        <div className="space-y-2 text-[12px] leading-6">
+          <p>
+            Your <strong>5D Leadership profile</strong> gives you the <em>How.</em>
+          </p>
+          <p>
+            Your <strong>Raison d’être</strong> gives you the <em>Why.</em>
+          </p>
+          <p className="pt-3 font-black text-[#102640]">
+            Together? They shape your Unique Destiny and Define your Legacy as a 5D Leader.
+          </p>
+        </div>
+      ) : firstText ? (
+        <p className="text-[12px] leading-6 text-[#313C52]">{firstText}</p>
+      ) : null}
+
+      <div className="mt-7 space-y-5">
+        {restTexts.map((text, idx) => (
+          <p key={idx} className="text-[12px] leading-6 text-[#313C52]">
+            {text}
+          </p>
+        ))}
+      </div>
+
+      <div className="mt-7 rounded-[8px] border border-[#102640] px-5 py-4">
+        <p className="text-[22px] leading-8 tracking-[-0.02em] text-[#102640]">
+          {calloutText}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function shouldSuppressBlockInSection(block: SectionBlock, sectionTitle: string) {
   const title = sectionTitle.toLowerCase();
   const type = safeText(block.type).toLowerCase();
@@ -2391,6 +2660,9 @@ function ContentSection({
   const showSuccessFactors = title.includes("success factors");
   const showIdealRoles = title.includes("ideal roles");
   const showChallengingRoles = title.includes("roles that will be challenging");
+  const showRaisonDetre = title.includes("raison");
+  const showFinalFiveDThoughts =
+    title.includes("final thoughts") && (title.includes("5d leader") || title.includes("living with purpose"));
 
   const shouldRenderJsonBlocks = !showFiveDimensions && !showProfiles;
 
@@ -2412,6 +2684,10 @@ function ContentSection({
             <RoleCardsLayout blocks={visibleBlocks} ctx={ctx} />
           ) : showChallengingRoles ? (
             <RoleCardsLayout blocks={visibleBlocks} ctx={ctx} label="Challenging Role" challenge />
+          ) : showRaisonDetre ? (
+            <RaisonDetreLayout blocks={visibleBlocks} ctx={ctx} />
+          ) : showFinalFiveDThoughts ? (
+            <FinalFiveDThoughtsLayout blocks={visibleBlocks} ctx={ctx} />
           ) : showCaseStudyCards ? (
             <CaseStudyCards blocks={visibleBlocks} ctx={ctx} />
           ) : showEnhancingDevelopment ? (
