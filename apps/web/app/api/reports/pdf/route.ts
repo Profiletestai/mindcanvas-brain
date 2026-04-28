@@ -1,7 +1,11 @@
 //apps/web/app/api/reports/pdf/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
-import { chromium as playwrightChromium, type Browser, type Page } from "playwright-core";
+import {
+  chromium as playwrightChromium,
+  type Browser,
+  type Page,
+} from "playwright-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,10 +51,8 @@ const PDF_PRINT_CSS = `
   .pdf-hide,
   [data-no-print="true"],
   [data-pdf-hide="true"],
-  nav,
-  header,
-  footer,
   button,
+  nav,
   [role="navigation"],
   [aria-label="breadcrumb"],
   [aria-label="breadcrumbs"] {
@@ -58,11 +60,11 @@ const PDF_PRINT_CSS = `
     visibility: hidden !important;
   }
 
-  a[href*="admin"],
-  a[href*="database"],
-  a[href*="settings"],
-  a[href*="tests"],
-  a[href*="communications"],
+  a[href*="/admin"],
+  a[href*="/database"],
+  a[href*="/settings"],
+  a[href*="/tests"],
+  a[href*="/communications"],
   a[href*="profile-settings"] {
     display: none !important;
     visibility: hidden !important;
@@ -74,51 +76,22 @@ const PDF_PRINT_CSS = `
   article {
     width: 100% !important;
     max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     background: #ffffff !important;
     box-shadow: none !important;
   }
 
-  .min-h-screen,
-  .min-h-\\[240px\\],
-  .bg-slate-100 {
-    min-height: auto !important;
+  .print-clean-page {
     background: #ffffff !important;
   }
 
-  .mx-auto {
-    max-width: 100% !important;
-  }
-
-  .max-w-\\[1440px\\],
-  .max-w-7xl,
-  .max-w-6xl,
-  .max-w-5xl,
-  .max-w-4xl {
-    max-width: 100% !important;
-  }
-
-  .px-5,
-  .px-6,
-  .px-8 {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-
-  .py-4,
-  .py-5,
-  .py-6 {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-  }
-
-  .pb-16 {
-    padding-bottom: 0 !important;
-  }
-
-  .pt-5 {
-    padding-top: 0 !important;
+  .min-h-screen,
+  .bg-slate-100,
+  .bg-slate-50,
+  .bg-gray-50,
+  .bg-gray-100 {
+    background: #ffffff !important;
   }
 
   .sticky,
@@ -159,10 +132,6 @@ const PDF_PRINT_CSS = `
 
   .grid {
     page-break-inside: auto !important;
-  }
-
-  .print-clean-page {
-    background: #ffffff !important;
   }
 `;
 
@@ -281,49 +250,6 @@ function getOrigin(req: NextRequest) {
   );
 }
 
-async function hideElementByText(page: Page, text: string) {
-  await page
-    .evaluate((targetText) => {
-      const normalise = (value: string) =>
-        value.replace(/\s+/g, " ").trim().toLowerCase();
-
-      const target = normalise(targetText);
-
-      const elements = Array.from(
-        document.querySelectorAll("a, button, div, section, aside")
-      );
-
-      for (const element of elements) {
-        const ownText = normalise(element.textContent || "");
-
-        if (!ownText.includes(target)) continue;
-
-        const htmlElement = element as HTMLElement;
-
-        if (
-          target === "report index" ||
-          target === "dashboard database tests" ||
-          target === "profile settings" ||
-          target === "back to admin" ||
-          target === "back to test taker profile" ||
-          target === "download pdf"
-        ) {
-          const nearest =
-            htmlElement.closest("aside") ||
-            htmlElement.closest("nav") ||
-            htmlElement.closest("header") ||
-            htmlElement.closest("section") ||
-            htmlElement.closest("div") ||
-            htmlElement;
-
-          (nearest as HTMLElement).style.display = "none";
-          (nearest as HTMLElement).style.visibility = "hidden";
-        }
-      }
-    }, text)
-    .catch(() => {});
-}
-
 async function cleanPageForPdf(page: Page) {
   await page.addStyleTag({ content: PDF_PRINT_CSS }).catch(() => {});
 
@@ -337,14 +263,11 @@ async function cleanPageForPdf(page: Page) {
         ".pdf-hide",
         "[data-no-print='true']",
         "[data-pdf-hide='true']",
-        "nav",
-        "header",
-        "footer",
         "button",
+        "nav",
         "[role='navigation']",
         "[aria-label='breadcrumb']",
         "[aria-label='breadcrumbs']",
-        "aside",
       ];
 
       for (const selector of selectorsToHide) {
@@ -363,14 +286,10 @@ async function cleanPageForPdf(page: Page) {
         const href = (link.getAttribute("href") || "").toLowerCase();
 
         if (
-          text.includes("back") ||
-          text.includes("dashboard") ||
-          text.includes("database") ||
-          text.includes("tests") ||
-          text.includes("profile settings") ||
-          text.includes("communications") ||
-          href.includes("admin") ||
-          href.includes("settings")
+          text.includes("back to") ||
+          text.includes("download pdf") ||
+          href.includes("/admin") ||
+          href.includes("/settings")
         ) {
           htmlLink.style.display = "none";
           htmlLink.style.visibility = "hidden";
@@ -378,20 +297,13 @@ async function cleanPageForPdf(page: Page) {
       }
     })
     .catch(() => {});
-
-  await hideElementByText(page, "Dashboard Database Tests");
-  await hideElementByText(page, "Profile Settings");
-  await hideElementByText(page, "Back to admin");
-  await hideElementByText(page, "Back to test taker profile");
-  await hideElementByText(page, "Download PDF");
-  await hideElementByText(page, "Report Index");
 }
 
 async function waitForReportToSettle(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 60_000 });
 
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {
-    // Some app pages keep small requests alive.
+    // Some app pages keep small requests alive. Do not block PDF generation.
   });
 
   await page
@@ -452,8 +364,6 @@ export async function GET(req: NextRequest) {
     page.on("pageerror", (error) => {
       console.error("PDF page error:", error);
     });
-
-    await page.emulateMedia({ media: "print" });
 
     await page.goto(reportUrl, {
       waitUntil: "domcontentloaded",
