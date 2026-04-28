@@ -26,6 +26,9 @@ export type KbBlockRow = {
 
 export type ProfileExtendedPanelKey =
   | "snapshot"
+  | "personality_sales_profile"
+  | "words_to_use"
+  | "words_not_to_use"
   | "real_situation"
   | "core_pain"
   | "real_problem"
@@ -90,6 +93,24 @@ const STRUCTURE: Array<{
     heading: "Snapshot",
     panel_key: "snapshot",
     panel_title: "Snapshot",
+  },
+  {
+    section_key: "personality_sales_profile",
+    heading: "Personality Sales Profile",
+    panel_key: "personality_sales_profile",
+    panel_title: "Personality Sales Profile",
+  },
+  {
+    section_key: "words_to_use",
+    heading: "Words to Use",
+    panel_key: "words_to_use",
+    panel_title: "Words to Use",
+  },
+  {
+    section_key: "words_not_to_use",
+    heading: "Words NOT to Use",
+    panel_key: "words_not_to_use",
+    panel_title: "Words NOT to Use",
   },
   {
     section_key: "real_situation",
@@ -178,6 +199,17 @@ function createVisibilityAdminClient() {
 
 type VisibilityDbClient = ReturnType<typeof createVisibilityAdminClient>;
 
+type PersonalitySalesGuide = {
+  typeLabel: string;
+  summary: string;
+  trustTrigger: string;
+  decisionDriver: string;
+  callPacing: string;
+  closeStyle: string;
+  wordsToUse: string[];
+  wordsToAvoid: string[];
+};
+
 function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -262,9 +294,11 @@ function rowMatchesInput(row: KbBlockRow, input: ProfileExtendedReportInput): bo
   const tierAllowed = Array.isArray(triggers.tier)
     ? (triggers.tier as VisibilityTier[])
     : undefined;
+
   const behaviourAllowed = Array.isArray(triggers.behaviour_style)
     ? (triggers.behaviour_style as BehaviourStyle[])
     : undefined;
+
   const readinessAllowed = Array.isArray(triggers.readiness)
     ? (triggers.readiness as Array<Readiness | null>)
     : undefined;
@@ -331,56 +365,20 @@ function getBlockSummary(row: KbBlockRow | null | undefined, headings: string[])
 function getBlockBullets(row: KbBlockRow | null | undefined, headings: string[]): string[] {
   const block = findBlock(row, headings);
   return Array.isArray(block?.bullets)
-    ? (block.bullets as unknown[])
-        .map((item) => safeString(item))
-        .filter(Boolean)
+    ? (block.bullets as unknown[]).map((item) => safeString(item)).filter(Boolean)
     : [];
 }
 
-function getBlockItems(row: KbBlockRow | null | undefined, headings: string[]): Array<Record<string, unknown>> {
+function getBlockItems(
+  row: KbBlockRow | null | undefined,
+  headings: string[]
+): Array<Record<string, unknown>> {
   const block = findBlock(row, headings);
   return Array.isArray(block?.items)
     ? (block.items as unknown[]).filter(
         (item): item is Record<string, unknown> => !!item && typeof item === "object"
       )
     : [];
-}
-
-function makeBlock(src?: Record<string, unknown> | null): AssembledProfileExtendedBlock {
-  const item = src || {};
-
-  const paragraphs = Array.isArray(item.paragraphs)
-    ? (item.paragraphs as unknown[]).map((p) => safeString(p)).filter(Boolean)
-    : [];
-
-  const bullets = Array.isArray(item.bullets)
-    ? (item.bullets as unknown[]).map((b) => safeString(b)).filter(Boolean)
-    : [];
-
-  const items = Array.isArray(item.items)
-    ? (item.items as unknown[]).filter(
-        (x): x is Record<string, unknown> => !!x && typeof x === "object"
-      )
-    : [];
-
-  return {
-    title:
-      safeString(item.title) ||
-      safeString(item.heading) ||
-      safeString(item.subheading) ||
-      undefined,
-    short_summary:
-      safeString(item.short_summary) ||
-      safeString(item.summary) ||
-      undefined,
-    paragraphs,
-    bullets,
-    items,
-    transition: safeString(item.transition) || undefined,
-    meta: item.meta && typeof item.meta === "object"
-      ? (item.meta as Record<string, unknown>)
-      : undefined,
-  };
 }
 
 function makeSimpleBlock(
@@ -416,50 +414,24 @@ function pushPanel(
 function selectedLevelItem(row: KbBlockRow | null | undefined, level: number) {
   if (!row) return null;
 
-  const levelsBlock = findBlock(row, ["Levels"]);
-  if (!levelsBlock || !Array.isArray(levelsBlock.items)) return null;
-
-  const items = levelsBlock.items as unknown[];
-  const match = items.find((item) => {
-    if (!item || typeof item !== "object") return false;
-    return safeNumber((item as Record<string, unknown>).level, -1) === level;
-  });
-
-  return match && typeof match === "object"
-    ? (match as Record<string, unknown>)
-    : null;
+  const items = getBlockItems(row, ["Levels"]);
+  const match = items.find((item) => safeNumber(item.level, -1) === level);
+  return match || null;
 }
 
 function strongestWeakest(input: ProfileExtendedReportInput) {
   const scores = input.pillar_scores || {};
 
   const items = [
-    {
-      key: "visibility",
-      label: "Visibility",
-      value: safeNumber(scores.visibility, 0),
-    },
-    {
-      key: "trust",
-      label: "Trust",
-      value: safeNumber(scores.trust, 0),
-    },
-    {
-      key: "authority",
-      label: "Authority",
-      value: safeNumber(scores.authority, 0),
-    },
-    {
-      key: "dominance",
-      label: "Dominance",
-      value: safeNumber(scores.dominance, 0),
-    },
+    { key: "visibility", label: "Visibility", value: safeNumber(scores.visibility, 0) },
+    { key: "trust", label: "Trust", value: safeNumber(scores.trust, 0) },
+    { key: "authority", label: "Authority", value: safeNumber(scores.authority, 0) },
+    { key: "dominance", label: "Dominance", value: safeNumber(scores.dominance, 0) },
   ].sort((a, b) => b.value - a.value);
 
   return {
     strongest: items[0],
     weakest: items[items.length - 1],
-    all: items,
   };
 }
 
@@ -504,7 +476,7 @@ function buildOfferFitLine(tier: VisibilityTier, focus: string, nextMilestone: s
   }
 
   if (tier === "Invisible") {
-    return "The right offer is the one that builds discoverability, credibility, and basic structural trust first.";
+    return "The right offer is the one that builds discoverability, credibility, and structural trust first.";
   }
 
   if (tier === "Emerging") {
@@ -523,6 +495,7 @@ function buildObjectionBullets(args: {
   behaviourMainRisk: string;
   behaviourWatchOut: string;
   weakestNarrative: string;
+  wordsNotToUse: string[];
 }) {
   const out: string[] = [];
 
@@ -533,11 +506,15 @@ function buildObjectionBullets(args: {
   }
 
   if (args.behaviourMainRisk) {
-    out.push(`A likely objection or hesitation point is ${decapitalizeSentence(trimTrailingPunctuation(args.behaviourMainRisk))}.`);
+    out.push(`A likely hesitation point is ${decapitalizeSentence(trimTrailingPunctuation(args.behaviourMainRisk))}.`);
   }
 
   if (args.behaviourWatchOut) {
-    out.push(`Implementation confidence can drop when ${decapitalizeSentence(trimTrailingPunctuation(args.behaviourWatchOut))}.`);
+    out.push(`Confidence can drop when ${decapitalizeSentence(trimTrailingPunctuation(args.behaviourWatchOut))}.`);
+  }
+
+  if (args.wordsNotToUse.length) {
+    out.push(`Language that sounds like ${args.wordsNotToUse.slice(0, 3).join(", ")} can create resistance.`);
   }
 
   if (!out.length && args.weakestNarrative) {
@@ -568,6 +545,143 @@ function buildSignalPathItems(frameworkRows: KbBlockRow[]) {
   }
 
   return items;
+}
+
+function getPersonalitySalesGuide(style: BehaviourStyle): PersonalitySalesGuide {
+  switch (style) {
+    case "A":
+      return {
+        typeLabel: "Type A — Vision Driven Initiator",
+        summary:
+          "This client responds best to momentum, visible upside, and commercially relevant progress. Keep the conversation energetic, focused, and tied to leverage.",
+        trustTrigger:
+          "They trust a recommendation when it sounds like forward movement with proof, not caution for caution’s sake.",
+        decisionDriver:
+          "They move when they can see traction, visibility, advantage, and a faster route to authority.",
+        callPacing:
+          "Keep the pace brisk. Show the strategic direction early, then back it with proof and structure.",
+        closeStyle:
+          "Close around momentum, focus, and the next smart move — not around fear or delay.",
+        wordsToUse: [
+          "momentum",
+          "traction",
+          "visibility",
+          "leverage",
+          "growth",
+          "authority",
+          "proof",
+          "next move",
+        ],
+        wordsToAvoid: [
+          "slow down",
+          "be careful for now",
+          "wait and see",
+          "too much process",
+          "hold back",
+          "generic awareness",
+        ],
+      };
+
+    case "B":
+      return {
+        typeLabel: "Type B — Relationship Driven Communicator",
+        summary:
+          "This client responds best to trust, rapport, reputation, and social proof. The conversation should feel collaborative, credible, and relational.",
+        trustTrigger:
+          "They trust a recommendation when it feels human, credible, and supported by proof from others.",
+        decisionDriver:
+          "They move when they can see stronger relationships, clearer trust signals, and an offer that feels aligned rather than pushed.",
+        callPacing:
+          "Keep the pace steady and conversational. Let rapport build before pushing the decision.",
+        closeStyle:
+          "Close through trust, fit, and confidence — not through pressure.",
+        wordsToUse: [
+          "trust",
+          "credibility",
+          "reputation",
+          "relationships",
+          "partnership",
+          "case studies",
+          "social proof",
+          "referrals",
+        ],
+        wordsToAvoid: [
+          "hard close",
+          "pressure",
+          "push",
+          "cold",
+          "aggressive",
+          "transactional",
+        ],
+      };
+
+    case "C":
+      return {
+        typeLabel: "Type C — Structure Driven Optimiser",
+        summary:
+          "This client responds best to logic, method, consistency, and structured proof. Keep the call calm, ordered, and grounded in process.",
+        trustTrigger:
+          "They trust a recommendation when it sounds thought-through, repeatable, and operationally solid.",
+        decisionDriver:
+          "They move when they can see a clear framework, a controlled path, and evidence that the recommendation will hold.",
+        callPacing:
+          "Keep the pace measured. Give structure, sequence, and enough logic for them to feel secure.",
+        closeStyle:
+          "Close through clarity, method, and confidence in execution — not hype.",
+        wordsToUse: [
+          "framework",
+          "method",
+          "system",
+          "consistency",
+          "quality",
+          "reliability",
+          "proof",
+          "process",
+        ],
+        wordsToAvoid: [
+          "viral",
+          "wing it",
+          "just post more",
+          "hype",
+          "messy growth",
+          "rush it",
+        ],
+      };
+
+    case "D":
+    default:
+      return {
+        typeLabel: "Type D — Control Driven Authority Builder",
+        summary:
+          "This client responds best to positioning, precision, strategic control, and authority. The conversation should feel sharp, credible, and commercially disciplined.",
+        trustTrigger:
+          "They trust a recommendation when it sounds strategically sound, well-framed, and in control.",
+        decisionDriver:
+          "They move when they can see positioning advantage, authority protection, and measured expansion.",
+        callPacing:
+          "Keep the pace deliberate and intelligent. Show the logic behind the recommendation.",
+        closeStyle:
+          "Close through strategic confidence and authority — not emotion or hype.",
+        wordsToUse: [
+          "positioning",
+          "authority",
+          "precision",
+          "control",
+          "strategy",
+          "standards",
+          "category leadership",
+          "advantage",
+        ],
+        wordsToAvoid: [
+          "just trust the process",
+          "spray and pray",
+          "broad awareness",
+          "cheap growth",
+          "chaos",
+          "vague brand talk",
+        ],
+      };
+  }
 }
 
 async function fetchKbRows(sb?: VisibilityDbClient): Promise<KbBlockRow[]> {
@@ -649,7 +763,8 @@ export function assembleProfileExtendedReport(
         normalizeText(row.content?.heading) === "pillar reading guidance"
     ) || null;
 
-  const { strongest, weakest, all } = strongestWeakest(input);
+  const { strongest, weakest } = strongestWeakest(input);
+  const personalityGuide = getPersonalitySalesGuide(input.behaviour_style);
 
   const currentStage = getBlockSummary(progressionLanguageRow, ["Current stage"]);
   const nextMilestone = getBlockSummary(progressionLanguageRow, ["Next milestone"]);
@@ -690,6 +805,7 @@ export function assembleProfileExtendedReport(
     behaviourMainRisk,
     behaviourWatchOut,
     weakestNarrative,
+    wordsNotToUse: personalityGuide.wordsToAvoid,
   });
 
   pushPanel(
@@ -738,6 +854,54 @@ export function assembleProfileExtendedReport(
       }
     ),
     levelRoadmapRow
+  );
+
+  pushPanel(
+    buckets,
+    "personality_sales_profile",
+    makeSimpleBlock(
+      personalityGuide.typeLabel,
+      personalityGuide.summary,
+      {
+        paragraphs: [
+          `Trust trigger: ${personalityGuide.trustTrigger}`,
+          `Decision driver: ${personalityGuide.decisionDriver}`,
+          `Call pacing: ${personalityGuide.callPacing}`,
+          `Close style: ${personalityGuide.closeStyle}`,
+          behaviourStrengths ? `Natural strengths: ${behaviourStrengths}` : "",
+          behaviourWorksBest ? `What usually works best: ${behaviourWorksBest}` : "",
+          tierGuidance ? `Tier-specific guidance: ${tierGuidance}` : "",
+          howToUseLayer ? `How to use this layer: ${howToUseLayer}` : "",
+        ].filter(Boolean),
+      }
+    ),
+    behaviourTypeRow || behaviourTierRow
+  );
+
+  pushPanel(
+    buckets,
+    "words_to_use",
+    makeSimpleBlock(
+      "Recommended language",
+      "These words and phrases are more likely to land well with this personality.",
+      {
+        bullets: personalityGuide.wordsToUse,
+      }
+    ),
+    null
+  );
+
+  pushPanel(
+    buckets,
+    "words_not_to_use",
+    makeSimpleBlock(
+      "Language to avoid",
+      "These phrases are more likely to create resistance or lower trust with this personality.",
+      {
+        bullets: personalityGuide.wordsToAvoid,
+      }
+    ),
+    null
   );
 
   if (coreReading) {
@@ -815,20 +979,23 @@ export function assembleProfileExtendedReport(
     resultRow
   );
 
-  if (whatDoesNotHelp.length || behaviourWatchOut) {
+  if (whatDoesNotHelp.length || behaviourWatchOut || personalityGuide.wordsToAvoid.length) {
     pushPanel(
       buckets,
       "what_not_to_do_on_call",
       makeSimpleBlock(
         "What not to do",
-        "Avoid recommendations that skip the real stage problem or create extra friction.",
+        "Avoid recommendations and language that skip the real stage problem or create extra resistance.",
         {
           bullets: Array.from(
-            new Set([
-              ...whatDoesNotHelp,
-              behaviourWatchOut ? `Watch out for: ${behaviourWatchOut}` : "",
-            ]).values()
-          ).filter(Boolean),
+            new Set(
+              [
+                ...whatDoesNotHelp,
+                behaviourWatchOut ? `Watch out for: ${behaviourWatchOut}` : "",
+                ...personalityGuide.wordsToAvoid.map((word) => `Avoid language like: ${word}`),
+              ].filter(Boolean)
+            )
+          ),
         }
       ),
       resultRow
@@ -842,8 +1009,17 @@ export function assembleProfileExtendedReport(
       "How to position the call",
       bestFitFocus || "Position the conversation around the structural move that fits this stage.",
       {
-        paragraphs: [howToUseLayer, tierGuidance, behaviourWorksBest].filter(Boolean),
-        bullets: whatHelps,
+        paragraphs: [
+          `Best personality angle: ${personalityGuide.trustTrigger}`,
+          `Decision framing: ${personalityGuide.decisionDriver}`,
+          `Call pacing: ${personalityGuide.callPacing}`,
+          behaviourWorksBest ? `What usually works best: ${behaviourWorksBest}` : "",
+          howToUseLayer,
+          tierGuidance,
+        ].filter(Boolean),
+        bullets: whatHelps.length
+          ? whatHelps
+          : personalityGuide.wordsToUse.map((word) => `Lean into language like: ${word}`),
       }
     ),
     resultRow
@@ -859,7 +1035,7 @@ export function assembleProfileExtendedReport(
         paragraphs: [
           currentStage ? `Current stage: ${currentStage}.` : "",
           nextMilestone ? `Next milestone: ${nextMilestone}.` : "",
-          tierGuidance,
+          `Why it fits this personality: ${personalityGuide.summary}`,
         ].filter(Boolean),
       }
     ),
@@ -902,7 +1078,12 @@ export function assembleProfileExtendedReport(
     makeSimpleBlock(
       "Recommended close line",
       languageToUse ||
-        "The close should reinforce the next structural move, not add pressure or complexity."
+        `Close through ${decapitalizeSentence(trimTrailingPunctuation(personalityGuide.closeStyle))}.`,
+      {
+        paragraphs: [
+          `Best close style for this personality: ${personalityGuide.closeStyle}`,
+        ],
+      }
     ),
     progressionLanguageRow
   );
@@ -915,7 +1096,11 @@ export function assembleProfileExtendedReport(
       frameworkSummary ||
         "Each stage builds on the one before it. Long-term value comes from strengthening the right signal in the right order.",
       {
-        paragraphs: [progressionPattern, frameworkInterpretation, behaviourStrengths].filter(Boolean),
+        paragraphs: [
+          progressionPattern,
+          frameworkInterpretation,
+          nextMilestone ? `Next milestone: ${nextMilestone}` : "",
+        ].filter(Boolean),
         items: signalPathItems,
       }
     ),
