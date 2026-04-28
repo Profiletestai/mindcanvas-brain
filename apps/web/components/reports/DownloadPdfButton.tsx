@@ -1,3 +1,4 @@
+//apps/web/components/reports/DownloadPdfButton.tsx
 "use client";
 
 import { useState } from "react";
@@ -20,6 +21,15 @@ type Props = {
   label?: string;
   className?: string;
 };
+
+function cleanDownloadFilename(filename: string) {
+  const cleaned = filename
+    .replace(/[^a-z0-9-_ ]/gi, "")
+    .replace(/\s+/g, "-")
+    .toLowerCase();
+
+  return cleaned || "mindcanvas-report";
+}
 
 export default function DownloadPdfButton({
   type,
@@ -46,27 +56,48 @@ export default function DownloadPdfButton({
       if (slug) params.set("slug", slug);
       if (takerId) params.set("takerId", takerId);
 
-      const res = await fetch(`/api/reports/pdf?${params.toString()}`);
+      const url = `/api/reports/pdf?${params.toString()}`;
+
+      console.log("PDF download URL:", url);
+
+      const res = await fetch(url);
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Could not generate PDF");
+        let message = "Could not generate PDF";
+
+        const contentType = res.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+          const json = await res.json();
+          message = json?.error || JSON.stringify(json);
+        } else {
+          message = await res.text();
+        }
+
+        throw new Error(message);
       }
 
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const downloadUrl = window.URL.createObjectURL(blob);
 
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `${filename.replace(/[^a-z0-9-_ ]/gi, "").replace(/\s+/g, "-")}.pdf`;
+      a.href = downloadUrl;
+      a.download = `${cleanDownloadFilename(filename)}.pdf`;
+
       document.body.appendChild(a);
       a.click();
       a.remove();
 
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error(error);
-      alert("Sorry, the PDF could not be generated. Please try again.");
+      console.error("PDF generation failed:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Sorry, the PDF could not be generated.";
+
+      alert(`PDF generation failed:\n\n${message}`);
     } finally {
       setLoading(false);
     }
@@ -77,7 +108,7 @@ export default function DownloadPdfButton({
       type="button"
       onClick={handleDownload}
       disabled={loading}
-      className={`no-print rounded-xl px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-60 ${className}`}
+      className={`no-print rounded-xl px-4 py-2 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       {loading ? "Preparing PDF..." : label}
     </button>
