@@ -1,10 +1,11 @@
 //apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/ProfileExtendedReportClient.tsx
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import DownloadPdfButton from "@/components/reports/DownloadPdfButton";
+
+const html2canvasPromise = () => import("html2canvas");
+const jsPdfPromise = () => import("jspdf");
 
 type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type BehaviourStyle = "A" | "B" | "C" | "D";
@@ -208,7 +209,7 @@ function getTierColor(tier: VisibilityTier) {
 }
 
 function getTierCounts(report: ReportPayload) {
-  const counts = report?.graphs?.tier_counts || {};
+  const counts = report?.graphs?.tier_counts || report?.input?.tier_counts || {};
   return {
     Invisible: safeNumber((counts as Record<string, unknown>)?.Invisible, 0),
     Emerging: safeNumber((counts as Record<string, unknown>)?.Emerging, 0),
@@ -258,48 +259,39 @@ function safeSectionId(sectionKey: unknown) {
 }
 
 function normalizeSections(rawSections: unknown[]): ProfileExtendedSection[] {
-  const mapped: Array<ProfileExtendedSection | null> = (rawSections || []).map(
-    (section: unknown) => {
-      const sec = (section || {}) as Record<string, unknown>;
-      const sectionKey = safeString(sec.section_key || sec.key);
+  return (rawSections || [])
+    .map((section): ProfileExtendedSection | null => {
+      const rawSection = (section || {}) as Record<string, unknown>;
+      const sectionKey = safeString(rawSection.section_key || rawSection.key);
       if (!sectionKey) return null;
 
       let panels: ProfileExtendedPanel[] = [];
 
-      if (Array.isArray(sec.panels)) {
-        panels = (sec.panels as unknown[])
-          .map((panel: unknown): ProfileExtendedPanel | null => {
-            const p = (panel || {}) as Record<string, unknown>;
-            const panelKey = safeString(p.panel_key || p.key || "panel");
-            const title = safeString(p.title) || titleCase(panelKey);
-            const blocks = Array.isArray(p.blocks)
-              ? (p.blocks as ProfileExtendedBlock[])
-              : [];
-
+      if (Array.isArray(rawSection.panels)) {
+        panels = rawSection.panels
+          .map((panel): ProfileExtendedPanel | null => {
+            const rawPanel = (panel || {}) as Record<string, unknown>;
+            const panelKey = safeString(rawPanel.panel_key || rawPanel.key || "panel");
             if (!panelKey) return null;
-            if (!blocks.length && !title) return null;
 
             return {
               panel_key: panelKey,
-              title,
-              blocks,
-              matched_rows: Array.isArray(p.matched_rows)
-                ? (p.matched_rows as Array<{
-                    id: string;
-                    priority: number;
-                    source_section_key: string;
-                    triggers: Record<string, unknown>;
-                  }>)
+              title: safeString(rawPanel.title) || titleCase(panelKey),
+              blocks: Array.isArray(rawPanel.blocks)
+                ? (rawPanel.blocks as ProfileExtendedBlock[])
+                : [],
+              matched_rows: Array.isArray(rawPanel.matched_rows)
+                ? (rawPanel.matched_rows as ProfileExtendedPanel["matched_rows"])
                 : [],
             };
           })
           .filter((panel): panel is ProfileExtendedPanel => panel !== null);
-      } else if (Array.isArray(sec.blocks)) {
+      } else if (Array.isArray(rawSection.blocks)) {
         panels = [
           {
             panel_key: `${sectionKey}_legacy`,
-            title: safeString(sec.title) || titleCase(sectionKey),
-            blocks: sec.blocks as ProfileExtendedBlock[],
+            title: safeString(rawSection.title) || titleCase(sectionKey),
+            blocks: rawSection.blocks as ProfileExtendedBlock[],
             matched_rows: [],
           },
         ];
@@ -308,351 +300,100 @@ function normalizeSections(rawSections: unknown[]): ProfileExtendedSection[] {
       return {
         section_key: sectionKey,
         heading:
-          safeString(sec.heading || sec.title) || titleCase(sectionKey),
+          safeString(rawSection.heading || rawSection.title) || titleCase(sectionKey),
         panels,
-        matched_rows: Array.isArray(sec.matched_rows)
-          ? (sec.matched_rows as Array<{
-              id: string;
-              priority: number;
-              source_section_key: string;
-              triggers: Record<string, unknown>;
-            }>)
+        matched_rows: Array.isArray(rawSection.matched_rows)
+          ? (rawSection.matched_rows as ProfileExtendedSection["matched_rows"])
           : [],
       };
+    })
+    .filter((section): section is ProfileExtendedSection => section !== null);
+}
+
+function collectSummary(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return "";
+  for (const block of panel.blocks || []) {
+    const value = safeString(block.short_summary);
+    if (value) return value;
+  }
+  return "";
+}
+
+function collectParagraphs(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return [] as string[];
+  const out: string[] = [];
+  for (const block of panel.blocks || []) {
+    const paragraphs = Array.isArray(block.paragraphs) ? block.paragraphs : [];
+    for (const paragraph of paragraphs) {
+      const value = safeString(paragraph);
+      if (value) out.push(value);
     }
-  );
-
-  return mapped.filter(
-    (section): section is ProfileExtendedSection =>
-      section !== null &&
-      !!section.section_key &&
-      Array.isArray(section.panels)
-  );
+  }
+  return out;
 }
 
+function collectBullets(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return [] as string[];
+  const out: string[] = [];
+  for (const block of panel.blocks || []) {
+    const bullets = Array.isArray(block.bullets) ? block.bullets : [];
+    for (const bullet of bullets) {
+      const value = safeString(bullet);
+      if (value) out.push(value);
+    }
+  }
+  return out;
+}
 
-function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
-  if (!isPrintMode) return null;
+function collectItems(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return [] as Array<Record<string, unknown>>;
+  const out: Array<Record<string, unknown>> = [];
+  for (const block of panel.blocks || []) {
+    const items = Array.isArray(block.items) ? block.items : [];
+    for (const item of items) {
+      if (item && typeof item === "object") out.push(item);
+    }
+  }
+  return out;
+}
 
+function collectTransition(panel?: ProfileExtendedPanel | null) {
+  if (!panel) return "";
+  for (const block of panel.blocks || []) {
+    const value = safeString(block.transition);
+    if (value) return value;
+  }
+  return "";
+}
+
+function isLanguagePanel(panelKey: string) {
+  return panelKey === "words_to_use" || panelKey === "words_not_to_use";
+}
+
+function isPersonalityPanel(panelKey: string) {
   return (
-    <style>{`
-      html.mc-pdf-print-mode,
-      body.mc-pdf-print-mode {
-        background: #ffffff !important;
-      }
-
-      body.mc-pdf-print-mode .no-print,
-      body.mc-pdf-print-mode .pdf-hide,
-      body.mc-pdf-print-mode [data-no-print="true"],
-      body.mc-pdf-print-mode [data-pdf-hide="true"],
-      body.mc-pdf-print-mode nav,
-      body.mc-pdf-print-mode header,
-      body.mc-pdf-print-mode aside,
-      body.mc-pdf-print-mode [role="navigation"],
-      body.mc-pdf-print-mode [aria-label="breadcrumb"],
-      body.mc-pdf-print-mode [aria-label="breadcrumbs"] {
-        display: none !important;
-        visibility: hidden !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell {
-        width: 100% !important;
-        max-width: none !important;
-        margin: 0 !important;
-        background: #ffffff !important;
-        color: #111827 !important;
-        font-size: 12.5px !important;
-        line-height: 1.45 !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-hero {
-        min-height: auto !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-hero-inner {
-        max-width: none !important;
-        padding: 0 0 8px 0 !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-content-area {
-        background: #ffffff !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-content-inner {
-        max-width: none !important;
-        padding: 8px 0 0 0 !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-page-break {
-        break-before: auto !important;
-        page-break-before: auto !important;
-      }
-
-      body.mc-pdf-print-mode .report-section {
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-        margin-top: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-sections-list > section:first-child,
-      body.mc-pdf-print-mode .pdf-content-inner > section:first-child {
-        margin-top: 0 !important;
-      }
-
-      body.mc-pdf-print-mode .chart-card,
-      body.mc-pdf-print-mode .summary-card {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
-      }
-
-      body.mc-pdf-print-mode .report-card,
-      body.mc-pdf-print-mode .pdf-avoid-break {
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-chart-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-sections-grid {
-        display: block !important;
-        margin-top: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-sections-list {
-        display: block !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-sections-list > * + * {
-        margin-top: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .space-y-6 > :not([hidden]) ~ :not([hidden]),
-      body.mc-pdf-print-mode .pdf-report-shell .space-y-5 > :not([hidden]) ~ :not([hidden]),
-      body.mc-pdf-print-mode .pdf-report-shell .space-y-4 > :not([hidden]) ~ :not([hidden]),
-      body.mc-pdf-print-mode .pdf-report-shell .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-        margin-top: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .mt-6 {
-        margin-top: 10px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .mt-5,
-      body.mc-pdf-print-mode .pdf-report-shell .mt-4 {
-        margin-top: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .mt-3,
-      body.mc-pdf-print-mode .pdf-report-shell .mt-2 {
-        margin-top: 5px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .p-5,
-      body.mc-pdf-print-mode .pdf-report-shell .p-4 {
-        padding: 10px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .px-8 {
-        padding-left: 12px !important;
-        padding-right: 12px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .py-6 {
-        padding-top: 10px !important;
-        padding-bottom: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .pb-8 {
-        padding-bottom: 12px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .px-4 {
-        padding-left: 10px !important;
-        padding-right: 10px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .py-4 {
-        padding-top: 8px !important;
-        padding-bottom: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .gap-5,
-      body.mc-pdf-print-mode .pdf-report-shell .gap-4 {
-        gap: 8px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .rounded-\[24px\],
-      body.mc-pdf-print-mode .pdf-report-shell .rounded-2xl,
-      body.mc-pdf-print-mode .pdf-report-shell .rounded-xl {
-        border-radius: 12px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[36px\] {
-        font-size: 26px !important;
-        line-height: 30px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[26px\] {
-        font-size: 19px !important;
-        line-height: 24px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[25px\] {
-        font-size: 19px !important;
-        line-height: 23px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[24px\] {
-        font-size: 18px !important;
-        line-height: 24px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[20px\] {
-        font-size: 15px !important;
-        line-height: 20px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[18px\] {
-        font-size: 15px !important;
-        line-height: 20px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[16px\] {
-        font-size: 13.5px !important;
-        line-height: 19px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[15px\] {
-        font-size: 12.5px !important;
-        line-height: 18px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .text-\[14px\] {
-        font-size: 12px !important;
-        line-height: 17px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .leading-10,
-      body.mc-pdf-print-mode .pdf-report-shell .leading-8,
-      body.mc-pdf-print-mode .pdf-report-shell .leading-7,
-      body.mc-pdf-print-mode .pdf-report-shell .leading-6 {
-        line-height: 1.35 !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell p {
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell ul {
-        margin-top: 6px !important;
-        margin-bottom: 0 !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell li + li {
-        margin-top: 3px !important;
-      }
-
-      body.mc-pdf-print-mode .pdf-report-shell .shadow,
-      body.mc-pdf-print-mode .pdf-report-shell .shadow-sm,
-      body.mc-pdf-print-mode .pdf-report-shell .shadow-md,
-      body.mc-pdf-print-mode .pdf-report-shell .shadow-lg,
-      body.mc-pdf-print-mode .pdf-report-shell .shadow-xl,
-      body.mc-pdf-print-mode .pdf-report-shell .shadow-2xl {
-        box-shadow: none !important;
-      }
-
-      body.mc-pdf-print-mode a {
-        color: inherit !important;
-        text-decoration: none !important;
-      }
-
-      @media print {
-        @page {
-          size: A4;
-          margin: 9mm;
-        }
-
-        body.mc-pdf-print-mode .pdf-page-break {
-          break-before: auto !important;
-          page-break-before: auto !important;
-        }
-      }
-    `}</style>
+    panelKey === "personality_sales_profile" ||
+    panelKey === "words_to_use" ||
+    panelKey === "words_not_to_use"
   );
 }
 
-function usePdfPrintCleanup(isPrintMode: boolean) {
-  useEffect(() => {
-    if (!isPrintMode || typeof document === "undefined") return;
-
-    document.documentElement.classList.add("mc-pdf-print-mode");
-    document.body.classList.add("mc-pdf-print-mode");
-
-    const hiddenTextFragments = [
-      "dashboard",
-      "database",
-      "tests",
-      "profile settings",
-      "communications",
-      "back to",
-      "download pdf",
-      "report index",
-    ];
-
-    const shouldHideText = (value: string) => {
-      const normalised = value.replace(/\s+/g, " ").trim().toLowerCase();
-      return hiddenTextFragments.some((fragment) => normalised.includes(fragment));
-    };
-
-    const hideElement = (element: Element) => {
-      const htmlElement = element as HTMLElement;
-      htmlElement.style.display = "none";
-      htmlElement.style.visibility = "hidden";
-      htmlElement.setAttribute("data-pdf-hidden-by-client", "true");
-    };
-
-    document
-      .querySelectorAll("a, button, nav, header, aside, [role='navigation'], [aria-label='breadcrumb'], [aria-label='breadcrumbs']")
-      .forEach((element) => {
-        const tagName = element.tagName.toLowerCase();
-        const text = element.textContent || "";
-        const href = element instanceof HTMLAnchorElement ? element.href || "" : "";
-
-        if (
-          tagName === "nav" ||
-          tagName === "header" ||
-          tagName === "aside" ||
-          shouldHideText(text) ||
-          shouldHideText(href)
-        ) {
-          hideElement(element);
-        }
-      });
-
-    return () => {
-      document.documentElement.classList.remove("mc-pdf-print-mode");
-      document.body.classList.remove("mc-pdf-print-mode");
-    };
-  }, [isPrintMode]);
+function isCallPanel(panelKey: string) {
+  return (
+    panelKey === "what_not_to_do_on_call" ||
+    panelKey === "what_to_do_on_call" ||
+    panelKey === "objections" ||
+    panelKey === "close_line"
+  );
 }
 
-function PdfSection({
-  children,
-  pageBreakBefore = false,
-}: {
-  children: ReactNode;
-  pageBreakBefore?: boolean;
-}) {
+function formatItemLabel(rawKey: string) {
+  return titleCase(rawKey);
+}
+
+function PdfSection({ children }: { children: ReactNode }) {
   return (
-    <section
-      data-pdf-section="true"
-      className={`report-section ${pageBreakBefore ? "pdf-page-break" : ""}`}
-    >
+    <section data-pdf-section="true" style={{ pageBreakAfter: "always" }}>
       {children}
     </section>
   );
@@ -677,6 +418,242 @@ function WhiteCard({
         {title}
       </div>
       <div className="px-8 pb-8">{children}</div>
+    </div>
+  );
+}
+
+function PanelShell({
+  title,
+  accentColor,
+  children,
+}: {
+  title: string;
+  accentColor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-2xl bg-slate-50 p-6"
+      style={{
+        outline: `1px solid ${BRAND.border}`,
+        borderLeft: accentColor ? `4px solid ${accentColor}` : undefined,
+      }}
+    >
+      <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function PanelCard({
+  panel,
+}: {
+  panel: ProfileExtendedPanel;
+}) {
+  const summary = collectSummary(panel);
+  const paragraphs = collectParagraphs(panel);
+  const bullets = collectBullets(panel);
+  const items = collectItems(panel);
+  const transition = collectTransition(panel);
+
+  const accentColor = isPersonalityPanel(panel.panel_key)
+    ? BRAND.purple
+    : isCallPanel(panel.panel_key)
+      ? BRAND.blue
+      : BRAND.blue;
+
+  return (
+    <PanelShell title={panel.title} accentColor={accentColor}>
+      {summary ? (
+        <div
+          className="mt-4 rounded-xl bg-white px-4 py-4"
+          style={{ outline: `1px solid ${accentColor}` }}
+        >
+          <span className="font-semibold" style={{ color: accentColor }}>
+            In short:
+          </span>{" "}
+          <span className="text-slate-950">{summary}</span>
+        </div>
+      ) : null}
+
+      {paragraphs.length > 0 ? (
+        <div className="mt-4 space-y-3 text-[15px] leading-7 text-slate-700">
+          {paragraphs.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </div>
+      ) : null}
+
+      {bullets.length > 0 ? (
+        isLanguagePanel(panel.panel_key) ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {bullets.map((bullet, i) => (
+              <span
+                key={i}
+                className="rounded-full px-3 py-1.5 text-[13px] font-medium"
+                style={{
+                  background:
+                    panel.panel_key === "words_not_to_use"
+                      ? "rgba(226, 75, 74, 0.10)"
+                      : "rgba(79, 125, 255, 0.10)",
+                  color: panel.panel_key === "words_not_to_use" ? BRAND.red : BRAND.blue,
+                  outline: `1px solid ${
+                    panel.panel_key === "words_not_to_use"
+                      ? "rgba(226, 75, 74, 0.25)"
+                      : "rgba(79, 125, 255, 0.25)"
+                  }`,
+                }}
+              >
+                {bullet}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <ul className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
+            {bullets.map((bullet, i) => (
+              <li key={i}>{bullet}</li>
+            ))}
+          </ul>
+        )
+      ) : null}
+
+      {items.length > 0 ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {items.map((item, idx) => {
+            const entries = Object.entries(item)
+              .map(([key, value]) => [formatItemLabel(key), safeString(value)] as const)
+              .filter(([, value]) => value);
+
+            if (!entries.length) return null;
+
+            return (
+              <div
+                key={idx}
+                className="rounded-xl bg-white p-4"
+                style={{ outline: `1px solid ${BRAND.border}` }}
+              >
+                <div className="space-y-2">
+                  {entries.map(([label, value]) => (
+                    <div key={label}>
+                      <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        {label}
+                      </div>
+                      <div className="mt-1 text-[14px] leading-6 text-slate-800">
+                        {value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {transition ? (
+        <div className="mt-4 text-[12px] italic leading-5 text-slate-500">
+          {transition}
+        </div>
+      ) : null}
+    </PanelShell>
+  );
+}
+
+function SummaryHeader({
+  orgName,
+  backHref,
+  onDownload,
+  taker,
+  report,
+}: {
+  orgName: string;
+  backHref: string;
+  onDownload: () => void;
+  taker: Props["taker"];
+  report: ReportPayload;
+}) {
+  const tier = getTier(report);
+  const level = getLevel(report);
+  const style = getStyle(report);
+  const readiness = readinessLabel(
+    report?.signals?.readiness ?? report?.input?.readiness
+  );
+  const score = overallScore(report);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[20px] font-semibold text-white">{orgName}</div>
+        <Link href={backHref} className="text-sm text-white/80 underline">
+          Back to test taker profile
+        </Link>
+      </div>
+
+      <div>
+        <div className="text-[26px] font-semibold leading-8 text-white">
+          Profile Extended Report
+        </div>
+        <div className="mt-1 text-[10px] text-white/85">
+          Internal-only extended interpretation layer for Visibility Ladder
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={onDownload}
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-[#050914]"
+        >
+          Download PDF
+        </button>
+      </div>
+
+      <div
+        className="rounded-[24px] bg-white p-5"
+        style={{ outline: `1px solid ${BRAND.border}` }}
+      >
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_620px]">
+          <div className="min-w-0">
+            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Internal Report
+            </div>
+
+            <div className="mt-4 text-[36px] font-semibold leading-10 text-slate-900">
+              {taker.fullName}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Pill text="WhatsWhat Prime" />
+              <Pill text="Visibility Ladder" />
+              <Pill text={`Style ${style}`} />
+            </div>
+
+            <div className="mt-6 grid gap-2 text-[14px] text-slate-600">
+              {taker.email ? <div>{taker.email}</div> : null}
+              {taker.phone ? <div>{taker.phone}</div> : null}
+              {taker.company ? <div>{taker.company}</div> : null}
+              {taker.roleTitle ? <div>{taker.roleTitle}</div> : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <StatCard
+              label="Tier"
+              value={tier}
+              dotColor={getTierColor(tier)}
+              badge={tier === "Magnetic" ? "Top tier" : undefined}
+              badgeColor={getTierColor(tier)}
+            />
+            <StatCard label="Level" value={`${level}`} subValue="of 20" />
+            <StatCard label="Profile Style" value={style} />
+            <StatCard
+              label="Readiness"
+              value={readiness}
+              badge={`${score}% Score`}
+              badgeColor={BRAND.green}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -713,7 +690,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="summary-card pdf-avoid-break rounded-2xl bg-slate-50 p-4"
+      className="rounded-2xl bg-slate-50 p-4"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -742,116 +719,7 @@ function StatCard({
         </div>
       </div>
 
-      {subValue ? <div className="mt-1 text-[11px] text-slate-500">{subValue}</div> : null}
-    </div>
-  );
-}
-
-function SummaryHeader({
-  orgName,
-  backHref,
-  taker,
-  test,
-  report,
-  orgSlug,
-  isPrintMode,
-}: {
-  orgName: string;
-  backHref: string;
-  taker: Props["taker"];
-  test: Props["test"];
-  report: ReportPayload;
-  orgSlug: string;
-  isPrintMode: boolean;
-}) {
-  const tier = getTier(report);
-  const level = getLevel(report);
-  const style = getStyle(report);
-  const readiness = readinessLabel(
-    report?.signals?.readiness ?? report?.input?.readiness
-  );
-  const score = overallScore(report);
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-[20px] font-semibold text-white">{orgName}</div>
-        {!isPrintMode ? (
-          <Link href={backHref} className="no-print text-sm text-white/80 underline">
-            Back to test taker profile
-          </Link>
-        ) : null}
-      </div>
-
-      <div>
-        <div className="text-[26px] font-semibold leading-8 text-white">
-          Internal Sales Report
-        </div>
-        <div className="mt-1 text-[11px] text-white/85">
-          Visibility Ladder — sales-facing internal guidance
-        </div>
-      </div>
-
-      {!isPrintMode ? (
-        <div className="no-print flex flex-wrap gap-3">
-          <DownloadPdfButton
-            type="profile-extended"
-            slug={orgSlug}
-            takerId={taker.id}
-            filename={`${taker.fullName || "profile"}-${test.name || "internal-sales-report"}-internal-sales-report`}
-            className="bg-white text-[#050914] hover:bg-slate-100"
-          />
-        </div>
-      ) : null}
-
-      <div
-        className="rounded-[24px] bg-white p-5"
-        style={{ outline: `1px solid ${BRAND.border}` }}
-      >
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_620px]">
-          <div className="min-w-0">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Internal report
-            </div>
-
-            <div className="mt-4 text-[36px] font-semibold leading-10 text-slate-900">
-              {taker.fullName}
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Pill text="WhatsWhat Prime" />
-              <Pill text="Visibility Ladder" />
-              <Pill text="Sales guidance" />
-            </div>
-
-            <div className="mt-6 grid gap-2 text-[14px] text-slate-600">
-              {taker.email ? <div>{taker.email}</div> : null}
-              {taker.phone ? <div>{taker.phone}</div> : null}
-              {test.name ? <div>{test.name}</div> : null}
-              {taker.roleTitle ? <div>{taker.roleTitle}</div> : null}
-              {taker.company ? <div>{taker.company}</div> : null}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <StatCard
-              label="Tier"
-              value={tier}
-              dotColor={getTierColor(tier)}
-              badge={tier === "Magnetic" ? "Top tier" : undefined}
-              badgeColor={getTierColor(tier)}
-            />
-            <StatCard label="Level" value={`${level}`} subValue="of 20" />
-            <StatCard label="Style" value={style} />
-            <StatCard
-              label="Readiness"
-              value={readiness}
-              badge={`${score}% Score`}
-              badgeColor={BRAND.green}
-            />
-          </div>
-        </div>
-      </div>
+      {subValue ? <div className="mt-1 text-[8px] text-slate-500">{subValue}</div> : null}
     </div>
   );
 }
@@ -863,7 +731,7 @@ function ReportIndexCard({
 }) {
   return (
     <div
-      className="no-print pdf-hide rounded-2xl bg-white p-5 shadow-sm"
+      className="rounded-2xl bg-white p-5 shadow-sm"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -899,11 +767,11 @@ function LadderPositionCard({ report }: { report: ReportPayload }) {
 
   return (
     <div
-      className="chart-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
+      className="rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        Ladder position
+        Ladder Position
       </div>
 
       <div className="mt-4 space-y-3">
@@ -961,10 +829,10 @@ function LadderPositionCard({ report }: { report: ReportPayload }) {
                     item === "Invisible"
                       ? "#F9FAFB"
                       : item === "Emerging"
-                      ? "#EFF6FF"
-                      : item === "Established"
-                      ? "#F0FDF4"
-                      : "#F5F3FF",
+                        ? "#EFF6FF"
+                        : item === "Established"
+                          ? "#F0FDF4"
+                          : "#F5F3FF",
                   outline: `1px solid ${passed ? color : BRAND.border}`,
                 }}
               >
@@ -1009,7 +877,7 @@ function PillarScoresCard({ report }: { report: ReportPayload }) {
 
   return (
     <div
-      className="chart-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
+      className="rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1045,7 +913,7 @@ function TierDistributionCard({ report }: { report: ReportPayload }) {
 
   return (
     <div
-      className="chart-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
+      className="rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1080,157 +948,13 @@ function TierDistributionCard({ report }: { report: ReportPayload }) {
   );
 }
 
-function ItemValue({ value }: { value: unknown }) {
-  if (value == null) return <span>—</span>;
-
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return <span>{String(value)}</span>;
-  }
-
-  if (Array.isArray(value)) {
-    return <span>{value.map((v) => String(v)).join(", ")}</span>;
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>);
-  if (!entries.length) return <span>—</span>;
-
-  return (
-    <div className="space-y-1">
-      {entries.map(([k, v]) => (
-        <div key={k}>
-          <span className="font-medium text-slate-900">{titleCase(k)}:</span>{" "}
-          <span>{String(v)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function BlockCard({ block }: { block: ProfileExtendedBlock }) {
-  const hasSummary = !!safeString(block.short_summary);
-  const paragraphs = Array.isArray(block.paragraphs) ? block.paragraphs : [];
-  const bullets = Array.isArray(block.bullets) ? block.bullets : [];
-  const items = Array.isArray(block.items) ? block.items : [];
-  const transition = safeString(block.transition);
-
-  return (
-    <div
-      className="report-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
-      style={{ outline: `1px solid ${BRAND.border}` }}
-    >
-      {block.title ? (
-        <div className="text-[16px] font-semibold leading-7 text-slate-900">
-          {block.title}
-        </div>
-      ) : null}
-
-      {hasSummary ? (
-        <div
-          className={`rounded-xl bg-white px-4 py-4 text-slate-950 ${
-            block.title ? "mt-4" : ""
-          }`}
-          style={{ outline: `1px solid ${BRAND.blue}` }}
-        >
-          {block.short_summary}
-        </div>
-      ) : null}
-
-      {paragraphs.length > 0 ? (
-        <div className="mt-4 space-y-3 text-[15px] leading-7 text-slate-700">
-          {paragraphs.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      ) : null}
-
-      {bullets.length > 0 ? (
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
-          {bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      {items.length > 0 ? (
-        <div className="mt-4 space-y-3">
-          {items.map((item, idx) => {
-            const entries = Object.entries(item);
-            return (
-              <div
-                key={idx}
-                className="rounded-xl bg-white px-4 py-4"
-                style={{ outline: `1px solid ${BRAND.border}` }}
-              >
-                {entries.map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="grid grid-cols-[180px_minmax(0,1fr)] gap-3 py-1 text-[14px] leading-6"
-                  >
-                    <div className="font-medium text-slate-500">{titleCase(key)}</div>
-                    <div className="text-slate-800">
-                      <ItemValue value={value} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {transition ? (
-        <div className="mt-4 text-[12px] italic leading-5 text-slate-500">
-          {transition}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function PanelCard({
-  title,
-  panel,
-  showPanelTitle,
-}: {
-  title: string;
-  panel?: ProfileExtendedPanel | null;
-  showPanelTitle: boolean;
-}) {
-  if (!panel) return null;
-
-  return (
-    <div className="space-y-4">
-      {showPanelTitle ? (
-        <div className="text-[18px] font-semibold leading-7 text-slate-900">
-          {title}
-        </div>
-      ) : null}
-
-      {panel.blocks.map((block, idx) => (
-        <BlockCard key={`${panel.panel_key}-${idx}`} block={block} />
-      ))}
-    </div>
-  );
-}
-
 function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
   return (
     <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
-      <div className="space-y-6">
-        {section.panels.map((panel) => {
-          const showPanelTitle =
-            section.panels.length > 1 ||
-            safeString(panel.title).toLowerCase() !== safeString(section.heading).toLowerCase();
-
-          return (
-            <PanelCard
-              key={panel.panel_key}
-              title={panel.title}
-              panel={panel}
-              showPanelTitle={showPanelTitle}
-            />
-          );
-        })}
+      <div className="space-y-5">
+        {section.panels.map((panel) => (
+          <PanelCard key={panel.panel_key} panel={panel} />
+        ))}
       </div>
     </WhiteCard>
   );
@@ -1243,73 +967,103 @@ export default function ProfileExtendedReportClient({
   report,
   backHref,
 }: Props) {
-  const searchParams = useSearchParams();
-  const isPrintMode = searchParams.get("print") === "1";
-
-  usePdfPrintCleanup(isPrintMode);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   const sections = useMemo(
-    () => normalizeSections((report.sections || []) as unknown[]),
+    () => normalizeSections(Array.isArray(report.sections) ? report.sections : []),
     [report.sections]
   );
 
+  async function downloadPdf() {
+    try {
+      const root = rootRef.current;
+      if (!root) return;
+
+      const sectionNodes = Array.from(
+        root.querySelectorAll("[data-pdf-section='true']")
+      ) as HTMLDivElement[];
+
+      if (!sectionNodes.length) return;
+
+      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
+        html2canvasPromise(),
+        jsPdfPromise(),
+      ]);
+
+      const pdf = new JsPDF("p", "pt", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+
+      for (let i = 0; i < sectionNodes.length; i += 1) {
+        const node = sectionNodes[i];
+        const canvas = await html2canvas(node, {
+          backgroundColor: "#F1F5F9",
+          scale: 2,
+          useCORS: true,
+          windowWidth: node.scrollWidth,
+          windowHeight: node.scrollHeight,
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+      }
+
+      const safeName = `${taker.fullName || "profile"}-profile-extended-report.pdf`.replace(
+        /[^\w\-]+/g,
+        "_"
+      );
+      pdf.save(safeName);
+    } catch (e) {
+      console.error("[profile-extended] pdf export failed", e);
+      alert("PDF export failed.");
+    }
+  }
+
   return (
-    <>
-      <PdfPrintModeStyles isPrintMode={isPrintMode} />
+    <div className="min-h-screen" style={{ background: BRAND.pageBg }}>
       <div
-        className="min-h-screen pdf-report-shell"
-        style={{ background: isPrintMode ? "#ffffff" : BRAND.pageBg }}
-      >
-      <div
-        className="min-h-[240px] pdf-hero"
+        className="min-h-[240px]"
         style={{
           background: BRAND.heroBg,
         }}
       >
-        <div className="pdf-hero-inner mx-auto max-w-[1440px] px-5 py-4">
+        <div className="mx-auto max-w-[1440px] px-5 py-4">
           <SummaryHeader
             orgName={org.name}
             backHref={backHref}
+            onDownload={downloadPdf}
             taker={taker}
-            test={test}
             report={report}
-            orgSlug={org.slug}
-            isPrintMode={isPrintMode}
           />
 
-          {!isPrintMode ? (
-            <div className="no-print mt-4 text-[12px] text-white/50">
-              Database → {taker.fullName} →{" "}
-              <span className="text-white">Internal Sales Report</span>
-            </div>
-          ) : null}
+          <div className="mt-4 text-[12px] text-white/50">
+            Database → {taker.fullName} →{" "}
+            <span className="text-white">Profile Extended Report</span>
+          </div>
         </div>
       </div>
 
-      <div className="pdf-content-area bg-slate-100">
-        <div className="pdf-content-inner mx-auto max-w-[1440px] px-5 pb-16 pt-5">
+      <div className="bg-slate-100">
+        <div ref={rootRef} className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
           <PdfSection>
-            <div className="pdf-chart-grid grid gap-4 xl:grid-cols-[455px_455px_1fr]">
+            <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
               <LadderPositionCard report={report} />
               <PillarScoresCard report={report} />
               <TierDistributionCard report={report} />
             </div>
           </PdfSection>
 
-          <div
-            className={`pdf-sections-grid mt-4 grid gap-4 items-start ${
-              isPrintMode ? "" : "xl:grid-cols-[280px_minmax(0,1fr)]"
-            }`}
-          >
-            {!isPrintMode ? (
-              <div className="no-print xl:sticky xl:top-5">
-                <ReportIndexCard sections={sections} />
-              </div>
-            ) : null}
+          <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
+            <div className="xl:sticky xl:top-5">
+              <ReportIndexCard sections={sections} />
+            </div>
 
-            <div className="pdf-sections-list space-y-4">
+            <div className="space-y-4">
               {sections.map((section) => (
-                <PdfSection key={section.section_key} pageBreakBefore={false}>
+                <PdfSection key={section.section_key}>
                   <SectionRenderer section={section} />
                 </PdfSection>
               ))}
@@ -1318,6 +1072,5 @@ export default function ProfileExtendedReportClient({
         </div>
       </div>
     </div>
-    </>
   );
 }
