@@ -1,8 +1,7 @@
 //apps/web/app/api/reports/pdf/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
-import { chromium as playwrightChromium, type Browser } from "playwright-core";
+import { chromium as playwrightChromium, type Browser, type Page } from "playwright-core";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +14,157 @@ type ReportType =
   | "five-d"
   | "visibility"
   | "profile-extended";
+
+const PDF_PRINT_CSS = `
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box !important;
+  }
+
+  body {
+    overflow: visible !important;
+  }
+
+  .no-print,
+  .pdf-hide,
+  [data-no-print="true"],
+  [data-pdf-hide="true"],
+  nav,
+  header,
+  footer,
+  button,
+  [role="navigation"],
+  [aria-label="breadcrumb"],
+  [aria-label="breadcrumbs"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  a[href*="admin"],
+  a[href*="database"],
+  a[href*="settings"],
+  a[href*="tests"],
+  a[href*="communications"],
+  a[href*="profile-settings"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .pdf-report-shell,
+  .report-shell,
+  main,
+  article {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  .min-h-screen,
+  .min-h-\\[240px\\],
+  .bg-slate-100 {
+    min-height: auto !important;
+    background: #ffffff !important;
+  }
+
+  .mx-auto {
+    max-width: 100% !important;
+  }
+
+  .max-w-\\[1440px\\],
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-5xl,
+  .max-w-4xl {
+    max-width: 100% !important;
+  }
+
+  .px-5,
+  .px-6,
+  .px-8 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .py-4,
+  .py-5,
+  .py-6 {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .pb-16 {
+    padding-bottom: 0 !important;
+  }
+
+  .pt-5 {
+    padding-top: 0 !important;
+  }
+
+  .sticky,
+  .fixed {
+    position: static !important;
+  }
+
+  .report-section,
+  .report-card,
+  .chart-card,
+  .summary-card,
+  .avoid-break,
+  .pdf-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .pdf-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  img,
+  svg,
+  canvas {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .shadow,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: none !important;
+  }
+
+  .grid {
+    page-break-inside: auto !important;
+  }
+
+  .print-clean-page {
+    background: #ffffff !important;
+  }
+`;
 
 function safeFileName(value: string) {
   const cleaned = value
@@ -36,6 +186,11 @@ function getRequiredParam(params: URLSearchParams, key: string) {
   return value.trim();
 }
 
+function withPrintParam(path: string) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}print=1`;
+}
+
 function buildReportPath(params: URLSearchParams) {
   const type = getRequiredParam(params, "type") as ReportType;
 
@@ -43,54 +198,60 @@ function buildReportPath(params: URLSearchParams) {
     const token = getRequiredParam(params, "token");
     const tid = getRequiredParam(params, "tid");
 
-    return `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-      tid
-    )}&print=1`;
+    return withPrintParam(
+      `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}`
+    );
   }
 
   if (type === "qsc-entrepreneur") {
     const token = getRequiredParam(params, "token");
     const tid = getRequiredParam(params, "tid");
 
-    return `/qsc/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-      tid
-    )}&print=1`;
+    return withPrintParam(
+      `/qsc/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}`
+    );
   }
 
   if (type === "qsc-leader") {
     const token = getRequiredParam(params, "token");
     const tid = getRequiredParam(params, "tid");
 
-    return `/qsc/${encodeURIComponent(
-      token
-    )}/leader-report?tid=${encodeURIComponent(tid)}&print=1`;
+    return withPrintParam(
+      `/qsc/${encodeURIComponent(token)}/leader-report?tid=${encodeURIComponent(
+        tid
+      )}`
+    );
   }
 
   if (type === "five-d") {
     const token = getRequiredParam(params, "token");
     const tid = getRequiredParam(params, "tid");
 
-    return `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
-      tid
-    )}&print=1`;
+    return withPrintParam(
+      `/t/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(tid)}`
+    );
   }
 
   if (type === "visibility") {
     const token = getRequiredParam(params, "token");
     const tid = getRequiredParam(params, "tid");
 
-    return `/visibility/${encodeURIComponent(
-      token
-    )}/report?tid=${encodeURIComponent(tid)}&print=1`;
+    return withPrintParam(
+      `/visibility/${encodeURIComponent(token)}/report?tid=${encodeURIComponent(
+        tid
+      )}`
+    );
   }
 
   if (type === "profile-extended") {
     const slug = getRequiredParam(params, "slug");
     const takerId = getRequiredParam(params, "takerId");
 
-    return `/portal/${encodeURIComponent(
-      slug
-    )}/database/${encodeURIComponent(takerId)}/profile-extended-report?print=1`;
+    return withPrintParam(
+      `/portal/${encodeURIComponent(slug)}/database/${encodeURIComponent(
+        takerId
+      )}/profile-extended-report`
+    );
   }
 
   throw new Error(`Unsupported report type: ${type}`);
@@ -120,12 +281,117 @@ function getOrigin(req: NextRequest) {
   );
 }
 
-async function waitForReportToSettle(page: Awaited<ReturnType<Browser["newPage"]>>) {
+async function hideElementByText(page: Page, text: string) {
+  await page
+    .evaluate((targetText) => {
+      const normalise = (value: string) =>
+        value.replace(/\s+/g, " ").trim().toLowerCase();
+
+      const target = normalise(targetText);
+
+      const elements = Array.from(
+        document.querySelectorAll("a, button, div, section, aside")
+      );
+
+      for (const element of elements) {
+        const ownText = normalise(element.textContent || "");
+
+        if (!ownText.includes(target)) continue;
+
+        const htmlElement = element as HTMLElement;
+
+        if (
+          target === "report index" ||
+          target === "dashboard database tests" ||
+          target === "profile settings" ||
+          target === "back to admin" ||
+          target === "back to test taker profile" ||
+          target === "download pdf"
+        ) {
+          const nearest =
+            htmlElement.closest("aside") ||
+            htmlElement.closest("nav") ||
+            htmlElement.closest("header") ||
+            htmlElement.closest("section") ||
+            htmlElement.closest("div") ||
+            htmlElement;
+
+          (nearest as HTMLElement).style.display = "none";
+          (nearest as HTMLElement).style.visibility = "hidden";
+        }
+      }
+    }, text)
+    .catch(() => {});
+}
+
+async function cleanPageForPdf(page: Page) {
+  await page.addStyleTag({ content: PDF_PRINT_CSS }).catch(() => {});
+
+  await page
+    .evaluate(() => {
+      document.documentElement.classList.add("print-clean-page");
+      document.body.classList.add("print-clean-page");
+
+      const selectorsToHide = [
+        ".no-print",
+        ".pdf-hide",
+        "[data-no-print='true']",
+        "[data-pdf-hide='true']",
+        "nav",
+        "header",
+        "footer",
+        "button",
+        "[role='navigation']",
+        "[aria-label='breadcrumb']",
+        "[aria-label='breadcrumbs']",
+        "aside",
+      ];
+
+      for (const selector of selectorsToHide) {
+        document.querySelectorAll(selector).forEach((element) => {
+          const htmlElement = element as HTMLElement;
+          htmlElement.style.display = "none";
+          htmlElement.style.visibility = "hidden";
+        });
+      }
+
+      const links = Array.from(document.querySelectorAll("a"));
+
+      for (const link of links) {
+        const htmlLink = link as HTMLElement;
+        const text = (htmlLink.textContent || "").toLowerCase();
+        const href = (link.getAttribute("href") || "").toLowerCase();
+
+        if (
+          text.includes("back") ||
+          text.includes("dashboard") ||
+          text.includes("database") ||
+          text.includes("tests") ||
+          text.includes("profile settings") ||
+          text.includes("communications") ||
+          href.includes("admin") ||
+          href.includes("settings")
+        ) {
+          htmlLink.style.display = "none";
+          htmlLink.style.visibility = "hidden";
+        }
+      }
+    })
+    .catch(() => {});
+
+  await hideElementByText(page, "Dashboard Database Tests");
+  await hideElementByText(page, "Profile Settings");
+  await hideElementByText(page, "Back to admin");
+  await hideElementByText(page, "Back to test taker profile");
+  await hideElementByText(page, "Download PDF");
+  await hideElementByText(page, "Report Index");
+}
+
+async function waitForReportToSettle(page: Page) {
   await page.waitForLoadState("domcontentloaded", { timeout: 60_000 });
 
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {
-    // Some report pages keep small network activity alive.
-    // This should not block PDF generation.
+    // Some app pages keep small requests alive.
   });
 
   await page
@@ -134,9 +400,7 @@ async function waitForReportToSettle(page: Awaited<ReturnType<Browser["newPage"]
         await document.fonts.ready;
       }
     })
-    .catch(() => {
-      // Font loading is helpful, but PDF generation should continue if this fails.
-    });
+    .catch(() => {});
 
   await page.waitForTimeout(1200);
 }
@@ -162,8 +426,8 @@ export async function GET(req: NextRequest) {
 
     const context = await browser.newContext({
       viewport: {
-        width: 1200,
-        height: 1600,
+        width: 1280,
+        height: 1800,
       },
       ignoreHTTPSErrors: true,
       extraHTTPHeaders: {
@@ -189,24 +453,27 @@ export async function GET(req: NextRequest) {
       console.error("PDF page error:", error);
     });
 
+    await page.emulateMedia({ media: "print" });
+
     await page.goto(reportUrl, {
       waitUntil: "domcontentloaded",
       timeout: 60_000,
     });
 
-    await page.emulateMedia({ media: "print" });
-
     await waitForReportToSettle(page);
+    await cleanPageForPdf(page);
+    await page.emulateMedia({ media: "print" });
+    await page.waitForTimeout(500);
 
     const pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       preferCSSPageSize: true,
       margin: {
-        top: "14mm",
-        right: "14mm",
-        bottom: "14mm",
-        left: "14mm",
+        top: "12mm",
+        right: "12mm",
+        bottom: "12mm",
+        left: "12mm",
       },
     });
 
