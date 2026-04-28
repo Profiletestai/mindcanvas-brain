@@ -391,14 +391,6 @@ function formatItemLabel(rawKey: string) {
   return titleCase(rawKey);
 }
 
-function PdfSection({ children }: { children: ReactNode }) {
-  return (
-    <section data-pdf-section="true" style={{ pageBreakAfter: "always" }}>
-      {children}
-    </section>
-  );
-}
-
 function WhiteCard({
   title,
   children,
@@ -960,13 +952,46 @@ function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
   );
 }
 
+function buildCardRanges(
+  heights: number[],
+  startIndex: number,
+  maxHeight: number,
+  gap: number
+) {
+  let used = 0;
+  let endIndex = startIndex;
+
+  while (endIndex < heights.length) {
+    const extra = endIndex > startIndex ? gap : 0;
+    const nextHeight = heights[endIndex] + extra;
+
+    if (endIndex > startIndex && used + nextHeight > maxHeight) {
+      break;
+    }
+
+    if (endIndex === startIndex && nextHeight > maxHeight) {
+      endIndex += 1;
+      break;
+    }
+
+    used += nextHeight;
+    endIndex += 1;
+  }
+
+  return endIndex;
+}
+
 export default function ProfileExtendedReportClient({
   org,
   taker,
+  test,
   report,
   backHref,
 }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const overviewRef = useRef<HTMLDivElement | null>(null);
+  const indexRef = useRef<HTMLDivElement | null>(null);
 
   const sections = useMemo(
     () => normalizeSections(Array.isArray(report.sections) ? report.sections : []),
@@ -975,98 +1000,218 @@ export default function ProfileExtendedReportClient({
 
   async function downloadPdf() {
     const root = rootRef.current;
-    if (!root) return;
+    const headerNode = headerRef.current;
+    const overviewNode = overviewRef.current;
+    const indexNode = indexRef.current;
 
-    const stickyNodes = Array.from(
-      root.querySelectorAll("[data-export-no-sticky='true']")
+    if (!root || !headerNode || !overviewNode || !indexNode) return;
+
+    const cardNodes = Array.from(
+      root.querySelectorAll("[data-export-card='true']")
     ) as HTMLElement[];
 
-    const stickyState = stickyNodes.map((node) => ({
-      node,
-      position: node.style.position,
-      top: node.style.top,
-      alignSelf: node.style.alignSelf,
-    }));
+    if (!cardNodes.length) return;
+
+    let stage: HTMLDivElement | null = null;
 
     try {
-      stickyNodes.forEach((node) => {
-        node.style.position = "static";
-        node.style.top = "auto";
-        node.style.alignSelf = "auto";
-      });
-
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
         html2canvasPromise(),
         jsPdfPromise(),
       ]);
 
-      const canvas = await html2canvas(root, {
-        backgroundColor: "#F1F5F9",
-        scale: 2,
-        useCORS: true,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        windowWidth: root.scrollWidth,
-        windowHeight: root.scrollHeight,
-      });
-
       const pdf = new JsPDF("p", "pt", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      const margin = 20;
-      const contentWidth = pdfWidth - margin * 2;
-      const contentHeight = pdfHeight - margin * 2;
+      const marginPt = 20;
+      const printableWidthPt = pdfWidth - marginPt * 2;
+      const printableHeightPt = pdfHeight - marginPt * 2;
 
-      const fullImageHeight = (canvas.height * contentWidth) / canvas.width;
-      const pageHeightPx = Math.floor((contentHeight / fullImageHeight) * canvas.height);
+      const exportWidthPx = Math.max(root.scrollWidth, 1480);
+      const pageHeightPx = Math.floor(
+        (printableHeightPt / printableWidthPt) * exportWidthPx
+      );
 
-      const pageCanvas = document.createElement("canvas");
-      const pageCtx = pageCanvas.getContext("2d");
+      const bodyPaddingPx = 20;
+      const pageGapPx = 16;
+      const cardGapPx = 16;
 
-      if (!pageCtx) throw new Error("Could not create PDF canvas context.");
+      const cardHeights = cardNodes.map((node) => Math.ceil(node.offsetHeight));
+      const headerHeight = Math.ceil(headerNode.offsetHeight);
+      const overviewHeight = Math.ceil(overviewNode.offsetHeight);
+      const indexHeight = Math.ceil(indexNode.offsetHeight);
 
-      let renderedHeight = 0;
-      let pageIndex = 0;
+      const cloneStatic = (node: HTMLElement) => {
+        const clone = node.cloneNode(true) as HTMLElement;
+        clone.style.position = "static";
+        clone.style.top = "auto";
+        clone.style.left = "auto";
+        clone.style.right = "auto";
+        clone.style.bottom = "auto";
+        clone.style.alignSelf = "auto";
+        return clone;
+      };
 
-      while (renderedHeight < canvas.height) {
-        const sliceHeight = Math.min(pageHeightPx, canvas.height - renderedHeight);
+      stage = document.createElement("div");
+      stage.style.position = "fixed";
+      stage.style.left = "-100000px";
+      stage.style.top = "0";
+      stage.style.width = `${exportWidthPx}px`;
+      stage.style.background = "#F1F5F9";
+      stage.style.pointerEvents = "none";
+      stage.style.zIndex = "-1";
+      document.body.appendChild(stage);
 
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = sliceHeight;
+      const pageCanvases: HTMLCanvasElement[] = [];
 
-        pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
-        pageCtx.drawImage(
-          canvas,
-          0,
-          renderedHeight,
-          canvas.width,
-          sliceHeight,
-          0,
-          0,
-          canvas.width,
-          sliceHeight
+      const firstPageAvailableForContent =
+        pageHeightPx -
+        headerHeight -
+        overviewHeight -
+        bodyPaddingPx * 2 -
+        pageGapPx * 2;
+
+      const firstPageAvailableForCards = Math.max(
+        0,
+        firstPageAvailableForContent
+      );
+
+      let firstPageEnd = buildCardRanges(
+        cardHeights,
+        0,
+        firstPageAvailableForCards,
+        cardGapPx
+      );
+
+      if (firstPageEnd < 1) firstPageEnd = 1;
+
+      const firstPage = document.createElement("div");
+      firstPage.style.width = `${exportWidthPx}px`;
+      firstPage.style.background = BRAND.pageBg;
+      firstPage.style.overflow = "hidden";
+
+      firstPage.appendChild(headerNode.cloneNode(true));
+
+      const firstPageBody = document.createElement("div");
+      firstPageBody.style.background = "#F1F5F9";
+
+      const firstPageInner = document.createElement("div");
+      firstPageInner.style.maxWidth = "1440px";
+      firstPageInner.style.margin = "0 auto";
+      firstPageInner.style.padding = `${bodyPaddingPx}px`;
+      firstPageInner.style.display = "grid";
+      firstPageInner.style.rowGap = `${pageGapPx}px`;
+
+      firstPageInner.appendChild(overviewNode.cloneNode(true));
+
+      const firstRow = document.createElement("div");
+      firstRow.style.display = "grid";
+      firstRow.style.gridTemplateColumns = "280px minmax(0,1fr)";
+      firstRow.style.columnGap = `${pageGapPx}px`;
+      firstRow.style.alignItems = "start";
+
+      firstRow.appendChild(cloneStatic(indexNode));
+
+      const firstCardsCol = document.createElement("div");
+      firstCardsCol.style.display = "grid";
+      firstCardsCol.style.rowGap = `${cardGapPx}px`;
+
+      for (let i = 0; i < firstPageEnd; i += 1) {
+        firstCardsCol.appendChild(cardNodes[i].cloneNode(true));
+      }
+
+      firstRow.appendChild(firstCardsCol);
+      firstPageInner.appendChild(firstRow);
+      firstPageBody.appendChild(firstPageInner);
+      firstPage.appendChild(firstPageBody);
+      stage.appendChild(firstPage);
+
+      const firstCanvas = await html2canvas(firstPage, {
+        backgroundColor: "#F1F5F9",
+        scale: 2,
+        useCORS: true,
+        windowWidth: exportWidthPx,
+        windowHeight: firstPage.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+      });
+
+      pageCanvases.push(firstCanvas);
+
+      let startIndex = firstPageEnd;
+
+      while (startIndex < cardNodes.length) {
+        const page = document.createElement("div");
+        page.style.width = `${exportWidthPx}px`;
+        page.style.background = "#F1F5F9";
+
+        const pageInner = document.createElement("div");
+        pageInner.style.maxWidth = "1440px";
+        pageInner.style.margin = "0 auto";
+        pageInner.style.padding = `${bodyPaddingPx}px`;
+
+        const row = document.createElement("div");
+        row.style.display = "grid";
+        row.style.gridTemplateColumns = "280px minmax(0,1fr)";
+        row.style.columnGap = `${pageGapPx}px`;
+        row.style.alignItems = "start";
+
+        row.appendChild(cloneStatic(indexNode));
+
+        const cardsCol = document.createElement("div");
+        cardsCol.style.display = "grid";
+        cardsCol.style.rowGap = `${cardGapPx}px`;
+
+        const availableHeight = Math.max(0, pageHeightPx - bodyPaddingPx * 2);
+        const endIndex = buildCardRanges(
+          cardHeights,
+          startIndex,
+          availableHeight,
+          cardGapPx
         );
 
-        const imgData = pageCanvas.toDataURL("image/png");
-        const renderedPageHeight = (sliceHeight * contentWidth) / canvas.width;
+        for (let i = startIndex; i < endIndex; i += 1) {
+          cardsCol.appendChild(cardNodes[i].cloneNode(true));
+        }
 
-        if (pageIndex > 0) pdf.addPage();
+        row.appendChild(cardsCol);
+        pageInner.appendChild(row);
+        page.appendChild(pageInner);
+        stage.appendChild(page);
+
+        const canvas = await html2canvas(page, {
+          backgroundColor: "#F1F5F9",
+          scale: 2,
+          useCORS: true,
+          windowWidth: exportWidthPx,
+          windowHeight: page.scrollHeight,
+          scrollX: 0,
+          scrollY: 0,
+        });
+
+        pageCanvases.push(canvas);
+        startIndex = endIndex;
+      }
+
+      pageCanvases.forEach((canvas, idx) => {
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidthPt = printableWidthPt;
+        const imgHeightPt = (canvas.height * imgWidthPt) / canvas.width;
+
+        if (idx > 0) pdf.addPage();
 
         pdf.addImage(
           imgData,
           "PNG",
-          margin,
-          margin,
-          contentWidth,
-          renderedPageHeight,
+          marginPt,
+          marginPt,
+          imgWidthPt,
+          imgHeightPt,
           undefined,
           "FAST"
         );
-
-        renderedHeight += sliceHeight;
-        pageIndex += 1;
-      }
+      });
 
       const safeName = `${taker.fullName || "profile"}-profile-extended-report.pdf`.replace(
         /[^\w\-]+/g,
@@ -1078,11 +1223,9 @@ export default function ProfileExtendedReportClient({
       console.error("[profile-extended] pdf export failed", e);
       alert("PDF export failed.");
     } finally {
-      stickyState.forEach(({ node, position, top, alignSelf }) => {
-        node.style.position = position;
-        node.style.top = top;
-        node.style.alignSelf = alignSelf;
-      });
+      if (stage && stage.parentNode) {
+        stage.parentNode.removeChild(stage);
+      }
     }
   }
 
@@ -1090,6 +1233,7 @@ export default function ProfileExtendedReportClient({
     <div className="min-h-screen" style={{ background: BRAND.pageBg }}>
       <div ref={rootRef}>
         <div
+          ref={headerRef}
           className="min-h-[240px]"
           style={{
             background: BRAND.heroBg,
@@ -1113,27 +1257,24 @@ export default function ProfileExtendedReportClient({
 
         <div className="bg-slate-100">
           <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
-            <PdfSection>
+            <div ref={overviewRef}>
               <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
                 <LadderPositionCard report={report} />
                 <PillarScoresCard report={report} />
                 <TierDistributionCard report={report} />
               </div>
-            </PdfSection>
+            </div>
 
             <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
-              <div
-                data-export-no-sticky="true"
-                className="xl:sticky xl:top-5"
-              >
+              <div ref={indexRef} className="xl:sticky xl:top-5">
                 <ReportIndexCard sections={sections} />
               </div>
 
               <div className="space-y-4">
                 {sections.map((section) => (
-                  <PdfSection key={section.section_key}>
+                  <div key={section.section_key} data-export-card="true">
                     <SectionRenderer section={section} />
-                  </PdfSection>
+                  </div>
                 ))}
               </div>
             </div>
