@@ -83,10 +83,191 @@ export type AssembledProfileExtendedSection = {
   }>;
 };
 
+export type InternalSalesSnapshot = {
+  visibility_score: number;
+  level: number;
+  tier: VisibilityTier;
+  behaviour_style: BehaviourStyle;
+  readiness: Readiness | null;
+  correct_programme: string;
+  primary_objective: string;
+  secondary_objective: string;
+};
+
+export type InternalSalesObjection = {
+  objection: string;
+  response: string;
+};
+
+export type InternalSalesReport = {
+  snapshot: InternalSalesSnapshot;
+  real_situation: string[];
+  core_pain: string[];
+  real_problem: string[];
+  what_not_to_do: string[];
+  what_to_do: string[];
+  why_this_offer: string[];
+  objections: InternalSalesObjection[];
+  conversion_signals: string[];
+  close_line: string;
+  long_term_value: string[];
+};
+
 export type AssembledProfileExtendedReport = {
   audience: "profile_extended_report";
   input: ProfileExtendedReportInput;
+  internal_sales_report: InternalSalesReport;
   sections: AssembledProfileExtendedSection[];
+};
+
+type GenericBlock = Record<string, any>;
+
+type PanelBucketItem = {
+  block: AssembledProfileExtendedBlock;
+  row: KbBlockRow | null;
+};
+
+const SALES_PROGRAMME_BY_TIER: Record<
+  VisibilityTier,
+  {
+    correct_programme: string;
+    primary_objective: string;
+    secondary_objective: string;
+    close_line: string;
+    long_term_value: string;
+    default_not_to_do: string[];
+    default_why_offer: string[];
+    default_objections: InternalSalesObjection[];
+  }
+> = {
+  Invisible: {
+    correct_programme: "Visibility Foundation",
+    primary_objective: "Build discoverability and visible trust",
+    secondary_objective: "Prepare for authority development",
+    close_line:
+      "You can keep hoping the market eventually discovers what is already true — or you can build the signals that make credibility visible before the conversation starts.",
+    long_term_value:
+      "If the business builds stable discoverability and visible proof, it becomes ready for authority-focused support in the next stage.",
+    default_not_to_do: [
+      "Do not position this as aggressive scale.",
+      "Do not jump straight into authority branding.",
+      "Do not suggest major campaign expansion before the signal base is stable.",
+      "Do not frame the business as broken; frame it as under-signalled.",
+    ],
+    default_why_offer: [
+      "The business needs visible signal structure before bigger growth strategies will hold.",
+      "This stage is about discoverability, proof, and consistency — not scale for the sake of it.",
+      "The right support should reduce hesitation by making credibility easier to see.",
+    ],
+    default_objections: [
+      {
+        objection: "I already know we need more visibility.",
+        response:
+          "This is not just about more visibility. It is about building the right trust signals so visibility actually converts.",
+      },
+      {
+        objection: "I do not want to over-invest too early.",
+        response:
+          "That is exactly why this is the right stage to address now. A stronger foundation prevents wasted spend later.",
+      },
+    ],
+  },
+  Emerging: {
+    correct_programme: "GROWTH",
+    primary_objective: "Turn recognition into trust",
+    secondary_objective: "Prepare for authority compounding",
+    close_line:
+      "You can keep letting prospects compare their way to uncertainty — or you can build the authority signals that make trust arrive earlier. That is what this stage is for.",
+    long_term_value:
+      "When authority and proof deepen at this stage, the business becomes ready for leadership-oriented positioning support next.",
+    default_not_to_do: [
+      "Do not talk about dominating the market too early.",
+      "Do not suggest broad expansion before authority strengthens.",
+      "Do not position this as fixing basics if the business is already visible.",
+      "Do not let the conversation drift into price-led growth.",
+    ],
+    default_why_offer: [
+      "The business is already visible; the real job now is reducing comparison and increasing expert trust.",
+      "This offer should strengthen authority, proof depth, and differentiation.",
+      "The goal is not more activity. The goal is clearer expertise in the market’s eyes.",
+    ],
+    default_objections: [
+      {
+        objection: "I feel like I am already doing most of this.",
+        response:
+          "You may already be doing it internally. The issue is whether the market is receiving those authority signals clearly enough before contact.",
+      },
+      {
+        objection: "I just need more leads.",
+        response:
+          "More leads without stronger authority often creates more comparison. The better move is making the business the clearer expert choice.",
+      },
+    ],
+  },
+  Established: {
+    correct_programme: "Market Authority Programme",
+    primary_objective: "Turn credibility into leadership",
+    secondary_objective: "Prepare for category influence",
+    close_line:
+      "You have already built credibility. The opportunity now is deciding whether the market keeps seeing you as one of several credible options — or as the leader they reference first.",
+    long_term_value:
+      "If leadership positioning consolidates here, the business becomes ready for broader influence and category-shaping opportunities.",
+    default_not_to_do: [
+      "Do not fall back into generic marketing language.",
+      "Do not widen the offer in ways that dilute authority.",
+      "Do not treat this like a visibility problem when credibility is already present.",
+      "Do not recommend growth moves that weaken positioning.",
+    ],
+    default_why_offer: [
+      "The business no longer needs basic visibility work. It needs clearer leadership perception.",
+      "This stage is about category positioning, influence, and authority consolidation.",
+      "The right support should help the market see leadership, not just competence.",
+    ],
+    default_objections: [
+      {
+        objection: "We already have a good reputation.",
+        response:
+          "Exactly — and the next step is turning reputation into leadership positioning that compounds rather than plateaus.",
+      },
+      {
+        objection: "We are already getting inbound opportunities.",
+        response:
+          "That is a strong sign. This stage is about making sure those opportunities reinforce leadership instead of staying at a respected-but-broad level.",
+      },
+    ],
+  },
+  Magnetic: {
+    correct_programme: "Category Leadership Advisory",
+    primary_objective: "Protect authority while expanding influence",
+    secondary_objective: "Prepare for scalable category leadership",
+    close_line:
+      "The market already recognises your authority. The real decision now is whether that authority stays localised — or becomes the platform for wider category influence.",
+    long_term_value:
+      "If influence expands without weakening positioning, the business can move into larger authority, partnership, and category-shaping opportunities.",
+    default_not_to_do: [
+      "Do not position this as ordinary marketing support.",
+      "Do not recommend generic campaigns that dilute authority.",
+      "Do not let short-term growth compromise leadership perception.",
+      "Do not frame the issue as visibility alone when the real challenge is influence expansion.",
+    ],
+    default_why_offer: [
+      "This stage is about extending influence without weakening authority.",
+      "The right support should protect positioning while expanding category impact.",
+      "The business is not solving for recognition anymore; it is solving for disciplined leadership growth.",
+    ],
+    default_objections: [
+      {
+        objection: "We are already doing well.",
+        response:
+          "That is true — and this stage is about making sure success evolves into wider influence rather than quiet plateau.",
+      },
+      {
+        objection: "I do not want to dilute what already works.",
+        response:
+          "Exactly. The right next step should protect authority while extending it, not weaken it.",
+      },
+    ],
+  },
 };
 
 function buildStructure(input: ProfileExtendedReportInput): Array<{
@@ -266,19 +447,35 @@ function uniqueRows(
   return out;
 }
 
-function makeBlock(src?: Record<string, any> | null): AssembledProfileExtendedBlock {
+function dedupeStrings(values: Array<string | null | undefined>) {
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of values) {
+    const s = safeString(value);
+    if (!s) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+
+  return out;
+}
+
+function makeBlock(src?: GenericBlock | null): AssembledProfileExtendedBlock {
   const item = src || {};
 
   const paragraphs = Array.isArray(item.paragraphs)
-    ? item.paragraphs.map((p: any) => safeString(p)).filter(Boolean)
+    ? (item.paragraphs as unknown[]).map((p: unknown) => safeString(p)).filter(Boolean)
     : [];
 
   const bullets = Array.isArray(item.bullets)
-    ? item.bullets.map((b: any) => safeString(b)).filter(Boolean)
+    ? (item.bullets as unknown[]).map((b: unknown) => safeString(b)).filter(Boolean)
     : [];
 
   const items = Array.isArray(item.items)
-    ? item.items.filter((x: any) => x && typeof x === "object")
+    ? (item.items as unknown[]).filter((x: unknown) => x && typeof x === "object") as GenericBlock[]
     : [];
 
   return {
@@ -295,7 +492,7 @@ function makeBlock(src?: Record<string, any> | null): AssembledProfileExtendedBl
     bullets,
     items,
     transition: safeString(item.transition) || undefined,
-    meta: item.meta && typeof item.meta === "object" ? item.meta : undefined,
+    meta: item.meta && typeof item.meta === "object" ? (item.meta as Record<string, any>) : undefined,
   };
 }
 
@@ -316,17 +513,62 @@ function makeSimpleBlock(
 }
 
 function pushPanel(
-  buckets: Map<
-    ProfileExtendedPanelKey,
-    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
-  >,
+  buckets: Map<ProfileExtendedPanelKey, PanelBucketItem[]>,
   panelKey: ProfileExtendedPanelKey,
   block: AssembledProfileExtendedBlock,
   row: KbBlockRow | null
 ) {
-  const existing = buckets.get(panelKey) || [];
-  existing.push({ block, row });
-  buckets.set(panelKey, existing);
+  const current = buckets.get(panelKey) || [];
+  current.push({ block, row });
+  buckets.set(panelKey, current);
+}
+
+function getRowBlocks(row?: KbBlockRow | null): GenericBlock[] {
+  const content = row?.content || {};
+  return Array.isArray(content.blocks) ? (content.blocks as GenericBlock[]) : [];
+}
+
+function getRowByHeading(
+  rows: KbBlockRow[],
+  sectionKey: string,
+  heading: string
+): KbBlockRow | null {
+  const wanted = normalizeText(heading);
+  return (
+    rows.find(
+      (row: KbBlockRow) =>
+        row.section_key === sectionKey &&
+        normalizeText(row.content?.heading) === wanted
+    ) || null
+  );
+}
+
+function getBlockFromRow(row: KbBlockRow | null | undefined, heading: string): GenericBlock | null {
+  const wanted = normalizeText(heading);
+  return (
+    getRowBlocks(row).find((block: GenericBlock) => normalizeText(block?.heading) === wanted) ||
+    null
+  );
+}
+
+function getBlockSummary(row: KbBlockRow | null | undefined, heading: string) {
+  const block = getBlockFromRow(row, heading);
+  return safeString(block?.summary || block?.short_summary);
+}
+
+function getBlockBullets(row: KbBlockRow | null | undefined, heading: string) {
+  const block = getBlockFromRow(row, heading);
+  return Array.isArray(block?.bullets)
+    ? (block?.bullets as unknown[]).map((b: unknown) => safeString(b)).filter(Boolean)
+    : [];
+}
+
+function selectedLevelItem(row: KbBlockRow | null, level: number): GenericBlock | null {
+  const block = getBlockFromRow(row, "Levels");
+  const items = Array.isArray(block?.items) ? (block?.items as GenericBlock[]) : [];
+  return (
+    items.find((item: GenericBlock) => safeNumber(item?.level, -1) === level) || null
+  );
 }
 
 function strongestWeakest(input: ProfileExtendedReportInput) {
@@ -344,22 +586,261 @@ function strongestWeakest(input: ProfileExtendedReportInput) {
   };
 }
 
-function selectedLevelItem(row: KbBlockRow, level: number) {
-  const blocks = Array.isArray(row.content?.blocks) ? row.content?.blocks : [];
-  const levelsBlock = blocks.find(
-    (b: any) => normalizeText(b?.heading) === "levels" && Array.isArray(b?.items)
-  );
-  if (!levelsBlock) return null;
+function overallScore(input: ProfileExtendedReportInput) {
+  const source = input.pillar_scores || {};
+  const values = [
+    safeNumber(source.visibility, NaN),
+    safeNumber(source.trust, NaN),
+    safeNumber(source.authority, NaN),
+    safeNumber(source.dominance, NaN),
+  ].filter((n) => Number.isFinite(n));
 
-  const items = Array.isArray(levelsBlock.items) ? levelsBlock.items : [];
-  return items.find((item: any) => safeNumber(item?.level, -1) === level) || null;
+  if (!values.length) return 0;
+  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
 }
 
-function addSyntheticPanels(
-  buckets: Map<
-    ProfileExtendedPanelKey,
-    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
-  >,
+function weakestSignalProblem(key: string) {
+  const k = normalizeText(key);
+
+  if (k === "visibility") {
+    return "The market is still not receiving enough discoverability and recognition signals consistently enough.";
+  }
+  if (k === "trust") {
+    return "The market still needs stronger proof and reassurance before confidence settles early.";
+  }
+  if (k === "authority") {
+    return "The market can see value, but it does not yet see strong enough expert positioning to reduce comparison behaviour.";
+  }
+  if (k === "dominance") {
+    return "The business has not yet consolidated a strong enough leadership signal to shape preference consistently.";
+  }
+
+  return "The market is still missing one of the structural signals needed for smoother progression.";
+}
+
+function tierPainLines(tier: VisibilityTier) {
+  if (tier === "Invisible") {
+    return [
+      "The pain at this stage is often uncertainty and inconsistency.",
+      "The business may feel capable internally but under-recognised externally.",
+    ];
+  }
+  if (tier === "Emerging") {
+    return [
+      "The pain at this stage is often comparison fatigue and fragile trust.",
+      "The business can feel visible, but still not like the clear expert choice.",
+    ];
+  }
+  if (tier === "Established") {
+    return [
+      "The pain at this stage is often plateau rather than absence of demand.",
+      "The business is respected, but leadership is not yet fully consolidated in the market.",
+    ];
+  }
+  return [
+    "The pain at this stage is usually not visibility. It is how to expand influence without weakening authority.",
+    "The business may be successful already, but still sense that broader category impact is not yet fully unlocked.",
+  ];
+}
+
+function readinessSignalsFallback(tier: VisibilityTier) {
+  if (tier === "Invisible") {
+    return [
+      "Customers can find the business reliably.",
+      "Proof and credibility signals are visible across platforms.",
+      "Discovery depends less on private referrals alone.",
+    ];
+  }
+  if (tier === "Emerging") {
+    return [
+      "Customers begin referencing expertise before contact.",
+      "Comparison behaviour starts dropping.",
+      "Authority and proof feel stronger before the sales conversation starts.",
+    ];
+  }
+  if (tier === "Established") {
+    return [
+      "Prospects arrive with stronger pre-existing trust.",
+      "The business is referenced more specifically for expertise or outcomes.",
+      "Leadership perception strengthens beyond existing audiences.",
+    ];
+  }
+  return [
+    "The business is referenced as a leading authority.",
+    "Reputation creates higher-value introductions and strategic opportunities.",
+    "Influence expands without weakening positioning.",
+  ];
+}
+
+function buildObjections(
+  input: ProfileExtendedReportInput,
+  programmeConfig: (typeof SALES_PROGRAMME_BY_TIER)[VisibilityTier],
+  typeRisk: string,
+  strategicFocus: string
+): InternalSalesObjection[] {
+  const base = [...programmeConfig.default_objections];
+
+  if (safeString(typeRisk)) {
+    base.push({
+      objection: "I do not want to lose what already works.",
+      response: `That caution makes sense. The goal is not to replace strengths — it is to remove the pattern currently creating drag: ${typeRisk}`,
+    });
+  }
+
+  if (safeString(strategicFocus)) {
+    base.push({
+      objection: "This feels like a lot right now.",
+      response: `That is why the focus has to stay narrow. The priority is not everything at once. It is this: ${strategicFocus}`,
+    });
+  }
+
+  return base.slice(0, 3);
+}
+
+function buildInternalSalesReport(
+  input: ProfileExtendedReportInput,
+  matched: KbBlockRow[]
+): InternalSalesReport {
+  const programmeConfig = SALES_PROGRAMME_BY_TIER[input.tier];
+
+  const resultRow = getRowByHeading(
+    matched,
+    "result_interpretation_scripts",
+    "Result Interpretation Scripts"
+  );
+  const levelBandRow = getRowByHeading(
+    matched,
+    "level_progression_roadmap",
+    "Level Progression Roadmap"
+  );
+  const roadmapRow = getRowByHeading(
+    matched,
+    "level_progression_roadmap",
+    "Progression roadmap language"
+  );
+  const behaviourTypeRow = getRowByHeading(
+    matched,
+    "visibility_audit_layer",
+    "Behaviour style layer"
+  );
+  const behaviourTierRow = getRowByHeading(
+    matched,
+    "visibility_audit_layer",
+    "Behaviour strategy by tier"
+  );
+  const pillarGuidanceRow = getRowByHeading(
+    matched,
+    "visibility_audit_layer",
+    "Pillar reading guidance"
+  );
+
+  const levelItem = selectedLevelItem(levelBandRow, input.level);
+  const strongestWeakestState = strongestWeakest(input);
+
+  const coreReading = getBlockSummary(resultRow, "Core reading");
+  const marketHappening = getBlockSummary(resultRow, "What is usually happening in the market");
+  const whyStuck = getBlockSummary(resultRow, "Why businesses tend to get stuck here");
+  const strategicFocus =
+    getBlockSummary(resultRow, "Best-fit strategic focus") ||
+    safeString(levelItem?.immediate_focus);
+  const helpsMost = getBlockBullets(resultRow, "What usually helps most at this stage");
+  const notToDo = getBlockBullets(resultRow, "What usually does not help yet");
+  const readinessSignals = getBlockBullets(resultRow, "Signs the business is ready to progress");
+
+  const meaningInPractice = getBlockSummary(levelBandRow, "Meaning in practice");
+  const consultantRead = getBlockSummary(levelBandRow, "Consultant read");
+  const nextMilestone = getBlockSummary(roadmapRow, "Next milestone");
+  const roadmapLanguage = getBlockSummary(roadmapRow, "Language to use");
+
+  const naturalStrengths = getBlockSummary(behaviourTypeRow, "Natural strengths");
+  const mainRisk = getBlockSummary(behaviourTypeRow, "Main risk");
+  const worksBest = getBlockSummary(behaviourTypeRow, "What usually works best");
+  const watchOutFor = getBlockSummary(behaviourTypeRow, "Watch out for");
+  const behaviourGuidance = getBlockSummary(behaviourTierRow, "Guidance");
+
+  const pillarGuidanceSummary = safeString(pillarGuidanceRow?.content?.summary);
+  const pillarInterpretationRule = getBlockSummary(pillarGuidanceRow, "Interpretation rule");
+
+  return {
+    snapshot: {
+      visibility_score: overallScore(input),
+      level: input.level,
+      tier: input.tier,
+      behaviour_style: input.behaviour_style,
+      readiness: input.readiness ?? null,
+      correct_programme: programmeConfig.correct_programme,
+      primary_objective: programmeConfig.primary_objective,
+      secondary_objective: programmeConfig.secondary_objective,
+    },
+
+    real_situation: dedupeStrings([
+      `This business is currently operating in the ${input.tier} tier at Level ${input.level}.`,
+      coreReading,
+      marketHappening,
+      safeString(levelItem?.market_position)
+        ? `Current market position: ${safeString(levelItem?.market_position)}`
+        : "",
+      `${strongestWeakestState.strongest.label} is currently the strongest visible signal, while ${strongestWeakestState.weakest.label} looks like the main limiting factor.`,
+    ]),
+
+    core_pain: dedupeStrings([
+      ...tierPainLines(input.tier),
+      meaningInPractice ? `Meaning in practice: ${meaningInPractice}` : "",
+      naturalStrengths ? `Natural strengths already present: ${naturalStrengths}` : "",
+      mainRisk ? `The tension often shows up through this risk pattern: ${mainRisk}` : "",
+    ]),
+
+    real_problem: dedupeStrings([
+      whyStuck,
+      weakestSignalProblem(strongestWeakestState.weakest.key),
+      pillarGuidanceSummary,
+      pillarInterpretationRule,
+      consultantRead,
+    ]),
+
+    what_not_to_do: dedupeStrings([
+      ...notToDo,
+      ...programmeConfig.default_not_to_do,
+      watchOutFor ? `Watch out for: ${watchOutFor}` : "",
+    ]).slice(0, 6),
+
+    what_to_do: dedupeStrings([
+      "Acknowledge that the business has already built something real and that the result is structural, not personal.",
+      strategicFocus ? `Name the real strategic focus clearly: ${strategicFocus}` : "",
+      safeString(levelItem?.immediate_focus)
+        ? `Keep the immediate focus narrow: ${safeString(levelItem?.immediate_focus)}`
+        : "",
+      behaviourGuidance ? `Use the behaviour-led guidance in the conversation: ${behaviourGuidance}` : "",
+      worksBest ? `Anchor the recommendation in what usually works best for this style: ${worksBest}` : "",
+      nextMilestone ? `Tie the recommendation to the next milestone: ${nextMilestone}` : "",
+    ]).slice(0, 6),
+
+    why_this_offer: dedupeStrings([
+      ...programmeConfig.default_why_offer,
+      strategicFocus ? `This offer fits because the business now needs: ${strategicFocus}` : "",
+      ...helpsMost.map((entry: string) => `This stage typically responds well to: ${entry}`),
+      roadmapLanguage,
+    ]).slice(0, 6),
+
+    objections: buildObjections(input, programmeConfig, mainRisk, strategicFocus),
+
+    conversion_signals: dedupeStrings([
+      ...readinessSignals,
+      ...readinessSignalsFallback(input.tier),
+    ]).slice(0, 6),
+
+    close_line: programmeConfig.close_line,
+
+    long_term_value: dedupeStrings([
+      nextMilestone ? `Next milestone: ${nextMilestone}` : "",
+      roadmapLanguage,
+      programmeConfig.long_term_value,
+    ]).slice(0, 5),
+  };
+}
+
+function addSyntheticBlocks(
+  buckets: Map<ProfileExtendedPanelKey, PanelBucketItem[]>,
   input: ProfileExtendedReportInput
 ) {
   const readiness =
@@ -395,10 +876,253 @@ function addSyntheticPanels(
     "current_signal_pattern",
     makeSimpleBlock(
       "Current signal pattern",
-      `${strongest.label} is currently the strongest visible signal, while ${weakest.label} looks like the main limiting factor.`
+      `${strongest.label} is currently the strongest visible signal, while ${weakest.label} looks like the main limiting factor.`,
+      {
+        transition:
+          "The same low pillar can mean different things at different levels, so the pillar pattern should always be read together with the tier and level.",
+      }
     ),
     null
   );
+}
+
+function assembleExtendedSections(
+  matched: KbBlockRow[],
+  input: ProfileExtendedReportInput
+): AssembledProfileExtendedSection[] {
+  const structure = buildStructure(input);
+
+  const buckets = new Map<ProfileExtendedPanelKey, PanelBucketItem[]>();
+
+  const resultRow = getRowByHeading(
+    matched,
+    "result_interpretation_scripts",
+    "Result Interpretation Scripts"
+  );
+  const levelRow = getRowByHeading(
+    matched,
+    "level_progression_roadmap",
+    "Level Progression Roadmap"
+  );
+  const roadmapRow = getRowByHeading(
+    matched,
+    "level_progression_roadmap",
+    "Progression roadmap language"
+  );
+  const frameworkIntroRow = getRowByHeading(
+    matched,
+    "visibility_signal_framework",
+    "Visibility Signal Framework"
+  );
+
+  const frameworkRows = matched.filter(
+    (row: KbBlockRow) =>
+      row.section_key === "visibility_signal_framework" &&
+      safeString(row.content?.subheading) !== ""
+  );
+
+  const behaviourTypeRow = getRowByHeading(
+    matched,
+    "visibility_audit_layer",
+    "Behaviour style layer"
+  );
+  const behaviourTierRow = getRowByHeading(
+    matched,
+    "visibility_audit_layer",
+    "Behaviour strategy by tier"
+  );
+  const pillarGuidanceRow = getRowByHeading(
+    matched,
+    "visibility_audit_layer",
+    "Pillar reading guidance"
+  );
+
+  addSyntheticBlocks(buckets, input);
+
+  if (resultRow) {
+    for (const raw of getRowBlocks(resultRow)) {
+      const block = makeBlock(raw);
+      const h = normalizeText(raw?.heading);
+
+      if (h === "core reading") {
+        pushPanel(buckets, "core_diagnosis", block, resultRow);
+        continue;
+      }
+
+      if (h === "what is usually happening in the market") {
+        pushPanel(buckets, "market_happening", block, resultRow);
+        continue;
+      }
+
+      if (h === "why businesses tend to get stuck here" || h === "report writing cue") {
+        pushPanel(buckets, "core_reading", block, resultRow);
+        continue;
+      }
+
+      if (
+        h === "best fit strategic focus" ||
+        h === "what usually helps most at this stage" ||
+        h === "what usually does not help yet"
+      ) {
+        pushPanel(buckets, "what_to_focus_on_now", block, resultRow);
+        continue;
+      }
+
+      if (h === "signs the business is ready to progress") {
+        pushPanel(buckets, "how_to_recognise_readiness", block, resultRow);
+        continue;
+      }
+    }
+  }
+
+  if (levelRow) {
+    const selected = selectedLevelItem(levelRow, input.level);
+
+    for (const raw of getRowBlocks(levelRow)) {
+      const h = normalizeText(raw?.heading);
+
+      if (h === "meaning in practice") {
+        pushPanel(buckets, "meaning_in_practice", makeBlock(raw), levelRow);
+        continue;
+      }
+
+      if (h === "consultant read") {
+        pushPanel(buckets, "level_meaning", makeBlock(raw), levelRow);
+        continue;
+      }
+
+      if (h === "levels" && selected) {
+        pushPanel(
+          buckets,
+          "level_meaning",
+          makeSimpleBlock(
+            `Level ${safeNumber(selected.level, input.level)} meaning`,
+            safeString(selected.meaning),
+            {
+              items: [
+                {
+                  level: safeNumber(selected.level, input.level),
+                  market_position: safeString(selected.market_position),
+                  immediate_focus: safeString(selected.immediate_focus),
+                },
+              ],
+            }
+          ),
+          levelRow
+        );
+      }
+    }
+  }
+
+  if (roadmapRow) {
+    for (const raw of getRowBlocks(roadmapRow)) {
+      pushPanel(buckets, "what_progression_looks_like_next", makeBlock(raw), roadmapRow);
+    }
+  }
+
+  if (frameworkIntroRow) {
+    const rowSummary = safeString(frameworkIntroRow.content?.summary);
+    if (rowSummary) {
+      pushPanel(
+        buckets,
+        "wider_signal_pathway",
+        makeSimpleBlock("The wider signal pathway", rowSummary),
+        frameworkIntroRow
+      );
+    }
+
+    for (const raw of getRowBlocks(frameworkIntroRow)) {
+      const h = normalizeText(raw?.heading);
+
+      if (h === "progression pattern" || h === "interpretation") {
+        pushPanel(buckets, "progression_pattern", makeBlock(raw), frameworkIntroRow);
+      } else {
+        pushPanel(buckets, "wider_signal_pathway", makeBlock(raw), frameworkIntroRow);
+      }
+    }
+  }
+
+  for (const row of frameworkRows) {
+    const subheading = safeString(row.content?.subheading);
+    const blocks = getRowBlocks(row);
+
+    pushPanel(
+      buckets,
+      "wider_signal_pathway",
+      makeSimpleBlock(subheading || "Signal framework", undefined, {
+        items: blocks.map((item: GenericBlock) => ({
+          label: safeString(item?.heading),
+          value: safeString(item?.summary),
+        })),
+      }),
+      row
+    );
+  }
+
+  if (behaviourTypeRow) {
+    for (const raw of getRowBlocks(behaviourTypeRow)) {
+      pushPanel(buckets, "type_interpretation", makeBlock(raw), behaviourTypeRow);
+    }
+  }
+
+  if (behaviourTierRow) {
+    for (const raw of getRowBlocks(behaviourTierRow)) {
+      pushPanel(buckets, "how_to_use_this_layer", makeBlock(raw), behaviourTierRow);
+    }
+  }
+
+  if (pillarGuidanceRow) {
+    const rowSummary = safeString(pillarGuidanceRow.content?.summary);
+    if (rowSummary) {
+      pushPanel(
+        buckets,
+        "current_signal_pattern",
+        makeSimpleBlock("Pillar reading guidance", rowSummary),
+        pillarGuidanceRow
+      );
+    }
+
+    for (const raw of getRowBlocks(pillarGuidanceRow)) {
+      pushPanel(buckets, "current_signal_pattern", makeBlock(raw), pillarGuidanceRow);
+    }
+  }
+
+  const sections: AssembledProfileExtendedSection[] = [];
+
+  for (const sectionDef of structure) {
+    const panels: AssembledProfileExtendedPanel[] = [];
+
+    for (const panelDef of sectionDef.panels) {
+      const bucket: PanelBucketItem[] = buckets.get(panelDef.panel_key) || [];
+      if (!bucket.length) continue;
+
+      panels.push({
+        panel_key: panelDef.panel_key,
+        title: panelDef.title,
+        blocks: bucket.map((item: PanelBucketItem) => item.block),
+        matched_rows: uniqueRows(
+          bucket
+            .filter((item: PanelBucketItem) => item.row !== null)
+            .map((item: PanelBucketItem) => rowRef(item.row as KbBlockRow))
+        ),
+      });
+    }
+
+    if (!panels.length) continue;
+
+    sections.push({
+      section_key: sectionDef.section_key,
+      heading: sectionDef.heading,
+      panels,
+      matched_rows: uniqueRows(
+        panels.flatMap(
+          (panel: AssembledProfileExtendedPanel) => panel.matched_rows
+        )
+      ),
+    });
+  }
+
+  return sections;
 }
 
 async function fetchKbRows(sb?: VisibilityDbClient): Promise<KbBlockRow[]> {
@@ -422,300 +1146,15 @@ export function assembleProfileExtendedReport(
   rows: KbBlockRow[],
   input: ProfileExtendedReportInput
 ): AssembledProfileExtendedReport {
-  const matched = rows.filter((row) => rowMatchesInput(row, input));
-
-  const buckets = new Map<
-    ProfileExtendedPanelKey,
-    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
-  >();
-
-  addSyntheticPanels(buckets, input);
-
-  let resultRow: KbBlockRow | null = null;
-  let levelRoadmapRow: KbBlockRow | null = null;
-  let roadmapLanguageRow: KbBlockRow | null = null;
-  let frameworkIntroRow: KbBlockRow | null = null;
-  const frameworkStageRows: KbBlockRow[] = [];
-  let behaviourTypeRow: KbBlockRow | null = null;
-  let behaviourTierRow: KbBlockRow | null = null;
-  let pillarGuidanceRow: KbBlockRow | null = null;
-
-  for (const row of matched) {
-    const heading = normalizeText(row.content?.heading);
-    const subheading = safeString(row.content?.subheading);
-
-    if (row.section_key === "result_interpretation_scripts" && !resultRow) {
-      resultRow = row;
-      continue;
-    }
-
-    if (row.section_key === "level_progression_roadmap" && heading === "level progression roadmap") {
-      if (!levelRoadmapRow) levelRoadmapRow = row;
-      continue;
-    }
-
-    if (row.section_key === "level_progression_roadmap" && heading === "progression roadmap language") {
-      if (!roadmapLanguageRow) roadmapLanguageRow = row;
-      continue;
-    }
-
-    if (row.section_key === "visibility_signal_framework" && !subheading) {
-      if (!frameworkIntroRow) frameworkIntroRow = row;
-      continue;
-    }
-
-    if (row.section_key === "visibility_signal_framework" && subheading) {
-      frameworkStageRows.push(row);
-      continue;
-    }
-
-    if (row.section_key === "visibility_audit_layer" && heading === "behaviour style layer") {
-      if (!behaviourTypeRow) behaviourTypeRow = row;
-      continue;
-    }
-
-    if (row.section_key === "visibility_audit_layer" && heading === "behaviour strategy by tier") {
-      if (!behaviourTierRow) behaviourTierRow = row;
-      continue;
-    }
-
-    if (row.section_key === "visibility_audit_layer" && heading === "pillar reading guidance") {
-      if (!pillarGuidanceRow) pillarGuidanceRow = row;
-      continue;
-    }
-  }
-
-  if (resultRow) {
-    const blocks = Array.isArray(resultRow.content?.blocks) ? resultRow.content?.blocks : [];
-
-    for (const raw of blocks) {
-      const heading = normalizeText(raw?.heading);
-
-      if (heading === "core reading") {
-        pushPanel(buckets, "core_diagnosis", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "what is usually happening in the market") {
-        pushPanel(buckets, "market_happening", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "why businesses tend to get stuck here") {
-        pushPanel(buckets, "core_reading", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "report writing cue") {
-        pushPanel(buckets, "core_reading", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "best fit strategic focus" || heading === "best-fit strategic focus") {
-        pushPanel(buckets, "what_to_focus_on_now", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "what usually helps most at this stage") {
-        pushPanel(buckets, "what_to_focus_on_now", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "what usually does not help yet") {
-        pushPanel(buckets, "what_to_focus_on_now", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "signs the business is ready to progress") {
-        pushPanel(buckets, "how_to_recognise_readiness", makeBlock(raw), resultRow);
-        continue;
-      }
-    }
-  }
-
-  if (levelRoadmapRow) {
-    const blocks = Array.isArray(levelRoadmapRow.content?.blocks)
-      ? levelRoadmapRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      const heading = normalizeText(raw?.heading);
-
-      if (heading === "meaning in practice") {
-        pushPanel(buckets, "meaning_in_practice", makeBlock(raw), levelRoadmapRow);
-        continue;
-      }
-
-      if (heading === "consultant read") {
-        pushPanel(buckets, "level_meaning", makeBlock(raw), levelRoadmapRow);
-        continue;
-      }
-    }
-
-    const selected = selectedLevelItem(levelRoadmapRow, input.level);
-    if (selected) {
-      pushPanel(
-        buckets,
-        "level_meaning",
-        makeSimpleBlock(
-          `Level ${safeNumber(selected.level, input.level)} meaning`,
-          safeString(selected.meaning),
-          {
-            items: [
-              {
-                level: safeNumber(selected.level, input.level),
-                market_position: safeString(selected.market_position),
-                immediate_focus: safeString(selected.immediate_focus),
-              },
-            ],
-          }
-        ),
-        levelRoadmapRow
-      );
-    }
-  }
-
-  if (roadmapLanguageRow) {
-    const blocks = Array.isArray(roadmapLanguageRow.content?.blocks)
-      ? roadmapLanguageRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(
-        buckets,
-        "what_progression_looks_like_next",
-        makeBlock(raw),
-        roadmapLanguageRow
-      );
-    }
-  }
-
-  if (frameworkIntroRow) {
-    const rowSummary = safeString(frameworkIntroRow.content?.summary);
-    if (rowSummary) {
-      pushPanel(
-        buckets,
-        "wider_signal_pathway",
-        makeSimpleBlock("The wider signal pathway", rowSummary),
-        frameworkIntroRow
-      );
-    }
-
-    const blocks = Array.isArray(frameworkIntroRow.content?.blocks)
-      ? frameworkIntroRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      const heading = normalizeText(raw?.heading);
-      if (heading === "progression pattern") {
-        pushPanel(buckets, "progression_pattern", makeBlock(raw), frameworkIntroRow);
-      } else {
-        pushPanel(buckets, "wider_signal_pathway", makeBlock(raw), frameworkIntroRow);
-      }
-    }
-  }
-
-  for (const row of frameworkStageRows) {
-    const blocks = Array.isArray(row.content?.blocks) ? row.content?.blocks : [];
-    const subheading = safeString(row.content?.subheading) || "Framework";
-
-    const items: Array<Record<string, any>> = [];
-    for (const raw of blocks) {
-      const label = safeString(raw?.heading);
-      const value = safeString(raw?.summary);
-      if (label || value) {
-        items.push({ label, value });
-      }
-    }
-
-    if (items.length) {
-      pushPanel(
-        buckets,
-        "wider_signal_pathway",
-        makeSimpleBlock(subheading, undefined, { items }),
-        row
-      );
-    }
-  }
-
-  if (behaviourTypeRow) {
-    const blocks = Array.isArray(behaviourTypeRow.content?.blocks)
-      ? behaviourTypeRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(buckets, "type_interpretation", makeBlock(raw), behaviourTypeRow);
-    }
-  }
-
-  if (behaviourTierRow) {
-    const blocks = Array.isArray(behaviourTierRow.content?.blocks)
-      ? behaviourTierRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(buckets, "how_to_use_this_layer", makeBlock(raw), behaviourTierRow);
-    }
-  }
-
-  if (pillarGuidanceRow) {
-    const rowSummary = safeString(pillarGuidanceRow.content?.summary);
-    if (rowSummary) {
-      pushPanel(
-        buckets,
-        "current_signal_pattern",
-        makeSimpleBlock("Pillar reading guidance", rowSummary),
-        pillarGuidanceRow
-      );
-    }
-
-    const blocks = Array.isArray(pillarGuidanceRow.content?.blocks)
-      ? pillarGuidanceRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(buckets, "current_signal_pattern", makeBlock(raw), pillarGuidanceRow);
-    }
-  }
-
-  const structure = buildStructure(input);
-  const sections: AssembledProfileExtendedSection[] = [];
-
-  for (const sectionDef of structure) {
-    const panels: AssembledProfileExtendedPanel[] = [];
-
-    for (const panelDef of sectionDef.panels) {
-      const bucket = buckets.get(panelDef.panel_key) || [];
-      if (!bucket.length) continue;
-
-      const matchedRows = uniqueRows(
-        bucket
-          .filter((item) => item.row !== null)
-          .map((item) => rowRef(item.row as KbBlockRow))
-      );
-
-      panels.push({
-        panel_key: panelDef.panel_key,
-        title: panelDef.title,
-        blocks: bucket.map((item) => item.block),
-        matched_rows: matchedRows,
-      });
-    }
-
-    if (!panels.length) continue;
-
-    sections.push({
-      section_key: sectionDef.section_key,
-      heading: sectionDef.heading,
-      panels,
-      matched_rows: uniqueRows(panels.flatMap((panel) => panel.matched_rows)),
-    });
-  }
+  const matched = rows
+    .filter((row: KbBlockRow) => rowMatchesInput(row, input))
+    .sort((a: KbBlockRow, b: KbBlockRow) => b.priority - a.priority);
 
   return {
     audience: "profile_extended_report",
     input,
-    sections,
+    internal_sales_report: buildInternalSalesReport(input, matched),
+    sections: assembleExtendedSections(matched, input),
   };
 }
 
