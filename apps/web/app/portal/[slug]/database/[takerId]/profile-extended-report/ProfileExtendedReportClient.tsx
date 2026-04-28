@@ -963,7 +963,6 @@ function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
 export default function ProfileExtendedReportClient({
   org,
   taker,
-  test,
   report,
   backHref,
 }: Props) {
@@ -975,98 +974,168 @@ export default function ProfileExtendedReportClient({
   );
 
   async function downloadPdf() {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const stickyNodes = Array.from(
+      root.querySelectorAll("[data-export-no-sticky='true']")
+    ) as HTMLElement[];
+
+    const stickyState = stickyNodes.map((node) => ({
+      node,
+      position: node.style.position,
+      top: node.style.top,
+      alignSelf: node.style.alignSelf,
+    }));
+
     try {
-      const root = rootRef.current;
-      if (!root) return;
-
-      const sectionNodes = Array.from(
-        root.querySelectorAll("[data-pdf-section='true']")
-      ) as HTMLDivElement[];
-
-      if (!sectionNodes.length) return;
+      stickyNodes.forEach((node) => {
+        node.style.position = "static";
+        node.style.top = "auto";
+        node.style.alignSelf = "auto";
+      });
 
       const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
         html2canvasPromise(),
         jsPdfPromise(),
       ]);
 
+      const canvas = await html2canvas(root, {
+        backgroundColor: "#F1F5F9",
+        scale: 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: root.scrollWidth,
+        windowHeight: root.scrollHeight,
+      });
+
       const pdf = new JsPDF("p", "pt", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      for (let i = 0; i < sectionNodes.length; i += 1) {
-        const node = sectionNodes[i];
-        const canvas = await html2canvas(node, {
-          backgroundColor: "#F1F5F9",
-          scale: 2,
-          useCORS: true,
-          windowWidth: node.scrollWidth,
-          windowHeight: node.scrollHeight,
-        });
+      const margin = 20;
+      const contentWidth = pdfWidth - margin * 2;
+      const contentHeight = pdfHeight - margin * 2;
 
-        const imgData = canvas.toDataURL("image/png");
-        const imgWidth = pageWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const fullImageHeight = (canvas.height * contentWidth) / canvas.width;
+      const pageHeightPx = Math.floor((contentHeight / fullImageHeight) * canvas.height);
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+      const pageCanvas = document.createElement("canvas");
+      const pageCtx = pageCanvas.getContext("2d");
+
+      if (!pageCtx) throw new Error("Could not create PDF canvas context.");
+
+      let renderedHeight = 0;
+      let pageIndex = 0;
+
+      while (renderedHeight < canvas.height) {
+        const sliceHeight = Math.min(pageHeightPx, canvas.height - renderedHeight);
+
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+
+        pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pageCtx.drawImage(
+          canvas,
+          0,
+          renderedHeight,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight
+        );
+
+        const imgData = pageCanvas.toDataURL("image/png");
+        const renderedPageHeight = (sliceHeight * contentWidth) / canvas.width;
+
+        if (pageIndex > 0) pdf.addPage();
+
+        pdf.addImage(
+          imgData,
+          "PNG",
+          margin,
+          margin,
+          contentWidth,
+          renderedPageHeight,
+          undefined,
+          "FAST"
+        );
+
+        renderedHeight += sliceHeight;
+        pageIndex += 1;
       }
 
       const safeName = `${taker.fullName || "profile"}-profile-extended-report.pdf`.replace(
         /[^\w\-]+/g,
         "_"
       );
+
       pdf.save(safeName);
     } catch (e) {
       console.error("[profile-extended] pdf export failed", e);
       alert("PDF export failed.");
+    } finally {
+      stickyState.forEach(({ node, position, top, alignSelf }) => {
+        node.style.position = position;
+        node.style.top = top;
+        node.style.alignSelf = alignSelf;
+      });
     }
   }
 
   return (
     <div className="min-h-screen" style={{ background: BRAND.pageBg }}>
-      <div
-        className="min-h-[240px]"
-        style={{
-          background: BRAND.heroBg,
-        }}
-      >
-        <div className="mx-auto max-w-[1440px] px-5 py-4">
-          <SummaryHeader
-            orgName={org.name}
-            backHref={backHref}
-            onDownload={downloadPdf}
-            taker={taker}
-            report={report}
-          />
+      <div ref={rootRef}>
+        <div
+          className="min-h-[240px]"
+          style={{
+            background: BRAND.heroBg,
+          }}
+        >
+          <div className="mx-auto max-w-[1440px] px-5 py-4">
+            <SummaryHeader
+              orgName={org.name}
+              backHref={backHref}
+              onDownload={downloadPdf}
+              taker={taker}
+              report={report}
+            />
 
-          <div className="mt-4 text-[12px] text-white/50">
-            Database → {taker.fullName} →{" "}
-            <span className="text-white">Profile Extended Report</span>
+            <div className="mt-4 text-[12px] text-white/50">
+              Database → {taker.fullName} →{" "}
+              <span className="text-white">Profile Extended Report</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-slate-100">
-        <div ref={rootRef} className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
-          <PdfSection>
-            <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
-              <LadderPositionCard report={report} />
-              <PillarScoresCard report={report} />
-              <TierDistributionCard report={report} />
-            </div>
-          </PdfSection>
+        <div className="bg-slate-100">
+          <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
+            <PdfSection>
+              <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
+                <LadderPositionCard report={report} />
+                <PillarScoresCard report={report} />
+                <TierDistributionCard report={report} />
+              </div>
+            </PdfSection>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
-            <div className="xl:sticky xl:top-5">
-              <ReportIndexCard sections={sections} />
-            </div>
+            <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
+              <div
+                data-export-no-sticky="true"
+                className="xl:sticky xl:top-5"
+              >
+                <ReportIndexCard sections={sections} />
+              </div>
 
-            <div className="space-y-4">
-              {sections.map((section) => (
-                <PdfSection key={section.section_key}>
-                  <SectionRenderer section={section} />
-                </PdfSection>
-              ))}
+              <div className="space-y-4">
+                {sections.map((section) => (
+                  <PdfSection key={section.section_key}>
+                    <SectionRenderer section={section} />
+                  </PdfSection>
+                ))}
+              </div>
             </div>
           </div>
         </div>
