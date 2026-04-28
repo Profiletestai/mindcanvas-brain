@@ -1,7 +1,7 @@
 //apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/ProfileExtendedReportClient.tsx
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DownloadPdfButton from "@/components/reports/DownloadPdfButton";
@@ -330,6 +330,173 @@ function normalizeSections(rawSections: unknown[]): ProfileExtendedSection[] {
   );
 }
 
+
+function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
+  if (!isPrintMode) return null;
+
+  return (
+    <style>{`
+      html.mc-pdf-print-mode,
+      body.mc-pdf-print-mode {
+        background: #ffffff !important;
+      }
+
+      body.mc-pdf-print-mode .no-print,
+      body.mc-pdf-print-mode .pdf-hide,
+      body.mc-pdf-print-mode [data-no-print="true"],
+      body.mc-pdf-print-mode [data-pdf-hide="true"],
+      body.mc-pdf-print-mode nav,
+      body.mc-pdf-print-mode header,
+      body.mc-pdf-print-mode [role="navigation"],
+      body.mc-pdf-print-mode [aria-label="breadcrumb"],
+      body.mc-pdf-print-mode [aria-label="breadcrumbs"] {
+        display: none !important;
+        visibility: hidden !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell {
+        background: #ffffff !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-hero {
+        min-height: auto !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-hero-inner {
+        padding-top: 0 !important;
+        padding-bottom: 16px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-content-area {
+        background: #ffffff !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-content-inner {
+        padding-top: 12px !important;
+        padding-bottom: 0 !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-page-break {
+        break-before: auto !important;
+        page-break-before: auto !important;
+      }
+
+      body.mc-pdf-print-mode .report-section {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+        margin-top: 16px !important;
+      }
+
+      body.mc-pdf-print-mode .report-card,
+      body.mc-pdf-print-mode .summary-card,
+      body.mc-pdf-print-mode .chart-card,
+      body.mc-pdf-print-mode .pdf-avoid-break {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-chart-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-sections-grid {
+        display: block !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-sections-list {
+        display: block !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-sections-list > section:first-child {
+        margin-top: 0 !important;
+      }
+
+      body.mc-pdf-print-mode .shadow,
+      body.mc-pdf-print-mode .shadow-sm,
+      body.mc-pdf-print-mode .shadow-md,
+      body.mc-pdf-print-mode .shadow-lg,
+      body.mc-pdf-print-mode .shadow-xl,
+      body.mc-pdf-print-mode .shadow-2xl {
+        box-shadow: none !important;
+      }
+
+      body.mc-pdf-print-mode a {
+        color: inherit !important;
+        text-decoration: none !important;
+      }
+
+      @media print {
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+
+        body.mc-pdf-print-mode .pdf-page-break {
+          break-before: auto !important;
+          page-break-before: auto !important;
+        }
+      }
+    `}</style>
+  );
+}
+
+function usePdfPrintCleanup(isPrintMode: boolean) {
+  useEffect(() => {
+    if (!isPrintMode || typeof document === "undefined") return;
+
+    document.documentElement.classList.add("mc-pdf-print-mode");
+    document.body.classList.add("mc-pdf-print-mode");
+
+    const hiddenTextFragments = [
+      "dashboard",
+      "database",
+      "tests",
+      "profile settings",
+      "communications",
+      "back to",
+      "download pdf",
+      "report index",
+    ];
+
+    const shouldHideText = (value: string) => {
+      const normalised = value.replace(/\s+/g, " ").trim().toLowerCase();
+      return hiddenTextFragments.some((fragment) => normalised.includes(fragment));
+    };
+
+    const hideElement = (element: Element) => {
+      const htmlElement = element as HTMLElement;
+      htmlElement.style.display = "none";
+      htmlElement.style.visibility = "hidden";
+      htmlElement.setAttribute("data-pdf-hidden-by-client", "true");
+    };
+
+    document
+      .querySelectorAll("a, button, nav, header, aside, [role='navigation'], [aria-label='breadcrumb'], [aria-label='breadcrumbs']")
+      .forEach((element) => {
+        const tagName = element.tagName.toLowerCase();
+        const text = element.textContent || "";
+        const href = element instanceof HTMLAnchorElement ? element.href || "" : "";
+
+        if (
+          tagName === "nav" ||
+          tagName === "header" ||
+          tagName === "aside" ||
+          shouldHideText(text) ||
+          shouldHideText(href)
+        ) {
+          hideElement(element);
+        }
+      });
+
+    return () => {
+      document.documentElement.classList.remove("mc-pdf-print-mode");
+      document.body.classList.remove("mc-pdf-print-mode");
+    };
+  }, [isPrintMode]);
+}
+
 function PdfSection({
   children,
   pageBreakBefore = false,
@@ -552,7 +719,7 @@ function ReportIndexCard({
 }) {
   return (
     <div
-      className="rounded-2xl bg-white p-5 shadow-sm"
+      className="no-print pdf-hide rounded-2xl bg-white p-5 shadow-sm"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -935,23 +1102,27 @@ export default function ProfileExtendedReportClient({
   const searchParams = useSearchParams();
   const isPrintMode = searchParams.get("print") === "1";
 
+  usePdfPrintCleanup(isPrintMode);
+
   const sections = useMemo(
     () => normalizeSections((report.sections || []) as unknown[]),
     [report.sections]
   );
 
   return (
-    <div
-      className="min-h-screen pdf-report-shell"
-      style={{ background: BRAND.pageBg }}
-    >
+    <>
+      <PdfPrintModeStyles isPrintMode={isPrintMode} />
       <div
-        className="min-h-[240px]"
+        className="min-h-screen pdf-report-shell"
+        style={{ background: isPrintMode ? "#ffffff" : BRAND.pageBg }}
+      >
+      <div
+        className="min-h-[240px] pdf-hero"
         style={{
           background: BRAND.heroBg,
         }}
       >
-        <div className="mx-auto max-w-[1440px] px-5 py-4">
+        <div className="pdf-hero-inner mx-auto max-w-[1440px] px-5 py-4">
           <SummaryHeader
             orgName={org.name}
             backHref={backHref}
@@ -971,10 +1142,10 @@ export default function ProfileExtendedReportClient({
         </div>
       </div>
 
-      <div className="bg-slate-100">
-        <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
+      <div className="pdf-content-area bg-slate-100">
+        <div className="pdf-content-inner mx-auto max-w-[1440px] px-5 pb-16 pt-5">
           <PdfSection>
-            <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
+            <div className="pdf-chart-grid grid gap-4 xl:grid-cols-[455px_455px_1fr]">
               <LadderPositionCard report={report} />
               <PillarScoresCard report={report} />
               <TierDistributionCard report={report} />
@@ -982,7 +1153,7 @@ export default function ProfileExtendedReportClient({
           </PdfSection>
 
           <div
-            className={`mt-4 grid gap-4 items-start ${
+            className={`pdf-sections-grid mt-4 grid gap-4 items-start ${
               isPrintMode ? "" : "xl:grid-cols-[280px_minmax(0,1fr)]"
             }`}
           >
@@ -992,9 +1163,9 @@ export default function ProfileExtendedReportClient({
               </div>
             ) : null}
 
-            <div className="space-y-4">
-              {sections.map((section, idx) => (
-                <PdfSection key={section.section_key} pageBreakBefore={idx > 0}>
+            <div className="pdf-sections-list space-y-4">
+              {sections.map((section) => (
+                <PdfSection key={section.section_key} pageBreakBefore={false}>
                   <SectionRenderer section={section} />
                 </PdfSection>
               ))}
@@ -1003,5 +1174,6 @@ export default function ProfileExtendedReportClient({
         </div>
       </div>
     </div>
+    </>
   );
 }
