@@ -22,7 +22,7 @@ type ReportType =
 const PDF_PRINT_CSS = `
   @page {
     size: A4;
-    margin: 12mm;
+    margin: 9mm;
   }
 
   html,
@@ -53,6 +53,8 @@ const PDF_PRINT_CSS = `
   [data-pdf-hide="true"],
   button,
   nav,
+  header,
+  aside,
   [role="navigation"],
   [aria-label="breadcrumb"],
   [aria-label="breadcrumbs"] {
@@ -99,19 +101,27 @@ const PDF_PRINT_CSS = `
     position: static !important;
   }
 
-  .report-section,
-  .report-card,
+  .report-section {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
   .chart-card,
-  .summary-card,
-  .avoid-break,
-  .pdf-avoid-break {
+  .summary-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
+  .report-card,
+  .avoid-break,
+  .pdf-avoid-break {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
   .pdf-page-break {
-    break-before: page !important;
-    page-break-before: always !important;
+    break-before: auto !important;
+    page-break-before: auto !important;
   }
 
   img,
@@ -250,7 +260,25 @@ function getOrigin(req: NextRequest) {
   );
 }
 
+async function isolateReportRoot(page: Page) {
+  await page
+    .evaluate(() => {
+      const reportRoot = document.querySelector(".pdf-report-shell");
+
+      if (!reportRoot) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.setAttribute("data-pdf-isolated-root", "true");
+      wrapper.appendChild(reportRoot);
+
+      document.body.innerHTML = "";
+      document.body.appendChild(wrapper);
+    })
+    .catch(() => {});
+}
+
 async function cleanPageForPdf(page: Page) {
+  await isolateReportRoot(page);
   await page.addStyleTag({ content: PDF_PRINT_CSS }).catch(() => {});
 
   await page
@@ -265,6 +293,8 @@ async function cleanPageForPdf(page: Page) {
         "[data-pdf-hide='true']",
         "button",
         "nav",
+        "header",
+        "aside",
         "[role='navigation']",
         "[aria-label='breadcrumb']",
         "[aria-label='breadcrumbs']",
@@ -380,10 +410,10 @@ export async function GET(req: NextRequest) {
       printBackground: true,
       preferCSSPageSize: true,
       margin: {
-        top: "12mm",
-        right: "12mm",
-        bottom: "12mm",
-        left: "12mm",
+        top: "9mm",
+        right: "9mm",
+        bottom: "9mm",
+        left: "9mm",
       },
     });
 

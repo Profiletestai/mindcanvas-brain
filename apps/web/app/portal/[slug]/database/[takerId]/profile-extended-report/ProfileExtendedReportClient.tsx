@@ -347,6 +347,7 @@ function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
       body.mc-pdf-print-mode [data-pdf-hide="true"],
       body.mc-pdf-print-mode nav,
       body.mc-pdf-print-mode header,
+      body.mc-pdf-print-mode aside,
       body.mc-pdf-print-mode [role="navigation"],
       body.mc-pdf-print-mode [aria-label="breadcrumb"],
       body.mc-pdf-print-mode [aria-label="breadcrumbs"] {
@@ -355,7 +356,13 @@ function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
       }
 
       body.mc-pdf-print-mode .pdf-report-shell {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
         background: #ffffff !important;
+        color: #111827 !important;
+        font-size: 12.5px !important;
+        line-height: 1.45 !important;
       }
 
       body.mc-pdf-print-mode .pdf-hero {
@@ -363,8 +370,8 @@ function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
       }
 
       body.mc-pdf-print-mode .pdf-hero-inner {
-        padding-top: 0 !important;
-        padding-bottom: 16px !important;
+        max-width: none !important;
+        padding: 0 0 8px 0 !important;
       }
 
       body.mc-pdf-print-mode .pdf-content-area {
@@ -372,8 +379,8 @@ function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
       }
 
       body.mc-pdf-print-mode .pdf-content-inner {
-        padding-top: 12px !important;
-        padding-bottom: 0 !important;
+        max-width: none !important;
+        padding: 8px 0 0 0 !important;
       }
 
       body.mc-pdf-print-mode .pdf-page-break {
@@ -384,41 +391,178 @@ function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
       body.mc-pdf-print-mode .report-section {
         break-inside: auto !important;
         page-break-inside: auto !important;
-        margin-top: 16px !important;
+        margin-top: 8px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-sections-list > section:first-child,
+      body.mc-pdf-print-mode .pdf-content-inner > section:first-child {
+        margin-top: 0 !important;
+      }
+
+      body.mc-pdf-print-mode .chart-card,
+      body.mc-pdf-print-mode .summary-card {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
       }
 
       body.mc-pdf-print-mode .report-card,
-      body.mc-pdf-print-mode .summary-card,
-      body.mc-pdf-print-mode .chart-card,
       body.mc-pdf-print-mode .pdf-avoid-break {
-        break-inside: avoid !important;
-        page-break-inside: avoid !important;
+        break-inside: auto !important;
+        page-break-inside: auto !important;
       }
 
       body.mc-pdf-print-mode .pdf-chart-grid {
         display: grid !important;
         grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 12px !important;
+        gap: 8px !important;
       }
 
       body.mc-pdf-print-mode .pdf-sections-grid {
         display: block !important;
+        margin-top: 8px !important;
       }
 
       body.mc-pdf-print-mode .pdf-sections-list {
         display: block !important;
       }
 
-      body.mc-pdf-print-mode .pdf-sections-list > section:first-child {
-        margin-top: 0 !important;
+      body.mc-pdf-print-mode .pdf-sections-list > * + * {
+        margin-top: 8px !important;
       }
 
-      body.mc-pdf-print-mode .shadow,
-      body.mc-pdf-print-mode .shadow-sm,
-      body.mc-pdf-print-mode .shadow-md,
-      body.mc-pdf-print-mode .shadow-lg,
-      body.mc-pdf-print-mode .shadow-xl,
-      body.mc-pdf-print-mode .shadow-2xl {
+      body.mc-pdf-print-mode .pdf-report-shell .space-y-6 > :not([hidden]) ~ :not([hidden]),
+      body.mc-pdf-print-mode .pdf-report-shell .space-y-5 > :not([hidden]) ~ :not([hidden]),
+      body.mc-pdf-print-mode .pdf-report-shell .space-y-4 > :not([hidden]) ~ :not([hidden]),
+      body.mc-pdf-print-mode .pdf-report-shell .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 8px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .mt-6 {
+        margin-top: 10px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .mt-5,
+      body.mc-pdf-print-mode .pdf-report-shell .mt-4 {
+        margin-top: 8px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .mt-3,
+      body.mc-pdf-print-mode .pdf-report-shell .mt-2 {
+        margin-top: 5px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .p-5,
+      body.mc-pdf-print-mode .pdf-report-shell .p-4 {
+        padding: 10px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .px-8 {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .py-6 {
+        padding-top: 10px !important;
+        padding-bottom: 8px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .pb-8 {
+        padding-bottom: 12px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .px-4 {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .py-4 {
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .gap-5,
+      body.mc-pdf-print-mode .pdf-report-shell .gap-4 {
+        gap: 8px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .rounded-\[24px\],
+      body.mc-pdf-print-mode .pdf-report-shell .rounded-2xl,
+      body.mc-pdf-print-mode .pdf-report-shell .rounded-xl {
+        border-radius: 12px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[36px\] {
+        font-size: 26px !important;
+        line-height: 30px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[26px\] {
+        font-size: 19px !important;
+        line-height: 24px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[25px\] {
+        font-size: 19px !important;
+        line-height: 23px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[24px\] {
+        font-size: 18px !important;
+        line-height: 24px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[20px\] {
+        font-size: 15px !important;
+        line-height: 20px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[18px\] {
+        font-size: 15px !important;
+        line-height: 20px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[16px\] {
+        font-size: 13.5px !important;
+        line-height: 19px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[15px\] {
+        font-size: 12.5px !important;
+        line-height: 18px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .text-\[14px\] {
+        font-size: 12px !important;
+        line-height: 17px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .leading-10,
+      body.mc-pdf-print-mode .pdf-report-shell .leading-8,
+      body.mc-pdf-print-mode .pdf-report-shell .leading-7,
+      body.mc-pdf-print-mode .pdf-report-shell .leading-6 {
+        line-height: 1.35 !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell p {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell ul {
+        margin-top: 6px !important;
+        margin-bottom: 0 !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell li + li {
+        margin-top: 3px !important;
+      }
+
+      body.mc-pdf-print-mode .pdf-report-shell .shadow,
+      body.mc-pdf-print-mode .pdf-report-shell .shadow-sm,
+      body.mc-pdf-print-mode .pdf-report-shell .shadow-md,
+      body.mc-pdf-print-mode .pdf-report-shell .shadow-lg,
+      body.mc-pdf-print-mode .pdf-report-shell .shadow-xl,
+      body.mc-pdf-print-mode .pdf-report-shell .shadow-2xl {
         box-shadow: none !important;
       }
 
@@ -430,7 +574,7 @@ function PdfPrintModeStyles({ isPrintMode }: { isPrintMode: boolean }) {
       @media print {
         @page {
           size: A4;
-          margin: 12mm;
+          margin: 9mm;
         }
 
         body.mc-pdf-print-mode .pdf-page-break {
