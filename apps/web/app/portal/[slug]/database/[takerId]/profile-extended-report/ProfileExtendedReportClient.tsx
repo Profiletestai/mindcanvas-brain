@@ -10,15 +10,25 @@ const jsPdfPromise = () => import("jspdf");
 type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type BehaviourStyle = "A" | "B" | "C" | "D";
 
+type ProfileExtendedBlock = {
+  title?: string;
+  short_summary?: string;
+  paragraphs?: string[];
+  bullets?: string[];
+  items?: Array<Record<string, unknown>>;
+  transition?: string;
+  meta?: Record<string, unknown>;
+};
+
 type ProfileExtendedPanel = {
   panel_key: string;
   title: string;
-  blocks: Array<Record<string, any>>;
+  blocks: ProfileExtendedBlock[];
   matched_rows?: Array<{
     id: string;
     priority: number;
     source_section_key: string;
-    triggers: Record<string, any>;
+    triggers: Record<string, unknown>;
   }>;
 };
 
@@ -30,36 +40,8 @@ type ProfileExtendedSection = {
     id: string;
     priority: number;
     source_section_key: string;
-    triggers: Record<string, any>;
+    triggers: Record<string, unknown>;
   }>;
-};
-
-type InternalSalesObjection = {
-  objection: string;
-  response: string;
-};
-
-type InternalSalesReport = {
-  snapshot?: {
-    visibility_score?: number | null;
-    level?: number | null;
-    tier?: string | null;
-    behaviour_style?: string | null;
-    readiness?: string | null;
-    correct_programme?: string | null;
-    primary_objective?: string | null;
-    secondary_objective?: string | null;
-  } | null;
-  real_situation?: string[];
-  core_pain?: string[];
-  real_problem?: string[];
-  what_not_to_do?: string[];
-  what_to_do?: string[];
-  why_this_offer?: string[];
-  objections?: InternalSalesObjection[];
-  conversion_signals?: string[];
-  close_line?: string | null;
-  long_term_value?: string[];
 };
 
 type ReportPayload = {
@@ -96,8 +78,7 @@ type ReportPayload = {
     pillars?: Record<string, number | null> | null;
     pillar_bands?: Record<string, string | null> | null;
   } | null;
-  internal_sales_report?: InternalSalesReport | null;
-  sections?: any[];
+  sections?: unknown[];
 };
 
 type Props = {
@@ -141,22 +122,11 @@ const BRAND = {
   slate: "#A7B3C7",
 } as const;
 
-const SECTION_LABELS: Array<{ key: string; label: string }> = [
-  { key: "internal-sales-report", label: "Internal sales report" },
-  { key: "result_at_a_glance", label: "Result at a glance" },
-  { key: "what_this_tier_means", label: "What this tier means" },
-  { key: "level_nuance", label: "Level nuance" },
-  { key: "pillars_and_signals", label: "Pillars and signals" },
-  { key: "behaviour_style", label: "Behaviour style" },
-  { key: "strategic_priority_now", label: "Strategic priority now" },
-  { key: "progression_roadmap", label: "Progression roadmap" },
-];
-
-function safeString(v: any): string {
+function safeString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-function safeNumber(v: any, fallback = 0): number {
+function safeNumber(v: unknown, fallback = 0): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -189,10 +159,10 @@ function overallScore(report: ReportPayload) {
     {};
 
   const values = [
-    safeNumber((source as any)?.visibility, NaN),
-    safeNumber((source as any)?.trust, NaN),
-    safeNumber((source as any)?.authority, NaN),
-    safeNumber((source as any)?.dominance, NaN),
+    safeNumber((source as Record<string, unknown>)?.visibility, NaN),
+    safeNumber((source as Record<string, unknown>)?.trust, NaN),
+    safeNumber((source as Record<string, unknown>)?.authority, NaN),
+    safeNumber((source as Record<string, unknown>)?.dominance, NaN),
   ].filter((n) => Number.isFinite(n));
 
   if (!values.length) return 0;
@@ -241,10 +211,10 @@ function getTierColor(tier: VisibilityTier) {
 function getTierCounts(report: ReportPayload) {
   const counts = report?.graphs?.tier_counts || {};
   return {
-    Invisible: safeNumber((counts as any)?.Invisible, 0),
-    Emerging: safeNumber((counts as any)?.Emerging, 0),
-    Established: safeNumber((counts as any)?.Established, 0),
-    Magnetic: safeNumber((counts as any)?.Magnetic, 0),
+    Invisible: safeNumber((counts as Record<string, unknown>)?.Invisible, 0),
+    Emerging: safeNumber((counts as Record<string, unknown>)?.Emerging, 0),
+    Established: safeNumber((counts as Record<string, unknown>)?.Established, 0),
+    Magnetic: safeNumber((counts as Record<string, unknown>)?.Magnetic, 0),
   };
 }
 
@@ -259,93 +229,53 @@ function getPillarItems(report: ReportPayload) {
     {
       key: "trust",
       label: "Trust",
-      value: safeNumber((source as any)?.trust, 0),
+      value: safeNumber((source as Record<string, unknown>)?.trust, 0),
       color: BRAND.green,
     },
     {
       key: "authority",
       label: "Authority",
-      value: safeNumber((source as any)?.authority, 0),
+      value: safeNumber((source as Record<string, unknown>)?.authority, 0),
       color: BRAND.red,
     },
     {
       key: "dominance",
       label: "Dominance",
-      value: safeNumber((source as any)?.dominance, 0),
+      value: safeNumber((source as Record<string, unknown>)?.dominance, 0),
       color: BRAND.sky,
     },
     {
       key: "visibility",
       label: "Visibility",
-      value: safeNumber((source as any)?.visibility, 0),
+      value: safeNumber((source as Record<string, unknown>)?.visibility, 0),
       color: BRAND.orange,
     },
   ];
 }
 
-function safeSectionId(sectionKey: any) {
+function safeSectionId(sectionKey: unknown) {
   const raw = safeString(sectionKey);
   return raw ? raw.replace(/_/g, "-") : "section";
 }
 
-function collectSummary(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return "";
-  for (const block of panel.blocks || []) {
-    const shortSummary = safeString(block?.short_summary || block?.summary);
-    if (shortSummary) return shortSummary;
-  }
-  return "";
-}
-
-function collectParagraphs(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return [] as string[];
-  const out: string[] = [];
-  for (const block of panel.blocks || []) {
-    const paragraphs = Array.isArray(block?.paragraphs) ? block.paragraphs : [];
-    for (const p of paragraphs) {
-      const s = safeString(p);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
-function collectBullets(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return [] as string[];
-  const out: string[] = [];
-  for (const block of panel.blocks || []) {
-    const bullets = Array.isArray(block?.bullets) ? block.bullets : [];
-    for (const b of bullets) {
-      const s = safeString(b);
-      if (s) out.push(s);
-    }
-  }
-  return out;
-}
-
-function collectTransition(panel?: ProfileExtendedPanel | null) {
-  if (!panel) return "";
-  for (const block of panel.blocks || []) {
-    const t = safeString(block?.transition);
-    if (t) return t;
-  }
-  return "";
-}
-
-function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
+function normalizeSections(rawSections: unknown[]): ProfileExtendedSection[] {
   const mapped: Array<ProfileExtendedSection | null> = (rawSections || []).map(
-    (section: any) => {
-      const sectionKey = safeString(section?.section_key || section?.key);
+    (section: unknown) => {
+      const sec = (section || {}) as Record<string, unknown>;
+      const sectionKey = safeString(sec.section_key || sec.key);
       if (!sectionKey) return null;
 
       let panels: ProfileExtendedPanel[] = [];
 
-      if (Array.isArray(section?.panels)) {
-        panels = section.panels
-          .map((panel: any): ProfileExtendedPanel | null => {
-            const panelKey = safeString(panel?.panel_key || panel?.key || "panel");
-            const title = safeString(panel?.title) || titleCase(panelKey);
-            const blocks = Array.isArray(panel?.blocks) ? panel.blocks : [];
+      if (Array.isArray(sec.panels)) {
+        panels = (sec.panels as unknown[])
+          .map((panel: unknown): ProfileExtendedPanel | null => {
+            const p = (panel || {}) as Record<string, unknown>;
+            const panelKey = safeString(p.panel_key || p.key || "panel");
+            const title = safeString(p.title) || titleCase(panelKey);
+            const blocks = Array.isArray(p.blocks)
+              ? (p.blocks as ProfileExtendedBlock[])
+              : [];
 
             if (!panelKey) return null;
             if (!blocks.length && !title) return null;
@@ -354,21 +284,23 @@ function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
               panel_key: panelKey,
               title,
               blocks,
-              matched_rows: Array.isArray(panel?.matched_rows)
-                ? panel.matched_rows
+              matched_rows: Array.isArray(p.matched_rows)
+                ? (p.matched_rows as Array<{
+                    id: string;
+                    priority: number;
+                    source_section_key: string;
+                    triggers: Record<string, unknown>;
+                  }>)
                 : [],
             };
           })
-          .filter(
-            (panel: ProfileExtendedPanel | null): panel is ProfileExtendedPanel =>
-              panel !== null
-          );
-      } else if (Array.isArray(section?.blocks)) {
+          .filter((panel): panel is ProfileExtendedPanel => panel !== null);
+      } else if (Array.isArray(sec.blocks)) {
         panels = [
           {
             panel_key: `${sectionKey}_legacy`,
-            title: safeString(section?.title) || titleCase(sectionKey),
-            blocks: section.blocks,
+            title: safeString(sec.title) || titleCase(sectionKey),
+            blocks: sec.blocks as ProfileExtendedBlock[],
             matched_rows: [],
           },
         ];
@@ -377,10 +309,15 @@ function normalizeSections(rawSections: any[]): ProfileExtendedSection[] {
       return {
         section_key: sectionKey,
         heading:
-          safeString(section?.heading || section?.title) || titleCase(sectionKey),
+          safeString(sec.heading || sec.title) || titleCase(sectionKey),
         panels,
-        matched_rows: Array.isArray(section?.matched_rows)
-          ? section.matched_rows
+        matched_rows: Array.isArray(sec.matched_rows)
+          ? (sec.matched_rows as Array<{
+              id: string;
+              priority: number;
+              source_section_key: string;
+              triggers: Record<string, unknown>;
+            }>)
           : [],
       };
     }
@@ -421,163 +358,6 @@ function WhiteCard({
         {title}
       </div>
       <div className="px-8 pb-8">{children}</div>
-    </div>
-  );
-}
-
-function PanelCard({
-  title,
-  panel,
-}: {
-  title: string;
-  panel?: ProfileExtendedPanel | null;
-}) {
-  const summary = collectSummary(panel);
-  const paragraphs = collectParagraphs(panel);
-  const bullets = collectBullets(panel);
-  const transition = collectTransition(panel);
-
-  return (
-    <div
-      className="rounded-2xl bg-slate-50 p-6"
-      style={{ outline: `1px solid ${BRAND.border}` }}
-    >
-      <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
-
-      {summary ? (
-        <div
-          className="mt-4 rounded-xl bg-white px-4 py-4"
-          style={{ outline: `1px solid ${BRAND.blue}` }}
-        >
-          <span className="font-semibold text-[#4F7DFF]">In short:</span>{" "}
-          <span className="text-slate-950">{summary}</span>
-        </div>
-      ) : null}
-
-      {paragraphs.length > 0 ? (
-        <div className="mt-4 space-y-3 text-[15px] leading-7 text-slate-700">
-          {paragraphs.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
-        </div>
-      ) : null}
-
-      {bullets.length > 0 ? (
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
-          {bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
-        </ul>
-      ) : null}
-
-      {transition ? (
-        <div className="mt-4 text-[12px] italic leading-4 text-slate-500">
-          {transition}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function SummaryHeader({
-  orgName,
-  backHref,
-  onDownload,
-  taker,
-  test,
-  report,
-}: {
-  orgName: string;
-  backHref: string;
-  onDownload: () => void;
-  taker: Props["taker"];
-  test: Props["test"];
-  report: ReportPayload;
-}) {
-  const tier = getTier(report);
-  const level = getLevel(report);
-  const style = getStyle(report);
-  const readiness = readinessLabel(
-    report?.signals?.readiness ?? report?.input?.readiness
-  );
-  const score =
-    safeNumber(report?.internal_sales_report?.snapshot?.visibility_score, -1) >= 0
-      ? safeNumber(report?.internal_sales_report?.snapshot?.visibility_score, 0)
-      : overallScore(report);
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-[20px] font-semibold text-white">{orgName}</div>
-        <Link href={backHref} className="text-sm text-white/80 underline">
-          Back to test taker profile
-        </Link>
-      </div>
-
-      <div>
-        <div className="text-[26px] font-semibold leading-8 text-white">
-          Profile Extended Report
-        </div>
-        <div className="mt-1 text-[10px] text-white/85">
-          Internal-only extended interpretation layer for Visibility Ladder
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={onDownload}
-          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-[#050914]"
-        >
-          Download PDF
-        </button>
-      </div>
-
-      <div
-        className="rounded-[24px] bg-white p-5"
-        style={{ outline: `1px solid ${BRAND.border}` }}
-      >
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_620px]">
-          <div className="min-w-0">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Internal Report
-            </div>
-
-            <div className="mt-4 text-[36px] font-semibold leading-10 text-slate-900">
-              {taker.fullName}
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Pill text="WhatsWhat Prime" />
-              <Pill text="Visibility Ladder" />
-            </div>
-
-            <div className="mt-6 grid gap-2 text-[14px] text-slate-600">
-              {taker.email ? <div>{taker.email}</div> : null}
-              {taker.phone ? <div>{taker.phone}</div> : null}
-              {test.name ? <div>{test.name}</div> : null}
-              {taker.roleTitle ? <div>{taker.roleTitle}</div> : null}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <StatCard
-              label="Tier"
-              value={tier}
-              dotColor={getTierColor(tier)}
-              badge={tier === "Magnetic" ? "Top tier" : undefined}
-              badgeColor={getTierColor(tier)}
-            />
-            <StatCard label="Level" value={`${level}`} subValue="of 20" />
-            <StatCard label="Profile Style" value={style} />
-            <StatCard
-              label="Readiness"
-              value={readiness}
-              badge={`${score}% Score`}
-              badgeColor={BRAND.green}
-            />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -643,23 +423,118 @@ function StatCard({
         </div>
       </div>
 
-      {subValue ? <div className="mt-1 text-[8px] text-slate-500">{subValue}</div> : null}
+      {subValue ? <div className="mt-1 text-[11px] text-slate-500">{subValue}</div> : null}
+    </div>
+  );
+}
+
+function SummaryHeader({
+  orgName,
+  backHref,
+  onDownload,
+  taker,
+  test,
+  report,
+}: {
+  orgName: string;
+  backHref: string;
+  onDownload: () => void;
+  taker: Props["taker"];
+  test: Props["test"];
+  report: ReportPayload;
+}) {
+  const tier = getTier(report);
+  const level = getLevel(report);
+  const style = getStyle(report);
+  const readiness = readinessLabel(
+    report?.signals?.readiness ?? report?.input?.readiness
+  );
+  const score = overallScore(report);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-[20px] font-semibold text-white">{orgName}</div>
+        <Link href={backHref} className="text-sm text-white/80 underline">
+          Back to test taker profile
+        </Link>
+      </div>
+
+      <div>
+        <div className="text-[26px] font-semibold leading-8 text-white">
+          Internal Sales Report
+        </div>
+        <div className="mt-1 text-[11px] text-white/85">
+          Visibility Ladder — sales-facing internal guidance
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={onDownload}
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-[#050914]"
+        >
+          Download PDF
+        </button>
+      </div>
+
+      <div
+        className="rounded-[24px] bg-white p-5"
+        style={{ outline: `1px solid ${BRAND.border}` }}
+      >
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_620px]">
+          <div className="min-w-0">
+            <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Internal report
+            </div>
+
+            <div className="mt-4 text-[36px] font-semibold leading-10 text-slate-900">
+              {taker.fullName}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Pill text="WhatsWhat Prime" />
+              <Pill text="Visibility Ladder" />
+              <Pill text="Sales guidance" />
+            </div>
+
+            <div className="mt-6 grid gap-2 text-[14px] text-slate-600">
+              {taker.email ? <div>{taker.email}</div> : null}
+              {taker.phone ? <div>{taker.phone}</div> : null}
+              {test.name ? <div>{test.name}</div> : null}
+              {taker.roleTitle ? <div>{taker.roleTitle}</div> : null}
+              {taker.company ? <div>{taker.company}</div> : null}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <StatCard
+              label="Tier"
+              value={tier}
+              dotColor={getTierColor(tier)}
+              badge={tier === "Magnetic" ? "Top tier" : undefined}
+              badgeColor={getTierColor(tier)}
+            />
+            <StatCard label="Level" value={`${level}`} subValue="of 20" />
+            <StatCard label="Style" value={style} />
+            <StatCard
+              label="Readiness"
+              value={readiness}
+              badge={`${score}% Score`}
+              badgeColor={BRAND.green}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 function ReportIndexCard({
   sections,
-  showInternalSalesReport,
 }: {
   sections: ProfileExtendedSection[];
-  showInternalSalesReport: boolean;
 }) {
-  const items = SECTION_LABELS.filter((item) => {
-    if (item.key === "internal-sales-report") return showInternalSalesReport;
-    return sections.some((section) => section.section_key === item.key);
-  });
-
   return (
     <div
       className="rounded-2xl bg-white p-5 shadow-sm"
@@ -670,15 +545,15 @@ function ReportIndexCard({
       </div>
 
       <div className="mt-4 space-y-3">
-        {items.map((item, idx) => (
+        {sections.map((section, idx) => (
           <a
-            key={item.key}
-            href={`#${safeSectionId(item.key)}`}
+            key={section.section_key}
+            href={`#${safeSectionId(section.section_key)}`}
             className="block rounded-xl bg-slate-50 px-3 py-3 text-[14px] text-slate-950"
             style={{ outline: `1px solid ${BRAND.border}` }}
           >
             <span className="mr-2 text-slate-400">{idx + 1}.</span>
-            {item.label}
+            {section.heading}
           </a>
         ))}
       </div>
@@ -879,260 +754,157 @@ function TierDistributionCard({ report }: { report: ReportPayload }) {
   );
 }
 
+function ItemValue({ value }: { value: unknown }) {
+  if (value == null) return <span>—</span>;
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return <span>{String(value)}</span>;
+  }
+
+  if (Array.isArray(value)) {
+    return <span>{value.map((v) => String(v)).join(", ")}</span>;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return <span>—</span>;
+
+  return (
+    <div className="space-y-1">
+      {entries.map(([k, v]) => (
+        <div key={k}>
+          <span className="font-medium text-slate-900">{titleCase(k)}:</span>{" "}
+          <span>{String(v)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BlockCard({ block }: { block: ProfileExtendedBlock }) {
+  const hasSummary = !!safeString(block.short_summary);
+  const paragraphs = Array.isArray(block.paragraphs) ? block.paragraphs : [];
+  const bullets = Array.isArray(block.bullets) ? block.bullets : [];
+  const items = Array.isArray(block.items) ? block.items : [];
+  const transition = safeString(block.transition);
+
+  return (
+    <div
+      className="rounded-2xl bg-slate-50 p-5"
+      style={{ outline: `1px solid ${BRAND.border}` }}
+    >
+      {block.title ? (
+        <div className="text-[16px] font-semibold leading-7 text-slate-900">
+          {block.title}
+        </div>
+      ) : null}
+
+      {hasSummary ? (
+        <div
+          className={`rounded-xl bg-white px-4 py-4 text-slate-950 ${
+            block.title ? "mt-4" : ""
+          }`}
+          style={{ outline: `1px solid ${BRAND.blue}` }}
+        >
+          {block.short_summary}
+        </div>
+      ) : null}
+
+      {paragraphs.length > 0 ? (
+        <div className="mt-4 space-y-3 text-[15px] leading-7 text-slate-700">
+          {paragraphs.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </div>
+      ) : null}
+
+      {bullets.length > 0 ? (
+        <ul className="mt-4 list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
+          {bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      ) : null}
+
+      {items.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {items.map((item, idx) => {
+            const entries = Object.entries(item);
+            return (
+              <div
+                key={idx}
+                className="rounded-xl bg-white px-4 py-4"
+                style={{ outline: `1px solid ${BRAND.border}` }}
+              >
+                {entries.map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="grid grid-cols-[180px_minmax(0,1fr)] gap-3 py-1 text-[14px] leading-6"
+                  >
+                    <div className="font-medium text-slate-500">{titleCase(key)}</div>
+                    <div className="text-slate-800">
+                      <ItemValue value={value} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {transition ? (
+        <div className="mt-4 text-[12px] italic leading-5 text-slate-500">
+          {transition}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PanelCard({
+  title,
+  panel,
+  showPanelTitle,
+}: {
+  title: string;
+  panel?: ProfileExtendedPanel | null;
+  showPanelTitle: boolean;
+}) {
+  if (!panel) return null;
+
+  return (
+    <div className="space-y-4">
+      {showPanelTitle ? (
+        <div className="text-[18px] font-semibold leading-7 text-slate-900">
+          {title}
+        </div>
+      ) : null}
+
+      {panel.blocks.map((block, idx) => (
+        <BlockCard key={`${panel.panel_key}-${idx}`} block={block} />
+      ))}
+    </div>
+  );
+}
+
 function SectionRenderer({ section }: { section: ProfileExtendedSection }) {
   return (
     <WhiteCard id={safeSectionId(section.section_key)} title={section.heading}>
-      <div className="space-y-5">
-        {section.panels.map((panel) => (
-          <PanelCard key={panel.panel_key} title={panel.title} panel={panel} />
-        ))}
-      </div>
-    </WhiteCard>
-  );
-}
+      <div className="space-y-6">
+        {section.panels.map((panel) => {
+          const showPanelTitle =
+            section.panels.length > 1 ||
+            safeString(panel.title).toLowerCase() !== safeString(section.heading).toLowerCase();
 
-function SalesList({
-  items,
-  ordered = false,
-  danger = false,
-}: {
-  items: string[];
-  ordered?: boolean;
-  danger?: boolean;
-}) {
-  if (!items.length) return null;
-
-  if (ordered) {
-    return (
-      <ol className="list-decimal space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
-        {items.map((item, idx) => (
-          <li key={idx} className={danger ? "text-slate-700" : ""}>
-            {item}
-          </li>
-        ))}
-      </ol>
-    );
-  }
-
-  return (
-    <ul className="list-disc space-y-2 pl-5 text-[15px] leading-7 text-slate-700">
-      {items.map((item, idx) => (
-        <li key={idx}>{item}</li>
-      ))}
-    </ul>
-  );
-}
-
-function SalesSectionCard({
-  title,
-  items,
-  ordered = false,
-}: {
-  title: string;
-  items: string[];
-  ordered?: boolean;
-}) {
-  if (!items.length) return null;
-
-  return (
-    <div
-      className="rounded-2xl bg-slate-50 p-6"
-      style={{ outline: `1px solid ${BRAND.border}` }}
-    >
-      <div className="text-[18px] font-semibold leading-7 text-slate-900">{title}</div>
-      <div className="mt-4">
-        <SalesList items={items} ordered={ordered} />
-      </div>
-    </div>
-  );
-}
-
-function ObjectionsCard({
-  objections,
-}: {
-  objections: InternalSalesObjection[];
-}) {
-  if (!objections.length) return null;
-
-  return (
-    <div
-      className="rounded-2xl bg-slate-50 p-6"
-      style={{ outline: `1px solid ${BRAND.border}` }}
-    >
-      <div className="text-[18px] font-semibold leading-7 text-slate-900">
-        Objections you’ll hear (and how to handle them)
-      </div>
-
-      <div className="mt-4 space-y-4">
-        {objections.map((item, idx) => (
-          <div
-            key={`${item.objection}-${idx}`}
-            className="rounded-xl bg-white p-4"
-            style={{ outline: `1px solid ${BRAND.border}` }}
-          >
-            <div className="text-[14px] font-semibold text-slate-900">
-              Objection:
-            </div>
-            <div className="mt-1 text-[15px] leading-7 text-slate-700">
-              {item.objection}
-            </div>
-
-            <div className="mt-3 text-[14px] font-semibold text-slate-900">
-              Response:
-            </div>
-            <div className="mt-1 text-[15px] leading-7 text-slate-700">
-              {item.response}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CloseLineCard({ text }: { text: string }) {
-  if (!safeString(text)) return null;
-
-  return (
-    <div
-      className="rounded-2xl bg-slate-900 p-6"
-      style={{ outline: `1px solid ${BRAND.border}` }}
-    >
-      <div className="text-[18px] font-semibold leading-7 text-white">Close line</div>
-      <div className="mt-4 text-[16px] leading-8 text-white/95">“{text}”</div>
-    </div>
-  );
-}
-
-function InternalSalesReportRenderer({
-  id,
-  takerName,
-  salesReport,
-}: {
-  id: string;
-  takerName: string;
-  salesReport: InternalSalesReport;
-}) {
-  const snapshot = salesReport.snapshot || null;
-
-  const snapshotRows = [
-    {
-      label: "Name",
-      value: takerName || "—",
-    },
-    {
-      label: "Visibility Score",
-      value:
-        safeNumber(snapshot?.visibility_score, -1) >= 0
-          ? `${safeNumber(snapshot?.visibility_score, 0)} / 100`
-          : "—",
-    },
-    {
-      label: "Level",
-      value:
-        snapshot?.level != null
-          ? `${safeNumber(snapshot.level, 0)}`
-          : "—",
-    },
-    {
-      label: "Tier",
-      value: safeString(snapshot?.tier) || "—",
-    },
-    {
-      label: "Correct Programme",
-      value: safeString(snapshot?.correct_programme) || "—",
-    },
-    {
-      label: "Primary Objective",
-      value: safeString(snapshot?.primary_objective) || "—",
-    },
-    {
-      label: "Secondary Objective",
-      value: safeString(snapshot?.secondary_objective) || "—",
-    },
-    {
-      label: "Behaviour Style",
-      value: safeString(snapshot?.behaviour_style) || "—",
-    },
-    {
-      label: "Readiness",
-      value: readinessLabel(snapshot?.readiness || null),
-    },
-  ];
-
-  return (
-    <WhiteCard id={id} title="Internal Sales Report">
-      <div className="space-y-5">
-        <div
-          className="rounded-2xl bg-slate-50 p-6"
-          style={{ outline: `1px solid ${BRAND.border}` }}
-        >
-          <div className="text-[18px] font-semibold leading-7 text-slate-900">
-            Snapshot
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {snapshotRows.map((row) => (
-              <div
-                key={row.label}
-                className="rounded-xl bg-white p-4"
-                style={{ outline: `1px solid ${BRAND.border}` }}
-              >
-                <div className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
-                  {row.label}
-                </div>
-                <div className="mt-2 text-[15px] font-medium leading-6 text-slate-900">
-                  {row.value}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <SalesSectionCard
-          title={`${takerName || "This client"}’s REAL Situation (Read This First)`}
-          items={salesReport.real_situation || []}
-        />
-
-        <SalesSectionCard
-          title={`${takerName || "This client"}’s Core Pain`}
-          items={salesReport.core_pain || []}
-        />
-
-        <SalesSectionCard
-          title="The Real Problem"
-          items={salesReport.real_problem || []}
-        />
-
-        <SalesSectionCard
-          title="What NOT to do on the call"
-          items={salesReport.what_not_to_do || []}
-        />
-
-        <SalesSectionCard
-          title="What TO do on the call"
-          items={salesReport.what_to_do || []}
-          ordered
-        />
-
-        <SalesSectionCard
-          title={`Why ${safeString(snapshot?.correct_programme) || "this offer"} is the right offer`}
-          items={salesReport.why_this_offer || []}
-        />
-
-        <ObjectionsCard objections={salesReport.objections || []} />
-
-        <SalesSectionCard
-          title="Conversion signals"
-          items={salesReport.conversion_signals || []}
-        />
-
-        <CloseLineCard text={safeString(salesReport.close_line)} />
-
-        <SalesSectionCard
-          title="Long-term value"
-          items={salesReport.long_term_value || []}
-        />
+          return (
+            <PanelCard
+              key={panel.panel_key}
+              title={panel.title}
+              panel={panel}
+              showPanelTitle={showPanelTitle}
+            />
+          );
+        })}
       </div>
     </WhiteCard>
   );
@@ -1148,13 +920,8 @@ export default function ProfileExtendedReportClient({
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const sections = useMemo(
-    () => normalizeSections(report.sections || []),
+    () => normalizeSections((report.sections || []) as unknown[]),
     [report.sections]
-  );
-
-  const salesReport = useMemo(
-    () => report.internal_sales_report || null,
-    [report.internal_sales_report]
   );
 
   async function downloadPdf() {
@@ -1194,7 +961,7 @@ export default function ProfileExtendedReportClient({
         pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
       }
 
-      const safeName = `${taker.fullName || "profile"}-profile-extended-report.pdf`.replace(
+      const safeName = `${taker.fullName || "profile"}-internal-sales-report.pdf`.replace(
         /[^\w\-]+/g,
         "_"
       );
@@ -1225,7 +992,7 @@ export default function ProfileExtendedReportClient({
 
           <div className="mt-4 text-[12px] text-white/50">
             Database → {taker.fullName} →{" "}
-            <span className="text-white">Profile Extended Report</span>
+            <span className="text-white">Internal Sales Report</span>
           </div>
         </div>
       </div>
@@ -1242,23 +1009,10 @@ export default function ProfileExtendedReportClient({
 
           <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
             <div className="xl:sticky xl:top-5">
-              <ReportIndexCard
-                sections={sections}
-                showInternalSalesReport={Boolean(salesReport)}
-              />
+              <ReportIndexCard sections={sections} />
             </div>
 
             <div className="space-y-4">
-              {salesReport ? (
-                <PdfSection>
-                  <InternalSalesReportRenderer
-                    id="internal-sales-report"
-                    takerName={taker.fullName}
-                    salesReport={salesReport}
-                  />
-                </PdfSection>
-              ) : null}
-
               {sections.map((section) => (
                 <PdfSection key={section.section_key}>
                   <SectionRenderer section={section} />
