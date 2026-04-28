@@ -1,11 +1,10 @@
 //apps/web/app/portal/[slug]/database/[takerId]/profile-extended-report/ProfileExtendedReportClient.tsx
 "use client";
 
-import { useMemo, useRef, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
-
-const html2canvasPromise = () => import("html2canvas");
-const jsPdfPromise = () => import("jspdf");
+import { useSearchParams } from "next/navigation";
+import DownloadPdfButton from "@/components/reports/DownloadPdfButton";
 
 type VisibilityTier = "Invisible" | "Emerging" | "Established" | "Magnetic";
 type BehaviourStyle = "A" | "B" | "C" | "D";
@@ -331,9 +330,18 @@ function normalizeSections(rawSections: unknown[]): ProfileExtendedSection[] {
   );
 }
 
-function PdfSection({ children }: { children: ReactNode }) {
+function PdfSection({
+  children,
+  pageBreakBefore = false,
+}: {
+  children: ReactNode;
+  pageBreakBefore?: boolean;
+}) {
   return (
-    <section data-pdf-section="true" style={{ pageBreakAfter: "always" }}>
+    <section
+      data-pdf-section="true"
+      className={`report-section ${pageBreakBefore ? "pdf-page-break" : ""}`}
+    >
       {children}
     </section>
   );
@@ -394,7 +402,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-2xl bg-slate-50 p-4"
+      className="summary-card pdf-avoid-break rounded-2xl bg-slate-50 p-4"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -431,17 +439,19 @@ function StatCard({
 function SummaryHeader({
   orgName,
   backHref,
-  onDownload,
   taker,
   test,
   report,
+  orgSlug,
+  isPrintMode,
 }: {
   orgName: string;
   backHref: string;
-  onDownload: () => void;
   taker: Props["taker"];
   test: Props["test"];
   report: ReportPayload;
+  orgSlug: string;
+  isPrintMode: boolean;
 }) {
   const tier = getTier(report);
   const level = getLevel(report);
@@ -455,9 +465,11 @@ function SummaryHeader({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-[20px] font-semibold text-white">{orgName}</div>
-        <Link href={backHref} className="text-sm text-white/80 underline">
-          Back to test taker profile
-        </Link>
+        {!isPrintMode ? (
+          <Link href={backHref} className="no-print text-sm text-white/80 underline">
+            Back to test taker profile
+          </Link>
+        ) : null}
       </div>
 
       <div>
@@ -469,14 +481,17 @@ function SummaryHeader({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={onDownload}
-          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-[#050914]"
-        >
-          Download PDF
-        </button>
-      </div>
+      {!isPrintMode ? (
+        <div className="no-print flex flex-wrap gap-3">
+          <DownloadPdfButton
+            type="profile-extended"
+            slug={orgSlug}
+            takerId={taker.id}
+            filename={`${taker.fullName || "profile"}-${test.name || "internal-sales-report"}-internal-sales-report`}
+            className="bg-white text-[#050914] hover:bg-slate-100"
+          />
+        </div>
+      ) : null}
 
       <div
         className="rounded-[24px] bg-white p-5"
@@ -573,7 +588,7 @@ function LadderPositionCard({ report }: { report: ReportPayload }) {
 
   return (
     <div
-      className="rounded-2xl bg-slate-50 p-5"
+      className="chart-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -683,7 +698,7 @@ function PillarScoresCard({ report }: { report: ReportPayload }) {
 
   return (
     <div
-      className="rounded-2xl bg-slate-50 p-5"
+      className="chart-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -719,7 +734,7 @@ function TierDistributionCard({ report }: { report: ReportPayload }) {
 
   return (
     <div
-      className="rounded-2xl bg-slate-50 p-5"
+      className="chart-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -789,7 +804,7 @@ function BlockCard({ block }: { block: ProfileExtendedBlock }) {
 
   return (
     <div
-      className="rounded-2xl bg-slate-50 p-5"
+      className="report-card pdf-avoid-break rounded-2xl bg-slate-50 p-5"
       style={{ outline: `1px solid ${BRAND.border}` }}
     >
       {block.title ? (
@@ -917,63 +932,19 @@ export default function ProfileExtendedReportClient({
   report,
   backHref,
 }: Props) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const searchParams = useSearchParams();
+  const isPrintMode = searchParams.get("print") === "1";
 
   const sections = useMemo(
     () => normalizeSections((report.sections || []) as unknown[]),
     [report.sections]
   );
 
-  async function downloadPdf() {
-    try {
-      const root = rootRef.current;
-      if (!root) return;
-
-      const sectionNodes = Array.from(
-        root.querySelectorAll("[data-pdf-section='true']")
-      ) as HTMLDivElement[];
-
-      if (!sectionNodes.length) return;
-
-      const [{ default: html2canvas }, { default: JsPDF }] = await Promise.all([
-        html2canvasPromise(),
-        jsPdfPromise(),
-      ]);
-
-      const pdf = new JsPDF("p", "pt", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-
-      for (let i = 0; i < sectionNodes.length; i += 1) {
-        const node = sectionNodes[i];
-        const canvas = await html2canvas(node, {
-          backgroundColor: "#F1F5F9",
-          scale: 2,
-          useCORS: true,
-          windowWidth: node.scrollWidth,
-          windowHeight: node.scrollHeight,
-        });
-
-        const imgData = canvas.toDataURL("image/png");
-        const imgWidth = pageWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
-      }
-
-      const safeName = `${taker.fullName || "profile"}-internal-sales-report.pdf`.replace(
-        /[^\w\-]+/g,
-        "_"
-      );
-      pdf.save(safeName);
-    } catch (e) {
-      console.error("[profile-extended] pdf export failed", e);
-      alert("PDF export failed.");
-    }
-  }
-
   return (
-    <div className="min-h-screen" style={{ background: BRAND.pageBg }}>
+    <div
+      className="min-h-screen pdf-report-shell"
+      style={{ background: BRAND.pageBg }}
+    >
       <div
         className="min-h-[240px]"
         style={{
@@ -984,21 +955,24 @@ export default function ProfileExtendedReportClient({
           <SummaryHeader
             orgName={org.name}
             backHref={backHref}
-            onDownload={downloadPdf}
             taker={taker}
             test={test}
             report={report}
+            orgSlug={org.slug}
+            isPrintMode={isPrintMode}
           />
 
-          <div className="mt-4 text-[12px] text-white/50">
-            Database → {taker.fullName} →{" "}
-            <span className="text-white">Internal Sales Report</span>
-          </div>
+          {!isPrintMode ? (
+            <div className="no-print mt-4 text-[12px] text-white/50">
+              Database → {taker.fullName} →{" "}
+              <span className="text-white">Internal Sales Report</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
       <div className="bg-slate-100">
-        <div ref={rootRef} className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
+        <div className="mx-auto max-w-[1440px] px-5 pb-16 pt-5">
           <PdfSection>
             <div className="grid gap-4 xl:grid-cols-[455px_455px_1fr]">
               <LadderPositionCard report={report} />
@@ -1007,14 +981,20 @@ export default function ProfileExtendedReportClient({
             </div>
           </PdfSection>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] items-start">
-            <div className="xl:sticky xl:top-5">
-              <ReportIndexCard sections={sections} />
-            </div>
+          <div
+            className={`mt-4 grid gap-4 items-start ${
+              isPrintMode ? "" : "xl:grid-cols-[280px_minmax(0,1fr)]"
+            }`}
+          >
+            {!isPrintMode ? (
+              <div className="no-print xl:sticky xl:top-5">
+                <ReportIndexCard sections={sections} />
+              </div>
+            ) : null}
 
             <div className="space-y-4">
-              {sections.map((section) => (
-                <PdfSection key={section.section_key}>
+              {sections.map((section, idx) => (
+                <PdfSection key={section.section_key} pageBreakBefore={idx > 0}>
                   <SectionRenderer section={section} />
                 </PdfSection>
               ))}
