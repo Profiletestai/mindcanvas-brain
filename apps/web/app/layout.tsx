@@ -2,6 +2,7 @@ import "./globals.css";
 import "../styles/branding.css";
 import type { ReactNode } from "react";
 import { Inter, Manrope } from "next/font/google";
+import "./pdf-print.css";
 
 /** Inter = main UI font, Manrope = optional accent via CSS variable */
 const inter = Inter({

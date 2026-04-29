@@ -19,44 +19,37 @@ export type KbBlockRow = {
   section_key: string;
   audience: string;
   priority: number;
-  triggers: Record<string, any> | null;
-  content: Record<string, any> | null;
+  triggers: Record<string, unknown> | null;
+  content: Record<string, unknown> | null;
   is_active: boolean;
 };
 
 export type ProfileExtendedPanelKey =
-  | "plain_english_summary"
-  | "core_diagnosis"
-  | "market_happening"
-  | "core_reading"
-  | "level_meaning"
-  | "meaning_in_practice"
-  | "current_signal_pattern"
-  | "wider_signal_pathway"
-  | "progression_pattern"
-  | "type_interpretation"
-  | "how_to_use_this_layer"
-  | "what_to_focus_on_now"
-  | "what_progression_looks_like_next"
-  | "how_to_recognise_readiness";
+  | "snapshot"
+  | "personality_sales_profile"
+  | "words_to_use"
+  | "words_not_to_use"
+  | "real_situation"
+  | "core_pain"
+  | "real_problem"
+  | "what_not_to_do_on_call"
+  | "what_to_do_on_call"
+  | "why_the_offer_is_the_right_offer"
+  | "objections"
+  | "conversion_signals"
+  | "close_line"
+  | "long_term_value";
 
-export type ProfileExtendedSectionKey =
-  | "result_at_a_glance"
-  | "what_this_tier_means"
-  | "level_nuance"
-  | "pillars_and_signals"
-  | "behaviour_style"
-  | "strategic_priority_now"
-  | "progression_roadmap";
+export type ProfileExtendedSectionKey = ProfileExtendedPanelKey;
 
 export type AssembledProfileExtendedBlock = {
   title?: string;
   short_summary?: string;
   paragraphs?: string[];
   bullets?: string[];
-  items?: Array<Record<string, any>>;
+  items?: Array<Record<string, unknown>>;
   transition?: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 };
 
 export type AssembledProfileExtendedPanel = {
@@ -67,7 +60,7 @@ export type AssembledProfileExtendedPanel = {
     id: string;
     priority: number;
     source_section_key: string;
-    triggers: Record<string, any>;
+    triggers: Record<string, unknown>;
   }>;
 };
 
@@ -79,7 +72,7 @@ export type AssembledProfileExtendedSection = {
     id: string;
     priority: number;
     source_section_key: string;
-    triggers: Record<string, any>;
+    triggers: Record<string, unknown>;
   }>;
 };
 
@@ -89,72 +82,97 @@ export type AssembledProfileExtendedReport = {
   sections: AssembledProfileExtendedSection[];
 };
 
-function buildStructure(input: ProfileExtendedReportInput): Array<{
+const STRUCTURE: Array<{
   section_key: ProfileExtendedSectionKey;
   heading: string;
-  panels: Array<{ panel_key: ProfileExtendedPanelKey; title: string }>;
-}> {
-  return [
-    {
-      section_key: "result_at_a_glance",
-      heading: "Result at a glance",
-      panels: [{ panel_key: "plain_english_summary", title: "Plain-English summary" }],
-    },
-    {
-      section_key: "what_this_tier_means",
-      heading: "What this tier means",
-      panels: [
-        { panel_key: "core_diagnosis", title: "Core diagnosis" },
-        { panel_key: "market_happening", title: "What is likely happening in the market" },
-        { panel_key: "core_reading", title: "Core reading" },
-      ],
-    },
-    {
-      section_key: "level_nuance",
-      heading: "Level nuance",
-      panels: [
-        { panel_key: "level_meaning", title: `Level ${input.level} meaning` },
-        { panel_key: "meaning_in_practice", title: "Meaning in practice" },
-      ],
-    },
-    {
-      section_key: "pillars_and_signals",
-      heading: "Pillars and signals",
-      panels: [
-        { panel_key: "current_signal_pattern", title: "Current signal pattern" },
-        { panel_key: "wider_signal_pathway", title: "The wider signal pathway" },
-        { panel_key: "progression_pattern", title: "Progression pattern" },
-      ],
-    },
-    {
-      section_key: "behaviour_style",
-      heading: "Behaviour style",
-      panels: [
-        { panel_key: "type_interpretation", title: `Type ${input.behaviour_style} interpretation` },
-        { panel_key: "how_to_use_this_layer", title: "How to use this layer" },
-      ],
-    },
-    {
-      section_key: "strategic_priority_now",
-      heading: "Strategic priority now",
-      panels: [{ panel_key: "what_to_focus_on_now", title: "What to focus on now" }],
-    },
-    {
-      section_key: "progression_roadmap",
-      heading: "Progression roadmap",
-      panels: [
-        {
-          panel_key: "what_progression_looks_like_next",
-          title: "What progression looks like next",
-        },
-        {
-          panel_key: "how_to_recognise_readiness",
-          title: "How to recognise readiness",
-        },
-      ],
-    },
-  ];
-}
+  panel_key: ProfileExtendedPanelKey;
+  panel_title: string;
+}> = [
+  {
+    section_key: "snapshot",
+    heading: "Snapshot",
+    panel_key: "snapshot",
+    panel_title: "Snapshot",
+  },
+  {
+    section_key: "personality_sales_profile",
+    heading: "Personality Sales Profile",
+    panel_key: "personality_sales_profile",
+    panel_title: "Personality Sales Profile",
+  },
+  {
+    section_key: "words_to_use",
+    heading: "Words to Use",
+    panel_key: "words_to_use",
+    panel_title: "Words to Use",
+  },
+  {
+    section_key: "words_not_to_use",
+    heading: "Words NOT to Use",
+    panel_key: "words_not_to_use",
+    panel_title: "Words NOT to Use",
+  },
+  {
+    section_key: "real_situation",
+    heading: "REAL Situation",
+    panel_key: "real_situation",
+    panel_title: "REAL Situation",
+  },
+  {
+    section_key: "core_pain",
+    heading: "Core Pain",
+    panel_key: "core_pain",
+    panel_title: "Core Pain",
+  },
+  {
+    section_key: "real_problem",
+    heading: "Real Problem",
+    panel_key: "real_problem",
+    panel_title: "Real Problem",
+  },
+  {
+    section_key: "what_not_to_do_on_call",
+    heading: "What NOT to Do on the Call",
+    panel_key: "what_not_to_do_on_call",
+    panel_title: "What NOT to Do on the Call",
+  },
+  {
+    section_key: "what_to_do_on_call",
+    heading: "What TO Do on the Call",
+    panel_key: "what_to_do_on_call",
+    panel_title: "What TO Do on the Call",
+  },
+  {
+    section_key: "why_the_offer_is_the_right_offer",
+    heading: "Why the Offer Is the Right Offer",
+    panel_key: "why_the_offer_is_the_right_offer",
+    panel_title: "Why the Offer Is the Right Offer",
+  },
+  {
+    section_key: "objections",
+    heading: "Objections",
+    panel_key: "objections",
+    panel_title: "Objections",
+  },
+  {
+    section_key: "conversion_signals",
+    heading: "Conversion Signals",
+    panel_key: "conversion_signals",
+    panel_title: "Conversion Signals",
+  },
+  {
+    section_key: "close_line",
+    heading: "Close Line",
+    panel_key: "close_line",
+    panel_title: "Close Line",
+  },
+  {
+    section_key: "long_term_value",
+    heading: "Long-Term Value",
+    panel_key: "long_term_value",
+    panel_title: "Long-Term Value",
+  },
+];
 
 function getServiceRoleKey() {
   return (
@@ -181,6 +199,17 @@ function createVisibilityAdminClient() {
 
 type VisibilityDbClient = ReturnType<typeof createVisibilityAdminClient>;
 
+type PersonalitySalesGuide = {
+  typeLabel: string;
+  summary: string;
+  trustTrigger: string;
+  decisionDriver: string;
+  callPacing: string;
+  closeStyle: string;
+  wordsToUse: string[];
+  wordsToAvoid: string[];
+};
+
 function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -194,9 +223,56 @@ function normalizeText(value: unknown): string {
   return safeString(value)
     .toLowerCase()
     .replace(/[–—]/g, "-")
-    .replace(/[^\w\s-]/g, " ")
+    .replace(/[^\w\s/-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function titleCase(value: string): string {
+  return safeString(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
+function decapitalizeSentence(value: string): string {
+  const text = safeString(value);
+  if (!text) return "";
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function trimTrailingPunctuation(value: string): string {
+  return safeString(value).replace(/[.\s]+$/g, "");
+}
+
+function readinessLabel(value?: Readiness | null): string {
+  if (value === "ready_to_progress") return "Ready to progress";
+  if (value === "stabilise") return "Stabilise";
+  return "Stabilise";
+}
+
+function uniqueRows(
+  rows: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, unknown>;
+  }>
+) {
+  const seen = new Set<string>();
+  const out: Array<{
+    id: string;
+    priority: number;
+    source_section_key: string;
+    triggers: Record<string, unknown>;
+  }> = [];
+
+  for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push(row);
+  }
+
+  return out;
 }
 
 function matchesArrayTrigger<T>(value: T | null | undefined, allowed?: T[]): boolean {
@@ -213,14 +289,28 @@ function matchesRange(value: number | null | undefined, min?: number, max?: numb
 }
 
 function rowMatchesInput(row: KbBlockRow, input: ProfileExtendedReportInput): boolean {
-  const triggers = row.triggers || {};
+  const triggers = (row.triggers || {}) as Record<string, unknown>;
 
-  if (!matchesArrayTrigger(input.tier, triggers.tier)) return false;
-  if (!matchesArrayTrigger(input.behaviour_style, triggers.behaviour_style)) return false;
-  if (!matchesArrayTrigger(input.readiness ?? null, triggers.readiness)) return false;
+  const tierAllowed = Array.isArray(triggers.tier)
+    ? (triggers.tier as VisibilityTier[])
+    : undefined;
 
-  const levelMin = typeof triggers.level_min === "number" ? triggers.level_min : undefined;
-  const levelMax = typeof triggers.level_max === "number" ? triggers.level_max : undefined;
+  const behaviourAllowed = Array.isArray(triggers.behaviour_style)
+    ? (triggers.behaviour_style as BehaviourStyle[])
+    : undefined;
+
+  const readinessAllowed = Array.isArray(triggers.readiness)
+    ? (triggers.readiness as Array<Readiness | null>)
+    : undefined;
+
+  if (!matchesArrayTrigger(input.tier, tierAllowed)) return false;
+  if (!matchesArrayTrigger(input.behaviour_style, behaviourAllowed)) return false;
+  if (!matchesArrayTrigger(input.readiness ?? null, readinessAllowed)) return false;
+
+  const levelMin =
+    typeof triggers.level_min === "number" ? (triggers.level_min as number) : undefined;
+  const levelMax =
+    typeof triggers.level_max === "number" ? (triggers.level_max as number) : undefined;
 
   if (
     (levelMin !== undefined || levelMax !== undefined) &&
@@ -237,66 +327,58 @@ function rowRef(row: KbBlockRow) {
     id: row.id,
     priority: row.priority,
     source_section_key: row.section_key,
-    triggers: row.triggers || {},
+    triggers: (row.triggers || {}) as Record<string, unknown>,
   };
 }
 
-function uniqueRows(
-  rows: Array<{
-    id: string;
-    priority: number;
-    source_section_key: string;
-    triggers: Record<string, any>;
-  }>
-) {
-  const seen = new Set<string>();
-  const out: Array<{
-    id: string;
-    priority: number;
-    source_section_key: string;
-    triggers: Record<string, any>;
-  }> = [];
+function getRowBlocks(row?: KbBlockRow | null): Record<string, unknown>[] {
+  const blocks = row?.content?.blocks;
+  return Array.isArray(blocks)
+    ? blocks.filter((block): block is Record<string, unknown> => !!block && typeof block === "object")
+    : [];
+}
 
-  for (const row of rows) {
-    if (seen.has(row.id)) continue;
-    seen.add(row.id);
-    out.push(row);
+function findBlock(
+  row: KbBlockRow | null | undefined,
+  headings: string[]
+): Record<string, unknown> | null {
+  if (!row) return null;
+
+  const wanted = headings.map((heading) => normalizeText(heading)).filter(Boolean);
+  if (!wanted.length) return null;
+
+  for (const block of getRowBlocks(row)) {
+    const heading = normalizeText(block.heading);
+    if (wanted.includes(heading)) {
+      return block;
+    }
   }
 
-  return out;
+  return null;
 }
 
-function makeBlock(src?: Record<string, any> | null): AssembledProfileExtendedBlock {
-  const item = src || {};
+function getBlockSummary(row: KbBlockRow | null | undefined, headings: string[]): string {
+  const block = findBlock(row, headings);
+  return safeString(block?.summary) || safeString(block?.short_summary);
+}
 
-  const paragraphs = Array.isArray(item.paragraphs)
-    ? item.paragraphs.map((p: any) => safeString(p)).filter(Boolean)
+function getBlockBullets(row: KbBlockRow | null | undefined, headings: string[]): string[] {
+  const block = findBlock(row, headings);
+  return Array.isArray(block?.bullets)
+    ? (block.bullets as unknown[]).map((item) => safeString(item)).filter(Boolean)
     : [];
+}
 
-  const bullets = Array.isArray(item.bullets)
-    ? item.bullets.map((b: any) => safeString(b)).filter(Boolean)
+function getBlockItems(
+  row: KbBlockRow | null | undefined,
+  headings: string[]
+): Array<Record<string, unknown>> {
+  const block = findBlock(row, headings);
+  return Array.isArray(block?.items)
+    ? (block.items as unknown[]).filter(
+        (item): item is Record<string, unknown> => !!item && typeof item === "object"
+      )
     : [];
-
-  const items = Array.isArray(item.items)
-    ? item.items.filter((x: any) => x && typeof x === "object")
-    : [];
-
-  return {
-    title:
-      safeString(item.title) ||
-      safeString(item.heading) ||
-      safeString(item.subheading) ||
-      undefined,
-    short_summary:
-      safeString(item.short_summary) ||
-      safeString(item.summary) ||
-      undefined,
-    paragraphs,
-    bullets,
-    items,
-    transition: safeString(item.transition) || undefined,
-    meta: item.meta && typeof item.meta === "object" ? item.meta : undefined,
-  };
 }
 
 function makeSimpleBlock(
@@ -324,13 +406,22 @@ function pushPanel(
   block: AssembledProfileExtendedBlock,
   row: KbBlockRow | null
 ) {
-  const existing = buckets.get(panelKey) || [];
-  existing.push({ block, row });
-  buckets.set(panelKey, existing);
+  const current = buckets.get(panelKey) || [];
+  current.push({ block, row });
+  buckets.set(panelKey, current);
+}
+
+function selectedLevelItem(row: KbBlockRow | null | undefined, level: number) {
+  if (!row) return null;
+
+  const items = getBlockItems(row, ["Levels"]);
+  const match = items.find((item) => safeNumber(item.level, -1) === level);
+  return match || null;
 }
 
 function strongestWeakest(input: ProfileExtendedReportInput) {
   const scores = input.pillar_scores || {};
+
   const items = [
     { key: "visibility", label: "Visibility", value: safeNumber(scores.visibility, 0) },
     { key: "trust", label: "Trust", value: safeNumber(scores.trust, 0) },
@@ -344,61 +435,253 @@ function strongestWeakest(input: ProfileExtendedReportInput) {
   };
 }
 
-function selectedLevelItem(row: KbBlockRow, level: number) {
-  const blocks = Array.isArray(row.content?.blocks) ? row.content?.blocks : [];
-  const levelsBlock = blocks.find(
-    (b: any) => normalizeText(b?.heading) === "levels" && Array.isArray(b?.items)
-  );
-  if (!levelsBlock) return null;
+function getWeakestPillarNarrative(
+  pillarGuidanceRow: KbBlockRow | null,
+  weakestKey: string
+): string {
+  if (!pillarGuidanceRow) return "";
 
-  const items = Array.isArray(levelsBlock.items) ? levelsBlock.items : [];
-  return items.find((item: any) => safeNumber(item?.level, -1) === level) || null;
+  const map: Record<string, string[]> = {
+    visibility: ["Lower discoverability", "Lower visibility"],
+    trust: ["Lower trust / credibility", "Lower trust", "Lower credibility"],
+    authority: ["Lower conversion / authority", "Lower authority", "Lower conversion"],
+    dominance: ["Lower dominance", "Lower influence", "Lower authority / dominance"],
+  };
+
+  return getBlockSummary(pillarGuidanceRow, map[weakestKey] || []);
 }
 
-function addSyntheticPanels(
-  buckets: Map<
-    ProfileExtendedPanelKey,
-    Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
-  >,
-  input: ProfileExtendedReportInput
-) {
-  const readiness =
-    input.readiness === "ready_to_progress"
-      ? "Ready to progress"
-      : input.readiness === "stabilise"
-      ? "Stabilise"
-      : "Stabilise";
+function buildOfferFitLine(tier: VisibilityTier, focus: string, nextMilestone: string) {
+  const cleanFocus = safeString(focus);
+  const cleanMilestone = safeString(nextMilestone);
 
-  pushPanel(
-    buckets,
-    "plain_english_summary",
-    makeSimpleBlock(
-      "Plain-English summary",
-      `You are in the ${input.tier} tier at Level ${input.level}, with behaviour style ${input.behaviour_style} and readiness set to ${readiness}.`,
-      {
-        paragraphs: [
-          "Tier explains the current stage of market visibility.",
-          "Level explains how stable or advanced that stage currently is.",
-          "Behaviour style shows how this person is most likely to implement strategy consistently.",
+  if (cleanFocus && cleanMilestone) {
+    return `The right offer is the one that directly solves ${decapitalizeSentence(
+      trimTrailingPunctuation(cleanFocus)
+    )} and moves them toward ${decapitalizeSentence(
+      trimTrailingPunctuation(cleanMilestone)
+    )}.`;
+  }
+
+  if (cleanFocus) {
+    return `The right offer is the one that directly solves ${decapitalizeSentence(
+      trimTrailingPunctuation(cleanFocus)
+    )}.`;
+  }
+
+  if (cleanMilestone) {
+    return `The right offer is the one that helps them move toward ${decapitalizeSentence(
+      trimTrailingPunctuation(cleanMilestone)
+    )}.`;
+  }
+
+  if (tier === "Invisible") {
+    return "The right offer is the one that builds discoverability, credibility, and structural trust first.";
+  }
+
+  if (tier === "Emerging") {
+    return "The right offer is the one that strengthens authority, proof, and expert positioning before more exposure is added.";
+  }
+
+  if (tier === "Established") {
+    return "The right offer is the one that converts credibility into stronger category leadership and market authority.";
+  }
+
+  return "The right offer is the one that protects authority while expanding influence in a deliberate, disciplined way.";
+}
+
+function buildObjectionBullets(args: {
+  whatDoesNotHelp: string[];
+  behaviourMainRisk: string;
+  behaviourWatchOut: string;
+  weakestNarrative: string;
+  wordsNotToUse: string[];
+}) {
+  const out: string[] = [];
+
+  for (const item of args.whatDoesNotHelp) {
+    const clean = trimTrailingPunctuation(item);
+    if (!clean) continue;
+    out.push(`Resistance usually rises when the recommendation feels like ${decapitalizeSentence(clean)}.`);
+  }
+
+  if (args.behaviourMainRisk) {
+    out.push(`A likely hesitation point is ${decapitalizeSentence(trimTrailingPunctuation(args.behaviourMainRisk))}.`);
+  }
+
+  if (args.behaviourWatchOut) {
+    out.push(`Confidence can drop when ${decapitalizeSentence(trimTrailingPunctuation(args.behaviourWatchOut))}.`);
+  }
+
+  if (args.wordsNotToUse.length) {
+    out.push(`Language that sounds like ${args.wordsNotToUse.slice(0, 3).join(", ")} can create resistance.`);
+  }
+
+  if (!out.length && args.weakestNarrative) {
+    out.push(args.weakestNarrative);
+  }
+
+  return Array.from(new Set(out.filter(Boolean)));
+}
+
+function buildSignalPathItems(frameworkRows: KbBlockRow[]) {
+  const items: Array<Record<string, unknown>> = [];
+
+  for (const row of frameworkRows) {
+    const stage = safeString(row.content?.subheading);
+    if (!stage) continue;
+
+    const strongestImpact =
+      getBlockSummary(row, ["Strongest ladder impact"]) ||
+      getBlockSummary(row, ["What stronger signals look like"]) ||
+      getBlockSummary(row, ["What it tells the market"]);
+
+    if (!strongestImpact) continue;
+
+    items.push({
+      stage,
+      focus: strongestImpact,
+    });
+  }
+
+  return items;
+}
+
+function getPersonalitySalesGuide(style: BehaviourStyle): PersonalitySalesGuide {
+  switch (style) {
+    case "A":
+      return {
+        typeLabel: "Type A — Vision Driven Initiator",
+        summary:
+          "This client responds best to momentum, visible upside, and commercially relevant progress. Keep the conversation energetic, focused, and tied to leverage.",
+        trustTrigger:
+          "They trust a recommendation when it sounds like forward movement with proof, not caution for caution’s sake.",
+        decisionDriver:
+          "They move when they can see traction, visibility, advantage, and a faster route to authority.",
+        callPacing:
+          "Keep the pace brisk. Show the strategic direction early, then back it with proof and structure.",
+        closeStyle:
+          "Close around momentum, focus, and the next smart move — not around fear or delay.",
+        wordsToUse: [
+          "momentum",
+          "traction",
+          "visibility",
+          "leverage",
+          "growth",
+          "authority",
+          "proof",
+          "next move",
         ],
-        transition:
-          "This gives the report its structural truth: tier explains the stage, while level explains how stable or advanced that stage currently is.",
-      }
-    ),
-    null
-  );
+        wordsToAvoid: [
+          "slow down",
+          "be careful for now",
+          "wait and see",
+          "too much process",
+          "hold back",
+          "generic awareness",
+        ],
+      };
 
-  const { strongest, weakest } = strongestWeakest(input);
+    case "B":
+      return {
+        typeLabel: "Type B — Relationship Driven Communicator",
+        summary:
+          "This client responds best to trust, rapport, reputation, and social proof. The conversation should feel collaborative, credible, and relational.",
+        trustTrigger:
+          "They trust a recommendation when it feels human, credible, and supported by proof from others.",
+        decisionDriver:
+          "They move when they can see stronger relationships, clearer trust signals, and an offer that feels aligned rather than pushed.",
+        callPacing:
+          "Keep the pace steady and conversational. Let rapport build before pushing the decision.",
+        closeStyle:
+          "Close through trust, fit, and confidence — not through pressure.",
+        wordsToUse: [
+          "trust",
+          "credibility",
+          "reputation",
+          "relationships",
+          "partnership",
+          "case studies",
+          "social proof",
+          "referrals",
+        ],
+        wordsToAvoid: [
+          "hard close",
+          "pressure",
+          "push",
+          "cold",
+          "aggressive",
+          "transactional",
+        ],
+      };
 
-  pushPanel(
-    buckets,
-    "current_signal_pattern",
-    makeSimpleBlock(
-      "Current signal pattern",
-      `${strongest.label} is currently the strongest visible signal, while ${weakest.label} looks like the main limiting factor.`
-    ),
-    null
-  );
+    case "C":
+      return {
+        typeLabel: "Type C — Structure Driven Optimiser",
+        summary:
+          "This client responds best to logic, method, consistency, and structured proof. Keep the call calm, ordered, and grounded in process.",
+        trustTrigger:
+          "They trust a recommendation when it sounds thought-through, repeatable, and operationally solid.",
+        decisionDriver:
+          "They move when they can see a clear framework, a controlled path, and evidence that the recommendation will hold.",
+        callPacing:
+          "Keep the pace measured. Give structure, sequence, and enough logic for them to feel secure.",
+        closeStyle:
+          "Close through clarity, method, and confidence in execution — not hype.",
+        wordsToUse: [
+          "framework",
+          "method",
+          "system",
+          "consistency",
+          "quality",
+          "reliability",
+          "proof",
+          "process",
+        ],
+        wordsToAvoid: [
+          "viral",
+          "wing it",
+          "just post more",
+          "hype",
+          "messy growth",
+          "rush it",
+        ],
+      };
+
+    case "D":
+    default:
+      return {
+        typeLabel: "Type D — Control Driven Authority Builder",
+        summary:
+          "This client responds best to positioning, precision, strategic control, and authority. The conversation should feel sharp, credible, and commercially disciplined.",
+        trustTrigger:
+          "They trust a recommendation when it sounds strategically sound, well-framed, and in control.",
+        decisionDriver:
+          "They move when they can see positioning advantage, authority protection, and measured expansion.",
+        callPacing:
+          "Keep the pace deliberate and intelligent. Show the logic behind the recommendation.",
+        closeStyle:
+          "Close through strategic confidence and authority — not emotion or hype.",
+        wordsToUse: [
+          "positioning",
+          "authority",
+          "precision",
+          "control",
+          "strategy",
+          "standards",
+          "category leadership",
+          "advantage",
+        ],
+        wordsToAvoid: [
+          "just trust the process",
+          "spray and pray",
+          "broad awareness",
+          "cheap growth",
+          "chaos",
+          "vague brand talk",
+        ],
+      };
+  }
 }
 
 async function fetchKbRows(sb?: VisibilityDbClient): Promise<KbBlockRow[]> {
@@ -429,288 +712,425 @@ export function assembleProfileExtendedReport(
     Array<{ block: AssembledProfileExtendedBlock; row: KbBlockRow | null }>
   >();
 
-  addSyntheticPanels(buckets, input);
+  const resultRow =
+    matched.find((row) => row.section_key === "result_interpretation_scripts") || null;
 
-  let resultRow: KbBlockRow | null = null;
-  let levelRoadmapRow: KbBlockRow | null = null;
-  let roadmapLanguageRow: KbBlockRow | null = null;
-  let frameworkIntroRow: KbBlockRow | null = null;
-  const frameworkStageRows: KbBlockRow[] = [];
-  let behaviourTypeRow: KbBlockRow | null = null;
-  let behaviourTierRow: KbBlockRow | null = null;
-  let pillarGuidanceRow: KbBlockRow | null = null;
+  const levelRoadmapRow =
+    matched.find(
+      (row) =>
+        row.section_key === "level_progression_roadmap" &&
+        normalizeText(row.content?.heading) === "level progression roadmap"
+    ) || null;
 
-  for (const row of matched) {
-    const heading = normalizeText(row.content?.heading);
-    const subheading = safeString(row.content?.subheading);
+  const progressionLanguageRow =
+    matched.find(
+      (row) =>
+        row.section_key === "level_progression_roadmap" &&
+        normalizeText(row.content?.heading) === "progression roadmap language"
+    ) || null;
 
-    if (row.section_key === "result_interpretation_scripts" && !resultRow) {
-      resultRow = row;
-      continue;
-    }
+  const frameworkIntroRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_signal_framework" &&
+        safeString(row.content?.subheading) === ""
+    ) || null;
 
-    if (row.section_key === "level_progression_roadmap" && heading === "level progression roadmap") {
-      if (!levelRoadmapRow) levelRoadmapRow = row;
-      continue;
-    }
+  const frameworkRows = matched.filter(
+    (row) =>
+      row.section_key === "visibility_signal_framework" &&
+      safeString(row.content?.subheading) !== ""
+  );
 
-    if (row.section_key === "level_progression_roadmap" && heading === "progression roadmap language") {
-      if (!roadmapLanguageRow) roadmapLanguageRow = row;
-      continue;
-    }
+  const behaviourTypeRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_audit_layer" &&
+        normalizeText(row.content?.heading) === "behaviour style layer"
+    ) || null;
 
-    if (row.section_key === "visibility_signal_framework" && !subheading) {
-      if (!frameworkIntroRow) frameworkIntroRow = row;
-      continue;
-    }
+  const behaviourTierRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_audit_layer" &&
+        normalizeText(row.content?.heading) === "behaviour strategy by tier"
+    ) || null;
 
-    if (row.section_key === "visibility_signal_framework" && subheading) {
-      frameworkStageRows.push(row);
-      continue;
-    }
+  const pillarGuidanceRow =
+    matched.find(
+      (row) =>
+        row.section_key === "visibility_audit_layer" &&
+        normalizeText(row.content?.heading) === "pillar reading guidance"
+    ) || null;
 
-    if (row.section_key === "visibility_audit_layer" && heading === "behaviour style layer") {
-      if (!behaviourTypeRow) behaviourTypeRow = row;
-      continue;
-    }
+  const { strongest, weakest } = strongestWeakest(input);
+  const personalityGuide = getPersonalitySalesGuide(input.behaviour_style);
 
-    if (row.section_key === "visibility_audit_layer" && heading === "behaviour strategy by tier") {
-      if (!behaviourTierRow) behaviourTierRow = row;
-      continue;
-    }
+  const currentStage = getBlockSummary(progressionLanguageRow, ["Current stage"]);
+  const nextMilestone = getBlockSummary(progressionLanguageRow, ["Next milestone"]);
+  const languageToUse = getBlockSummary(progressionLanguageRow, ["Language to use"]);
 
-    if (row.section_key === "visibility_audit_layer" && heading === "pillar reading guidance") {
-      if (!pillarGuidanceRow) pillarGuidanceRow = row;
-      continue;
-    }
-  }
+  const coreReading = getBlockSummary(resultRow, ["Core reading"]);
+  const bestFitFocus = getBlockSummary(resultRow, ["Best-fit strategic focus"]);
+  const marketHappening = getBlockSummary(resultRow, [
+    "What is usually happening in the market",
+  ]);
+  const stuckReason = getBlockSummary(resultRow, ["Why businesses tend to get stuck here"]);
+  const whatHelps = getBlockBullets(resultRow, ["What usually helps most at this stage"]);
+  const whatDoesNotHelp = getBlockBullets(resultRow, ["What usually does not help yet"]);
+  const signsReady = getBlockBullets(resultRow, ["Signs the business is ready to progress"]);
 
-  if (resultRow) {
-    const blocks = Array.isArray(resultRow.content?.blocks) ? resultRow.content?.blocks : [];
+  const meaningInPractice = getBlockSummary(levelRoadmapRow, ["Meaning in practice"]);
+  const consultantRead = getBlockSummary(levelRoadmapRow, ["Consultant read"]);
+  const selectedLevel = selectedLevelItem(levelRoadmapRow, input.level);
 
-    for (const raw of blocks) {
-      const heading = normalizeText(raw?.heading);
+  const behaviourStrengths = getBlockSummary(behaviourTypeRow, ["Natural strengths"]);
+  const behaviourMainRisk = getBlockSummary(behaviourTypeRow, ["Main risk"]);
+  const behaviourWorksBest = getBlockSummary(behaviourTypeRow, ["What usually works best"]);
+  const behaviourWatchOut = getBlockSummary(behaviourTypeRow, ["Watch out for"]);
 
-      if (heading === "core reading") {
-        pushPanel(buckets, "core_diagnosis", makeBlock(raw), resultRow);
-        continue;
-      }
+  const howToUseLayer = getBlockSummary(behaviourTierRow, ["How to use this layer"]);
+  const tierGuidance = getBlockSummary(behaviourTierRow, ["Guidance"]);
 
-      if (heading === "what is usually happening in the market") {
-        pushPanel(buckets, "market_happening", makeBlock(raw), resultRow);
-        continue;
-      }
+  const frameworkSummary = safeString(frameworkIntroRow?.content?.summary);
+  const progressionPattern = getBlockSummary(frameworkIntroRow, ["Progression pattern"]);
+  const frameworkInterpretation = getBlockSummary(frameworkIntroRow, ["Interpretation"]);
 
-      if (heading === "why businesses tend to get stuck here") {
-        pushPanel(buckets, "core_reading", makeBlock(raw), resultRow);
-        continue;
-      }
+  const weakestNarrative = getWeakestPillarNarrative(pillarGuidanceRow, weakest.key);
+  const interpretationRule = getBlockSummary(pillarGuidanceRow, ["Interpretation rule"]);
 
-      if (heading === "report writing cue") {
-        pushPanel(buckets, "core_reading", makeBlock(raw), resultRow);
-        continue;
-      }
+  const signalPathItems = buildSignalPathItems(frameworkRows);
+  const objections = buildObjectionBullets({
+    whatDoesNotHelp,
+    behaviourMainRisk,
+    behaviourWatchOut,
+    weakestNarrative,
+    wordsNotToUse: personalityGuide.wordsToAvoid,
+  });
 
-      if (heading === "best fit strategic focus" || heading === "best-fit strategic focus") {
-        pushPanel(buckets, "what_to_focus_on_now", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "what usually helps most at this stage") {
-        pushPanel(buckets, "what_to_focus_on_now", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "what usually does not help yet") {
-        pushPanel(buckets, "what_to_focus_on_now", makeBlock(raw), resultRow);
-        continue;
-      }
-
-      if (heading === "signs the business is ready to progress") {
-        pushPanel(buckets, "how_to_recognise_readiness", makeBlock(raw), resultRow);
-        continue;
-      }
-    }
-  }
-
-  if (levelRoadmapRow) {
-    const blocks = Array.isArray(levelRoadmapRow.content?.blocks)
-      ? levelRoadmapRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      const heading = normalizeText(raw?.heading);
-
-      if (heading === "meaning in practice") {
-        pushPanel(buckets, "meaning_in_practice", makeBlock(raw), levelRoadmapRow);
-        continue;
-      }
-
-      if (heading === "consultant read") {
-        pushPanel(buckets, "level_meaning", makeBlock(raw), levelRoadmapRow);
-        continue;
-      }
-    }
-
-    const selected = selectedLevelItem(levelRoadmapRow, input.level);
-    if (selected) {
-      pushPanel(
-        buckets,
-        "level_meaning",
-        makeSimpleBlock(
-          `Level ${safeNumber(selected.level, input.level)} meaning`,
-          safeString(selected.meaning),
+  pushPanel(
+    buckets,
+    "snapshot",
+    makeSimpleBlock(
+      "Internal snapshot",
+      `${input.tier} • Level ${input.level} • Type ${input.behaviour_style} • ${readinessLabel(
+        input.readiness
+      )}`,
+      {
+        items: [
           {
-            items: [
-              {
-                level: safeNumber(selected.level, input.level),
-                market_position: safeString(selected.market_position),
-                immediate_focus: safeString(selected.immediate_focus),
-              },
-            ],
-          }
-        ),
-        levelRoadmapRow
-      );
-    }
-  }
-
-  if (roadmapLanguageRow) {
-    const blocks = Array.isArray(roadmapLanguageRow.content?.blocks)
-      ? roadmapLanguageRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(
-        buckets,
-        "what_progression_looks_like_next",
-        makeBlock(raw),
-        roadmapLanguageRow
-      );
-    }
-  }
-
-  if (frameworkIntroRow) {
-    const rowSummary = safeString(frameworkIntroRow.content?.summary);
-    if (rowSummary) {
-      pushPanel(
-        buckets,
-        "wider_signal_pathway",
-        makeSimpleBlock("The wider signal pathway", rowSummary),
-        frameworkIntroRow
-      );
-    }
-
-    const blocks = Array.isArray(frameworkIntroRow.content?.blocks)
-      ? frameworkIntroRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      const heading = normalizeText(raw?.heading);
-      if (heading === "progression pattern") {
-        pushPanel(buckets, "progression_pattern", makeBlock(raw), frameworkIntroRow);
-      } else {
-        pushPanel(buckets, "wider_signal_pathway", makeBlock(raw), frameworkIntroRow);
+            label: "Current stage",
+            value: currentStage || input.tier,
+          },
+          {
+            label: "Next milestone",
+            value: nextMilestone || bestFitFocus || "—",
+          },
+          {
+            label: "Strongest signal",
+            value: `${strongest.label} (${strongest.value}%)`,
+          },
+          {
+            label: "Weakest signal",
+            value: `${weakest.label} (${weakest.value}%)`,
+          },
+        ],
       }
-    }
-  }
+    ),
+    null
+  );
 
-  for (const row of frameworkStageRows) {
-    const blocks = Array.isArray(row.content?.blocks) ? row.content?.blocks : [];
-    const subheading = safeString(row.content?.subheading) || "Framework";
-
-    const items: Array<Record<string, any>> = [];
-    for (const raw of blocks) {
-      const label = safeString(raw?.heading);
-      const value = safeString(raw?.summary);
-      if (label || value) {
-        items.push({ label, value });
+  pushPanel(
+    buckets,
+    "snapshot",
+    makeSimpleBlock(
+      `Level ${input.level} summary`,
+      safeString(selectedLevel?.meaning) || meaningInPractice || consultantRead,
+      {
+        paragraphs: [
+          safeString(selectedLevel?.market_position),
+          safeString(selectedLevel?.immediate_focus),
+        ].filter(Boolean),
       }
-    }
+    ),
+    levelRoadmapRow
+  );
 
-    if (items.length) {
-      pushPanel(
-        buckets,
-        "wider_signal_pathway",
-        makeSimpleBlock(subheading, undefined, { items }),
-        row
-      );
-    }
+  pushPanel(
+    buckets,
+    "personality_sales_profile",
+    makeSimpleBlock(
+      personalityGuide.typeLabel,
+      personalityGuide.summary,
+      {
+        paragraphs: [
+          `Trust trigger: ${personalityGuide.trustTrigger}`,
+          `Decision driver: ${personalityGuide.decisionDriver}`,
+          `Call pacing: ${personalityGuide.callPacing}`,
+          `Close style: ${personalityGuide.closeStyle}`,
+          behaviourStrengths ? `Natural strengths: ${behaviourStrengths}` : "",
+          behaviourWorksBest ? `What usually works best: ${behaviourWorksBest}` : "",
+          tierGuidance ? `Tier-specific guidance: ${tierGuidance}` : "",
+          howToUseLayer ? `How to use this layer: ${howToUseLayer}` : "",
+        ].filter(Boolean),
+      }
+    ),
+    behaviourTypeRow || behaviourTierRow
+  );
+
+  pushPanel(
+    buckets,
+    "words_to_use",
+    makeSimpleBlock(
+      "Recommended language",
+      "These words and phrases are more likely to land well with this personality.",
+      {
+        bullets: personalityGuide.wordsToUse,
+      }
+    ),
+    null
+  );
+
+  pushPanel(
+    buckets,
+    "words_not_to_use",
+    makeSimpleBlock(
+      "Language to avoid",
+      "These phrases are more likely to create resistance or lower trust with this personality.",
+      {
+        bullets: personalityGuide.wordsToAvoid,
+      }
+    ),
+    null
+  );
+
+  if (coreReading) {
+    pushPanel(
+      buckets,
+      "real_situation",
+      makeSimpleBlock("Core reading", coreReading),
+      resultRow
+    );
   }
 
-  if (behaviourTypeRow) {
-    const blocks = Array.isArray(behaviourTypeRow.content?.blocks)
-      ? behaviourTypeRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(buckets, "type_interpretation", makeBlock(raw), behaviourTypeRow);
-    }
+  if (marketHappening) {
+    pushPanel(
+      buckets,
+      "real_situation",
+      makeSimpleBlock("What is usually happening in the market", marketHappening),
+      resultRow
+    );
   }
 
-  if (behaviourTierRow) {
-    const blocks = Array.isArray(behaviourTierRow.content?.blocks)
-      ? behaviourTierRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(buckets, "how_to_use_this_layer", makeBlock(raw), behaviourTierRow);
-    }
+  if (meaningInPractice || consultantRead) {
+    pushPanel(
+      buckets,
+      "real_situation",
+      makeSimpleBlock("Level reality", meaningInPractice || consultantRead, {
+        paragraphs: consultantRead && consultantRead !== meaningInPractice ? [consultantRead] : [],
+      }),
+      levelRoadmapRow
+    );
   }
 
-  if (pillarGuidanceRow) {
-    const rowSummary = safeString(pillarGuidanceRow.content?.summary);
-    if (rowSummary) {
-      pushPanel(
-        buckets,
-        "current_signal_pattern",
-        makeSimpleBlock("Pillar reading guidance", rowSummary),
-        pillarGuidanceRow
-      );
-    }
-
-    const blocks = Array.isArray(pillarGuidanceRow.content?.blocks)
-      ? pillarGuidanceRow.content?.blocks
-      : [];
-
-    for (const raw of blocks) {
-      pushPanel(buckets, "current_signal_pattern", makeBlock(raw), pillarGuidanceRow);
-    }
+  if (behaviourMainRisk) {
+    pushPanel(
+      buckets,
+      "core_pain",
+      makeSimpleBlock("Behaviour-level pain", behaviourMainRisk),
+      behaviourTypeRow
+    );
   }
 
-  const structure = buildStructure(input);
-  const sections: AssembledProfileExtendedSection[] = [];
+  if (stuckReason) {
+    pushPanel(
+      buckets,
+      "core_pain",
+      makeSimpleBlock("Why they feel stuck", stuckReason),
+      resultRow
+    );
+  }
 
-  for (const sectionDef of structure) {
-    const panels: AssembledProfileExtendedPanel[] = [];
+  if (weakestNarrative) {
+    pushPanel(
+      buckets,
+      "core_pain",
+      makeSimpleBlock(`Pressure point: ${weakest.label}`, weakestNarrative),
+      pillarGuidanceRow
+    );
+  }
 
-    for (const panelDef of sectionDef.panels) {
-      const bucket = buckets.get(panelDef.panel_key) || [];
-      if (!bucket.length) continue;
+  pushPanel(
+    buckets,
+    "real_problem",
+    makeSimpleBlock(
+      "Structural problem",
+      coreReading ||
+        `This is not mainly a motivation problem. It is a structural signal problem centred on ${weakest.label.toLowerCase()}.`,
+      {
+        paragraphs: [
+          weakestNarrative
+            ? `${weakest.label} is the main limiting signal right now. ${weakestNarrative}`
+            : "",
+          interpretationRule,
+        ].filter(Boolean),
+      }
+    ),
+    resultRow
+  );
 
-      const matchedRows = uniqueRows(
+  if (whatDoesNotHelp.length || behaviourWatchOut || personalityGuide.wordsToAvoid.length) {
+    pushPanel(
+      buckets,
+      "what_not_to_do_on_call",
+      makeSimpleBlock(
+        "What not to do",
+        "Avoid recommendations and language that skip the real stage problem or create extra resistance.",
+        {
+          bullets: Array.from(
+            new Set(
+              [
+                ...whatDoesNotHelp,
+                behaviourWatchOut ? `Watch out for: ${behaviourWatchOut}` : "",
+                ...personalityGuide.wordsToAvoid.map((word) => `Avoid language like: ${word}`),
+              ].filter(Boolean)
+            )
+          ),
+        }
+      ),
+      resultRow
+    );
+  }
+
+  pushPanel(
+    buckets,
+    "what_to_do_on_call",
+    makeSimpleBlock(
+      "How to position the call",
+      bestFitFocus || "Position the conversation around the structural move that fits this stage.",
+      {
+        paragraphs: [
+          `Best personality angle: ${personalityGuide.trustTrigger}`,
+          `Decision framing: ${personalityGuide.decisionDriver}`,
+          `Call pacing: ${personalityGuide.callPacing}`,
+          behaviourWorksBest ? `What usually works best: ${behaviourWorksBest}` : "",
+          howToUseLayer,
+          tierGuidance,
+        ].filter(Boolean),
+        bullets: whatHelps.length
+          ? whatHelps
+          : personalityGuide.wordsToUse.map((word) => `Lean into language like: ${word}`),
+      }
+    ),
+    resultRow
+  );
+
+  pushPanel(
+    buckets,
+    "why_the_offer_is_the_right_offer",
+    makeSimpleBlock(
+      "Offer fit",
+      buildOfferFitLine(input.tier, bestFitFocus, nextMilestone),
+      {
+        paragraphs: [
+          currentStage ? `Current stage: ${currentStage}.` : "",
+          nextMilestone ? `Next milestone: ${nextMilestone}.` : "",
+          `Why it fits this personality: ${personalityGuide.summary}`,
+        ].filter(Boolean),
+      }
+    ),
+    progressionLanguageRow
+  );
+
+  if (objections.length) {
+    pushPanel(
+      buckets,
+      "objections",
+      makeSimpleBlock(
+        "Likely objections or hesitations",
+        "These are the resistance patterns most likely to appear on the call.",
+        {
+          bullets: objections,
+        }
+      ),
+      resultRow
+    );
+  }
+
+  if (signsReady.length) {
+    pushPanel(
+      buckets,
+      "conversion_signals",
+      makeSimpleBlock(
+        "Signals they are ready to move",
+        "Look for these cues during the conversation.",
+        {
+          bullets: signsReady,
+        }
+      ),
+      resultRow
+    );
+  }
+
+  pushPanel(
+    buckets,
+    "close_line",
+    makeSimpleBlock(
+      "Recommended close line",
+      languageToUse ||
+        `Close through ${decapitalizeSentence(trimTrailingPunctuation(personalityGuide.closeStyle))}.`,
+      {
+        paragraphs: [
+          `Best close style for this personality: ${personalityGuide.closeStyle}`,
+        ],
+      }
+    ),
+    progressionLanguageRow
+  );
+
+  pushPanel(
+    buckets,
+    "long_term_value",
+    makeSimpleBlock(
+      "Why this matters beyond the first sale",
+      frameworkSummary ||
+        "Each stage builds on the one before it. Long-term value comes from strengthening the right signal in the right order.",
+      {
+        paragraphs: [
+          progressionPattern,
+          frameworkInterpretation,
+          nextMilestone ? `Next milestone: ${nextMilestone}` : "",
+        ].filter(Boolean),
+        items: signalPathItems,
+      }
+    ),
+    frameworkIntroRow
+  );
+
+  const sections: AssembledProfileExtendedSection[] = STRUCTURE.map((sectionDef) => {
+    const bucket = buckets.get(sectionDef.panel_key) || [];
+    if (!bucket.length) return null;
+
+    const panel: AssembledProfileExtendedPanel = {
+      panel_key: sectionDef.panel_key,
+      title: sectionDef.panel_title,
+      blocks: bucket.map((item) => item.block),
+      matched_rows: uniqueRows(
         bucket
           .filter((item) => item.row !== null)
           .map((item) => rowRef(item.row as KbBlockRow))
-      );
+      ),
+    };
 
-      panels.push({
-        panel_key: panelDef.panel_key,
-        title: panelDef.title,
-        blocks: bucket.map((item) => item.block),
-        matched_rows: matchedRows,
-      });
-    }
-
-    if (!panels.length) continue;
-
-    sections.push({
+    return {
       section_key: sectionDef.section_key,
       heading: sectionDef.heading,
-      panels,
-      matched_rows: uniqueRows(panels.flatMap((panel) => panel.matched_rows)),
-    });
-  }
+      panels: [panel],
+      matched_rows: uniqueRows(panel.matched_rows),
+    };
+  }).filter(
+    (section): section is AssembledProfileExtendedSection => section !== null
+  );
 
   return {
     audience: "profile_extended_report",

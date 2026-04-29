@@ -2791,6 +2791,74 @@ function NextStepsPanel({
   );
 }
 
+function buildCardRanges(heights: number[], startIndex: number, maxHeight: number, gap: number) {
+  let used = 0;
+  let endIndex = startIndex;
+
+  while (endIndex < heights.length) {
+    const extra = endIndex > startIndex ? gap : 0;
+    const nextHeight = heights[endIndex] + extra;
+
+    if (endIndex > startIndex && used + nextHeight > maxHeight) break;
+    if (endIndex === startIndex && nextHeight > maxHeight) {
+      endIndex += 1;
+      break;
+    }
+
+    used += nextHeight;
+    endIndex += 1;
+  }
+
+  return endIndex;
+}
+
+function canvasToPageSlices(source: HTMLCanvasElement, targetSliceHeightPx: number) {
+  const slices: HTMLCanvasElement[] = [];
+  let offsetY = 0;
+
+  while (offsetY < source.height) {
+    const sliceHeight = Math.min(targetSliceHeightPx, source.height - offsetY);
+    const slice = document.createElement("canvas");
+    slice.width = source.width;
+    slice.height = sliceHeight;
+
+    const ctx = slice.getContext("2d");
+    if (!ctx) break;
+
+    ctx.drawImage(source, 0, offsetY, source.width, sliceHeight, 0, 0, source.width, sliceHeight);
+    slices.push(slice);
+    offsetY += sliceHeight;
+  }
+
+  return slices;
+}
+
+function appendCanvasSlicesToPdf(args: {
+  pdf: jsPDF;
+  canvas: HTMLCanvasElement;
+  printableWidthPt: number;
+  printableHeightPt: number;
+  marginPt: number;
+  addNewPageBeforeFirstSlice: boolean;
+}) {
+  const { pdf, canvas, printableWidthPt, printableHeightPt, marginPt, addNewPageBeforeFirstSlice } = args;
+
+  const sliceHeightPx = Math.max(1, Math.floor((printableHeightPt / printableWidthPt) * canvas.width));
+  const slices = canvasToPageSlices(canvas, sliceHeightPx);
+
+  slices.forEach((slice, idx) => {
+    if (addNewPageBeforeFirstSlice || idx > 0) pdf.addPage();
+
+    const imgData = slice.toDataURL("image/png");
+    const imgWidthPt = printableWidthPt;
+    const imgHeightPt = (slice.height * imgWidthPt) / slice.width;
+
+    pdf.addImage(imgData, "PNG", marginPt, marginPt, imgWidthPt, imgHeightPt, undefined, "FAST");
+  });
+
+  return slices.length > 0;
+}
+
 export default function FiveDLeadershipReportClient(props: {
   token: string;
   tid: string;
@@ -2799,6 +2867,10 @@ export default function FiveDLeadershipReportClient(props: {
 }) {
   const { data } = props;
   const reportRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const heroRef = useRef<HTMLElement | null>(null);
+  const overviewRef = useRef<HTMLElement | null>(null);
+  const indexRef = useRef<HTMLDivElement | null>(null);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
 
@@ -2828,37 +2900,152 @@ export default function FiveDLeadershipReportClient(props: {
   );
 
   async function handleDownloadPdf() {
-    if (!reportRef.current) return;
+    const root = reportRef.current;
+    const headerNode = headerRef.current;
+    const heroNode = heroRef.current;
+    const overviewNode = overviewRef.current;
+    const indexNode = indexRef.current;
 
-    const element = reportRef.current;
+    if (!root || !headerNode || !heroNode || !overviewNode || !indexNode) return;
+
+    const contentCardNodes = Array.from(
+      root.querySelectorAll("[data-export-card='true']")
+    ) as HTMLElement[];
+
+    if (!contentCardNodes.length) return;
+
     const prevScroll = window.scrollY;
+    let stage: HTMLDivElement | null = null;
 
     window.scrollTo(0, 0);
 
     try {
-      const canvas = await html2canvas(element, {
-        scale: 1.45,
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4", compress: true });
+      const pageWidthPt = pdf.internal.pageSize.getWidth();
+      const pageHeightPt = pdf.internal.pageSize.getHeight();
+      const marginPt = 20;
+      const printableWidthPt = pageWidthPt - marginPt * 2;
+      const printableHeightPt = pageHeightPt - marginPt * 2;
+
+      const exportWidthPx = Math.max(root.scrollWidth, 1180);
+      const targetPageHeightPx = Math.floor((printableHeightPt / printableWidthPt) * exportWidthPx);
+
+      const bodyPaddingPx = 16;
+      const pageGapPx = 16;
+      const cardGapPx = 16;
+
+
+      stage = document.createElement("div");
+      stage.style.position = "fixed";
+      stage.style.left = "-100000px";
+      stage.style.top = "0";
+      stage.style.width = `${exportWidthPx}px`;
+      stage.style.background = "#061A3A";
+      stage.style.pointerEvents = "none";
+      stage.style.zIndex = "-1";
+      document.body.appendChild(stage);
+
+      const cloneStatic = (node: HTMLElement) => {
+        const clone = node.cloneNode(true) as HTMLElement;
+        clone.style.position = "static";
+        clone.style.top = "auto";
+        clone.style.left = "auto";
+        clone.style.right = "auto";
+        clone.style.bottom = "auto";
+        clone.style.alignSelf = "start";
+        return clone;
+      };
+
+      const firstPage = document.createElement("div");
+      firstPage.style.width = `${exportWidthPx}px`;
+      firstPage.style.background = PAGE_BG;
+      firstPage.style.padding = "0 16px";
+      firstPage.style.display = "grid";
+      firstPage.style.rowGap = `${pageGapPx}px`;
+      firstPage.appendChild(cloneStatic(headerNode));
+      firstPage.appendChild(cloneStatic(heroNode));
+      firstPage.appendChild(cloneStatic(overviewNode));
+      stage.appendChild(firstPage);
+
+      const firstCanvas = await html2canvas(firstPage, {
+        backgroundColor: "#061A3A",
+        scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: "#061A3A",
-        scrollY: -window.scrollY,
-        windowWidth: Math.max(element.scrollWidth, 1180),
-        windowHeight: element.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: exportWidthPx,
+        windowHeight: firstPage.scrollHeight,
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "px",
-        format: [canvas.width, canvas.height],
-        compress: true,
+      appendCanvasSlicesToPdf({
+        pdf,
+        canvas: firstCanvas,
+        printableWidthPt,
+        printableHeightPt,
+        marginPt,
+        addNewPageBeforeFirstSlice: false,
       });
 
-      pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height, undefined, "FAST");
+      const cardHeights = contentCardNodes.map((node) => Math.ceil(node.offsetHeight));
+      const availableCardsHeight = Math.max(200, targetPageHeightPx - bodyPaddingPx * 2);
 
-      pdf.save(`5d-leadership-compass-${participant.toLowerCase().replace(/\s+/g, "-")}.pdf`);
+      let startIndex = 0;
+      while (startIndex < contentCardNodes.length) {
+        const endIndex = buildCardRanges(cardHeights, startIndex, availableCardsHeight, cardGapPx);
+
+        const page = document.createElement("div");
+        page.style.width = `${exportWidthPx}px`;
+        page.style.background = PAGE_BG;
+        page.style.padding = `${bodyPaddingPx}px`;
+
+        const layout = document.createElement("div");
+        layout.style.display = "grid";
+        layout.style.gridTemplateColumns = "190px minmax(0, 1fr)";
+        layout.style.columnGap = `${pageGapPx}px`;
+        layout.style.alignItems = "start";
+
+        layout.appendChild(cloneStatic(indexNode));
+
+        const cardsCol = document.createElement("div");
+        cardsCol.style.display = "grid";
+        cardsCol.style.rowGap = `${cardGapPx}px`;
+
+        for (let i = startIndex; i < endIndex; i += 1) {
+          cardsCol.appendChild(contentCardNodes[i].cloneNode(true));
+        }
+
+        layout.appendChild(cardsCol);
+        page.appendChild(layout);
+        stage.appendChild(page);
+
+        const canvas = await html2canvas(page, {
+          backgroundColor: "#061A3A",
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: exportWidthPx,
+          windowHeight: page.scrollHeight,
+        });
+
+        appendCanvasSlicesToPdf({
+          pdf,
+          canvas,
+          printableWidthPt,
+          printableHeightPt,
+          marginPt,
+          addNewPageBeforeFirstSlice: true,
+        });
+
+        startIndex = endIndex;
+      }
+
+      const safeParticipant = participant.toLowerCase().replace(/\s+/g, "-");
+      pdf.save(`5d-leadership-compass-${safeParticipant}.pdf`);
     } finally {
+      if (stage && stage.parentNode) stage.parentNode.removeChild(stage);
       window.scrollTo(0, prevScroll);
     }
   }
@@ -2887,32 +3074,46 @@ export default function FiveDLeadershipReportClient(props: {
       />
 
       <div ref={reportRef} className="relative mx-auto flex max-w-[1180px] flex-col gap-4 px-4">
-        <TopHeader
-          participant={participant}
-          reportDate={reportDate}
-          onDownload={handleDownloadPdf}
-          onNext={openNextSteps}
-        />
+        <section ref={headerRef}>
+          <TopHeader
+            participant={participant}
+            reportDate={reportDate}
+            onDownload={handleDownloadPdf}
+            onNext={openNextSteps}
+          />
+        </section>
 
-        <HeroHeader data={data} participant={participant} raisonScore={raisonScore} />
+        <section ref={heroRef}>
+          <HeroHeader data={data} participant={participant} raisonScore={raisonScore} />
+        </section>
 
-        <OverviewDashboard data={data} />
+        <section ref={overviewRef}>
+          <OverviewDashboard data={data} />
+        </section>
 
         <section className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
-          <ReportIndex sections={sections} onDownload={handleDownloadPdf} onNext={openNextSteps} />
+          <div ref={indexRef}>
+            <ReportIndex sections={sections} onDownload={handleDownloadPdf} onNext={openNextSteps} />
+          </div>
 
           <main className="flex min-w-0 flex-col gap-4">
             {sections.map((section) => (
-              <ContentSection key={section.id} section={section} ctx={ctx} />
+              <div key={section.id} data-export-card="true">
+                <ContentSection section={section} ctx={ctx} />
+              </div>
             ))}
 
-            <NextStepsPanel participant={participant} onDownload={handleDownloadPdf} onNext={openNextSteps} />
+            <div data-export-card="true">
+              <NextStepsPanel participant={participant} onDownload={handleDownloadPdf} onNext={openNextSteps} />
+            </div>
           </main>
         </section>
 
-        <footer className="pb-8 pt-2 text-center text-xs text-white/60">
-          The 5D Leadership Compass · Businesses Are People Too · Powered by Profiletest.ai
-        </footer>
+        <div data-export-card="true">
+          <footer className="pb-8 pt-2 text-center text-xs text-white/60">
+            The 5D Leadership Compass · Businesses Are People Too · Powered by Profiletest.ai
+          </footer>
+        </div>
       </div>
     </div>
   );
