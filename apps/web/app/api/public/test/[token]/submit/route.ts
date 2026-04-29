@@ -19,6 +19,18 @@ type SectionCode =
 
 type PMEntry = { points?: number; profile?: string };
 
+type RhythmDriver =
+  | "resourceful"
+  | "human_centred"
+  | "yielding"
+  | "tactical"
+  | "hopeful"
+  | "measured";
+
+type RhythmDriverEntry = {
+  driver?: string;
+};
+
 type PortalQuestionRow = {
   id: string;
   idx?: number | string | null;
@@ -26,7 +38,7 @@ type PortalQuestionRow = {
   category?: string | null;
   type?: string | null;
   options?: any | null;
-  profile_map?: PMEntry[] | null;
+  profile_map?: any | null;
   weights?: any | null;
 };
 
@@ -239,6 +251,131 @@ function toZeroBasedSelected(row: any): number | null {
 
   if (row?.value && typeof row.value.index === "number") return row.value.index;
   return null;
+}
+
+const RHYTHM_DRIVERS: RhythmDriver[] = [
+  "resourceful",
+  "human_centred",
+  "yielding",
+  "tactical",
+  "hopeful",
+  "measured",
+];
+
+function isRhythmDriver(value: any): value is RhythmDriver {
+  return RHYTHM_DRIVERS.includes(String(value || "") as RhythmDriver);
+}
+
+function coerceRhythmDriverEntries(value: any): { driver: RhythmDriver }[] {
+  const direct = parseMaybeJson<any>(value);
+
+  const arr = Array.isArray(direct)
+    ? direct
+    : Array.isArray((direct as any)?.drivers)
+      ? (direct as any).drivers
+      : [];
+
+  return arr
+    .map((entry: RhythmDriverEntry) => ({
+      driver: String(entry?.driver || "").trim(),
+    }))
+    .filter((entry: { driver: string }) => isRhythmDriver(entry.driver))
+    .map((entry: { driver: string }) => ({
+      driver: entry.driver as RhythmDriver,
+    }));
+}
+
+function scoreRhythmLayer(args: {
+  rhythmQuestions: PortalQuestionRow[];
+  answers: any[];
+}) {
+  const { rhythmQuestions, answers } = args;
+
+  const rawScores: Record<RhythmDriver, number> = {
+    resourceful: 0,
+    human_centred: 0,
+    yielding: 0,
+    tactical: 0,
+    hopeful: 0,
+    measured: 0,
+  };
+
+  const answersSnapshot: Record<string, any> = {};
+  const rhythmQuestionIds = new Set(
+    rhythmQuestions.map((q) => String(q.id))
+  );
+
+  const questionById = new Map<string, PortalQuestionRow>();
+  for (const q of rhythmQuestions) {
+    questionById.set(String(q.id), q);
+  }
+
+  let answeredRhythmQuestions = 0;
+
+  for (const row of answers || []) {
+    const qid = String(row?.question_id || row?.qid || row?.id || "").trim();
+    if (!qid || !rhythmQuestionIds.has(qid)) continue;
+
+    const q = questionById.get(qid);
+    if (!q) continue;
+
+    const driverEntries = coerceRhythmDriverEntries(q.profile_map);
+    if (!driverEntries.length) continue;
+
+    const selectedIndex = toZeroBasedSelected(row);
+    if (
+      selectedIndex == null ||
+      selectedIndex < 0 ||
+      selectedIndex >= driverEntries.length
+    ) {
+      continue;
+    }
+
+    const driver = driverEntries[selectedIndex]?.driver;
+    if (!isRhythmDriver(driver)) continue;
+
+    rawScores[driver] += 1;
+    answeredRhythmQuestions += 1;
+
+    answersSnapshot[String(q.idx ?? qid)] = {
+      question_id: qid,
+      idx: q.idx ?? null,
+      question_text: q.text ?? null,
+      selected_index: selectedIndex,
+      driver,
+    };
+  }
+
+  const denominator = rhythmQuestions.length || 17;
+
+  const percentages = Object.fromEntries(
+    RHYTHM_DRIVERS.map((driver) => [
+      driver,
+      Number(((rawScores[driver] / denominator) * 100).toFixed(1)),
+    ])
+  ) as Record<RhythmDriver, number>;
+
+  const rankedDrivers = [...RHYTHM_DRIVERS].sort((a, b) => {
+    const scoreDiff = rawScores[b] - rawScores[a];
+    if (scoreDiff !== 0) return scoreDiff;
+
+    // Stable tie-breaker so reports do not randomly change on equal scores.
+    return RHYTHM_DRIVERS.indexOf(a) - RHYTHM_DRIVERS.indexOf(b);
+  });
+
+  return {
+    rawScores,
+    percentages,
+    rankedDrivers,
+    flowDrivers: rankedDrivers.slice(0, 2),
+    stabilisingDrivers: rankedDrivers.slice(2, 4),
+    frustrationDrivers: rankedDrivers.slice(4, 6),
+    primaryDriver: rankedDrivers[0] ?? null,
+    secondaryDriver: rankedDrivers[1] ?? null,
+    answersSnapshot,
+    answeredRhythmQuestions,
+    rhythmQuestionCount: rhythmQuestions.length,
+  };
 }
 
 const asNumber = (x: any, d = 0) =>
@@ -1863,6 +2000,35 @@ export async function POST(
     const profileTotals: Record<string, number> = {};
     let qscSummary: QscResultSummary | null = null;
 
+    const hasRhythmLayer =
+      meta?.has_rhythm_layer === true ||
+      meta?.rhythm?.enabled === true ||
+      String(meta?.report_layout || "") === "team_puzzle_rhythm_v1" ||
+      String(meta?.variant || "") === "rhythm_edition";
+
+    const rhythmQuestions = (questions || []).filter(
+      (q: PortalQuestionRow) =>
+        String(q.category || "").toLowerCase() === "rhythm"
+    );
+
+    if (hasRhythmLayer && rhythmQuestions.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "RHYTHM scoring is enabled for this test, but no RHYTHM questions were found.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const rhythmScore = hasRhythmLayer
+      ? scoreRhythmLayer({
+          rhythmQuestions,
+          answers,
+        })
+      : null;
+
     for (let idx = 0; idx < answers.length; idx++) {
       const row = answers[idx];
       const qid = row?.question_id || row?.qid || row?.id;
@@ -1908,28 +2074,84 @@ export async function POST(
         effective_test_id: effectiveTestId,
         is_ged: isGedTest,
         ged: hasGedDiagnostics(gedDiagnostics) ? gedDiagnostics : null,
+        rhythm: rhythmScore
+          ? {
+              enabled: true,
+              scoring_version: "rhythm_v1",
+              primary_driver: rhythmScore.primaryDriver,
+              secondary_driver: rhythmScore.secondaryDriver,
+              flow_drivers: rhythmScore.flowDrivers,
+              stabilising_drivers: rhythmScore.stabilisingDrivers,
+              frustration_drivers: rhythmScore.frustrationDrivers,
+              answered_questions: rhythmScore.answeredRhythmQuestions,
+              question_count: rhythmScore.rhythmQuestionCount,
+            }
+          : null,
       },
     };
 
-    const { error: subErr } = await sb.from("test_submissions").insert({
-      taker_id: taker.id,
-      test_id: taker.test_id,
-      link_token: token,
-      totals,
-      answers_json: answers,
-      raw_answers: answers,
-      first_name: taker.first_name ?? null,
-      last_name: taker.last_name ?? null,
-      email: taker.email ?? null,
-      company: taker.company ?? null,
-      role_title: taker.role_title ?? null,
-    });
+    const { data: submissionRow, error: subErr } = await sb
+      .from("test_submissions")
+      .insert({
+        taker_id: taker.id,
+        test_id: taker.test_id,
+        link_token: token,
+        totals,
+        answers_json: answers,
+        raw_answers: answers,
+        first_name: taker.first_name ?? null,
+        last_name: taker.last_name ?? null,
+        email: taker.email ?? null,
+        company: taker.company ?? null,
+        role_title: taker.role_title ?? null,
+      })
+      .select("id")
+      .single();
 
     if (subErr) {
       return NextResponse.json(
         { ok: false, error: `Submission insert failed: ${subErr.message}` },
         { status: 500 }
       );
+    }
+
+    if (rhythmScore && submissionRow?.id) {
+      const { error: rhythmErr } = await sb.from("rhythm_results").insert({
+        org_id: taker.org_id,
+        test_id: taker.test_id,
+        taker_id: taker.id,
+        submission_id: submissionRow.id,
+        link_token: token,
+
+        driver_raw_scores: rhythmScore.rawScores,
+        driver_percentages: rhythmScore.percentages,
+        ranked_drivers: rhythmScore.rankedDrivers,
+
+        flow_drivers: rhythmScore.flowDrivers,
+        stabilising_drivers: rhythmScore.stabilisingDrivers,
+        frustration_drivers: rhythmScore.frustrationDrivers,
+
+        primary_driver: rhythmScore.primaryDriver,
+        secondary_driver: rhythmScore.secondaryDriver,
+
+        scoring_version: "rhythm_v1",
+        answers_snapshot: rhythmScore.answersSnapshot,
+        meta: {
+          answered_questions: rhythmScore.answeredRhythmQuestions,
+          question_count: rhythmScore.rhythmQuestionCount,
+          report_layout: "team_puzzle_rhythm_v1",
+        },
+      });
+
+      if (rhythmErr) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `RHYTHM result insert failed: ${rhythmErr.message}`,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     const { error: upErr } = await sb
@@ -2298,6 +2520,17 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       totals,
+      rhythm: rhythmScore
+        ? {
+            primary_driver: rhythmScore.primaryDriver,
+            secondary_driver: rhythmScore.secondaryDriver,
+            ranked_drivers: rhythmScore.rankedDrivers,
+            flow_drivers: rhythmScore.flowDrivers,
+            stabilising_drivers: rhythmScore.stabilisingDrivers,
+            frustration_drivers: rhythmScore.frustrationDrivers,
+            raw_scores: rhythmScore.rawScores,
+          }
+        : null,
       ged: isGedTest
         ? {
             diagnostics: gedDiagnostics,
