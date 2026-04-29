@@ -18,13 +18,60 @@ type AnswersMap = Record<string, number>;
 type TextAnswersMap = Record<string, string>;
 type Step = "details" | "questions";
 
+type CountryCode = {
+  iso: string;
+  label: string;
+  dial: string;
+};
+
+const PRIVACY_POLICY_URL = "https://profiletest.ai/privacy-policy";
+
+const COUNTRY_CODES: CountryCode[] = [
+  { iso: "ZA", label: "South Africa", dial: "+27" },
+  { iso: "GB", label: "United Kingdom", dial: "+44" },
+  { iso: "US", label: "United States", dial: "+1" },
+  { iso: "CA", label: "Canada", dial: "+1" },
+  { iso: "AU", label: "Australia", dial: "+61" },
+  { iso: "NZ", label: "New Zealand", dial: "+64" },
+  { iso: "IE", label: "Ireland", dial: "+353" },
+  { iso: "AE", label: "United Arab Emirates", dial: "+971" },
+  { iso: "FR", label: "France", dial: "+33" },
+  { iso: "DE", label: "Germany", dial: "+49" },
+  { iso: "NL", label: "Netherlands", dial: "+31" },
+  { iso: "ES", label: "Spain", dial: "+34" },
+  { iso: "IT", label: "Italy", dial: "+39" },
+  { iso: "PT", label: "Portugal", dial: "+351" },
+  { iso: "CH", label: "Switzerland", dial: "+41" },
+  { iso: "BE", label: "Belgium", dial: "+32" },
+  { iso: "SE", label: "Sweden", dial: "+46" },
+  { iso: "NO", label: "Norway", dial: "+47" },
+  { iso: "DK", label: "Denmark", dial: "+45" },
+  { iso: "FI", label: "Finland", dial: "+358" },
+  { iso: "IN", label: "India", dial: "+91" },
+  { iso: "SG", label: "Singapore", dial: "+65" },
+  { iso: "HK", label: "Hong Kong", dial: "+852" },
+  { iso: "JP", label: "Japan", dial: "+81" },
+  { iso: "CN", label: "China", dial: "+86" },
+  { iso: "BR", label: "Brazil", dial: "+55" },
+  { iso: "MX", label: "Mexico", dial: "+52" },
+  { iso: "KE", label: "Kenya", dial: "+254" },
+  { iso: "NG", label: "Nigeria", dial: "+234" },
+  { iso: "ZW", label: "Zimbabwe", dial: "+263" },
+  { iso: "ZM", label: "Zambia", dial: "+260" },
+  { iso: "BW", label: "Botswana", dial: "+267" },
+  { iso: "NA", label: "Namibia", dial: "+264" },
+  { iso: "MU", label: "Mauritius", dial: "+230" },
+];
+
 async function fetchJson(url: string, init?: RequestInit) {
   const r = await fetch(url, init);
   const ct = r.headers.get("content-type") || "";
+
   if (!ct.includes("application/json")) {
     const text = (await r.text()).slice(0, 600);
     throw new Error(`HTTP ${r.status} – non-JSON response:\n${text}`);
   }
+
   const j = await r.json();
   if (!r.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${r.status}`);
   return j;
@@ -65,6 +112,54 @@ function isAbsoluteUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
+function buildInternationalPhone(countryCode: string, localNumber: string) {
+  const cleanedCountryCode = safeString(countryCode).trim() || "+27";
+  const cleanedLocal = safeString(localNumber).replace(/[^\d]/g, "").replace(/^0+/, "");
+
+  return cleanedLocal ? `${cleanedCountryCode}${cleanedLocal}` : "";
+}
+
+function parseSavedPhone(savedCountryCode: any, savedPhone: any) {
+  const existingCountryCode = safeString(savedCountryCode).trim();
+  const phone = safeString(savedPhone).trim();
+
+  if (existingCountryCode) {
+    const localWithoutCountry = phone.startsWith(existingCountryCode)
+      ? phone.slice(existingCountryCode.length)
+      : phone;
+
+    return {
+      countryCode: existingCountryCode,
+      localPhone: localWithoutCountry,
+    };
+  }
+
+  if (!phone) {
+    return {
+      countryCode: "+27",
+      localPhone: "",
+    };
+  }
+
+  const compactPhone = phone.replace(/\s+/g, "");
+
+  const matchingCountry = [...COUNTRY_CODES]
+    .sort((a, b) => b.dial.length - a.dial.length)
+    .find((country) => compactPhone.startsWith(country.dial));
+
+  if (matchingCountry) {
+    return {
+      countryCode: matchingCountry.dial,
+      localPhone: compactPhone.slice(matchingCountry.dial.length),
+    };
+  }
+
+  return {
+    countryCode: "+27",
+    localPhone: phone,
+  };
+}
+
 export default function PublicTestClient({
   token,
   embed = false,
@@ -96,6 +191,7 @@ export default function PublicTestClient({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+27");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
@@ -112,6 +208,7 @@ export default function PublicTestClient({
 
   useEffect(() => {
     let alive = true;
+
     (async () => {
       try {
         setLoading(true);
@@ -172,10 +269,13 @@ export default function PublicTestClient({
           if (d) {
             try {
               const o = JSON.parse(d);
+              const parsedPhone = parseSavedPhone(o.phoneCountryCode, o.phone);
+
               setFirstName(o.firstName || "");
               setLastName(o.lastName || "");
               setEmail(o.email || "");
-              setPhone(o.phone || "");
+              setPhoneCountryCode(parsedPhone.countryCode);
+              setPhone(parsedPhone.localPhone);
               setCompany(o.company || "");
               setRoleTitle(o.roleTitle || "");
               setDataConsent(Boolean(o.dataConsent));
@@ -219,6 +319,7 @@ export default function PublicTestClient({
           firstName,
           lastName,
           email,
+          phoneCountryCode,
           phone,
           company,
           roleTitle,
@@ -226,7 +327,7 @@ export default function PublicTestClient({
         })
       );
     }
-  }, [firstName, lastName, email, phone, company, roleTitle, dataConsent, token]);
+  }, [firstName, lastName, email, phoneCountryCode, phone, company, roleTitle, dataConsent, token]);
 
   const q = questions[i];
 
@@ -247,7 +348,7 @@ export default function PublicTestClient({
     const fn = firstName.trim();
     const ln = lastName.trim();
     const em = email.trim();
-    const ph = phone.trim();
+    const ph = buildInternationalPhone(phoneCountryCode, phone);
 
     if (!fn || !ln || !em || !ph) {
       return "Please complete all required fields before starting.";
@@ -256,6 +357,11 @@ export default function PublicTestClient({
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(em)) {
       return "Please enter a valid email address.";
+    }
+
+    const localDigits = phone.replace(/[^\d]/g, "").replace(/^0+/, "");
+    if (localDigits.length < 6) {
+      return "Please enter a valid mobile number.";
     }
 
     if (!dataConsent) {
@@ -267,6 +373,7 @@ export default function PublicTestClient({
 
   const proceedToQuestions = async () => {
     const validationError = validateDetails();
+
     if (validationError) {
       setDetailsError(validationError);
       return;
@@ -277,6 +384,8 @@ export default function PublicTestClient({
       setError("");
       setDetailsError(null);
 
+      const internationalPhone = buildInternationalPhone(phoneCountryCode, phone);
+
       const res: any = await fetchJson(`/api/public/test/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -284,7 +393,7 @@ export default function PublicTestClient({
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
           email: email.trim().toLowerCase() || null,
-          phone: phone.trim() || null,
+          phone: internationalPhone || null,
           company: company.trim() || null,
           role_title: roleTitle.trim() || null,
           data_consent: true,
@@ -348,6 +457,7 @@ export default function PublicTestClient({
         if (isTextQuestion(qq)) {
           return { question_id: qq.id, text: (textAnswers[qq.id] || "").trim() };
         }
+
         return { question_id: qq.id, selected: Number(answers[qq.id] || 0) - 1 };
       });
 
@@ -358,7 +468,10 @@ export default function PublicTestClient({
       });
 
       const j: SubmitResponse = await res.json().catch(() => ({} as any));
-      if (!res.ok || (j as any)?.ok === false) throw new Error((j as any)?.error || `HTTP ${res.status}`);
+
+      if (!res.ok || (j as any)?.ok === false) {
+        throw new Error((j as any)?.error || `HTTP ${res.status}`);
+      }
 
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(key("answers"));
@@ -374,7 +487,7 @@ export default function PublicTestClient({
 
       const { redirect, nextSteps, showResults } = resolveRedirectAndNextSteps(j);
 
-      // ✅ CRITICAL FIX:
+      // CRITICAL FIX:
       // Trust explicit backend redirect FIRST (QSC and other bespoke engines)
       if (redirect) {
         if (isAbsoluteUrl(redirect)) {
@@ -382,6 +495,7 @@ export default function PublicTestClient({
         } else {
           router.replace(redirect);
         }
+
         return;
       }
 
@@ -391,6 +505,7 @@ export default function PublicTestClient({
         } else {
           router.replace(nextSteps);
         }
+
         return;
       }
 
@@ -430,7 +545,9 @@ export default function PublicTestClient({
     return (
       <div className={embed ? "p-0" : "p-6"} style={embed ? { minHeight: 420 } : undefined}>
         <h1 className="text-xl font-semibold text-white">Couldn’t load test</h1>
-        <pre className="mt-3 p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">{error}</pre>
+        <pre className="mt-3 p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">
+          {error}
+        </pre>
       </div>
     );
   }
@@ -452,7 +569,7 @@ export default function PublicTestClient({
     firstName.trim().length > 0 &&
     lastName.trim().length > 0 &&
     email.trim().length > 0 &&
-    phone.trim().length > 0 &&
+    buildInternationalPhone(phoneCountryCode, phone).length > 0 &&
     dataConsent &&
     !savingDetails;
 
@@ -533,15 +650,36 @@ export default function PublicTestClient({
                 </label>
 
                 <label className="block">
-                  <span className="text-sm text-white/80">Mobile</span>
-                  <input
-                    className="w-full rounded-xl bg-white text-black p-3 mt-1"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      setDetailsError(null);
-                    }}
-                  />
+                  <span className="text-sm text-white/80">Mobile *</span>
+
+                  <div className="mt-1 flex gap-2">
+                    <select
+                      className="w-36 rounded-xl bg-white text-black p-3"
+                      value={phoneCountryCode}
+                      onChange={(e) => {
+                        setPhoneCountryCode(e.target.value);
+                        setDetailsError(null);
+                      }}
+                    >
+                      {COUNTRY_CODES.map((country) => (
+                        <option key={`${country.iso}-${country.dial}`} value={country.dial}>
+                          {country.iso} {country.dial}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="Mobile number"
+                      className="min-w-0 flex-1 rounded-xl bg-white text-black p-3"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        setDetailsError(null);
+                      }}
+                    />
+                  </div>
                 </label>
 
                 <label className="block">
@@ -581,7 +719,12 @@ export default function PublicTestClient({
 
                 <p className="text-xs text-white/70">
                   By submitting this assessment, you have read and agree to our{" "}
-                  <a href="/privacy" target="_blank" className="underline" rel="noopener noreferrer">
+                  <a
+                    href={PRIVACY_POLICY_URL}
+                    target="_blank"
+                    className="underline"
+                    rel="noopener noreferrer"
+                  >
                     Privacy Policy
                   </a>{" "}
                   and{" "}
@@ -650,6 +793,7 @@ export default function PublicTestClient({
                 {q.options.map((label: string, idx: number) => {
                   const val = idx + 1;
                   const selected = answers[q.id] === val;
+
                   return (
                     <button
                       key={idx}
