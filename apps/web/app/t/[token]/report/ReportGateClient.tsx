@@ -86,6 +86,12 @@ function getStorageFrameworkPath(data: ResultData | null) {
   const p2 = String(data?.sections?.framework_path || "").trim();
   if (p2) return p2;
 
+  const p3 = String(data?.sections?.reportFramework?.path || "").trim();
+  if (p3) return p3;
+
+  const p4 = String(data?.debug?.reportFramework?.path || "").trim();
+  if (p4) return p4;
+
   return "";
 }
 
@@ -96,7 +102,114 @@ function getStorageFrameworkBucket(data: ResultData | null) {
   const b2 = String(data?.sections?.framework_bucket || "").trim();
   if (b2) return b2;
 
+  const b3 = String(data?.sections?.reportFramework?.bucket || "").trim();
+  if (b3) return b3;
+
+  const b4 = String(data?.debug?.reportFramework?.bucket || "").trim();
+  if (b4) return b4;
+
   return "framework";
+}
+
+function normaliseProfileCode(code: any) {
+  const c = String(code || "").trim().toUpperCase();
+  if (!c) return "";
+
+  if (/^PROFILE_\d+$/.test(c)) return c;
+
+  if (/^P\d+$/.test(c)) {
+    return `PROFILE_${c.replace("P", "")}`;
+  }
+
+  if (/^\d+$/.test(c)) {
+    return `PROFILE_${c}`;
+  }
+
+  return c;
+}
+
+function unwrapFrameworkRoot(frameworkJson: any) {
+  if (!frameworkJson) return null;
+
+  // LEAD framework public JSON shape:
+  // { framework: { common: { sections: [] }, profiles: { PROFILE_1: { sections: [] } } } }
+  if (frameworkJson.framework && typeof frameworkJson.framework === "object") {
+    return frameworkJson.framework;
+  }
+
+  // Some older loaders used reportFramework as the root.
+  if (frameworkJson.reportFramework && typeof frameworkJson.reportFramework === "object") {
+    return frameworkJson.reportFramework;
+  }
+
+  return frameworkJson;
+}
+
+function getSectionsArray(value: any) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+
+  if (Array.isArray(value?.sections)) {
+    return value.sections.filter(Boolean);
+  }
+
+  return [];
+}
+
+function getProfileSectionsFromFramework(root: any, profileCode: string) {
+  const code = normaliseProfileCode(profileCode);
+  const profiles = root?.profiles || {};
+
+  const direct = profiles?.[profileCode];
+  const normalised = profiles?.[code];
+
+  const directSections = getSectionsArray(direct);
+  if (directSections.length > 0) return directSections;
+
+  const normalisedSections = getSectionsArray(normalised);
+  if (normalisedSections.length > 0) return normalisedSections;
+
+  return [];
+}
+
+function hasUsableFrameworkProfileSections(data: ResultData | null) {
+  if (!data?.sections) return false;
+
+  const root = unwrapFrameworkRoot(data.sections);
+  const profileSections = getProfileSectionsFromFramework(root, data.top_profile_code);
+
+  return profileSections.length > 0;
+}
+
+function applyFrameworkToReportData(data: ResultData, frameworkJson: any): ResultData {
+  const root = unwrapFrameworkRoot(frameworkJson);
+  if (!root) return data;
+
+  const profileCode = normaliseProfileCode(data.top_profile_code);
+  const commonSections = getSectionsArray(root?.common);
+  const profileSections = getProfileSectionsFromFramework(root, profileCode);
+
+  // Keep the original API data, but replace/augment the sections object so
+  // NativeBlocksReportClient receives the real framework sections instead of
+  // empty placeholder profile sections.
+  return {
+    ...data,
+    sections: {
+      ...(data.sections || {}),
+      framework: root,
+      common: commonSections.length > 0 ? commonSections : data.sections?.common,
+      profile: profileSections.length > 0 ? profileSections : data.sections?.profile,
+      profiles: root?.profiles || data.sections?.profiles,
+      framework_path: getStorageFrameworkPath(data) || data.sections?.framework_path,
+      framework_bucket: getStorageFrameworkBucket(data) || data.sections?.framework_bucket,
+    },
+    debug: {
+      ...(data.debug || {}),
+      clientLoadedFramework: true,
+      clientFrameworkProfileCode: profileCode,
+      clientFrameworkCommonSectionsCount: commonSections.length,
+      clientFrameworkProfileSectionsCount: profileSections.length,
+    },
+  };
 }
 
 function isOperatingFrame(data: ResultData | null) {
@@ -127,6 +240,25 @@ function isFiveDLeadership(data: ResultData | null) {
   );
 }
 
+async function fetchPublicFramework(data: ResultData) {
+  const storagePath = getStorageFrameworkPath(data);
+  const bucket = getStorageFrameworkBucket(data);
+  const fwUrl = supabasePublicFrameworkUrl(bucket, storagePath);
+
+  if (!fwUrl) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or storage framework path.");
+  }
+
+  const fwRes = await fetch(fwUrl, { cache: "no-store" });
+
+  if (!fwRes.ok) {
+    const t = await fwRes.text();
+    throw new Error(`Framework fetch failed (${fwRes.status}): ${t.slice(0, 200)}`);
+  }
+
+  return fwRes.json();
+}
+
 export default function ReportGateClient(props: { token: string; tid: string; src?: string }) {
   const { token, tid, src } = props;
 
@@ -136,6 +268,9 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
   const [ofFramework, setOfFramework] = useState<any | null>(null);
   const [ofErr, setOfErr] = useState<string | null>(null);
+
+  const [nativeBlocksFramework, setNativeBlocksFramework] = useState<any | null>(null);
+  const [nativeBlocksFrameworkErr, setNativeBlocksFrameworkErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +282,8 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
         setData(null);
         setOfFramework(null);
         setOfErr(null);
+        setNativeBlocksFramework(null);
+        setNativeBlocksFrameworkErr(null);
 
         if (!tid) {
           setErr("Missing tid");
@@ -177,34 +314,35 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
         if (cancelled) return;
         setData(json.data);
 
-        if (isOperatingFrame(json.data)) {
-          const storagePath = getStorageFrameworkPath(json.data);
-          const bucket = getStorageFrameworkBucket(json.data);
-          const fwUrl = supabasePublicFrameworkUrl(bucket, storagePath);
+        const shouldUseBlocksEngine = json.data.debug?.useBlocksEngine === true;
+        const shouldLoadOperatingFrame = isOperatingFrame(json.data);
+        const shouldLoadNativeBlocksFramework =
+          shouldUseBlocksEngine &&
+          !shouldLoadOperatingFrame &&
+          !!getStorageFrameworkPath(json.data) &&
+          !hasUsableFrameworkProfileSections(json.data);
 
-          if (!fwUrl) {
-            setOfErr(
-              "Missing NEXT_PUBLIC_SUPABASE_URL or storage framework path."
-            );
-            setLoading(false);
-            return;
-          }
-
+        if (shouldLoadOperatingFrame) {
           try {
-            const fwRes = await fetch(fwUrl, { cache: "no-store" });
-
-            if (!fwRes.ok) {
-              const t = await fwRes.text();
-              throw new Error(`Framework fetch failed (${fwRes.status}): ${t.slice(0, 200)}`);
-            }
-
-            const fwJson = await fwRes.json();
+            const fwJson = await fetchPublicFramework(json.data);
 
             if (cancelled) return;
             setOfFramework(fwJson);
           } catch (e: any) {
             if (cancelled) return;
             setOfErr(String(e?.message || e));
+          }
+        }
+
+        if (shouldLoadNativeBlocksFramework) {
+          try {
+            const fwJson = await fetchPublicFramework(json.data);
+
+            if (cancelled) return;
+            setNativeBlocksFramework(fwJson);
+          } catch (e: any) {
+            if (cancelled) return;
+            setNativeBlocksFrameworkErr(String(e?.message || e));
           }
         }
 
@@ -227,6 +365,25 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   const forcedLegacy = useMemo(() => isLegacyOrgForced(data), [data]);
   const isOF = useMemo(() => isOperatingFrame(data), [data]);
   const isFiveD = useMemo(() => isFiveDLeadership(data), [data]);
+
+  const nativeBlocksData = useMemo(() => {
+    if (!data) return null;
+
+    if (!nativeBlocksFramework) {
+      if (!nativeBlocksFrameworkErr) return data;
+
+      return {
+        ...data,
+        debug: {
+          ...(data.debug || {}),
+          clientLoadedFramework: false,
+          clientFrameworkError: nativeBlocksFrameworkErr,
+        },
+      };
+    }
+
+    return applyFrameworkToReportData(data, nativeBlocksFramework);
+  }, [data, nativeBlocksFramework, nativeBlocksFrameworkErr]);
 
   if (!tid) {
     return (
@@ -318,7 +475,14 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   }
 
   if (useBlocksEngine) {
-    return <NativeBlocksReportClient token={token} tid={tid} src={src || ""} data={data as any} />;
+    return (
+      <NativeBlocksReportClient
+        token={token}
+        tid={tid}
+        src={src || ""}
+        data={(nativeBlocksData || data) as any}
+      />
+    );
   }
 
   return <LegacyReportClient token={token} tid={tid} />;

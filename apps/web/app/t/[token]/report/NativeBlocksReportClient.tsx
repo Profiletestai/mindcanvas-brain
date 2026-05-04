@@ -74,8 +74,22 @@ type ReportSection = {
 };
 
 type SectionsPayload = {
-  common?: ReportSection[] | null;
-  profile?: ReportSection[] | null;
+  common?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+  profile?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+  profiles?: Record<string, { title?: string; sections?: ReportSection[] | null } | ReportSection[] | null> | null;
+  framework?: {
+    common?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+    profile?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+    profiles?: Record<string, { title?: string; sections?: ReportSection[] | null } | ReportSection[] | null> | null;
+    [k: string]: any;
+  } | null;
+  reportFramework?: {
+    common?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+    profile?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+    profiles?: Record<string, { title?: string; sections?: ReportSection[] | null } | ReportSection[] | null> | null;
+    [k: string]: any;
+  } | null;
+  [k: string]: any;
 };
 
 type ResultData = {
@@ -154,6 +168,91 @@ function cleanProfileName(raw: string) {
   out = out.replace(/^\s*(P\d+)\s*:\s*(P\d+)\s*/i, "$1 $2");
   out = out.replace(/\s+/g, " ").trim();
   return out || s || "Top profile";
+}
+
+function normaliseProfileCode(code: string) {
+  const c = String(code || "").trim().toUpperCase();
+
+  if (!c) return "";
+  if (/^PROFILE_\d+$/.test(c)) return c;
+
+  if (/^P\d+$/.test(c)) {
+    return `PROFILE_${c.replace("P", "")}`;
+  }
+
+  if (/^\d+$/.test(c)) {
+    return `PROFILE_${c}`;
+  }
+
+  return c;
+}
+
+function getSectionsArray(value: any): ReportSection[] {
+  if (Array.isArray(value)) return value.filter(Boolean) as ReportSection[];
+
+  if (Array.isArray(value?.sections)) {
+    return value.sections.filter(Boolean) as ReportSection[];
+  }
+
+  return [];
+}
+
+function getProfilePayload(root: any, profileCode: string) {
+  const code = normaliseProfileCode(profileCode);
+  if (!root?.profiles || typeof root.profiles !== "object") return null;
+
+  return (
+    root.profiles[code] ||
+    root.profiles[profileCode] ||
+    root.profiles[String(profileCode || "").toUpperCase()] ||
+    null
+  );
+}
+
+function isClosingOrNextStepSection(section: ReportSection) {
+  const id = String(section?.id || "").toLowerCase();
+  const title = String(section?.title || "").toLowerCase();
+
+  return (
+    id.includes("closing") ||
+    id.includes("conclusion") ||
+    id.includes("next-step") ||
+    id.includes("next_steps") ||
+    title.includes("closing") ||
+    title.includes("conclusion") ||
+    title.includes("next step")
+  );
+}
+
+function splitCommonSections(sections: ReportSection[]) {
+  const intro: ReportSection[] = [];
+  const closing: ReportSection[] = [];
+
+  sections.forEach((section) => {
+    if (isClosingOrNextStepSection(section)) closing.push(section);
+    else intro.push(section);
+  });
+
+  return { intro, closing };
+}
+
+function resolveReportSections(rawSections: any, profileCode: string): ReportSection[] {
+  const code = normaliseProfileCode(profileCode);
+
+  const possibleRoots = [rawSections?.framework, rawSections?.reportFramework, rawSections].filter(Boolean);
+
+  for (const root of possibleRoots) {
+    const commonSections = getSectionsArray(root?.common);
+    const directProfileSections = getSectionsArray(root?.profile);
+    const profileSections = getSectionsArray(getProfilePayload(root, code));
+
+    const { intro, closing } = splitCommonSections(commonSections);
+    const merged = [...intro, ...directProfileSections, ...profileSections, ...closing].filter(Boolean);
+
+    if (merged.length > 0) return merged;
+  }
+
+  return [];
 }
 
 function fallbackTitleFromId(id: string, topProfileName: string) {
@@ -614,6 +713,118 @@ function BlockRenderer(props: {
     );
   }
 
+  if (type === "chips") {
+    const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
+    if (!items.length) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        {items.map((it: any, i: number) => (
+          <span key={i} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+            {safeText(it)}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "cards") {
+    const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
+    const columns = Number((block as any)?.columns || 2);
+    const grid = columns === 3 ? "md:grid-cols-3" : columns === 1 ? "md:grid-cols-1" : "md:grid-cols-2";
+
+    if (!items.length) return null;
+
+    return (
+      <div className={`grid gap-3 ${grid}`}>
+        {items.map((item: any, i: number) => (
+          <div key={i} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            {item?.title ? <div className="text-sm font-semibold text-slate-900">{safeText(item.title)}</div> : null}
+            {item?.text ? <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-line">{safeText(item.text)}</p> : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "scorecard_row") {
+    const items = Array.isArray((block as any)?.items) ? (block as any).items : [];
+    if (!items.length) return null;
+
+    return (
+      <div className="grid gap-3 md:grid-cols-3">
+        {items.map((item: any, i: number) => (
+          <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{safeText(item?.label)}</div>
+            <div className="mt-1 text-lg font-bold text-slate-900">{safeText(item?.value)}</div>
+            {item?.hint ? <div className="mt-1 text-xs text-slate-500">{safeText(item.hint)}</div> : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "chart.frequency_bars") {
+    return <VerticalDriversChart labels={ctx.data.frequency_labels} pct={ctx.data.frequency_percentages} />;
+  }
+
+  if (type === "chart.profile_radar" || type === "chart.profile_bars") {
+    return <ProfileOnlyRadar profilePct={ctx.data.profile_percentages} />;
+  }
+
+  if (type === "images.pair") {
+    const left = (block as any)?.left;
+    const right = (block as any)?.right;
+    const pair = [left, right].filter(Boolean);
+
+    if (!pair.length) return null;
+
+    return (
+      <div className="grid gap-4 md:grid-cols-2">
+        {pair.map((item: any, i: number) => {
+          const src = resolveImageSrc(String(item?.src || ""), {
+            data: ctx.data,
+            primaryName: ctx.primaryName,
+            secondaryName: ctx.secondaryName,
+            tertiaryName: ctx.tertiaryName,
+            primaryCode: ctx.primaryCode,
+          });
+
+          if (!src) return null;
+
+          return (
+            <figure key={i} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <img
+                src={src}
+                alt={safeText(item?.alt)}
+                className="mx-auto h-auto max-w-full rounded-xl bg-white"
+                style={{ maxHeight: typeof item?.max_h === "number" ? item.max_h : 320 }}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+              {item?.caption ? <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText(item.caption)}</figcaption> : null}
+            </figure>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (type === "cta") {
+    const title = safeText((block as any)?.title || "Next steps");
+    const text = safeText((block as any)?.text);
+    const buttonText = safeText((block as any)?.button_text || "Next steps");
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white">
+        <div className="text-base font-semibold">{title}</div>
+        {text ? <p className="mt-2 text-sm leading-relaxed text-white/80">{text}</p> : null}
+        <div className="mt-4 inline-flex rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900">{buttonText}</div>
+      </div>
+    );
+  }
+
   return null;
 }
 
@@ -665,10 +876,8 @@ export default function NativeBlocksReportClient(props: { token: string; tid: st
   });
 
   const mergedSections = useMemo(() => {
-    const common = (data.sections?.common || []) as ReportSection[];
-    const profile = (data.sections?.profile || []) as ReportSection[];
-    return [...common, ...profile].filter(Boolean);
-  }, [data.sections]);
+    return resolveReportSections(data.sections, primaryCode || data.top_profile_code);
+  }, [data.sections, primaryCode, data.top_profile_code]);
 
   const indexItems = useMemo(() => {
     return mergedSections.map((s, i) => {
