@@ -59,10 +59,6 @@ export async function POST(req: Request, { params }: { params: { token: string }
     if (takerErr) throw new Error(takerErr.message);
     if (!taker)   throw new Error("Failed to create test taker");
 
-    if (typeof link.use_count === "number") {
-      await sb.from("test_links").update({ use_count: link.use_count + 1 }).eq("id", link.id);
-    }
-
     return NextResponse.json({ ok: true, taker_id: taker.id, test_id: link.test_id }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || "Unknown error" }, { status: 500 });

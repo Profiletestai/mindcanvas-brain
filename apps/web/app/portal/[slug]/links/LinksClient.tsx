@@ -52,7 +52,6 @@ export default function LinksClient(props: {
   const [contactOwner, setContactOwner] = useState("");
   const [showResults, setShowResults] = useState(true);
   const [emailReport, setEmailReport] = useState(true);
-  const [expiresAt, setExpiresAt] = useState<string>("");
 
   const [recipientEmail, setRecipientEmail] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
@@ -62,6 +61,11 @@ export default function LinksClient(props: {
   const [nextStepsUrl, setNextStepsUrl] = useState("");
 
   const [reportVariant, setReportVariant] = useState<ReportVariant>("full");
+
+  const [usageLimitMode, setUsageLimitMode] = useState<"unlimited" | "limited">(
+    "unlimited"
+  );
+  const [maxUses, setMaxUses] = useState<string>("");
 
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -170,13 +174,14 @@ export default function LinksClient(props: {
     setContactOwner("");
     setShowResults(true);
     setEmailReport(true);
-    setExpiresAt("");
     setRecipientEmail("");
     setSendEmail(false);
     setRedirectUrl("");
     setHiddenResultsMessage("");
     setNextStepsUrl("");
     setReportVariant("full");
+    setUsageLimitMode("unlimited");
+    setMaxUses("");
   };
 
   const generate = async () => {
@@ -204,6 +209,17 @@ export default function LinksClient(props: {
       return;
     }
 
+    let parsedMaxUses: number | null = null;
+    if (usageLimitMode === "limited") {
+      const n = parseInt(maxUses, 10);
+      if (!Number.isInteger(n) || n < 1) {
+        setStatus("Usage limit must be a whole number of 1 or more.");
+        setLoading(false);
+        return;
+      }
+      parsedMaxUses = n;
+    }
+
     try {
       const messageToSave =
         !showResults && hiddenResultsMessage.trim().length > 0
@@ -225,9 +241,8 @@ export default function LinksClient(props: {
           hiddenResultsMessage: messageToSave,
           redirectUrl: !showResults ? redirectUrl.trim() : null,
           nextStepsUrl: nextStepsUrl.trim(),
-          expiresAt: expiresAt || null,
-          reportVariant: finalReportVariant,
           report_variant: finalReportVariant,
+          max_uses: parsedMaxUses,
         }),
       });
 
@@ -531,18 +546,63 @@ export default function LinksClient(props: {
             </label>
           )}
 
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium">Expiry (optional)</span>
-            <input
-              type="datetime-local"
-              className="w-full rounded border border-gray-300 p-2 text-sm"
-              value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
-            />
-            <span className="mt-1 block text-xs text-gray-500">
-              If left blank, the link never expires.
-            </span>
-          </label>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-2 block font-medium text-sm">Usage limit</div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setUsageLimitMode("unlimited")}
+                className={`rounded-lg border px-3 py-3 text-left text-sm transition ${
+                  usageLimitMode === "unlimited"
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="font-medium">Unlimited</div>
+                <div className="mt-1 text-xs opacity-80">
+                  Anyone with the link can complete the test, no cap.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setUsageLimitMode("limited")}
+                className={`rounded-lg border px-3 py-3 text-left text-sm transition ${
+                  usageLimitMode === "limited"
+                    ? "border-sky-500 bg-sky-50 text-sky-900"
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="font-medium">Limited</div>
+                <div className="mt-1 text-xs">
+                  Cap the number of completed submissions.
+                </div>
+              </button>
+            </div>
+
+            {usageLimitMode === "limited" && (
+              <label className="mt-3 block text-sm">
+                <span className="mb-1 block font-medium">
+                  Max completed submissions{" "}
+                  <span className="text-red-600">*</span>
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="w-full rounded border border-gray-300 p-2 text-sm"
+                  placeholder="e.g. 50"
+                  value={maxUses}
+                  onChange={(e) => setMaxUses(e.target.value)}
+                />
+                <span className="mt-1 block text-xs text-gray-500">
+                  Once this many people complete the test, the link will block
+                  new completions.
+                </span>
+              </label>
+            )}
+          </div>
 
           <button
             type="button"
@@ -584,7 +644,6 @@ export default function LinksClient(props: {
                 <th className="px-3 py-2 text-left font-medium">Created</th>
                 <th className="px-3 py-2 text-left font-medium">Results</th>
                 <th className="px-3 py-2 text-left font-medium">Redirect link</th>
-                <th className="px-3 py-2 text-left font-medium">Expiry</th>
                 <th className="px-3 py-2 text-left font-medium">Link</th>
                 <th className="px-3 py-2 text-left font-medium">Copy</th>
                 <th className="px-3 py-2 text-left font-medium">Actions</th>
@@ -594,7 +653,7 @@ export default function LinksClient(props: {
             <tbody>
               {links.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-6 text-center text-gray-500">
+                  <td colSpan={10} className="py-6 text-center text-gray-500">
                     No links yet.
                   </td>
                 </tr>
@@ -602,9 +661,6 @@ export default function LinksClient(props: {
 
               {links.map((r, idx) => {
                 const url = fullLink(r.token);
-                const expired = r.expires_at
-                  ? new Date(r.expires_at) < new Date()
-                  : false;
                 const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-50";
 
                 const redirectOrNext =
@@ -647,6 +703,9 @@ export default function LinksClient(props: {
                         {typeof r.use_count === "number" ? r.use_count : 0}
                         {r.max_uses ? ` / ${r.max_uses}` : ""}
                       </div>
+                      {!r.max_uses && (
+                        <div className="text-xs text-gray-500">Unlimited</div>
+                      )}
                     </td>
 
                     <td className="px-3 py-2 align-top">
@@ -682,14 +741,6 @@ export default function LinksClient(props: {
                           {redirectOrNext}
                         </div>
                       ) : null}
-                    </td>
-
-                    <td className="px-3 py-2 align-top">
-                      {r.expires_at
-                        ? `${new Date(r.expires_at).toLocaleString()}${
-                            expired ? " (expired)" : ""
-                          }`
-                        : "—"}
                     </td>
 
                     <td className="px-3 py-2 align-top">

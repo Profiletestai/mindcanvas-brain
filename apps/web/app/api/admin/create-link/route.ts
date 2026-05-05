@@ -27,7 +27,16 @@ type Body = {
 
   reportVariant?: ReportVariant | null;
   report_variant?: ReportVariant | null;
+
+  max_uses?: number | null;
 };
+
+function normalizeMaxUses(v: any): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : parseInt(String(v), 10);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return null;
+  return n;
+}
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const EMAIL_FROM =
@@ -79,6 +88,8 @@ export async function POST(req: Request) {
       body.report_variant ?? body.reportVariant
     );
 
+    const maxUses = normalizeMaxUses(body.max_uses);
+
     const sb = createClient().schema("portal");
     const token = crypto.randomUUID().replace(/-/g, "");
 
@@ -97,6 +108,8 @@ export async function POST(req: Request) {
 
       // keep this available on the link either way
       next_steps_url: nextStepsUrl || null,
+
+      max_uses: maxUses,
 
       meta: {
         report_variant: reportVariant,
