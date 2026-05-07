@@ -171,6 +171,7 @@ export default function PublicTestClient({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [limitReached, setLimitReached] = useState(false);
 
   const [testName, setTestName] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
@@ -218,6 +219,12 @@ export default function PublicTestClient({
         if (!alive) return;
 
         const metaData = metaRes?.data ?? {};
+
+        if (metaData?.limit_reached) {
+          setLimitReached(true);
+          setLoading(false);
+          return;
+        }
         const nameFromMeta: string | null = metaData?.name ?? null;
 
         const orgNameFromMeta: string | null =
@@ -548,6 +555,22 @@ export default function PublicTestClient({
         <pre className="mt-3 p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">
           {error}
         </pre>
+      </div>
+    );
+  }
+
+  if (limitReached) {
+    return (
+      <div className={embed ? "p-0" : "p-6"} style={embed ? { minHeight: 420 } : undefined}>
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-5 max-w-2xl space-y-3">
+          <h1 className="text-xl font-semibold text-white">
+            This link is no longer accepting submissions
+          </h1>
+          <p className="text-sm text-white/80">
+            The usage limit for this test link has been reached. Please contact
+            the person who shared this link if you need access.
+          </p>
+        </div>
       </div>
     );
   }

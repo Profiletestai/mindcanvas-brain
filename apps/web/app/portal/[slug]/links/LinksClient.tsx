@@ -669,8 +669,18 @@ export default function LinksClient(props: {
                 const variant: ReportVariant =
                   r.report_variant === "lite" ? "lite" : "full";
 
+                const capped =
+                  r.max_uses != null &&
+                  typeof r.use_count === "number" &&
+                  r.use_count >= r.max_uses;
+
                 return (
-                  <tr key={r.id} className={`${rowBg} border-t`}>
+                  <tr
+                    key={r.id}
+                    className={`${rowBg} border-t ${
+                      capped ? "opacity-60" : ""
+                    }`}
+                  >
                     <td className="px-3 py-2 align-top">
                       <div className="font-medium">
                         {r.link_name || "Untitled link"}
@@ -705,6 +715,11 @@ export default function LinksClient(props: {
                       </div>
                       {!r.max_uses && (
                         <div className="text-xs text-gray-500">Unlimited</div>
+                      )}
+                      {capped && (
+                        <div className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-200">
+                          Limit reached
+                        </div>
                       )}
                     </td>
 
@@ -746,8 +761,21 @@ export default function LinksClient(props: {
                     <td className="px-3 py-2 align-top">
                       <button
                         type="button"
-                        onClick={() => window.open(url, "_blank")}
-                        className="text-blue-600 underline"
+                        onClick={() => {
+                          if (capped) return;
+                          window.open(url, "_blank");
+                        }}
+                        disabled={capped}
+                        title={
+                          capped
+                            ? "Usage limit reached — link is no longer accepting submissions"
+                            : "Open the test link"
+                        }
+                        className={
+                          capped
+                            ? "cursor-not-allowed text-gray-400 line-through"
+                            : "text-blue-600 underline"
+                        }
                       >
                         Open link
                       </button>
