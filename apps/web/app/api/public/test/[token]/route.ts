@@ -7,7 +7,12 @@ export const dynamic = "force-dynamic";
 
 type PortalClient = ReturnType<typeof createClient>;
 
-type LinkRow = { token: string; test_id: string };
+type LinkRow = {
+  token: string;
+  test_id: string;
+  max_uses: number | null;
+  use_count: number | null;
+};
 type TestRow = { id: string; name: string | null; org_id: string; meta: any | null };
 type OrgRow = { name: string | null; slug: string | null };
 
@@ -54,7 +59,7 @@ export async function GET(
     // 1) resolve link -> test_id
     const { data: linkRow, error: linkErr } = (await sb
       .from("test_links")
-      .select("token, test_id")
+      .select("token, test_id, max_uses, use_count")
       .eq("token", token)
       .maybeSingle()) as { data: LinkRow | null; error: any };
 
@@ -88,6 +93,10 @@ export async function GET(
 
     const effectiveTestId = resolveEffectiveTestId(testRow);
 
+    const maxUses = linkRow.max_uses;
+    const useCount = linkRow.use_count ?? 0;
+    const limitReached = maxUses != null && useCount >= maxUses;
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -98,6 +107,9 @@ export async function GET(
         org_name: orgRow?.name ?? null,
         org_slug: orgRow?.slug ?? null,
         meta: testRow?.meta ?? null,
+        max_uses: maxUses,
+        use_count: useCount,
+        limit_reached: limitReached,
       },
     });
   } catch (e: any) {

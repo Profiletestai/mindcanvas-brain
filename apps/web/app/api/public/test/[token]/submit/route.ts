@@ -1327,6 +1327,47 @@ export async function POST(
 
     const linkBehavior = await loadLinkBehavior(sb, token);
 
+    const { data: linkUsageRow, error: linkUsageErr } = await sb
+      .from("test_links")
+      .select("id, max_uses, use_count")
+      .eq("token", token)
+      .maybeSingle();
+
+    if (linkUsageErr) {
+      console.warn(
+        "[submit] failed to load link usage row:",
+        linkUsageErr.message
+      );
+    }
+
+    const linkId: string | null = (linkUsageRow as any)?.id ?? null;
+    const linkMaxUses: number | null =
+      typeof (linkUsageRow as any)?.max_uses === "number"
+        ? (linkUsageRow as any).max_uses
+        : null;
+    const linkUseCount: number =
+      typeof (linkUsageRow as any)?.use_count === "number"
+        ? (linkUsageRow as any).use_count
+        : 0;
+
+    if (linkMaxUses != null && linkUseCount >= linkMaxUses) {
+      return NextResponse.json(
+        { ok: false, error: "Link usage limit reached" },
+        { status: 403 }
+      );
+    }
+
+    const incrementUseCount = async () => {
+      if (!linkId) return;
+      const { error: incErr } = await sb
+        .from("test_links")
+        .update({ use_count: linkUseCount + 1 })
+        .eq("id", linkId);
+      if (incErr) {
+        console.warn("[submit] Failed to increment use_count:", incErr.message);
+      }
+    };
+
     const { data: taker, error: takerErr } = await sb
       .from("test_takers")
       .select(
@@ -1750,6 +1791,8 @@ export async function POST(
         );
       }
 
+      await incrementUseCount();
+
       const { error: upErr } = await sb
         .from("test_results")
         .upsert({ taker_id: taker.id, totals }, { onConflict: "taker_id" });
@@ -2114,6 +2157,8 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    await incrementUseCount();
 
     if (rhythmScore && submissionRow?.id) {
       const { error: rhythmErr } = await sb.from("rhythm_results").insert({
