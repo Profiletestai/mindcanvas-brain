@@ -2,17 +2,37 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { z } from "zod";
 import { OtpInput } from "../_components/OtpInput";
+import { StepCard } from "../_components/StepCard";
 import { api, isErr } from "../_lib/api";
+import { verifyOtpSchema } from "../_lib/schema";
+
+type VerifyFormInput = z.input<typeof verifyOtpSchema>;
+type VerifyFormOutput = z.output<typeof verifyOtpSchema>;
 
 export default function VerifyPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
-  const [token, setToken] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  const [resending, setResending] = useState(false);
+
+  const {
+    control,
+    handleSubmit,
+    setError,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<VerifyFormInput, unknown, VerifyFormOutput>({
+    resolver: zodResolver(verifyOtpSchema),
+    defaultValues: { email: "", token: "" },
+    mode: "onSubmit",
+  });
+
+  const token = watch("token") ?? "";
 
   useEffect(() => {
     const e = sessionStorage.getItem("onb_email");
@@ -21,77 +41,110 @@ export default function VerifyPage() {
       return;
     }
     setEmail(e);
-  }, [router]);
+    setValue("email", e);
+  }, [router, setValue]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn((n) => n - 1), 1000);
+    const t = setTimeout(() => setResendIn((n) => Math.max(0, n - 1)), 1000);
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    if (!email || token.length !== 6) {
-      setErr("Enter the 6-digit code.");
-      return;
-    }
-    setBusy(true);
-    const res = await api.verifyOtp({ email, token });
-    setBusy(false);
+  const onSubmit = handleSubmit(async (values) => {
+    const res = await api.verifyOtp(values);
     if (isErr(res)) {
-      setErr(res.error);
+      setError("root", { message: res.error });
       return;
     }
     router.push("/onboarding/v2/organisation");
-  };
+  });
 
   const onResend = async () => {
-    if (!email || resendIn > 0) return;
-    setErr(null);
+    if (!email || resendIn > 0 || resending) return;
     const first = sessionStorage.getItem("onb_first_name") || "";
     const last = sessionStorage.getItem("onb_last_name") || "";
     if (!first || !last) {
       router.replace("/onboarding/v2/account");
       return;
     }
+    setResending(true);
     setResendIn(30);
     const res = await api.signup({ first_name: first, last_name: last, email });
+    setResending(false);
     if (isErr(res)) {
-      setErr(res.error);
       setResendIn(0);
+      setError("root", { message: res.error });
     }
   };
 
   if (!email) return null;
 
+  const errMsg = errors.token?.message ?? errors.root?.message;
+  const canSubmit = token.length === 6 && !isSubmitting;
+
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-center">Verify your email</h1>
-      <p className="mt-2 text-center text-sm text-white/70">
-        Enter the 6-digit code we sent to <span className="text-white">{email}</span>.
-      </p>
+    <StepCard
+      title={
+        <>
+          Verify your <span style={{ color: "rgb(84, 175, 224)" }}>email</span>
+        </>
+      }
+      subtitle="Enter the 6-digit code we sent to your email address."
+    >
+      <form
+        onSubmit={onSubmit}
+        className="mt-6 mx-auto w-full max-w-[480px] rounded-[14px] border"
+        style={{
+          background: "#fff",
+          borderColor: "rgb(228,238,248)",
+          padding: "32px 24px 24px 24px",
+          boxShadow: "0px 2px 12px 0px rgba(13,45,94,0.06)",
+        }}
+      >
+        <Controller
+          control={control}
+          name="token"
+          render={({ field }) => (
+            <OtpInput value={field.value} onChange={field.onChange} autoFocus />
+          )}
+        />
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-6">
-        <OtpInput value={token} onChange={setToken} autoFocus />
+        {errMsg && (
+          <div className="mt-4 text-sm text-rose-500 text-center">{errMsg}</div>
+        )}
 
-        {err && <div className="text-sm text-rose-400 text-center">{err}</div>}
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className={`mt-6 w-full h-[52px] rounded-[12px] text-white font-bold tracking-wide ${
+            canSubmit ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+          }`}
+          style={{
+            background:
+              "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+            fontSize: "15px",
+            letterSpacing: "0.2px",
+            boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
+          }}
+        >
+          {isSubmitting ? "Verifying…" : "Verify and continue"}
+        </button>
 
-        <Button type="submit" disabled={busy || token.length !== 6} className="w-full">
-          {busy ? "Verifying…" : "Verify and continue"}
-        </Button>
-
-        <div className="text-center text-sm">
+        <div className="mt-4 text-center">
           <button
             type="button"
             onClick={onResend}
-            disabled={resendIn > 0}
-            className="text-white/70 hover:text-white disabled:opacity-50"
+            disabled={resendIn > 0 || resending}
+            className="font-semibold disabled:opacity-50"
+            style={{
+              color: "rgb(90,122,158)",
+              fontSize: "13px",
+            }}
           >
             {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
           </button>
         </div>
       </form>
-    </div>
+    </StepCard>
   );
 }

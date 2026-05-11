@@ -1,152 +1,341 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Field, inputClass, selectClass } from "../_components/Field";
-import { CountrySelect } from "../_components/CountrySelect";
-import { LogoUploader } from "../_components/LogoUploader";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { z } from "zod";
+import countries from "i18n-iso-countries";
+import enLocale from "i18n-iso-countries/langs/en.json";
 import { api, isErr } from "../_lib/api";
-import { isHttpUrl } from "../_lib/schema";
-import { BILLING_REGIONS } from "../_lib/regions";
+import { orgSchema } from "../_lib/schema";
+import { StepCard } from "../_components/StepCard";
+
+type OrgFormInput = z.input<typeof orgSchema>;
+type OrgFormOutput = z.output<typeof orgSchema>;
+
+countries.registerLocale(enLocale);
+
+const eyebrowStyle: React.CSSProperties = {
+  fontWeight: 700,
+  fontSize: "10px",
+  lineHeight: "16px",
+  letterSpacing: "1px",
+  textTransform: "uppercase",
+  color: "rgb(90,122,158)",
+};
+
+const inputStyle: React.CSSProperties = {
+  background: "rgb(240,246,255)",
+  border: "1px solid rgb(208,224,240)",
+  color: "rgb(24,44,62)",
+};
+
+const inputClass =
+  "w-full rounded-[10px] h-[46px] px-4 text-[14px] outline-none transition focus:bg-white placeholder:text-[rgb(140,160,185)]";
+
+const EMPTY: OrgFormInput = {
+  name: "",
+  country: "",
+  address: "",
+  website_url: "",
+  industry: "",
+  logo_url: "",
+};
 
 export default function OrganisationPage() {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [ready, setReady] = useState(false);
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [country, setCountry] = useState("");
-  const [region, setRegion] = useState("");
-  const [website, setWebsite] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<OrgFormInput, unknown, OrgFormOutput>({
+    resolver: zodResolver(orgSchema),
+    defaultValues: EMPTY,
+    mode: "onTouched",
+  });
+
+  const logoUrl = (watch("logo_url") as string | undefined) ?? "";
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const orgRes = await api.getOrg();
+      const res = await api.getOrg();
       if (cancelled) return;
-      if (!isErr(orgRes) && orgRes.org) {
-        const o = orgRes.org;
-        setName(o.name ?? "");
-        setAddress(o.address ?? "");
-        setCountry(o.country ?? "");
-        setRegion(o.billing_region ?? "");
-        setWebsite(o.website_url ?? "");
-        setIndustry(o.industry ?? "");
-        setLogoUrl(o.logo_url ?? null);
+      if (!isErr(res) && res.org) {
+        reset({
+          name: res.org.name ?? "",
+          country: res.org.country ?? "",
+          address: res.org.address ?? "",
+          website_url: res.org.website_url ?? "",
+          industry: res.org.industry ?? "",
+          logo_url: res.org.logo_url ?? "",
+        });
       }
       setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [reset]);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    if (!name.trim() || !country || !region) {
-      setErr("Organisation name, country, and billing region are required.");
-      return;
-    }
-    if (website.trim() && !isHttpUrl(website)) {
-      setErr("Website must be an http(s) URL.");
-      return;
-    }
-    setBusy(true);
-    const res = await api.createOrg({
-      name: name.trim(),
-      country,
-      billing_region: region,
-      address: address.trim() || undefined,
-      website_url: website.trim() || undefined,
-      industry: industry.trim() || undefined,
-      logo_url: logoUrl || undefined,
-    });
-    setBusy(false);
+  const countryOptions = useMemo(() => {
+    const all = countries.getNames("en", { select: "official" }) as Record<
+      string,
+      string
+    >;
+    return Object.entries(all)
+      .map(([code, n]) => ({ code, name: n }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  const handleFile = async (file: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    const res = await api.uploadLogo(file);
+    setUploading(false);
     if (isErr(res)) {
-      setErr(res.error);
+      setError("root", { message: res.error });
+      return;
+    }
+    setValue("logo_url", res.url, { shouldValidate: true, shouldDirty: true });
+  };
+
+  const onSubmit = handleSubmit(async (values) => {
+    const res = await api.createOrg(values);
+    if (isErr(res)) {
+      setError("root", { message: res.error });
       return;
     }
     router.push("/onboarding/v2/contact");
-  };
+  });
 
-  if (!ready) return <div className="py-8 text-center text-white/70">Loading…</div>;
+  if (!ready) {
+    return <div className="py-8 text-center text-white/70">Loading…</div>;
+  }
+
+  const errMsg =
+    errors.name?.message ??
+    errors.country?.message ??
+    errors.address?.message ??
+    errors.website_url?.message ??
+    errors.industry?.message ??
+    errors.logo_url?.message ??
+    errors.root?.message;
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-center">Tell us about your organisation</h1>
-      <p className="mt-2 text-center text-sm text-white/70">
-        Add the core details for your main organisation.
-      </p>
-
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <LogoUploader value={logoUrl} onChange={setLogoUrl} />
-
-        <Field label="Organisation name" required>
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-
-        <Field label="Address">
-          <input
-            className={inputClass}
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-        </Field>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Country" required>
-            <CountrySelect value={country} onChange={setCountry} />
-          </Field>
-          <Field label="Billing region" required>
-            <select
-              className={selectClass}
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
+    <StepCard
+      title={
+        <>
+          Tell us about your{" "}
+          <span style={{ color: "rgb(84, 175, 224)" }}>organisation</span>
+        </>
+      }
+      subtitle="Add the core details for your main organisation."
+    >
+      <form
+        onSubmit={onSubmit}
+        className="mt-6 rounded-[14px] border"
+        style={{
+          background: "#fff",
+          borderColor: "rgb(228,238,248)",
+          padding: "32px 24px 24px 24px",
+          boxShadow: "0px 2px 12px 0px rgba(13,45,94,0.06)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="w-full rounded-[12px] flex flex-col items-center justify-center transition hover:bg-[rgb(232,240,252)]"
+          style={{
+            background: "rgb(240,246,255)",
+            border: "1.5px dashed rgb(180,204,232)",
+            padding: "26px 16px",
+            minHeight: "132px",
+          }}
+        >
+          {logoUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt="logo"
+                className="h-16 w-16 object-cover rounded-md"
+              />
+              <span
+                className="mt-2"
+                style={{ fontSize: "12px", color: "rgb(90,122,158)" }}
+              >
+                Replace logo
+              </span>
+            </>
+          ) : (
+            <>
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <path
+                  d="M3 16.5V5.5C3 4.67 3.67 4 4.5 4h15c.83 0 1.5.67 1.5 1.5v13c0 .83-.67 1.5-1.5 1.5h-15C3.67 20 3 19.33 3 18.5"
+                  stroke="rgb(24,44,62)"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="m3.5 17 4.5-4.5 4 4 3.5-3.5 5 5"
+                  stroke="rgb(24,44,62)"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span
+                className="mt-2 font-bold"
+                style={{ fontSize: "14px", color: "rgb(24,44,62)" }}
+              >
+                {uploading ? "Uploading…" : "Upload logo"}
+              </span>
+              <span
+                className="mt-1"
+                style={{ fontSize: "12px", color: "rgb(120,144,176)" }}
+              >
+                PNG, JPG or SVG · Max 2MB
+              </span>
+            </>
+          )}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          className="hidden"
+          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+        />
+        {logoUrl && (
+          <div className="mt-2 text-center">
+            <button
+              type="button"
+              onClick={() =>
+                setValue("logo_url", "", { shouldDirty: true })
+              }
+              className="text-[12px] font-semibold"
+              style={{ color: "rgb(200,60,80)" }}
             >
-              <option value="">Select a region…</option>
-              {BILLING_REGIONS.map((r) => (
-                <option key={r.code} value={r.code} className="text-black">
-                  {r.label}
+              Remove
+            </button>
+          </div>
+        )}
+
+        <div className="mt-5">
+          <label className="block mb-1.5" style={eyebrowStyle}>
+            Organisation name <span style={{ color: "rgb(200,60,80)" }}>*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="Your organisation name"
+            {...register("name")}
+            className={inputClass}
+            style={inputStyle}
+          />
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-1.5" style={eyebrowStyle}>
+              Address <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Street address"
+              {...register("address")}
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5" style={eyebrowStyle}>
+              Country <span style={{ color: "rgb(200,60,80)" }}>*</span>
+            </label>
+            <select
+              {...register("country")}
+              className={inputClass + " appearance-none pr-9"}
+              style={{
+                ...inputStyle,
+                backgroundImage:
+                  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4.5l4 4 4-4' stroke='%235A7A9E' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>\")",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 14px center",
+              }}
+            >
+              <option value="">Select country</option>
+              {countryOptions.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.name}
                 </option>
               ))}
             </select>
-          </Field>
+          </div>
         </div>
 
-        <Field label="Website">
-          <input
-            type="url"
-            placeholder="https://example.com"
-            className={inputClass}
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-          />
-        </Field>
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block mb-1.5" style={eyebrowStyle}>
+              Website <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+            </label>
+            <input
+              type="url"
+              placeholder="https://"
+              {...register("website_url")}
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label className="block mb-1.5" style={eyebrowStyle}>
+              Industry <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Select industry"
+              {...register("industry")}
+              className={inputClass}
+              style={inputStyle}
+            />
+          </div>
+        </div>
 
-        <Field label="Industry">
-          <input
-            className={inputClass}
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-            placeholder="e.g. Healthcare, Education"
-          />
-        </Field>
+        {errMsg && <div className="mt-4 text-sm text-rose-500">{errMsg}</div>}
 
-        {err && <div className="text-sm text-rose-400">{err}</div>}
-
-        <Button type="submit" disabled={busy} className="w-full">
-          {busy ? "Saving…" : "Save and continue"}
-        </Button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className={`mt-6 w-full h-[52px] rounded-[12px] text-white font-bold tracking-wide ${
+            isSubmitting ? "cursor-not-allowed opacity-40" : "cursor-pointer"
+          }`}
+          style={{
+            background:
+              "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+            fontSize: "15px",
+            letterSpacing: "0.2px",
+            boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
+          }}
+        >
+          {isSubmitting ? "Saving…" : "Save and continue"}
+        </button>
       </form>
-    </div>
+    </StepCard>
   );
 }

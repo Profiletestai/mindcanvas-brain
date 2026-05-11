@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { getAuthUser } from "../_lib/auth";
-import type { ContactRequestBody } from "../_lib/types";
+import { contactSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 import type { PortalOrgUpdate } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
@@ -11,17 +11,22 @@ export async function PATCH(req: Request) {
     const { user, error: authError } = await getAuthUser();
     if (authError) return authError;
 
-    const body: Partial<ContactRequestBody> = await req.json().catch(() => ({}));
-    const contact_first_name = String(body?.contact_first_name || "").trim();
-    const contact_last_name = String(body?.contact_last_name || "").trim();
-    const contact_email = String(body?.contact_email || "").trim().toLowerCase();
-
-    if (!contact_first_name || !contact_last_name || !contact_email) {
+    const raw = await req.json().catch(() => ({}));
+    const parsed = contactSchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "contact_first_name, contact_last_name, and contact_email are required" },
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
+    const {
+      contact_first_name,
+      contact_last_name,
+      contact_email,
+      phone_number,
+      support_email,
+      notification_email,
+    } = parsed.data;
 
     const admin = portalAdmin();
 
@@ -42,9 +47,9 @@ export async function PATCH(req: Request) {
       last_completed_step: 4,
     };
 
-    if (body?.phone_number !== undefined) updates.phone_number = String(body.phone_number).trim() || null;
-    if (body?.support_email !== undefined) updates.support_email = String(body.support_email).trim().toLowerCase() || null;
-    if (body?.notification_email !== undefined) updates.notification_email = String(body.notification_email).trim().toLowerCase() || null;
+    updates.phone_number = phone_number ?? null;
+    updates.support_email = support_email ?? null;
+    updates.notification_email = notification_email ?? null;
 
     const { data: org, error } = await admin
       .from("orgs")

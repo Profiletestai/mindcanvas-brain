@@ -1,77 +1,62 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { PATH_TO_STEP } from "../_lib/progress";
-
-const STEPS: { num: number; label: string }[] = [
-  { num: 1, label: "Account" },
-  { num: 2, label: "Verify" },
-  { num: 3, label: "Organisation" },
-  { num: 4, label: "Contact" },
-  { num: 5, label: "Plan" },
-  { num: 6, label: "Branding" },
-];
+import { PATH_TO_STEP, TOTAL_STEPS, displayStep } from "../_lib/progress";
 
 export function Stepper() {
   const pathname = usePathname();
   const stepValue = PATH_TO_STEP[pathname];
+  if (stepValue === undefined) return null;
 
-  if (stepValue === "complete" || stepValue === undefined) return null;
-
-  const current = stepValue;
+  const current = displayStep(stepValue);
+  const progressPct = Math.max(
+    0,
+    Math.min(100, (current / TOTAL_STEPS) * 100)
+  );
 
   return (
-    <div className="w-full mb-6 px-6 sm:px-8">
-      <ol className="flex items-stretch">
-        {STEPS.map((s, i) => {
-          const done = s.num < current;
-          const active = s.num === current;
-          const isFirst = i === 0;
-          const isLast = i === STEPS.length - 1;
-          const leftFilled = s.num <= current && !isFirst;
-          const rightFilled = s.num < current && !isLast;
+    <div className="flex items-center gap-4 w-full">
+      <span
+        className="whitespace-nowrap font-bold"
+        style={{
+          fontSize: "11px",
+          lineHeight: "16px",
+          letterSpacing: "1px",
+          color: "rgb(90,122,158)",
+        }}
+      >
+        Onboarding Step: {current}/{TOTAL_STEPS}
+      </span>
+      <div
+        className="relative flex-1 h-1.5 rounded-full overflow-hidden"
+        style={{ background: "rgb(208,224,240)" }}
+      >
+        <div
+          className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-300"
+          style={{
+            width: `${progressPct}%`,
+            background:
+              "linear-gradient(90deg, rgb(37,99,200) 0%, rgb(74,144,217) 100%)",
+          }}
+        />
+      </div>
+      <ol className="flex items-center gap-1.5">
+        {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((n) => {
+          const filled = n <= current;
           return (
-            <li key={s.num} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-              <div className="flex items-center w-full">
-                <div
-                  className={`h-px flex-1 ${
-                    isFirst
-                      ? "invisible"
-                      : leftFilled
-                      ? "bg-emerald-500/70"
-                      : "bg-white/15"
-                  }`}
-                  aria-hidden
-                />
-                <div
-                  className={`h-8 w-8 shrink-0 rounded-md flex items-center justify-center text-sm font-semibold transition ${
-                    done
-                      ? "bg-emerald-500 text-white"
-                      : active
-                      ? "bg-emerald-500 text-white shadow-[0_0_0_4px_rgba(16,185,129,0.2)]"
-                      : "bg-white/10 text-white/60 border border-white/15"
-                  }`}
-                >
-                  {done ? "✓" : s.num}
-                </div>
-                <div
-                  className={`h-px flex-1 ${
-                    isLast
-                      ? "invisible"
-                      : rightFilled
-                      ? "bg-emerald-500/70"
-                      : "bg-white/15"
-                  }`}
-                  aria-hidden
-                />
-              </div>
-              <span
-                className={`text-[10px] uppercase tracking-wide truncate w-full text-center ${
-                  active ? "text-white" : "text-white/50"
-                }`}
-              >
-                {s.label}
-              </span>
+            <li
+              key={n}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white"
+              style={{
+                background: filled
+                  ? "rgb(37,99,200)"
+                  : "rgb(208,224,240)",
+                color: filled ? "#fff" : "rgb(90,122,158)",
+                boxShadow: "0px 1px 4px 0px rgba(0,0,0,0.08)",
+              }}
+              aria-current={n === current ? "step" : undefined}
+            >
+              {n}
             </li>
           );
         })}

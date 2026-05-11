@@ -1,4 +1,4 @@
-export type PlanTier = 1 | 2 | 3 | 4;
+export type PlanTier = 1 | 2 | 3;
 
 export interface PlanDef {
   tier: PlanTier;
@@ -16,36 +16,26 @@ export const PLANS: PlanDef[] = [
     tier: 1,
     name: "Starter",
     priceMonthly: 0,
-    priceLabel: "Free",
+    priceLabel: "Free · Up to 5 users",
     tagline: "Try the platform with limited usage.",
-    features: ["Up to 25 assessments / month", "1 admin seat", "Email support"],
+    features: ["Up to 5 users", "Core assessments", "Email support"],
   },
   {
     tier: 2,
     name: "Growth",
     priceMonthly: 49,
-    priceLabel: "$49 / mo",
+    priceLabel: "$49/mo · Up to 25 users",
     tagline: "For small teams running regular reports.",
-    features: ["Up to 250 assessments / month", "5 admin seats", "Custom branding"],
-    highlight: true,
+    features: ["Up to 25 users", "Custom branding", "Priority support"],
     disabled: true,
   },
   {
     tier: 3,
-    name: "Business",
-    priceMonthly: 199,
-    priceLabel: "$199 / mo",
-    tagline: "Scale across multiple departments.",
-    features: ["Up to 2,000 assessments / month", "Unlimited seats", "Priority support"],
-    disabled: true,
-  },
-  {
-    tier: 4,
     name: "Enterprise",
     priceMonthly: 0,
-    priceLabel: "Custom",
+    priceLabel: "Custom pricing",
     tagline: "Bespoke usage, SSO and SLAs.",
-    features: ["Unlimited assessments", "SSO + audit log", "Dedicated CSM"],
+    features: ["Unlimited users", "SSO + audit log", "Dedicated CSM"],
     disabled: true,
   },
 ];

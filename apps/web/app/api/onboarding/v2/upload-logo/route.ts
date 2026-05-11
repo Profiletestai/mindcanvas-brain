@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/_lib/supabaseAdmin";
 import { getAuthUser } from "../_lib/auth";
+import {
+  uploadLogoSchema,
+  LOGO_MIME_TO_EXT,
+} from "@/app/(v2)/onboarding/v2/_lib/schema";
 import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
-
-const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
-const MIME_TO_EXT: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-};
 
 export async function POST(req: Request) {
   const { user, error: authError } = await getAuthUser();
@@ -22,20 +19,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "missing file" }, { status: 400 });
   }
 
-  const ext = MIME_TO_EXT[file.type];
-  if (!ext) {
+  const parsed = uploadLogoSchema.safeParse({ type: file.type, size: file.size });
+  if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, error: "unsupported file type (allowed: png, jpeg, webp)" },
+      { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid file" },
       { status: 400 }
     );
   }
-
-  if (file.size > MAX_SIZE_BYTES) {
-    return NextResponse.json(
-      { ok: false, error: `file exceeds ${MAX_SIZE_BYTES} bytes` },
-      { status: 400 }
-    );
-  }
+  const ext = LOGO_MIME_TO_EXT[parsed.data.type];
 
   const supabase = supabaseAdmin();
 

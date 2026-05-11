@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { getAuthUser } from "../_lib/auth";
 import { generateUniqueSlug } from "../_lib/slug";
-import type { CreateOrgRequestBody } from "../_lib/types";
+import { orgSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 import type { PortalOrg } from "@/types/database.types";
 
 type OrgRef = { id: string; slug: string | null; name: string | null };
@@ -14,37 +14,16 @@ export async function POST(req: Request) {
     const { user, error: authError } = await getAuthUser();
     if (authError) return authError;
 
-    const body: Partial<CreateOrgRequestBody> = await req.json().catch(() => ({}));
-    const name = String(body?.name || "").trim();
-    const country = String(body?.country || "").trim();
-    const billing_region = String(body?.billing_region || "").trim();
-
-    if (!name || !country || !billing_region) {
+    const raw = await req.json().catch(() => ({}));
+    const parsed = orgSchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "name, country, and billing_region are required" },
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
-
-    let website_url: string | null = null;
-    const rawWebsite = typeof body?.website_url === "string" ? body.website_url.trim() : "";
-    if (rawWebsite) {
-      try {
-        const u = new URL(rawWebsite);
-        if (u.protocol !== "http:" && u.protocol !== "https:") {
-          return NextResponse.json(
-            { ok: false, error: "website_url must be http(s) URL" },
-            { status: 400 }
-          );
-        }
-        website_url = u.toString();
-      } catch {
-        return NextResponse.json(
-          { ok: false, error: "website_url is not a valid URL" },
-          { status: 400 }
-        );
-      }
-    }
+    const { name, country, address, industry, logo_url } = parsed.data;
+    const website_url = parsed.data.website_url ?? null;
 
     const admin = portalAdmin();
 
@@ -69,12 +48,12 @@ export async function POST(req: Request) {
       p_user_id: user.id,
       p_name: name,
       p_slug: slug,
-      p_address: body?.address || null,
+      p_address: address ?? null,
       p_country: country,
-      p_billing_region: billing_region,
+      p_billing_region: null,
       p_website_url: website_url,
-      p_industry: body?.industry || null,
-      p_logo_url: body?.logo_url || null,
+      p_industry: industry ?? null,
+      p_logo_url: logo_url ?? null,
     });
 
     if (rpcError) {

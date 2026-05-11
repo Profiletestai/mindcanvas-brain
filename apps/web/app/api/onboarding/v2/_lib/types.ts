@@ -1,9 +1,14 @@
+import type {
+  SignupInput,
+  VerifyOtpInput,
+  OrgInput,
+  ContactInput,
+  PlanInput,
+  BrandingInput,
+} from "@/app/(v2)/onboarding/v2/_lib/schema";
+
 // POST /api/onboarding/v2/signup
-export interface SignupRequestBody {
-  first_name: string;
-  last_name: string;
-  email: string;
-}
+export type SignupRequestBody = SignupInput;
 
 export interface SignupResponse {
   ok: true;
@@ -11,10 +16,7 @@ export interface SignupResponse {
 }
 
 // POST /api/onboarding/v2/verify-otp
-export interface VerifyOtpRequestBody {
-  email: string;
-  token: string;
-}
+export type VerifyOtpRequestBody = VerifyOtpInput;
 
 export interface VerifyOtpResponse {
   ok: true;
@@ -22,15 +24,7 @@ export interface VerifyOtpResponse {
 }
 
 // POST /api/onboarding/v2/org
-export interface CreateOrgRequestBody {
-  name: string;
-  country: string;
-  billing_region: string;
-  address?: string;
-  website_url?: string;
-  industry?: string;
-  logo_url?: string;
-}
+export type CreateOrgRequestBody = OrgInput;
 
 export interface OrgSummary {
   id: string;
@@ -50,12 +44,7 @@ export interface GetOrgResponse {
 }
 
 // PATCH /api/onboarding/v2/branding
-export interface BrandingRequestBody {
-  primary_colour?: string;
-  secondary_colour?: string;
-  background_colour?: string;
-  text_colour?: string;
-}
+export type BrandingRequestBody = BrandingInput;
 
 export interface BrandingResponse {
   ok: true;
@@ -63,14 +52,7 @@ export interface BrandingResponse {
 }
 
 // PATCH /api/onboarding/v2/contact
-export interface ContactRequestBody {
-  contact_first_name: string;
-  contact_last_name: string;
-  contact_email: string;
-  phone_number?: string;
-  support_email?: string;
-  notification_email?: string;
-}
+export type ContactRequestBody = ContactInput;
 
 export interface ContactResponse {
   ok: true;
@@ -78,11 +60,7 @@ export interface ContactResponse {
 }
 
 // PATCH /api/onboarding/v2/plan
-export interface PlanRequestBody {
-  tier: 1 | 2 | 3 | 4;
-  terms_accepted: true;
-  privacy_accepted: true;
-}
+export type PlanRequestBody = PlanInput;
 
 export interface PlanResponse {
   ok: true;

@@ -1,127 +1,369 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { PlanCard } from "../_components/PlanCard";
+import { Controller, useForm, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { api, isErr } from "../_lib/api";
-import { PLANS, type PlanTier } from "../_lib/plans";
+import { PLANS, type PlanTier, type PlanDef } from "../_lib/plans";
+import { planSchema } from "../_lib/schema";
+import { StepCard } from "../_components/StepCard";
+
+type PlanFormValues = {
+  tier: PlanTier;
+  terms_accepted: boolean;
+  privacy_accepted: boolean;
+};
+
+function parseTier(raw: string | null): PlanTier | undefined {
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return n === 1 || n === 2 || n === 3 || n === 4 ? (n as PlanTier) : undefined;
+}
 
 export default function PlanPage() {
   const router = useRouter();
-  const [tier, setTier] = useState<PlanTier>(1);
-  const [terms, setTerms] = useState(false);
-  const [privacy, setPrivacy] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    setError,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<PlanFormValues>({
+    resolver: zodResolver(planSchema) as unknown as Resolver<PlanFormValues>,
+    defaultValues: { tier: 1, terms_accepted: false, privacy_accepted: false },
+    mode: "onSubmit",
+  });
+
+  const tier = watch("tier");
+  const terms = watch("terms_accepted");
+  const privacy = watch("privacy_accepted");
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? sessionStorage.getItem("onb_tier") : null;
-    if (stored) {
-      const n = Number(stored);
-      if (n === 1 || n === 2 || n === 3 || n === 4) setTier(n as PlanTier);
-    }
+    const storedTier =
+      typeof window !== "undefined"
+        ? parseTier(sessionStorage.getItem("onb_tier"))
+        : undefined;
+    if (storedTier !== undefined) setValue("tier", storedTier);
+
     let cancelled = false;
     (async () => {
       const orgRes = await api.getOrg();
       if (cancelled) return;
       if (!isErr(orgRes) && orgRes.org) {
-        if (orgRes.org.terms_accepted_at) setTerms(true);
-        if (orgRes.org.privacy_accepted_at) setPrivacy(true);
+        if (orgRes.org.terms_accepted_at) setValue("terms_accepted", true);
+        if (orgRes.org.privacy_accepted_at) setValue("privacy_accepted", true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setValue]);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErr(null);
-    if (!terms || !privacy) {
-      setErr("Please accept the Terms and Privacy Policy.");
-      return;
-    }
-    setBusy(true);
+  const onSubmit = handleSubmit(async (values) => {
     const res = await api.patchPlan({
-      tier,
+      tier: values.tier,
       terms_accepted: true,
       privacy_accepted: true,
     });
-    setBusy(false);
     if (isErr(res)) {
-      setErr(res.error);
+      setError("root", { message: res.error });
       return;
     }
-    sessionStorage.setItem("onb_tier", String(tier));
+    sessionStorage.setItem("onb_tier", String(values.tier));
     router.push("/onboarding/v2/branding");
-  };
+  });
+
+  const errMsg =
+    errors.tier?.message ??
+    errors.terms_accepted?.message ??
+    errors.privacy_accepted?.message ??
+    errors.root?.message;
+
+  const canSubmit = terms && privacy && !isSubmitting;
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold text-center">
-        Choose your starting plan
-      </h1>
-      <p className="mt-2 text-center text-sm text-white/70">
-        Select the plan you want this organisation to start with.
-      </p>
+    <StepCard
+      title={
+        <>
+          Choose your{" "}
+          <span style={{ color: "rgb(84, 175, 224)" }}>starting plan</span>
+        </>
+      }
+      subtitle="Select the plan you want this organisation to start with."
+    >
+      <form
+        onSubmit={onSubmit}
+        className="mt-6 rounded-[14px] border"
+        style={{
+          background: "#fff",
+          borderColor: "rgb(228,238,248)",
+          padding: "32px 24px 24px 24px",
+          boxShadow: "0px 2px 12px 0px rgba(13,45,94,0.06)",
+        }}
+      >
+        <Controller
+          control={control}
+          name="tier"
+          render={({ field }) => (
+            <div className="space-y-3">
+              {PLANS.map((p) => (
+                <PlanRow
+                  key={p.tier}
+                  plan={p}
+                  selected={field.value === p.tier}
+                  onSelect={() => !p.disabled && field.onChange(p.tier)}
+                />
+              ))}
+            </div>
+          )}
+        />
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {PLANS.map((p) => (
-            <PlanCard
-              key={p.tier}
-              plan={p}
-              selected={tier === p.tier}
-              onSelect={() => setTier(p.tier)}
-            />
-          ))}
-        </div>
-
-        <div className="space-y-2">
-          <label className="flex items-start gap-2 text-sm text-white/80">
-            <input
-              type="checkbox"
-              checked={terms}
-              onChange={(e) => setTerms(e.target.checked)}
-              className="mt-0.5"
-            />
-            I accept the{" "}
-            <a href="https://profiletest.ai/terms--conditions" target="_blank" className="underline">
-              Terms and Conditions
-            </a>
-          </label>
-          <label className="flex items-start gap-2 text-sm text-white/80">
-            <input
-              type="checkbox"
-              checked={privacy}
-              onChange={(e) => setPrivacy(e.target.checked)}
-              className="mt-0.5"
-            />
-            I accept the{" "}
-            <a href="https://profiletest.ai/privacy-policy" target="_blank" className="underline">
-              Privacy Policy
-            </a>
-          </label>
-        </div>
-
-        {err && <div className="text-sm text-rose-400">{err}</div>}
-
-        <div className="flex flex-col-reverse sm:flex-row gap-3">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={busy}
-            onClick={() => router.push("/onboarding/v2/contact")}
-            className="sm:w-1/3"
+        <div
+          className="mt-3 rounded-[12px] flex items-center justify-center gap-2"
+          style={{
+            background: "rgb(240,246,255)",
+            border: "1.5px dashed rgb(180,204,232)",
+            padding: "14px 16px",
+            color: "rgb(90,122,158)",
+            fontSize: "13px",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
           >
-            Back
-          </Button>
-          <Button type="submit" disabled={busy} className="flex-1">
-            {busy ? "Saving…" : "Save and continue"}
-          </Button>
+            <rect
+              x="4"
+              y="11"
+              width="16"
+              height="10"
+              rx="2"
+              stroke="rgb(90,122,158)"
+              strokeWidth="1.6"
+            />
+            <path
+              d="M8 11V8a4 4 0 1 1 8 0v3"
+              stroke="rgb(90,122,158)"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+          Billing · Payment fields available after activation
         </div>
+
+        <div className="mt-5 space-y-3">
+          <Controller
+            control={control}
+            name="terms_accepted"
+            render={({ field }) => (
+              <CheckboxRow
+                checked={field.value}
+                onChange={field.onChange}
+                label={
+                  <>
+                    I agree to the{" "}
+                    <a
+                      href="https://profiletest.ai/terms--conditions"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                      style={{ color: "rgb(42,137,190)" }}
+                    >
+                      Terms and Conditions
+                    </a>
+                  </>
+                }
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="privacy_accepted"
+            render={({ field }) => (
+              <CheckboxRow
+                checked={field.value}
+                onChange={field.onChange}
+                label={
+                  <>
+                    I agree to the{" "}
+                    <a
+                      href="https://profiletest.ai/privacy-policy"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                      style={{ color: "rgb(42,137,190)" }}
+                    >
+                      Privacy Policy
+                    </a>
+                  </>
+                }
+              />
+            )}
+          />
+        </div>
+
+        {errMsg && <div className="mt-4 text-sm text-rose-500">{errMsg}</div>}
+
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className={`mt-6 w-full h-[52px] rounded-[12px] text-white font-bold tracking-wide ${
+            canSubmit ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+          }`}
+          style={{
+            background:
+              "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+            fontSize: "15px",
+            letterSpacing: "0.2px",
+            boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
+          }}
+        >
+          {isSubmitting ? "Saving…" : "Save and continue"}
+        </button>
       </form>
-    </div>
+    </StepCard>
+  );
+}
+
+function PlanRow({
+  plan,
+  selected,
+  onSelect,
+}: {
+  plan: PlanDef;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const disabled = plan.disabled;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      aria-pressed={selected}
+      aria-disabled={disabled}
+      className={`w-full flex items-center justify-between rounded-[12px] transition ${
+        disabled ? "cursor-not-allowed" : "cursor-pointer hover:bg-[rgb(232,240,252)]"
+      }`}
+      style={{
+        background: "rgb(240,246,255)",
+        border: selected
+          ? "1.5px solid rgb(42,137,190)"
+          : "1.5px solid rgb(208,224,240)",
+        padding: "16px 20px",
+        boxShadow: selected ? "0 0 0 3px rgba(42,137,190,0.12)" : "none",
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <RadioDot selected={selected} />
+        <span
+          style={{
+            color: "rgb(24,44,62)",
+            fontSize: "15px",
+            fontWeight: 600,
+          }}
+        >
+          {plan.name}
+        </span>
+      </div>
+      <span
+        style={{
+          color: "rgb(90,122,158)",
+          fontSize: "13px",
+        }}
+      >
+        {plan.priceLabel}
+      </span>
+    </button>
+  );
+}
+
+function RadioDot({ selected }: { selected: boolean }) {
+  return (
+    <span
+      className="relative inline-flex items-center justify-center rounded-full"
+      style={{
+        width: 20,
+        height: 20,
+        border: selected
+          ? "2px solid rgb(42,137,190)"
+          : "2px solid rgb(180,204,232)",
+        background: "#fff",
+      }}
+    >
+      {selected && (
+        <span
+          className="block rounded-full"
+          style={{
+            width: 10,
+            height: 10,
+            background: "rgb(42,137,190)",
+          }}
+        />
+      )}
+    </span>
+  );
+}
+
+function CheckboxRow({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+}) {
+  return (
+    <label
+      className="flex items-start gap-3 cursor-pointer select-none"
+      style={{ color: "rgb(24,44,62)", fontSize: "14px", lineHeight: "20px" }}
+    >
+      <span
+        className="inline-flex items-center justify-center rounded-[6px] mt-[2px] shrink-0"
+        style={{
+          width: 20,
+          height: 20,
+          background: checked ? "rgb(42,137,190)" : "#fff",
+          border: checked
+            ? "1.5px solid rgb(42,137,190)"
+            : "1.5px solid rgb(180,204,232)",
+          transition: "background 120ms, border-color 120ms",
+        }}
+      >
+        {checked && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
+          >
+            <path
+              d="M2.5 6.2 5 8.7l4.5-5"
+              stroke="#fff"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
   );
 }
