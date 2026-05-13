@@ -94,6 +94,24 @@ function looksLikeQscTest(test: PortalTestRow | null) {
   );
 }
 
+function looksLikeTeamPuzzleRhythmTest(test: PortalTestRow | null) {
+  const slug = String(test?.slug || "").toLowerCase();
+  const name = String(test?.name || "").toLowerCase();
+  const meta = test?.meta && typeof test.meta === "object" ? test.meta : {};
+
+  const reportLayout = String(meta?.report_layout || "").toLowerCase();
+  const variant = String(meta?.variant || "").toLowerCase();
+  const family = String(meta?.test_family || "").toLowerCase();
+
+  return (
+    reportLayout === "team_puzzle_rhythm_v1" ||
+    variant === "rhythm_edition" ||
+    meta?.has_rhythm_layer === true ||
+    meta?.rhythm?.enabled === true ||
+    (family === "team_puzzle" && (slug.includes("rhythm") || name.includes("rhythm")))
+  );
+}
+
 async function fetchPortalTestRow(sb: ReturnType<typeof portal>, testId: string): Promise<PortalTestRow | null> {
   const { data, error } = await sb
     .from("tests")
@@ -158,8 +176,18 @@ export default async function ReportPage({
         redirect(`/t/${encodeURIComponent(token)}/visibility/report?${qs.toString()}`);
       }
 
-      // 2) Resolve wrapper + effective source for robust QSC detection
+      // 2) Team Puzzle RHYTHM hard route
+      // This keeps the new RHYTHM Edition report separate from the existing generic report.
       const wrapperTestRow = await fetchPortalTestRow(sb, link.test_id);
+
+      if (looksLikeTeamPuzzleRhythmTest(wrapperTestRow)) {
+        const qs = new URLSearchParams();
+        qs.set("tid", tid);
+        if (src) qs.set("src", src);
+        redirect(`/t/${encodeURIComponent(token)}/team-puzzle-rhythm-report?${qs.toString()}`);
+      }
+
+      // 3) Resolve wrapper + effective source for robust QSC detection
       const effectiveTestRow = await resolveEffectiveTestRow(sb, wrapperTestRow);
 
       const isQsc =
