@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { getAuthUser } from "../_lib/auth";
-import type { BrandingRequestBody, BrandingResponse } from "../_lib/types";
+import { brandingSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 import type { PortalOrgUpdate } from "@/types/database.types";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,15 @@ export async function PATCH(req: Request) {
     const { user, error: authError } = await getAuthUser();
     if (authError) return authError;
 
-    const body: Partial<BrandingRequestBody> = await req.json().catch(() => ({}));
+    const raw = await req.json().catch(() => ({}));
+    const parsed = brandingSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
 
     const admin = portalAdmin();
 
@@ -27,10 +35,12 @@ export async function PATCH(req: Request) {
 
     const updates: PortalOrgUpdate = { last_completed_step: 6 };
 
-    if (body?.primary_colour !== undefined) updates.brand_primary = String(body.primary_colour).trim() || null;
-    if (body?.secondary_colour !== undefined) updates.brand_secondary = String(body.secondary_colour).trim() || null;
-    if (body?.background_colour !== undefined) updates.brand_background = String(body.background_colour).trim() || null;
-    if (body?.text_colour !== undefined) updates.brand_text = String(body.text_colour).trim() || null;
+    if (body.primary_colour !== undefined) updates.brand_primary = body.primary_colour;
+    if (body.secondary_colour !== undefined) updates.brand_secondary = body.secondary_colour;
+    if (body.background_colour !== undefined) updates.brand_background = body.background_colour;
+    if (body.text_colour !== undefined) updates.brand_text = body.text_colour;
+    if (body.surface_colour !== undefined) updates.brand_surface = body.surface_colour;
+    if (body.accent_colour !== undefined) updates.brand_accent = body.accent_colour;
 
     const { data: org, error } = await admin
       .from("orgs")

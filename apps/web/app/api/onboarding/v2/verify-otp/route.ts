@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/app/_lib/portal";
-import type { VerifyOtpRequestBody } from "../_lib/types";
+import { verifyOtpSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const body: Partial<VerifyOtpRequestBody> = await req.json().catch(() => ({}));
-    const email = String(body?.email || "").trim().toLowerCase();
-    const token = String(body?.token || "").trim();
-
-    if (!email || !token) {
+    const raw = await req.json().catch(() => ({}));
+    const parsed = verifyOtpSchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "email and token are required" },
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
+    const { email, token } = parsed.data;
 
     const sb = await getServerSupabase();
     const { data, error } = await sb.auth.verifyOtp({ email, token, type: "email" });

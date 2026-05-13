@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { getAuthUser } from "../_lib/auth";
-import type { PlanRequestBody } from "../_lib/types";
+import { planSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -10,24 +10,15 @@ export async function PATCH(req: Request) {
     const { user, error: authError } = await getAuthUser();
     if (authError) return authError;
 
-    const body: Partial<PlanRequestBody> = await req.json().catch(() => ({}));
-    const tier = Number(body?.tier);
-    const terms_accepted = body?.terms_accepted === true;
-    const privacy_accepted = body?.privacy_accepted === true;
-
-    if (!Number.isInteger(tier) || tier < 1 || tier > 4) {
+    const raw = await req.json().catch(() => ({}));
+    const parsed = planSchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "tier must be an integer between 1 and 4" },
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
-
-    if (!terms_accepted || !privacy_accepted) {
-      return NextResponse.json(
-        { ok: false, error: "terms_accepted and privacy_accepted must be true" },
-        { status: 400 }
-      );
-    }
+    const { tier } = parsed.data;
 
     const admin = portalAdmin();
 

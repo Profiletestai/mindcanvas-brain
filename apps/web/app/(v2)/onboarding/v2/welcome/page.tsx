@@ -2,25 +2,44 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
 import { api, isErr } from "../_lib/api";
 import { getPlan, type PlanTier } from "../_lib/plans";
+import { StepCard } from "../_components/StepCard";
 import type { PortalOrg } from "@/types/database.types";
 
 type OrgStatus = "pending_activation" | "active" | "suspended" | "archived";
 
 const STATUS_LABEL: Record<OrgStatus, string> = {
-  pending_activation: "Pending activation",
-  active: "Active",
-  suspended: "Suspended",
-  archived: "Archived",
+  pending_activation: "PENDING_ACTIVATION",
+  active: "ACTIVE",
+  suspended: "SUSPENDED",
+  archived: "ARCHIVED",
 };
 
-const STATUS_STYLE: Record<OrgStatus, { bg: string; text: string; dot: string }> = {
-  pending_activation: { bg: "bg-amber-500/15", text: "text-amber-300", dot: "bg-amber-400" },
-  active: { bg: "bg-emerald-500/15", text: "text-emerald-300", dot: "bg-emerald-400" },
-  suspended: { bg: "bg-rose-500/15", text: "text-rose-300", dot: "bg-rose-400" },
-  archived: { bg: "bg-white/10", text: "text-white/60", dot: "bg-white/40" },
+const STATUS_STYLE: Record<
+  OrgStatus,
+  { bg: string; text: string; dot: string }
+> = {
+  pending_activation: {
+    bg: "rgb(255,244,214)",
+    text: "rgb(168,114,12)",
+    dot: "rgb(214,158,46)",
+  },
+  active: {
+    bg: "rgb(220,247,232)",
+    text: "rgb(28,128,72)",
+    dot: "rgb(46,168,96)",
+  },
+  suspended: {
+    bg: "rgb(255,224,228)",
+    text: "rgb(176,40,68)",
+    dot: "rgb(214,62,90)",
+  },
+  archived: {
+    bg: "rgb(228,234,244)",
+    text: "rgb(90,108,134)",
+    dot: "rgb(140,160,185)",
+  },
 };
 
 export default function WelcomePage() {
@@ -41,57 +60,164 @@ export default function WelcomePage() {
     };
   }, []);
 
-  if (!ready) return <div className="py-8 text-center text-white/70">Loading…</div>;
+  if (!ready) {
+    return <div className="py-8 text-center text-white/70">Loading…</div>;
+  }
 
-  const tierStr = sessionStorage.getItem("onb_tier");
+  const tierStr =
+    typeof window !== "undefined" ? sessionStorage.getItem("onb_tier") : null;
   const tier = tierStr ? (Number(tierStr) as PlanTier) : null;
   const plan = getPlan(tier);
+  const status = (org?.status as OrgStatus) ?? "pending_activation";
+  const statusStyle = STATUS_STYLE[status] ?? STATUS_STYLE.pending_activation;
+  const statusLabel = STATUS_LABEL[status] ?? status;
 
   return (
-    <div className="text-center">
-      <div className="mx-auto h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-2xl">
-        ✓
-      </div>
-      <h1 className="mt-4 text-2xl font-semibold">Your organisation has been created</h1>
-      <p className="mt-2 text-sm text-white/70">You&apos;re all set to continue your setup.</p>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5 text-left space-y-3">
-        <Row label="Organisation" value={org?.name ?? "—"} />
-        <Row
-          label="Status"
-          value={(() => {
-            const status = (org?.status as OrgStatus) ?? "pending_activation";
-            const style = STATUS_STYLE[status] ?? STATUS_STYLE.pending_activation;
-            const label = STATUS_LABEL[status] ?? status;
-            return (
-              <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs ${style.bg} ${style.text}`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                {label}
-              </span>
-            );
-          })()}
-        />
-        <Row label="Selected plan" value={plan ? `${plan.name} — ${plan.priceLabel}` : "—"} />
-      </div>
-
-      <Button
-        type="button"
-        onClick={() => router.push("/portal/login")}
-        className="mt-6 w-full"
+    <StepCard
+      titleNoWrap={false}
+      title={
+        <>
+          Your organisation has{" "}
+          <br className="hidden sm:block" />
+          been <span style={{ color: "rgb(84, 175, 224)" }}>created</span>
+        </>
+      }
+      subtitle="You're all set to continue your setup."
+    >
+      <div
+        className="mt-8 rounded-[18px] border"
+        style={{
+          background: "#fff",
+          borderColor: "rgb(228,238,248)",
+          padding: "44px 28px 44px 28px",
+          boxShadow: "0px 2px 12px 0px rgba(13,45,94,0.06)",
+        }}
       >
-        Continue to setup
-      </Button>
+        <div className="flex justify-center">
+          <div
+            className="flex items-center justify-center"
+            style={{
+              height: "72px",
+              width: "72px",
+              borderRadius: "9999px",
+              background: "#fff",
+              border: "2px solid rgb(170,220,180)",
+              fontSize: "34px",
+              lineHeight: 1,
+              boxShadow: "0px 2px 10px 0px rgba(13,45,94,0.08)",
+            }}
+          >
+            🎉
+          </div>
+        </div>
+
+        <div
+          className="mt-6 rounded-[14px]"
+          style={{
+            background: "rgb(240,246,255)",
+            padding: "26px 28px",
+          }}
+        >
+          <Row label="Organisation" value={org?.name ?? "—"} />
+          <Divider />
+          <Row
+            label="Status"
+            value={
+              <span
+                className="inline-flex items-center gap-1.5"
+                style={{
+                  background: statusStyle.bg,
+                  color: statusStyle.text,
+                  border: `1px solid ${statusStyle.dot}`,
+                  borderRadius: "9999px",
+                  padding: "5px 14px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  letterSpacing: "0.5px",
+                }}
+              >
+                <span
+                  style={{
+                    height: "6px",
+                    width: "6px",
+                    borderRadius: "9999px",
+                    background: statusStyle.dot,
+                  }}
+                />
+                {statusLabel}
+              </span>
+            }
+          />
+          <Divider />
+          <Row label="Selected plan" value={plan ? plan.name : "—"} />
+          <Divider />
+          <Row
+            label="Billing"
+            value={
+              <span style={{ color: "rgb(120,144,176)", fontWeight: 500 }}>
+                Visible · disabled until activation
+              </span>
+            }
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => router.push("/portal/login")}
+          className="mt-6 w-full h-[60px] rounded-[14px] text-white font-bold tracking-wide cursor-pointer"
+          style={{
+            background:
+              "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+            fontSize: "16px",
+            letterSpacing: "0.2px",
+            boxShadow: "0px 6px 20px 0px rgba(37,99,200,0.30)",
+          }}
+        >
+          Continue to setup
+        </button>
+      </div>
+    </StepCard>
+  );
+}
+
+function Row({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <span
+        style={{
+          fontSize: "15px",
+          color: "rgb(90,122,158)",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        className="text-right"
+        style={{
+          fontSize: "15px",
+          color: "rgb(24,44,62)",
+          fontWeight: 700,
+        }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function Divider() {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm text-white/60">{label}</span>
-      <span className="text-sm text-white font-medium">{value}</span>
-    </div>
+    <div
+      style={{
+        height: "1px",
+        background: "rgba(180,204,232,0.45)",
+      }}
+    />
   );
 }
