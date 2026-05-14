@@ -540,12 +540,42 @@ function ProfileRadar(props: { labels: ProfileLabel[]; percentages: Record<strin
 
 function DriverTile(props: { driver: RhythmDriverKey; group?: DriverGroup }) {
   const d = DRIVER_COPY[props.driver];
-  const group = props.group ? GROUP_COPY[props.group] : null;
+  const group = props.group || "stabilising";
+  const theme: Record<DriverGroup, { color: string; bg: string; border: string }> = {
+    flow: {
+      color: "#16A34A",
+      bg: "rgba(22, 163, 74, 0.18)",
+      border: "#16A34A",
+    },
+    stabilising: {
+      color: "#F59E0B",
+      bg: "rgba(245, 158, 11, 0.18)",
+      border: "#F59E0B",
+    },
+    frustration: {
+      color: "#BC1823",
+      bg: "rgba(188, 24, 35, 0.18)",
+      border: "#BC1823",
+    },
+  };
+  const t = theme[group];
+
   return (
-    <div className={cls("rounded-2xl border p-4", group ? `${group.bg} ${group.border}` : "border-white/10 bg-white/5")}>
-      <div className="text-4xl font-bold" style={{ color: group?.color || "#60A5FA" }}>{d.letter}</div>
-      <div className={cls("mt-2 text-base font-bold", group ? group.text : "text-white")}>{d.label}</div>
-      <p className={cls("mt-2 text-sm leading-6", group ? "text-slate-700" : "text-white/75")}>{d.short}</p>
+    <div
+      className="min-h-[154px] rounded-lg px-[14px] pb-[14px] pt-[7px]"
+      style={{
+        background: t.bg,
+        borderLeft: `1px solid ${t.border}`,
+        borderRight: `1px solid ${t.border}`,
+        borderBottom: `1px solid ${t.border}`,
+        borderTop: `3px solid ${t.border}`,
+      }}
+    >
+      <div className="text-[42px] font-bold leading-[1.15]" style={{ color: t.color }}>
+        {d.letter}
+      </div>
+      <div className="mt-[6px] text-[13px] font-bold leading-[18px] text-white">{d.label}</div>
+      <p className="mt-[8px] text-[13px] leading-[21px] text-white/90">{d.short}</p>
     </div>
   );
 }
@@ -637,18 +667,24 @@ function HowToUseCards() {
 
 function ProfileList(props: { profiles: Array<ProfileLabel & { pct?: number; short_code?: string }>; activeCode?: string }) {
   return (
-    <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="space-y-[8px] rounded-[18px] border border-white/10 bg-white/5 p-[17px]">
       {props.profiles.map((p, index) => {
         const active = p.code === props.activeCode;
         return (
-          <div key={p.code} className={cls("flex items-center gap-3 rounded-xl border p-3", active ? "border-green-400/40 bg-green-400/15" : "border-white/10 bg-white/[0.03]")}>
-            <span className={cls("w-5 text-xs font-bold", active ? "text-green-300" : "text-white/40")}>{index + 1}</span>
-            <span className={cls("h-2 w-2 rounded-full", active ? "bg-green-400" : "bg-sky-200/60")} />
+          <div
+            key={p.code}
+            className={cls(
+              "flex min-h-[43px] items-center gap-[10px] rounded-lg border px-[13px] py-[8px]",
+              active ? "border-green-400/40 bg-green-400/15" : "border-white/10 bg-white/[0.03]"
+            )}
+          >
+            <span className={cls("w-[12px] text-[10px] font-normal", active ? "text-green-400/60" : "text-white/35")}>{index + 1}</span>
+            <span className={cls("h-[7px] w-[7px] rounded-full", active ? "bg-green-400" : "bg-sky-200/70")} />
             <div className="min-w-0 flex-1">
-              <div className={cls("text-sm font-semibold", active ? "text-green-300" : "text-white")}>{p.name}</div>
+              <div className={cls("text-[13px] font-semibold leading-[17px]", active ? "text-green-300" : "text-white")}>{p.name} {p.short_code ? `(${p.short_code})` : ""}</div>
             </div>
-            <span className="text-xs text-white/45">{p.frequency_code ? `${FREQUENCY_COPY[p.frequency_code]?.title.replace(" Frequency", "")} (${p.frequency_code})` : ""}</span>
-            {active ? <span className="rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white">You</span> : null}
+            <span className={cls("shrink-0 text-right text-[10px]", active ? "text-green-300" : "text-white/35")}>{p.frequency_code ? `${FREQUENCY_COPY[p.frequency_code]?.title.replace(" Frequency", "")} (${p.frequency_code})` : ""}</span>
+            {active ? <span className="rounded-full bg-green-500 px-2 py-[2px] text-[8px] font-bold text-white">You</span> : null}
           </div>
         );
       })}
@@ -870,103 +906,101 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
       <div className="pointer-events-none absolute inset-0 opacity-80" style={{ background: "radial-gradient(circle at 12% 12%, rgba(79,125,255,0.22), transparent 35%), radial-gradient(circle at 86% 18%, rgba(69,224,209,0.12), transparent 32%), radial-gradient(circle at 50% 90%, rgba(139,92,246,0.10), transparent 36%)" }} />
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
-        <Card className="overflow-hidden p-6 md:p-7">
-          <div className="grid gap-6 lg:grid-cols-[1fr_640px] lg:items-start">
-            <div>
-              <div className="flex items-start gap-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-1.5">
-                  <ReportAssetImage src={REPORT_ASSETS.logo} alt="Life Puzzle" className="h-full w-full object-contain" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-lg font-semibold leading-tight">Team Puzzle Discovery Report</div>
-                  <div className="mt-1 text-3xl font-bold uppercase leading-none tracking-[0.16em] md:text-5xl">Personalised Profile</div>
-                  <div className="mt-3 text-xs font-bold uppercase tracking-[0.34em] text-white/70">Life Puzzle</div>
-                </div>
-              </div>
-              <div className="mt-5 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white/75">powered by profiletest.ai</div>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button type="button" onClick={handleDownloadPdf} className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15">Download PDF</button>
-                {nextStepsUrl ? (
-                  <button type="button" onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")} className="rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-2 text-sm font-bold text-[#071C36]">Next steps</button>
-                ) : null}
-              </div>
+        <Card className="relative min-h-[170px] overflow-hidden p-[20px] md:p-[20px]">
+          <div className="absolute right-[20px] top-[20px] z-10 flex gap-[8px]">
+            <button type="button" onClick={handleDownloadPdf} className="h-[37px] rounded-lg border border-white/15 bg-[#08162B]/70 px-[15px] text-[13px] font-semibold leading-[20px] text-white hover:bg-[#08162B]/90">Download PDF</button>
+            {nextStepsUrl ? (
+              <button type="button" onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")} className="h-[37px] rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[13px] font-semibold leading-[20px] text-[#071C36]">Next steps</button>
+            ) : null}
+          </div>
+
+          <div className="flex items-start gap-[13px] pr-[240px]">
+            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden rounded-[16px] border border-white/15 bg-white/10 p-[3px]">
+              <ReportAssetImage src={REPORT_ASSETS.logo} alt="Life Puzzle" className="h-full w-full object-contain" />
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="min-h-[82px] rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/45">Prepared for</div>
-                <div className="mt-2 font-semibold leading-snug">{participantName}</div>
-              </div>
-              <div className="min-h-[82px] rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/45">Date</div>
-                <div className="mt-2 font-semibold leading-snug">{date}</div>
-              </div>
-              <div className="min-h-[82px] rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs text-white/45">Framework</div>
-                <div className="mt-2 font-semibold leading-snug">Team Puzzle RHYTHM Edition</div>
-              </div>
+            <div className="min-w-0">
+              <div className="text-[18px] font-semibold capitalize leading-[22px] text-white">Team Puzzle Discovery Report</div>
+              <div className="mt-[2px] text-[32px] font-semibold uppercase leading-[35px] tracking-[4.48px] text-white">Personalised Profile</div>
+              <div className="mt-[10px] text-[13px] font-bold uppercase leading-[19.5px] tracking-[3.64px] text-white/75">Life Puzzle</div>
+              <div className="mt-[13px] inline-flex rounded-full border border-white/15 bg-white/5 px-[12px] py-[3px] text-[10px] font-bold uppercase tracking-[0.25em] text-white/75">powered by profiletest.ai</div>
+            </div>
+          </div>
+
+          <div className="mt-[14px] grid gap-[10px] md:ml-auto md:mr-0 md:w-[697px] md:grid-cols-[168px_168px_1fr]">
+            <div className="h-[70px] rounded-[18px] border border-white/10 bg-gradient-to-b from-[rgba(35,62,97,0.72)] to-[rgba(18,38,64,0.78)] px-[15px] py-[12px]">
+              <div className="text-[10px] leading-[15px] text-white/55">Prepared for</div>
+              <div className="mt-[6px] text-[16px] font-semibold leading-[24px] text-white">{participantName}</div>
+            </div>
+            <div className="h-[70px] rounded-[18px] border border-white/10 bg-gradient-to-b from-[rgba(35,62,97,0.72)] to-[rgba(18,38,64,0.78)] px-[15px] py-[12px]">
+              <div className="text-[10px] leading-[15px] text-white/55">Date</div>
+              <div className="mt-[6px] text-[16px] font-semibold leading-[24px] text-white">{date}</div>
+            </div>
+            <div className="h-[70px] rounded-[18px] border border-white/10 bg-gradient-to-b from-[rgba(35,62,97,0.72)] to-[rgba(18,38,64,0.78)] px-[15px] py-[12px]">
+              <div className="text-[10px] leading-[15px] text-white/55">Framework</div>
+              <div className="mt-[6px] text-[16px] font-semibold leading-[20px] text-white">{data.test.name || "Team Puzzle Discovery Assessment"}</div>
             </div>
           </div>
         </Card>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_340px_340px]">
-          <Card>
-            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/50">Team Puzzle Profile</div>
-            <h1 className="mt-3 text-4xl font-bold md:text-6xl">{participantName}</h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-white/80">How the four behavioural energies show up in you, and your pattern to a more fearless way of being.</p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <StatPill tone="blue">Profile: {profileName}</StatPill>
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_353px_353px]">
+          <Card className="min-h-[423px] p-[22px]">
+            <div className="text-[10px] font-normal uppercase leading-[15px] tracking-[2.6px] text-white/55">Team Puzzle Profile</div>
+            <h1 className="mt-[18px] text-[42px] font-semibold leading-[46px] tracking-[0.5px] text-white md:text-[50px] md:leading-[50px]">{participantName}</h1>
+            <p className="mt-[21px] max-w-[493px] text-[15px] font-normal leading-[28px] text-white/90">How the four behavioural energies show up in you, and your pattern to a more fearless way of being.</p>
+
+            <div className="mt-[18px] flex flex-wrap items-center gap-[11px]">
+              <StatPill tone="blue">Profile: {profileName} ({profileCodeToShort(profileCode)})</StatPill>
               <StatPill tone="green">{topFreqName} ({topFreq})</StatPill>
               <StatPill>Organisation: {data.taker.company || orgName}</StatPill>
             </div>
-            <div className="mt-7 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Driver</div>
-                <div className="mt-2 text-2xl font-bold">{topFreqName} ({topFreq})</div>
-                <p className="mt-3 text-sm leading-6 text-white/60">{topFreqCopy?.description}</p>
+
+            <div className="mt-[28px] grid max-w-[550px] overflow-hidden rounded-[14px] border border-white/10 bg-white/[0.04] md:grid-cols-2">
+              <div className="min-h-[123px] border-b border-white/10 p-[22px] md:border-b-0 md:border-r">
+                <div className="text-[9px] font-semibold uppercase leading-[14px] tracking-[2px] text-[#5A6A88]">Driver</div>
+                <div className="mt-[8px] text-[20px] font-semibold leading-[20px] text-white">{topFreqName} ({topFreq})</div>
+                <p className="mt-[14px] max-w-[205px] text-[11px] leading-[17.6px] text-[#8B98B4]">{topFreqCopy?.focus || topFreqCopy?.description}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Top Profile</div>
-                <div className="mt-2 text-2xl font-bold">{profileName}</div>
-                <p className="mt-3 text-sm leading-6 text-white/60">A distinct working pattern that describes how you most naturally create value.</p>
+              <div className="min-h-[123px] p-[22px]">
+                <div className="text-[9px] font-semibold uppercase leading-[14px] tracking-[2px] text-[#5A6A88]">Top Profile</div>
+                <div className="mt-[8px] text-[20px] font-semibold leading-[20px] text-white">{profileName}</div>
+                <p className="mt-[14px] max-w-[227px] text-[11px] leading-[17.6px] text-[#8B98B4]">A distinct working pattern that describes how you most naturally create value.</p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-4">
+          <Card className="min-h-[423px] p-[17px]">
             <ProfileList profiles={sortedProfiles} activeCode={profileCode} />
           </Card>
 
-          <Card className="flex flex-col gap-5">
-            <div className="rounded-3xl border border-sky-300/20 bg-sky-400/25 p-8 text-center">
-              <div className="text-3xl font-bold">{topFreqName} ({topFreq})</div>
-              <div className="mt-3 text-sm text-white/80">Your Dominant Frequency</div>
+          <Card className="min-h-[423px] p-[16px]">
+            <div className="rounded-[18px] border border-[#4092C5] bg-[rgba(64,146,197,0.50)] px-[20px] py-[38px] text-center shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+              <div className="text-[28px] font-semibold leading-[38px] text-white">{topFreqName} ({topFreq})</div>
+              <div className="mt-[6px] text-[13px] leading-[19px] text-white/90">Your Dominant Frequency:</div>
             </div>
-            <div>
-              <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-white/45">Profile Mix</div>
-              <div className="space-y-3">
-                {[primary, secondary, tertiary].filter(Boolean).map((p: any, index) => (
-                  <div key={p.code} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <div className="font-semibold text-white">{p.name}</div>
-                        <div className="mt-1 text-xs text-white/45">{index === 0 ? "Primary" : index === 1 ? "Secondary" : "Tertiary"} · {p.short_code || profileCodeToShort(p.code)}</div>
-                      </div>
-                      <div className="text-sm font-semibold text-white/80">{p.pct}%</div>
+            <div className="mt-[17px] text-[9px] font-semibold uppercase leading-[14px] tracking-[2px] text-[#5A6A88]">Profile mix</div>
+            <div className="mt-[8px] space-y-[8px]">
+              {[primary, secondary, tertiary].filter(Boolean).map((p: any, index) => (
+                <div key={p.code} className="min-h-[66px] rounded-lg border border-white/10 bg-white/[0.03] px-[17px] py-[13px]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[13px] font-semibold leading-[17px] text-white">{p.name} ({p.short_code || profileCodeToShort(p.code)})</div>
+                      <div className="mt-[3px] text-[10px] text-white/35">{index === 0 ? "Primary" : index === 1 ? "Secondary" : "Tertiary"} · {p.short_code || profileCodeToShort(p.code)}</div>
                     </div>
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div className="h-full rounded-full bg-sky-300" style={{ width: `${clamp(Number(p.pct || 0))}%` }} />
-                    </div>
+                    <div className="text-[11px] text-white">{p.pct}%</div>
                   </div>
-                ))}
-              </div>
+                  <div className="ml-[78px] mt-[-5px] h-[4px] overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-[#6BAED6]" style={{ width: `${clamp(Number(p.pct || 0))}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
         </div>
 
-        <Card className="mt-6">
-          <h2 className="text-lg font-semibold">Professional Performance Rhythm</h2>
-          <p className="mt-2 text-sm text-white/75">Your RHYTHM Drivers</p>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Card className="mt-6 p-[24px]">
+          <h2 className="text-[14px] font-semibold leading-[20px] text-white">Professional Performance Rhythm</h2>
+          <p className="mt-[-2px] text-[14px] font-normal leading-[20px] text-white/85">Your RHYTHM Drivers</p>
+          <div className="mt-[36px] grid gap-[15px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {(["resourceful", "hopeful", "yielding", "tactical", "human_centred", "measured"] as RhythmDriverKey[]).map((driver) => (
               <DriverTile key={driver} driver={driver} group={flow.includes(driver) ? "flow" : stabilising.includes(driver) ? "stabilising" : "frustration"} />
             ))}
