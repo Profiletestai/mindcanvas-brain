@@ -306,17 +306,24 @@ const REPORT_ASSETS = {
   icons: {
     welcome: "/icons/tp-welcome-from-chandell.png",
     howToUse: "/icons/tp-how-to-use-report.png",
-    ideas: "/icons/tp-ideas.png",
+    introTeamPuzzleFramework: "/icons/tp-intro-team-puzzle-framework.png",
+    understandingFrequenciesProfiles: "/icons/tp-understanding-frequencies-profiles.png",
+    fourFrequencies: "/icons/tp-four-frequencies.png",
+    eightProfiles: "/icons/tp-eight-profiles.png",
     naturalContribution: "/icons/tp-natural-contribution.png",
-    nextSteps: "/icons/tp-next-steps.png",
+    frequencySummary: "/icons/tp-frequency-summary.png",
     personalityMap: "/icons/tp-personality-map.png",
-    profileInDepth: "/icons/tp-profile-in-depth.png",
     profileMix: "/icons/tp-profile-mix.png",
-    strategicMap: "/icons/tp-strategic-map.png",
-    structure: "/icons/tp-structure.png",
+    profileInDepth: "/icons/tp-profile-in-depth.png",
+    professionalPerformanceRhythm: "/icons/tp-profile-in-depth.png",
+    energyModel: "/icons/tp-profile-in-depth.png",
+    energyMix: "/icons/tp-energy-mix.png",
     teamRoleFit: "/icons/tp-team-role-fit.png",
     valueCreationPathway: "/icons/tp-value-creation-pathway.png",
-    whatsHoldingYouBack: "/icons/tp-whats-holding-you-back.png",
+    collaborationTips: "/icons/tp-collaboration-tips.png",
+    developmentRecommendations: "/icons/tp-development-recommendations.png",
+    whatsHoldingYouBack: "/icons/tp-whats-holing-you-back.png",
+    nextSteps: "/icons/tp-next-steps.png",
   },
 } as const;
 
@@ -959,7 +966,29 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
           <aside className="h-fit rounded-3xl border border-white/10 bg-[#0C203A]/80 p-5 shadow-2xl shadow-black/20 lg:sticky lg:top-4">
             <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">Report Index</div>
             <ol className="mt-4 space-y-2 text-sm leading-6 text-white/80">
-              {["Welcome from Chandell", "How to use this report", "Team Puzzle Framework", "Four Frequencies & Eight Profiles", "Frequency summary", "Profile mix", `Your profile in depth: ${profileName}`, "Professional Performance Rhythm", "The 3-Level Energy Model", "Your Professional Performance Rhythm", "Energy mix", "Team Role Fit", "Your Value Creation Pathway", "Collaboration Tips", "Development Recommendations", "What Could Be Holding You Back?", "Your Next Steps"].map((item, index) => (
+              {[
+                "Welcome from Chandell",
+                "How to Use This Report",
+                "Introducing The Team Puzzle Framework",
+                "Understanding the Four Frequencies & Eight Profiles",
+                "The Four Frequencies – Energies That Drive Contribution",
+                "The Eight Profiles",
+                "The Eight Profiles – Natural Contribution Types",
+                "Frequency summary",
+                "Personality Map",
+                "Profile mix",
+                `Your profile in depth: ${profileName}`,
+                "Professional Performance Rhythm",
+                "The 3-Level Energy Model",
+                "Your Professional Performance Rhythm",
+                "Energy mix – how your profiles work together",
+                "Team Role Fit",
+                "Your Value Creation Pathway",
+                "Collaboration Tips",
+                "Development Recommendations",
+                "What Could Be Holding You Back?",
+                "Your Next Steps",
+              ].map((item, index) => (
                 <li key={item}><span className="text-white/40">{index + 1}.</span> {item}</li>
               ))}
             </ol>
@@ -978,7 +1007,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
 
             <HowToUseCards />
 
-            <IntroTextBlock title="Introducing the Team Puzzle Framework" icon={REPORT_ASSETS.icons.ideas}>
+            <IntroTextBlock title="Introducing The Team Puzzle Framework" icon={REPORT_ASSETS.icons.introTeamPuzzleFramework}>
               <p>High-performing teams do not happen by accident. They are built with intention, structure, and insight. The Team Puzzle Framework bridges the gap between untapped human potential and practical business results.</p>
               <p>At its core, Team Puzzle helps organisations answer one fundamental question: <em>How do we get the best from each individual, and even better results from the team as a whole?</em></p>
               <p>The Team Puzzle approach is not about fixing people. It is about fitting people together. Each person has a unique shape and contribution, and the goal is to help teams see how those pieces connect.</p>
@@ -988,7 +1017,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </IntroTextBlock>
 
             <Card>
-              <SectionHeader title="Understanding the Four Frequencies & Eight Profiles" icon={REPORT_ASSETS.icons.structure} />
+              <SectionHeader title="Understanding the Four Frequencies & Eight Profiles" icon={REPORT_ASSETS.icons.understandingFrequenciesProfiles} />
               <WhiteCard>
                 <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
                   <p className="text-sm leading-7 text-slate-700">Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
@@ -1008,7 +1037,29 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="The Eight Profiles" icon={REPORT_ASSETS.icons.naturalContribution} />
+              <SectionHeader title="The Four Frequencies – Energies That Drive Contribution" icon={REPORT_ASSETS.icons.fourFrequencies} />
+              <WhiteCard>
+                <p className="text-sm leading-7 text-slate-700">Each person leads with one or two of these frequencies. Each frequency has a focus, a strength, and a potential blind spot. Understanding these allows teams to work with, not against, their people’s natural flow.</p>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {(["A", "B", "C", "D"] as FrequencyCode[]).map((code) => {
+                    const item = FREQUENCY_COPY[code];
+                    return (
+                      <div key={code} className="rounded-2xl border border-[#084595]/30 bg-white p-5">
+                        <h3 className="text-base font-bold text-[#084595]">{code}. {item.title}</h3>
+                        <dl className="mt-4 grid gap-3 text-sm leading-6 text-slate-700">
+                          <div><dt className="font-bold text-slate-900">Focus:</dt><dd>{item.focus}</dd></div>
+                          <div><dt className="font-bold text-slate-900">Strength:</dt><dd>{item.strength}</dd></div>
+                          <div><dt className="font-bold text-slate-900">Blind Spot:</dt><dd>{item.blindSpot}</dd></div>
+                        </dl>
+                      </div>
+                    );
+                  })}
+                </div>
+              </WhiteCard>
+            </Card>
+
+            <Card>
+              <SectionHeader title="The Eight Profiles" icon={REPORT_ASSETS.icons.eightProfiles} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">The Team Puzzle framework maps eight unique Profiles, each representing a different way of thinking, contributing, and leading.</p>
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -1030,7 +1081,29 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Frequency summary" icon={REPORT_ASSETS.icons.structure} />
+              <SectionHeader title="The Eight Profiles – Natural Contribution Types" icon={REPORT_ASSETS.icons.naturalContribution} />
+              <WhiteCard>
+                <p className="text-sm leading-7 text-slate-700">Each profile is a blend of one or more Frequencies and represents a unique role in the team. The more diversity you have across these eight, the more complete and capable your team becomes.</p>
+                <div className="mt-6 space-y-4">
+                  {data.result.profile_labels.map((p) => {
+                    const copy = PROFILE_COPY[p.code];
+                    const active = p.code === profileCode;
+                    return (
+                      <div key={p.code} className={cls("rounded-2xl border p-5", active ? "border-green-500 bg-green-50" : "border-slate-200 bg-slate-50")}>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="font-bold text-slate-900">{profileCodeToShort(p.code)} · {copy?.title || p.name} {copy?.role ? `– ${copy.role}` : ""}</h3>
+                          {active ? <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">Your Profile</span> : null}
+                        </div>
+                        <p className="mt-3 text-sm leading-7 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </WhiteCard>
+            </Card>
+
+            <Card>
+              <SectionHeader title="Frequency summary" icon={REPORT_ASSETS.icons.frequencySummary} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">Your strongest overall frequency is <strong>{topFreqName} ({topFreq})</strong>, which shapes how you approach problems, make decisions, and contribute in a team.</p>
                 <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -1040,6 +1113,31 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
                       <div className="mt-2 text-3xl font-bold text-[#084595]">{data.result.frequency_percentages[f.code] || 0}%</div>
                     </div>
                   ))}
+                </div>
+              </WhiteCard>
+            </Card>
+
+            <Card>
+              <SectionHeader title="Personality Map" icon={REPORT_ASSETS.icons.personalityMap} />
+              <ProfileRadar labels={data.result.profile_labels} percentages={data.result.profile_percentages} />
+            </Card>
+
+            <Card>
+              <SectionHeader title="Profile mix" icon={REPORT_ASSETS.icons.profileMix} />
+              <WhiteCard>
+                <p className="text-sm leading-7 text-slate-700">Your profile mix shows how strongly you match each of the eight Profiles. Higher percentages show patterns you use often; lower ones are backup styles you can lean on when needed.</p>
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  {[primary, secondary, tertiary].filter(Boolean).map((p, index) => {
+                    const item = p as ProfileLabel & { pct: number; short_code: string };
+                    const labels = ["Primary profile", "Secondary profile", "Tertiary profile"];
+                    return (
+                      <div key={`${item.code}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                        <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{labels[index]}</div>
+                        <div className="mt-3 text-3xl font-bold text-[#084595]">{Math.round(item.pct || 0)}%</div>
+                        <div className="mt-2 font-bold text-slate-900">{item.name} {item.short_code || profileCodeToShort(item.code)}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </WhiteCard>
             </Card>
@@ -1063,7 +1161,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Professional Performance Rhythm" icon={REPORT_ASSETS.rhythmPuzzle} />
+              <SectionHeader title="Professional Performance Rhythm" icon={REPORT_ASSETS.icons.professionalPerformanceRhythm} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">Your Team Puzzle profile explains your natural energy and contribution style. Alongside this, the Professional Performance Rhythm reveals how you approach work and create results across six key drivers.</p>
                 <div className="grid gap-6 lg:grid-cols-[1fr_280px] lg:items-start">
@@ -1081,7 +1179,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="The 3-Level Energy Model" icon={REPORT_ASSETS.icons.strategicMap} />
+              <SectionHeader title="The 3-Level Energy Model" icon={REPORT_ASSETS.icons.energyModel} />
               <WhiteCard>
                 <div className="grid gap-4 md:grid-cols-3">
                   {(["flow", "stabilising", "frustration"] as DriverGroup[]).map((group, index) => {
@@ -1100,7 +1198,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Your Professional Performance Rhythm" icon={REPORT_ASSETS.rhythmPuzzle} />
+              <SectionHeader title="Your Professional Performance Rhythm" icon={REPORT_ASSETS.icons.professionalPerformanceRhythm} />
               <div className="space-y-6">
                 <WhiteCard>
                   <h3 className="text-lg font-bold text-slate-900">{GROUP_COPY.flow.heading}</h3>
@@ -1119,7 +1217,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Energy mix — how your profile and RHYTHM work together" icon={REPORT_ASSETS.icons.profileMix} />
+              <SectionHeader title="Energy mix – how your profiles work together" icon={REPORT_ASSETS.icons.energyMix} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">As a <strong>{profileName}</strong>, your core contribution is shaped by {topFreqName} energy. Your RHYTHM adds another layer: it shows the conditions and behaviours that help you create results sustainably.</p>
                 <div className="mt-5 grid gap-4 md:grid-cols-3">
@@ -1165,7 +1263,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Collaboration Tips" icon={REPORT_ASSETS.icons.teamRoleFit} />
+              <SectionHeader title="Collaboration Tips" icon={REPORT_ASSETS.icons.collaborationTips} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">You thrive in teams that respect both contribution and rhythm. Use these tips to collaborate with more awareness.</p>
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -1177,7 +1275,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Development Recommendations" icon={REPORT_ASSETS.icons.strategicMap} />
+              <SectionHeader title="Development Recommendations" icon={REPORT_ASSETS.icons.developmentRecommendations} />
               <WhiteCard>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div><h4 className="font-bold text-slate-900">To elevate performance</h4><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700"><li>• Protect time for your Flow Drivers.</li><li>• Build simple support around your Frustration Drivers.</li><li>• Use Stabilising Drivers without over-relying on them.</li></ul></div>
