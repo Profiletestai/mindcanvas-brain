@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { api, isErr } from "../_lib/api";
@@ -37,7 +37,11 @@ export default function AccountPage() {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<SignupFormInput, unknown, SignupFormOutput>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(signupSchema) as unknown as Resolver<
+      SignupFormInput,
+      unknown,
+      SignupFormOutput
+    >,
     defaultValues: { first_name: "", last_name: "", email: "" },
     mode: "onTouched",
   });

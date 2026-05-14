@@ -17,13 +17,15 @@ export const nonEmptyTrimmed = z
 
 export const emailSchema = z.preprocess(
   (v) => (typeof v === "string" ? v.trim().toLowerCase() : v),
-  z.email({ message: "Invalid email format" })
+  z.string().email({ message: "Invalid email format" })
 );
 
-export const httpUrlSchema = z.url({
-  protocol: /^https?$/,
-  message: "Must be an http(s) URL.",
-});
+export const httpUrlSchema = z
+  .string()
+  .url({ message: "Must be an http(s) URL." })
+  .refine((v) => /^https?:/i.test(v), {
+    message: "Must be an http(s) URL.",
+  });
 
 export const hexColorSchema = z
   .string()
@@ -36,6 +38,7 @@ export const otpSchema = z
   .regex(OTP_RE, { message: "Enter the 6-digit code." });
 
 export const tierSchema = z
+  .number()
   .int()
   .min(1, { message: "tier must be an integer between 1 and 4" })
   .max(4, { message: "tier must be an integer between 1 and 4" });
@@ -83,10 +86,14 @@ export const contactSchema = z.object({
 export const planSchema = z.object({
   tier: tierSchema,
   terms_accepted: z.literal(true, {
-    message: "Please accept the Terms and Privacy Policy.",
+    errorMap: () => ({
+      message: "Please accept the Terms and Privacy Policy.",
+    }),
   }),
   privacy_accepted: z.literal(true, {
-    message: "Please accept the Terms and Privacy Policy.",
+    errorMap: () => ({
+      message: "Please accept the Terms and Privacy Policy.",
+    }),
   }),
 });
 
@@ -109,11 +116,16 @@ const LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
 
 export const uploadLogoSchema = z.object({
   type: z.enum(LOGO_MIMES, {
-    message: "unsupported file type (allowed: png, jpeg, webp)",
+    errorMap: () => ({
+      message: "unsupported file type (allowed: png, jpeg, webp)",
+    }),
   }),
-  size: z.int().max(LOGO_MAX_BYTES, {
-    message: `file exceeds ${LOGO_MAX_BYTES} bytes`,
-  }),
+  size: z
+    .number()
+    .int()
+    .max(LOGO_MAX_BYTES, {
+      message: `file exceeds ${LOGO_MAX_BYTES} bytes`,
+    }),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
