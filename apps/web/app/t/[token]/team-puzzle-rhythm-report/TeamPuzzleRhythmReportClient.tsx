@@ -318,6 +318,10 @@ const REPORT_ASSETS = {
     professionalPerformanceRhythm: "/icons/tp-profile-in-depth.png",
     energyModel: "/icons/tp-profile-in-depth.png",
     energyMix: "/icons/tp-energy-mix.png",
+    ideas: "/icons/tp-ideas.png",
+    strategicMap: "/icons/tp-strategic-map.png",
+    structure: "/icons/tp-structure.png",
+    commonLanguage: "/icons/tp-common-language.png",
     teamRoleFit: "/icons/tp-team-role-fit.png",
     valueCreationPathway: "/icons/tp-value-creation-pathway.png",
     collaborationTips: "/icons/tp-collaboration-tips.png",
@@ -866,41 +870,41 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
       <div className="pointer-events-none absolute inset-0 opacity-80" style={{ background: "radial-gradient(circle at 12% 12%, rgba(79,125,255,0.22), transparent 35%), radial-gradient(circle at 86% 18%, rgba(69,224,209,0.12), transparent 32%), radial-gradient(circle at 50% 90%, rgba(139,92,246,0.10), transparent 36%)" }} />
 
       <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8">
-        <Card className="overflow-hidden">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <Card className="overflow-hidden p-6 md:p-7">
+          <div className="grid gap-6 lg:grid-cols-[1fr_640px] lg:items-start">
             <div>
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-                  <ReportAssetImage src={REPORT_ASSETS.logo} alt="Life Puzzle" className="h-full w-full object-cover" />
+              <div className="flex items-start gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-1.5">
+                  <ReportAssetImage src={REPORT_ASSETS.logo} alt="Life Puzzle" className="h-full w-full object-contain" />
                 </div>
-                <div>
-                  <div className="text-lg font-semibold">Team Puzzle Discovery Report</div>
-                  <div className="text-2xl font-bold uppercase tracking-[0.14em] md:text-4xl">Personalised Profile</div>
-                  <div className="mt-2 text-xs font-bold uppercase tracking-[0.28em] text-white/60">Life Puzzle</div>
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold leading-tight">Team Puzzle Discovery Report</div>
+                  <div className="mt-1 text-3xl font-bold uppercase leading-none tracking-[0.16em] md:text-5xl">Personalised Profile</div>
+                  <div className="mt-3 text-xs font-bold uppercase tracking-[0.34em] text-white/70">Life Puzzle</div>
                 </div>
               </div>
-              <div className="mt-4 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/75">powered by profiletest.ai</div>
+              <div className="mt-5 inline-flex rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white/75">powered by profiletest.ai</div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button type="button" onClick={handleDownloadPdf} className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15">Download PDF</button>
+                {nextStepsUrl ? (
+                  <button type="button" onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")} className="rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-2 text-sm font-bold text-[#071C36]">Next steps</button>
+                ) : null}
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="min-h-[82px] rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/45">Prepared for</div>
-                <div className="mt-1 font-semibold">{participantName}</div>
+                <div className="mt-2 font-semibold leading-snug">{participantName}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="min-h-[82px] rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/45">Date</div>
-                <div className="mt-1 font-semibold">{date}</div>
+                <div className="mt-2 font-semibold leading-snug">{date}</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="min-h-[82px] rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="text-xs text-white/45">Framework</div>
-                <div className="mt-1 font-semibold">Team Puzzle RHYTHM Edition</div>
+                <div className="mt-2 font-semibold leading-snug">Team Puzzle RHYTHM Edition</div>
               </div>
             </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button type="button" onClick={handleDownloadPdf} className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15">Download PDF</button>
-            {nextStepsUrl ? (
-              <button type="button" onClick={() => window.open(nextStepsUrl, "_blank", "noopener,noreferrer")} className="rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-2 text-sm font-bold text-[#071C36]">Next steps</button>
-            ) : null}
           </div>
         </Card>
 
@@ -1023,11 +1027,46 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
               <SectionHeader title="Introducing The Team Puzzle Framework" icon={REPORT_ASSETS.icons.introTeamPuzzleFramework} />
               <WhiteCard className="p-0">
                 <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
-                  <p>High-performing teams do not happen by accident. They are built with intention, structure, and insight. The Team Puzzle Framework bridges the gap between untapped human potential and practical business results.</p>
+                  <p>High-performing teams do not happen by accident. They are built with intention, structure, and insight. The Team Puzzle Framework bridges the gap between untapped human potential and practical business results. It is a top-down, ground-up approach to unlocking the genius that already exists in your people.</p>
                   <p>At its core, Team Puzzle helps organisations answer one fundamental question: <em>How do we get the best from each individual, and even better results from the team as a whole?</em></p>
+                  <p>When people are placed in roles that energise them, when teams communicate in a shared language, and when leadership knows where and how each person adds value, the entire culture transforms.</p>
                 </div>
-                <div className="mx-5 mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                  <ReportAssetImage src={REPORT_ASSETS.frameworkVisual} alt="Team Puzzle framework visual" className="w-full object-contain" />
+                <div className="mx-5 mb-6 overflow-hidden rounded-2xl border border-[#4092C5] bg-white shadow-sm">
+                  <div className="grid lg:grid-cols-[210px_1fr]">
+                    <div className="flex items-center bg-[#4092C5] p-7 text-3xl font-bold leading-tight text-white">
+                      This framework gives you:
+                    </div>
+                    <div className="grid gap-0 divide-y divide-slate-100 p-5 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
+                      {[
+                        {
+                          icon: REPORT_ASSETS.icons.structure,
+                          text: "A clear, structured way to identify natural strengths and working energy.",
+                        },
+                        {
+                          icon: REPORT_ASSETS.icons.commonLanguage,
+                          text: "A common language that simplifies collaboration and reduces misunderstanding.",
+                        },
+                        {
+                          icon: REPORT_ASSETS.icons.strategicMap,
+                          text: "A strategic map to help leaders make better decisions about people, partnerships, and priorities.",
+                        },
+                        {
+                          icon: REPORT_ASSETS.icons.ideas,
+                          text: "Ideas for charting a course to results following a path of least resistance.",
+                        },
+                      ].map((item) => (
+                        <div key={item.text} className="flex flex-col items-start gap-4 p-5">
+                          <ReportAssetImage src={item.icon} alt="" className="h-16 w-16 object-contain" />
+                          <p className="text-sm leading-6 text-slate-700">{item.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3 px-6 pb-6 text-sm leading-7 text-slate-700">
+                  <p>The Team Puzzle approach is not about fixing people. It is about <strong>fitting people together.</strong></p>
+                  <p>Just like a real puzzle, each person has a unique shape and contribution. Our role is to help teams see how those pieces connect, so they can operate with more clarity, more confidence, and far better results.</p>
+                  <p>This is not theory; it is a tool for action. Once you see how the pieces fit together, you will never look at team performance the same way again.</p>
                 </div>
               </WhiteCard>
             </Card>
@@ -1035,15 +1074,13 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             <Card>
               <SectionHeader title="Understanding the Four Frequencies & Eight Profiles" icon={REPORT_ASSETS.icons.understandingFrequenciesProfiles} />
               <WhiteCard className="p-0">
-                <div className="grid gap-8 p-6 lg:grid-cols-[1fr_330px] lg:items-center">
-                  <div className="space-y-5 text-sm leading-7 text-slate-700">
-                    <p>Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
-                    <p>These frequencies are not about job titles or skills. They are about the natural way you show up in the workplace, the kind of energy you bring to the table, and how you most instinctively create value.</p>
-                    <p>Understanding the Four Frequencies is like learning the language of performance. Once your team can identify these dynamics, everything becomes clearer: roles, communication, conflict, collaboration, and results.</p>
-                  </div>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <ReportAssetImage src={REPORT_ASSETS.frequencyWheel} alt="Team Puzzle frequencies visual" className="mx-auto max-h-[330px] w-full object-contain" />
-                  </div>
+                <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
+                  <p>Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
+                  <p>These frequencies are not about job titles or skills. They are about the natural way you show up in the workplace, the kind of energy you bring to the table, and how you most instinctively create value.</p>
+                  <p>Understanding the Four Frequencies is like learning the language of performance. Once your team can identify these dynamics, everything becomes clearer: roles, communication, conflict, collaboration, and ultimately, results.</p>
+                </div>
+                <div className="flex justify-center px-6 pb-6">
+                  <ReportAssetImage src={REPORT_ASSETS.frequencyWheel} alt="Team Puzzle frequencies visual" className="mx-auto h-auto w-full max-w-[470px] object-contain" />
                 </div>
                 <div className="grid gap-3 px-6 pb-6 md:grid-cols-4">
                   {(["A", "B", "C", "D"] as FrequencyCode[]).map((code) => (
@@ -1053,6 +1090,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
                     </div>
                   ))}
                 </div>
+                <p className="px-6 pb-6 text-sm leading-7 text-slate-700">Each Frequency contributes something essential. None is more valuable than another. True team flow happens when all are present, and honoured.</p>
               </WhiteCard>
             </Card>
 
