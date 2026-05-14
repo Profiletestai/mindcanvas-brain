@@ -904,7 +904,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
           </div>
         </Card>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_340px_340px]">
           <Card>
             <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/50">Team Puzzle Profile</div>
             <h1 className="mt-3 text-4xl font-bold md:text-6xl">{participantName}</h1>
@@ -931,31 +931,43 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
           <Card className="p-4">
             <ProfileList profiles={sortedProfiles} activeCode={profileCode} />
           </Card>
-        </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
-          <Card>
-            <h2 className="text-lg font-semibold">Profile mix</h2>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {[primary, secondary, tertiary].filter(Boolean).map((p: any, index) => (
-                <div key={p.code} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <div className="text-xs text-white/45">{index === 0 ? "Primary" : index === 1 ? "Secondary" : "Tertiary"}</div>
-                  <div className="mt-2 text-2xl font-bold">{p.name}</div>
-                  <div className="mt-1 text-sm text-white/55">{p.short_code || profileCodeToShort(p.code)} · {p.pct}%</div>
-                </div>
-              ))}
+          <Card className="flex flex-col gap-5">
+            <div className="rounded-3xl border border-sky-300/20 bg-sky-400/25 p-8 text-center">
+              <div className="text-3xl font-bold">{topFreqName} ({topFreq})</div>
+              <div className="mt-3 text-sm text-white/80">Your Dominant Frequency</div>
+            </div>
+            <div>
+              <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-white/45">Profile Mix</div>
+              <div className="space-y-3">
+                {[primary, secondary, tertiary].filter(Boolean).map((p: any, index) => (
+                  <div key={p.code} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="font-semibold text-white">{p.name}</div>
+                        <div className="mt-1 text-xs text-white/45">{index === 0 ? "Primary" : index === 1 ? "Secondary" : "Tertiary"} · {p.short_code || profileCodeToShort(p.code)}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-white/80">{p.pct}%</div>
+                    </div>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full bg-sky-300" style={{ width: `${clamp(Number(p.pct || 0))}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </Card>
-
-          <Card>
-            <h2 className="text-lg font-semibold">Professional Performance Rhythm</h2>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {(["resourceful", "hopeful", "yielding", "tactical", "human_centred", "measured"] as RhythmDriverKey[]).map((driver) => (
-                <DriverTile key={driver} driver={driver} />
-              ))}
-            </div>
-          </Card>
         </div>
+
+        <Card className="mt-6">
+          <h2 className="text-lg font-semibold">Professional Performance Rhythm</h2>
+          <p className="mt-2 text-sm text-white/75">Your RHYTHM Drivers</p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {(["resourceful", "hopeful", "yielding", "tactical", "human_centred", "measured"] as RhythmDriverKey[]).map((driver) => (
+              <DriverTile key={driver} driver={driver} group={flow.includes(driver) ? "flow" : stabilising.includes(driver) ? "stabilising" : "frustration"} />
+            ))}
+          </div>
+        </Card>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <FrequencyChart labels={data.result.frequency_labels} percentages={data.result.frequency_percentages} />
@@ -1007,25 +1019,33 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
 
             <HowToUseCards />
 
-            <IntroTextBlock title="Introducing The Team Puzzle Framework" icon={REPORT_ASSETS.icons.introTeamPuzzleFramework}>
-              <p>High-performing teams do not happen by accident. They are built with intention, structure, and insight. The Team Puzzle Framework bridges the gap between untapped human potential and practical business results.</p>
-              <p>At its core, Team Puzzle helps organisations answer one fundamental question: <em>How do we get the best from each individual, and even better results from the team as a whole?</em></p>
-              <p>The Team Puzzle approach is not about fixing people. It is about fitting people together. Each person has a unique shape and contribution, and the goal is to help teams see how those pieces connect.</p>
-              <div className="not-prose mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                <ReportAssetImage src={REPORT_ASSETS.frameworkVisual} alt="Team Puzzle framework visual" className="w-full object-contain" />
-              </div>
-            </IntroTextBlock>
+            <Card>
+              <SectionHeader title="Introducing The Team Puzzle Framework" icon={REPORT_ASSETS.icons.introTeamPuzzleFramework} />
+              <WhiteCard className="p-0">
+                <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
+                  <p>High-performing teams do not happen by accident. They are built with intention, structure, and insight. The Team Puzzle Framework bridges the gap between untapped human potential and practical business results.</p>
+                  <p>At its core, Team Puzzle helps organisations answer one fundamental question: <em>How do we get the best from each individual, and even better results from the team as a whole?</em></p>
+                </div>
+                <div className="mx-5 mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  <ReportAssetImage src={REPORT_ASSETS.frameworkVisual} alt="Team Puzzle framework visual" className="w-full object-contain" />
+                </div>
+              </WhiteCard>
+            </Card>
 
             <Card>
               <SectionHeader title="Understanding the Four Frequencies & Eight Profiles" icon={REPORT_ASSETS.icons.understandingFrequenciesProfiles} />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-                  <p className="text-sm leading-7 text-slate-700">Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage src={REPORT_ASSETS.frequencyWheel} alt="Team Puzzle frequency wheel" className="mx-auto max-h-[360px] w-full object-contain" />
+              <WhiteCard className="p-0">
+                <div className="grid gap-8 p-6 lg:grid-cols-[1fr_330px] lg:items-center">
+                  <div className="space-y-5 text-sm leading-7 text-slate-700">
+                    <p>Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
+                    <p>These frequencies are not about job titles or skills. They are about the natural way you show up in the workplace, the kind of energy you bring to the table, and how you most instinctively create value.</p>
+                    <p>Understanding the Four Frequencies is like learning the language of performance. Once your team can identify these dynamics, everything becomes clearer: roles, communication, conflict, collaboration, and results.</p>
+                  </div>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <ReportAssetImage src={REPORT_ASSETS.frequencyWheel} alt="Team Puzzle frequencies visual" className="mx-auto max-h-[330px] w-full object-contain" />
                   </div>
                 </div>
-                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                <div className="grid gap-3 px-6 pb-6 md:grid-cols-4">
                   {(["A", "B", "C", "D"] as FrequencyCode[]).map((code) => (
                     <div key={code} className="rounded-2xl border border-[#084595] bg-white p-4">
                       <h3 className="font-semibold text-[#084595]">{FREQUENCY_COPY[code].title} ({code})</h3>
@@ -1060,23 +1080,34 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
 
             <Card>
               <SectionHeader title="The Eight Profiles" icon={REPORT_ASSETS.icons.eightProfiles} />
-              <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">The Team Puzzle framework maps eight unique Profiles, each representing a different way of thinking, contributing, and leading.</p>
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <WhiteCard className="p-0">
+                <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
+                  <p>The Team Puzzle framework maps eight unique Profiles, each representing a different way of thinking, contributing, and leading. These Profiles are powered by one or more of the Four Frequencies, and together they cover the full spectrum of what it takes to build a high-performing team.</p>
+                  <div className="mx-auto max-w-xl overflow-hidden rounded-2xl bg-white p-2">
+                    <ReportAssetImage src={REPORT_ASSETS.frameworkVisual} alt="Eight Team Puzzle profiles" className="mx-auto w-full object-contain" />
+                  </div>
+                </div>
+                <div className="grid gap-4 px-6 pb-6 md:grid-cols-2 xl:grid-cols-4">
                   {data.result.profile_labels.map((p) => {
                     const copy = PROFILE_COPY[p.code];
                     const active = p.code === profileCode;
+                    const image = topProfileImage(p.name);
                     return (
-                      <div key={p.code} className={cls("rounded-2xl border p-4", active ? "border-green-500 bg-green-50" : "border-slate-200 bg-white") }>
-                        <div className="flex items-center justify-between gap-3">
-                          <h3 className="font-semibold text-slate-900">{copy?.title || p.name}</h3>
-                          {active ? <span className="rounded-full bg-green-600 px-2 py-1 text-xs font-bold text-white">Your Profile</span> : null}
+                      <div key={p.code} className={cls("overflow-hidden rounded-2xl border bg-white shadow-md", active ? "border-green-500" : "border-slate-200")}>
+                        <div className="relative min-h-[96px] bg-[#4092C5]">
+                          {image ? <ReportAssetImage src={image} alt={p.name} className="h-28 w-full object-contain p-3" /> : null}
+                          {active ? <span className="absolute right-3 top-3 rounded-full bg-green-600 px-3 py-1 text-[10px] font-bold text-white">Your Profile</span> : null}
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
+                        <div className="p-4 text-center">
+                          <h3 className="font-bold text-slate-900">{p.name}</h3>
+                          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{p.frequency_code ? `${FREQUENCY_COPY[p.frequency_code]?.title.replace(" Frequency", "")} (${p.frequency_code})` : ""}</div>
+                          <p className="mt-3 text-xs leading-5 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
+                <p className="px-6 pb-6 text-sm leading-7 text-slate-700">Together, these eight Profiles represent the complete “team puzzle”, offering diversity not just of personality, but of contribution, energy, and value.</p>
               </WhiteCard>
             </Card>
 
@@ -1088,16 +1119,31 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
                   {data.result.profile_labels.map((p) => {
                     const copy = PROFILE_COPY[p.code];
                     const active = p.code === profileCode;
+                    const image = topProfileImage(p.name);
                     return (
-                      <div key={p.code} className={cls("rounded-2xl border p-5", active ? "border-green-500 bg-green-50" : "border-slate-200 bg-slate-50")}>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h3 className="font-bold text-slate-900">{profileCodeToShort(p.code)} · {copy?.title || p.name} {copy?.role ? `– ${copy.role}` : ""}</h3>
-                          {active ? <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">Your Profile</span> : null}
+                      <div key={p.code} className={cls("flex flex-col gap-5 rounded-2xl border bg-white p-4 md:flex-row md:items-center", active ? "border-green-500 bg-green-50" : "border-slate-200") }>
+                        {image ? <ReportAssetImage src={image} alt={p.name} className="h-28 w-28 shrink-0 object-contain" /> : null}
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{profileCodeToShort(p.code)} · Frequency {p.frequency_code || ""}</div>
+                              <h3 className="mt-1 font-bold text-slate-900">{copy?.title || p.name} {copy?.role ? `– ${copy.role}` : ""}</h3>
+                            </div>
+                            {active ? <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">Your Profile</span> : null}
+                          </div>
+                          <p className="mt-3 text-sm leading-7 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
                         </div>
-                        <p className="mt-3 text-sm leading-7 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Reflection Exercise</h3>
+                  <ol className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 md:grid-cols-2">
+                    {["Which of these profiles do you recognise in your current or past teammates?", "Which profile frustrates or challenges you, and why?", "Who have you relied on for support, execution, or clarity? Can you now name their profile?", "What gaps do you notice in your current team’s profile mix, and what would complement it?"].map((question, index) => (
+                      <li key={question} className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#084595] text-xs font-bold text-[#084595]">{index + 1}</span><span>{question}</span></li>
+                    ))}
+                  </ol>
                 </div>
               </WhiteCard>
             </Card>
