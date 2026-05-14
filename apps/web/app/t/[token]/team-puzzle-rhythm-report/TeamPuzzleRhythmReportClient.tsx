@@ -331,6 +331,47 @@ const REPORT_ASSETS = {
   },
 } as const;
 
+const PROFILE_ORDER = [
+  "PROFILE_1",
+  "PROFILE_2",
+  "PROFILE_3",
+  "PROFILE_4",
+  "PROFILE_5",
+  "PROFILE_6",
+  "PROFILE_7",
+  "PROFILE_8",
+] as const;
+
+const PROFILE_FREQUENCIES: Record<string, FrequencyCode> = {
+  PROFILE_1: "A",
+  PROFILE_2: "A",
+  PROFILE_3: "B",
+  PROFILE_4: "B",
+  PROFILE_5: "C",
+  PROFILE_6: "C",
+  PROFILE_7: "D",
+  PROFILE_8: "D",
+};
+
+const PROFILE_ACCENT: Record<FrequencyCode, string> = {
+  A: "#084595",
+  B: "#4092C5",
+  C: "#6AADD7",
+  D: "#B1D3F6",
+};
+
+function orderedProfileItems(labels: ProfileLabel[]) {
+  return PROFILE_ORDER.map((code) => {
+    const existing = labels.find((item) => item.code === code);
+    const copy = PROFILE_COPY[code];
+    return {
+      code,
+      name: existing?.name || copy?.title.replace(/^The\s+/i, "") || code,
+      frequency_code: existing?.frequency_code || PROFILE_FREQUENCIES[code],
+    } as ProfileLabel;
+  });
+}
+
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
@@ -1153,73 +1194,119 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             <Card>
               <SectionHeader title="The Eight Profiles" icon={REPORT_ASSETS.icons.eightProfiles} />
               <WhiteCard className="p-0">
-                <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
-                  <p>The Team Puzzle framework maps eight unique Profiles, each representing a different way of thinking, contributing, and leading. These Profiles are powered by one or more of the Four Frequencies, and together they cover the full spectrum of what it takes to build a high-performing team.</p>
-                  <div className="mx-auto max-w-xl overflow-hidden rounded-2xl bg-white p-2">
-                    <ReportAssetImage src={REPORT_ASSETS.frameworkVisual} alt="Eight Team Puzzle profiles" className="mx-auto w-full object-contain" />
-                  </div>
+                <div className="px-[35px] pt-[26px] text-[13px] leading-[28px] text-slate-700">
+                  <p>
+                    The Team Puzzle framework maps eight unique Profiles, each representing a different way of thinking, contributing, and leading. These Profiles are powered by one or more of the Four Frequencies, and together they cover the full spectrum of what it takes to build a high-performing team.
+                  </p>
                 </div>
-                <div className="grid gap-4 px-6 pb-6 md:grid-cols-2 xl:grid-cols-4">
-                  {data.result.profile_labels.map((p) => {
+
+                <div className="flex justify-center px-6 pt-[48px]">
+                  <ReportAssetImage
+                    src={REPORT_ASSETS.frameworkVisual}
+                    alt="Team Puzzle profile framework"
+                    className="h-auto w-full max-w-[387px] object-contain"
+                  />
+                </div>
+
+                <div className="grid gap-x-[18px] gap-y-[28px] px-[22px] pt-[48px] pb-[38px] md:grid-cols-2 xl:grid-cols-4">
+                  {orderedProfileItems(data.result.profile_labels).map((p) => {
                     const copy = PROFILE_COPY[p.code];
                     const active = p.code === profileCode;
                     const image = topProfileImage(p.name);
+                    const freq = p.frequency_code || PROFILE_FREQUENCIES[p.code] || "A";
+                    const accent = PROFILE_ACCENT[freq];
                     return (
-                      <div key={p.code} className={cls("overflow-hidden rounded-2xl border bg-white shadow-md", active ? "border-green-500" : "border-slate-200")}>
-                        <div className="relative min-h-[96px] bg-[#4092C5]">
-                          {image ? <ReportAssetImage src={image} alt={p.name} className="h-28 w-full object-contain p-3" /> : null}
-                          {active ? <span className="absolute right-3 top-3 rounded-full bg-green-600 px-3 py-1 text-[10px] font-bold text-white">Your Profile</span> : null}
+                      <div key={p.code} className="relative min-h-[266px] overflow-hidden rounded-[18px] bg-white shadow-[0_4px_8px_rgba(0,0,0,0.22)]">
+                        <div className="h-[84px] rounded-t-[18px]" style={{ backgroundColor: accent }} />
+                        <div className="absolute left-1/2 top-[31px] flex h-[91px] w-[89px] -translate-x-1/2 items-center justify-center rounded-b-[12px] bg-white shadow-[0_4px_8px_rgba(0,0,0,0.22)]">
+                          {image ? <ReportAssetImage src={image} alt={p.name} className="h-[59px] w-[59px] object-contain" /> : null}
                         </div>
-                        <div className="p-4 text-center">
-                          <h3 className="font-bold text-slate-900">{p.name}</h3>
-                          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{p.frequency_code ? `${FREQUENCY_COPY[p.frequency_code]?.title.replace(" Frequency", "")} (${p.frequency_code})` : ""}</div>
-                          <p className="mt-3 text-xs leading-5 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
+                        <div className="px-[15px] pt-[72px] text-center">
+                          <div className="relative inline-flex items-center justify-center gap-2">
+                            <h3 className="text-[12px] font-semibold leading-[19px] text-[#111828]">{p.name}</h3>
+                            {active ? (
+                              <span className="absolute left-full ml-2 whitespace-nowrap rounded-full bg-[#0FCD5E] px-[7px] py-[2px] text-[8px] font-bold leading-[10px] text-white">
+                                Your Profile
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-[6px] text-[10px] font-normal uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                            {FREQUENCY_COPY[freq]?.title.replace(" Frequency", "")} ({freq})
+                          </div>
+                          <p className="mx-auto mt-[16px] max-w-[226px] text-center text-[11px] font-normal leading-[16.5px] text-[#313C52]">
+                            {copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}
+                          </p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <p className="px-6 pb-6 text-sm leading-7 text-slate-700">Together, these eight Profiles represent the complete “team puzzle”, offering diversity not just of personality, but of contribution, energy, and value.</p>
+
+                <div className="px-[35px] pb-[30px] text-[13px] leading-[28px] text-slate-700">
+                  <p>
+                    Together, these eight Profiles represent the complete “team puzzle”, offering diversity not just of personality, but of contribution, energy, and value.<br />
+                    In the pages ahead, we’ll explore each profile in depth. For now, remember: every team has a puzzle. The most successful ones know how the pieces fit together.
+                  </p>
+                </div>
               </WhiteCard>
             </Card>
 
             <Card>
               <SectionHeader title="The Eight Profiles – Natural Contribution Types" icon={REPORT_ASSETS.icons.naturalContribution} />
-              <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">Each profile is a blend of one or more Frequencies and represents a unique role in the team. The more diversity you have across these eight, the more complete and capable your team becomes.</p>
-                <div className="mt-6 space-y-4">
-                  {data.result.profile_labels.map((p) => {
+              <WhiteCard className="p-0">
+                <div className="px-[17px] py-[23px] text-[13px] leading-[28px] text-[#313C52]">
+                  <p>
+                    Each profile is a blend of one or more Frequencies and represents a unique role in the team. The more diversity you have across these eight, the more complete and capable your team becomes.
+                  </p>
+                </div>
+
+                <div className="space-y-[17px] px-0 pb-[18px]">
+                  {orderedProfileItems(data.result.profile_labels).map((p) => {
                     const copy = PROFILE_COPY[p.code];
-                    const active = p.code === profileCode;
                     const image = topProfileImage(p.name);
+                    const freq = p.frequency_code || PROFILE_FREQUENCIES[p.code] || "A";
                     return (
-                      <div key={p.code} className={cls("flex flex-col gap-5 rounded-2xl border bg-white p-4 md:flex-row md:items-center", active ? "border-green-500 bg-green-50" : "border-slate-200") }>
-                        {image ? <ReportAssetImage src={image} alt={p.name} className="h-28 w-28 shrink-0 object-contain" /> : null}
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{profileCodeToShort(p.code)} · Frequency {p.frequency_code || ""}</div>
-                              <h3 className="mt-1 font-bold text-slate-900">{copy?.title || p.name} {copy?.role ? `– ${copy.role}` : ""}</h3>
-                            </div>
-                            {active ? <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white">Your Profile</span> : null}
+                      <div key={p.code} className="grid min-h-[186px] grid-cols-[124px_1fr] items-start gap-[26px] rounded-[18px] border-t-4 border-[#6BAED6] bg-white px-[9px] py-[20px] shadow-sm">
+                        <div className="flex h-[124px] w-[124px] items-center justify-center overflow-hidden">
+                          {image ? <ReportAssetImage src={image} alt={p.name} className="h-[124px] w-[124px] object-contain" /> : null}
+                        </div>
+                        <div className="pt-[1px]">
+                          <div className="text-[10px] font-normal uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                            Profile {profileCodeToShort(p.code).replace("P", "")} · Frequency {freq}
                           </div>
-                          <p className="mt-3 text-sm leading-7 text-slate-700">{copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}</p>
+                          <h3 className="mt-[7px] text-[15px] font-semibold leading-[19.2px] text-[#111828]">
+                            {copy?.title || p.name} {copy?.role ? <span className="font-normal italic">– {copy.role}</span> : null}
+                          </h3>
+                          <p className="mt-[18px] max-w-[898px] text-[13px] leading-[28px] text-[#313C52]">
+                            {copy?.summary || "A distinct contribution pattern within the Team Puzzle framework."}
+                          </p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <h3 className="text-sm font-bold uppercase tracking-wide text-slate-900">Reflection Exercise</h3>
-                  <ol className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 md:grid-cols-2">
-                    {["Which of these profiles do you recognise in your current or past teammates?", "Which profile frustrates or challenges you, and why?", "Who have you relied on for support, execution, or clarity? Can you now name their profile?", "What gaps do you notice in your current team’s profile mix, and what would complement it?"].map((question, index) => (
-                      <li key={question} className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#084595] text-xs font-bold text-[#084595]">{index + 1}</span><span>{question}</span></li>
-                    ))}
-                  </ol>
+
+                <div className="mx-0 mt-[17px] min-h-[309px] rounded-[18px] bg-white p-[30px]">
+                  <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">Reflection Exercise:</h3>
+                  <div className="mt-[20px] grid grid-cols-[56px_1fr] gap-[15px]">
+                    <div className="relative flex flex-col items-center gap-[15px] pt-[7px]">
+                      <div className="absolute left-1/2 top-[13px] h-[204px] w-px -translate-x-1/2 bg-gradient-to-b from-[#3B82F6] to-blue-500/10" />
+                      {[1, 2, 3, 4].map((number) => (
+                        <div key={number} className="relative z-10 flex h-[38px] w-[38px] items-center justify-center rounded-full border border-[#111828] bg-white text-[14px] font-bold leading-[22px] text-[#111828]">
+                          {number}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-[20px] pt-[7px] text-[13px] leading-[27px] text-[#313C52]">
+                      <p>Which of these profiles do you recognise in your current or past teammates?</p>
+                      <p>Which profile frustrates or challenges you, and why?</p>
+                      <p>Who have you relied on for support, execution, or clarity? Can you now name their profile?</p>
+                      <p>What gaps do you notice in your current team’s profile mix, and what would complement it?</p>
+                    </div>
+                  </div>
                 </div>
               </WhiteCard>
             </Card>
-
             <Card>
               <SectionHeader title="Frequency summary" icon={REPORT_ASSETS.icons.frequencySummary} />
               <WhiteCard>
