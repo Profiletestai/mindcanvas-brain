@@ -297,6 +297,29 @@ const GROUP_COPY: Record<DriverGroup, { label: string; heading: string; color: s
   },
 };
 
+const REPORT_ASSETS = {
+  logo: "/org-graphics/tp-logo.png",
+  chandell: "/org-graphics/tp-chandell.png",
+  frameworkVisual: "/org-graphics/tp-framework-visual.png",
+  frequencyWheel: "/org-graphics/tp-frequency-wheel.png",
+  rhythmPuzzle: "/org-graphics/rhythm-puzzle.png",
+  icons: {
+    welcome: "/icons/tp-welcome-from-chandell.png",
+    howToUse: "/icons/tp-how-to-use-report.png",
+    ideas: "/icons/tp-ideas.png",
+    naturalContribution: "/icons/tp-natural-contribution.png",
+    nextSteps: "/icons/tp-next-steps.png",
+    personalityMap: "/icons/tp-personality-map.png",
+    profileInDepth: "/icons/tp-profile-in-depth.png",
+    profileMix: "/icons/tp-profile-mix.png",
+    strategicMap: "/icons/tp-strategic-map.png",
+    structure: "/icons/tp-structure.png",
+    teamRoleFit: "/icons/tp-team-role-fit.png",
+    valueCreationPathway: "/icons/tp-value-creation-pathway.png",
+    whatsHoldingYouBack: "/icons/tp-whats-holding-you-back.png",
+  },
+} as const;
+
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
@@ -334,6 +357,20 @@ function topProfileImage(profileName?: string | null) {
   return null;
 }
 
+function ReportAssetImage(props: { src: string; alt: string; className?: string }) {
+  return (
+    <img
+      src={props.src}
+      alt={props.alt}
+      loading="lazy"
+      className={props.className}
+      onError={(e) => {
+        (e.currentTarget as HTMLImageElement).style.display = "none";
+      }}
+    />
+  );
+}
+
 function Card(props: { children: ReactNode; className?: string }) {
   return <section className={cls("rounded-3xl border border-white/10 bg-[#0C203A]/80 p-5 shadow-2xl shadow-black/20", props.className)}>{props.children}</section>;
 }
@@ -343,9 +380,17 @@ function WhiteCard(props: { children: ReactNode; className?: string }) {
 }
 
 function SectionHeader(props: { eyebrow?: string; title: string; icon?: string }) {
+  const iconIsImage = typeof props.icon === "string" && props.icon.startsWith("/");
+
   return (
     <div className="mb-5 flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-blue-300/20 bg-blue-400/10 text-lg">{props.icon || "✉"}</div>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-blue-300/20 bg-blue-400/10 text-lg">
+        {iconIsImage ? (
+          <ReportAssetImage src={props.icon || ""} alt="" className="h-full w-full object-cover" />
+        ) : (
+          props.icon || "✉"
+        )}
+      </div>
       <div>
         {props.eyebrow ? <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/50">{props.eyebrow}</div> : null}
         <h2 className="text-lg font-semibold text-white">{props.title}</h2>
@@ -560,7 +605,7 @@ function HowToUseCards() {
 
   return (
     <Card>
-      <SectionHeader title="How to Use This Report" icon="🧭" />
+      <SectionHeader title="How to Use This Report" icon={REPORT_ASSETS.icons.howToUse} />
       <WhiteCard>
         <p className="text-sm leading-7 text-slate-700">
           Think of this report as your personal blueprint for working smarter, not harder. It is more than a profile; it is a practical manual for doing your best work, building stronger relationships, and creating long-term impact.
@@ -603,7 +648,7 @@ function ProfileList(props: { profiles: Array<ProfileLabel & { pct?: number; sho
 function NextStepCard(props: { title: string; body: string; button: string; href?: string | null; primary?: boolean }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl">🚀</div>
+      <div className="mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-slate-100"><ReportAssetImage src={REPORT_ASSETS.icons.nextSteps} alt="Next steps" className="h-full w-full object-cover" /></div>
       <h4 className="mt-4 font-semibold text-slate-800">{props.title}</h4>
       <p className="mt-2 text-sm leading-6 text-slate-600">{props.body}</p>
       {props.href ? (
@@ -819,7 +864,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             <div>
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10">
-                  <img src="/org-graphics/tp-logo.png" alt="Life Puzzle" className="h-full w-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  <ReportAssetImage src={REPORT_ASSETS.logo} alt="Life Puzzle" className="h-full w-full object-cover" />
                 </div>
                 <div>
                   <div className="text-lg font-semibold">Team Puzzle Discovery Report</div>
@@ -921,25 +966,36 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
           </aside>
 
           <div className="space-y-8">
-            <IntroTextBlock title="Welcome from Chandell" icon="✉">
+            <IntroTextBlock title="Welcome from Chandell" icon={REPORT_ASSETS.icons.welcome}>
               <p>Welcome to your Team Puzzle Discovery Report. I am so excited to be part of your journey as you uncover your natural strengths, communication style, and best-fit contribution in the workplace.</p>
               <p>Team Puzzle was created to help people understand themselves and each other more deeply. When this happens, the entire culture shifts, results improve, engagement increases, and people are genuinely more fulfilled.</p>
               <p>Whether you are reading this as part of a leadership team, a coaching session, or a personal development journey, treat this insight as a starting point: a map for growth, alignment, and leadership that reflects your natural style.</p>
-              <p><strong>Warm regards<br />Chandell Labbozzetta</strong><br />CEO of Life Puzzle, and Creator of the Team Puzzle Discovery Assessment</p>
+              <div className="not-prose mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
+                <ReportAssetImage src={REPORT_ASSETS.chandell} alt="Chandell Labbozzetta" className="h-20 w-20 rounded-full border border-slate-200 object-cover" />
+                <p className="m-0 text-sm leading-7 text-slate-700"><strong>Warm regards<br />Chandell Labbozzetta</strong><br />CEO of Life Puzzle, and Creator of the Team Puzzle Discovery Assessment</p>
+              </div>
             </IntroTextBlock>
 
             <HowToUseCards />
 
-            <IntroTextBlock title="Introducing the Team Puzzle Framework" icon="🧩">
+            <IntroTextBlock title="Introducing the Team Puzzle Framework" icon={REPORT_ASSETS.icons.ideas}>
               <p>High-performing teams do not happen by accident. They are built with intention, structure, and insight. The Team Puzzle Framework bridges the gap between untapped human potential and practical business results.</p>
               <p>At its core, Team Puzzle helps organisations answer one fundamental question: <em>How do we get the best from each individual, and even better results from the team as a whole?</em></p>
               <p>The Team Puzzle approach is not about fixing people. It is about fitting people together. Each person has a unique shape and contribution, and the goal is to help teams see how those pieces connect.</p>
+              <div className="not-prose mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                <ReportAssetImage src={REPORT_ASSETS.frameworkVisual} alt="Team Puzzle framework visual" className="w-full object-contain" />
+              </div>
             </IntroTextBlock>
 
             <Card>
-              <SectionHeader title="Understanding the Four Frequencies & Eight Profiles" icon="⚡" />
+              <SectionHeader title="Understanding the Four Frequencies & Eight Profiles" icon={REPORT_ASSETS.icons.structure} />
               <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
+                <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+                  <p className="text-sm leading-7 text-slate-700">Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies: the foundational rhythms that drive how people think, operate, and contribute.</p>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <ReportAssetImage src={REPORT_ASSETS.frequencyWheel} alt="Team Puzzle frequency wheel" className="mx-auto max-h-[360px] w-full object-contain" />
+                  </div>
+                </div>
                 <div className="mt-6 grid gap-4 md:grid-cols-4">
                   {(["A", "B", "C", "D"] as FrequencyCode[]).map((code) => (
                     <div key={code} className="rounded-2xl border border-[#084595] bg-white p-4">
@@ -952,7 +1008,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="The Eight Profiles" icon="📖" />
+              <SectionHeader title="The Eight Profiles" icon={REPORT_ASSETS.icons.naturalContribution} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">The Team Puzzle framework maps eight unique Profiles, each representing a different way of thinking, contributing, and leading.</p>
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -974,7 +1030,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Frequency summary" icon="📖" />
+              <SectionHeader title="Frequency summary" icon={REPORT_ASSETS.icons.structure} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">Your strongest overall frequency is <strong>{topFreqName} ({topFreq})</strong>, which shapes how you approach problems, make decisions, and contribute in a team.</p>
                 <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -989,7 +1045,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title={`Your profile in depth: ${profileName}`} icon="👤" />
+              <SectionHeader title={`Your profile in depth: ${profileName}`} icon={REPORT_ASSETS.icons.profileInDepth} />
               <WhiteCard>
                 <div className="grid gap-6 md:grid-cols-[1fr_260px]">
                   <div>
@@ -1007,10 +1063,17 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Professional Performance Rhythm" icon="🎵" />
+              <SectionHeader title="Professional Performance Rhythm" icon={REPORT_ASSETS.rhythmPuzzle} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">Your Team Puzzle profile explains your natural energy and contribution style. Alongside this, the Professional Performance Rhythm reveals how you approach work and create results across six key drivers.</p>
-                <p className="mt-4 text-sm leading-7 text-slate-700">Think of it as the tempo behind your profile — the underlying rhythm that influences the way you solve problems, collaborate, adapt, and lead.</p>
+                <div className="grid gap-6 lg:grid-cols-[1fr_280px] lg:items-start">
+                  <div>
+                    <p className="mt-4 text-sm leading-7 text-slate-700">Think of it as the tempo behind your profile — the underlying rhythm that influences the way you solve problems, collaborate, adapt, and lead.</p>
+                  </div>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <ReportAssetImage src={REPORT_ASSETS.rhythmPuzzle} alt="RHYTHM puzzle visual" className="mx-auto max-h-[220px] w-full object-contain" />
+                  </div>
+                </div>
                 <div className="mt-6 grid gap-3 md:grid-cols-3">
                   {(["resourceful", "human_centred", "yielding", "tactical", "hopeful", "measured"] as RhythmDriverKey[]).map((driver) => <DriverTile key={driver} driver={driver} group={flow.includes(driver) ? "flow" : stabilising.includes(driver) ? "stabilising" : "frustration"} />)}
                 </div>
@@ -1018,7 +1081,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="The 3-Level Energy Model" icon="T" />
+              <SectionHeader title="The 3-Level Energy Model" icon={REPORT_ASSETS.icons.strategicMap} />
               <WhiteCard>
                 <div className="grid gap-4 md:grid-cols-3">
                   {(["flow", "stabilising", "frustration"] as DriverGroup[]).map((group, index) => {
@@ -1037,7 +1100,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Your Professional Performance Rhythm" icon="🎼" />
+              <SectionHeader title="Your Professional Performance Rhythm" icon={REPORT_ASSETS.rhythmPuzzle} />
               <div className="space-y-6">
                 <WhiteCard>
                   <h3 className="text-lg font-bold text-slate-900">{GROUP_COPY.flow.heading}</h3>
@@ -1056,7 +1119,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Energy mix — how your profile and RHYTHM work together" icon="🔗" />
+              <SectionHeader title="Energy mix — how your profile and RHYTHM work together" icon={REPORT_ASSETS.icons.profileMix} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">As a <strong>{profileName}</strong>, your core contribution is shaped by {topFreqName} energy. Your RHYTHM adds another layer: it shows the conditions and behaviours that help you create results sustainably.</p>
                 <div className="mt-5 grid gap-4 md:grid-cols-3">
@@ -1068,9 +1131,14 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Team Role Fit" icon="🪟" />
+              <SectionHeader title="Team Role Fit" icon={REPORT_ASSETS.icons.teamRoleFit} />
               <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">Your profile gives language to your natural team role. Use this section as a Johari-style reflection: what others see clearly, what you may underplay, what you hold back, and what potential is still emerging.</p>
+                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
+                  <p className="text-sm leading-7 text-slate-700">Your profile gives language to your natural team role. Use this section as a Johari-style reflection: what others see clearly, what you may underplay, what you hold back, and what potential is still emerging.</p>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <ReportAssetImage src={REPORT_ASSETS.icons.teamRoleFit} alt="Team role fit" className="mx-auto max-h-[160px] w-full object-contain" />
+                  </div>
+                </div>
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   {["Open Area — visible strengths", "Blind Spot — what others may notice", "Hidden Area — what you may hold back", "Unknown Area — potential still emerging"].map((title) => (
                     <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><h4 className="font-semibold text-slate-900">{title}</h4><p className="mt-2 text-sm leading-6 text-slate-700">Reflect on how your {profileName} style shows up here and what support helps you contribute with more confidence.</p></div>
@@ -1080,9 +1148,14 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Your Value Creation Pathway" icon="🛤️" />
+              <SectionHeader title="Your Value Creation Pathway" icon={REPORT_ASSETS.icons.valueCreationPathway} />
               <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">You create value when your profile contribution and your RHYTHM drivers work together. Your strongest pathway is to use your natural contribution style while designing your work around the drivers that create energy rather than drain it.</p>
+                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
+                  <p className="text-sm leading-7 text-slate-700">You create value when your profile contribution and your RHYTHM drivers work together. Your strongest pathway is to use your natural contribution style while designing your work around the drivers that create energy rather than drain it.</p>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <ReportAssetImage src={REPORT_ASSETS.icons.valueCreationPathway} alt="Value creation pathway" className="mx-auto max-h-[160px] w-full object-contain" />
+                  </div>
+                </div>
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
                   <div className="rounded-2xl bg-slate-50 p-4"><h4 className="font-bold">You deliver your best value when</h4><p className="mt-2 text-sm leading-6 text-slate-700">You work in roles and projects that let you express {profileName} strengths and your Flow Drivers.</p></div>
                   <div className="rounded-2xl bg-slate-50 p-4"><h4 className="font-bold">You build trust when</h4><p className="mt-2 text-sm leading-6 text-slate-700">You communicate your needs clearly and help others understand your natural working rhythm.</p></div>
@@ -1092,7 +1165,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Collaboration Tips" icon="🤝" />
+              <SectionHeader title="Collaboration Tips" icon={REPORT_ASSETS.icons.teamRoleFit} />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">You thrive in teams that respect both contribution and rhythm. Use these tips to collaborate with more awareness.</p>
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -1104,7 +1177,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Development Recommendations" icon="🌱" />
+              <SectionHeader title="Development Recommendations" icon={REPORT_ASSETS.icons.strategicMap} />
               <WhiteCard>
                 <div className="grid gap-4 md:grid-cols-3">
                   <div><h4 className="font-bold text-slate-900">To elevate performance</h4><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700"><li>• Protect time for your Flow Drivers.</li><li>• Build simple support around your Frustration Drivers.</li><li>• Use Stabilising Drivers without over-relying on them.</li></ul></div>
@@ -1115,9 +1188,14 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="What Could Be Holding You Back?" icon="⚠️" />
+              <SectionHeader title="What Could Be Holding You Back?" icon={REPORT_ASSETS.icons.whatsHoldingYouBack} />
               <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">Sometimes the behaviours that make you valuable can also become limiting when overused. Use this section to self-audit and rebalance.</p>
+                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
+                  <p className="text-sm leading-7 text-slate-700">Sometimes the behaviours that make you valuable can also become limiting when overused. Use this section to self-audit and rebalance.</p>
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <ReportAssetImage src={REPORT_ASSETS.icons.whatsHoldingYouBack} alt="What could be holding you back" className="mx-auto max-h-[160px] w-full object-contain" />
+                  </div>
+                </div>
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4"><h4 className="font-bold">Weekly check-in prompts</h4><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700"><li>• What emotional or practical weight am I carrying?</li><li>• Where am I compromising too often?</li><li>• What did I notice but not say?</li></ul></div>
                   <div className="rounded-2xl bg-slate-50 p-4"><h4 className="font-bold">Monthly calibration metrics</h4><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700"><li>• Times I redirected confusion constructively.</li><li>• Discussions where I contributed a bridge or solution.</li><li>• One opportunity where I influenced direction without needing credit.</li></ul></div>
@@ -1126,7 +1204,7 @@ export default function TeamPuzzleRhythmReportClient(props: { token: string; tid
             </Card>
 
             <Card>
-              <SectionHeader title="Your Next Steps" icon="🚀" />
+              <SectionHeader title="Your Next Steps" icon={REPORT_ASSETS.icons.nextSteps} />
               <WhiteCard>
                 <div className="grid gap-4 md:grid-cols-3">
                   <NextStepCard title="Download Your Report" body="Save a PDF copy of your Team Puzzle RHYTHM report for reference." button="Download PDF" href={null} />
