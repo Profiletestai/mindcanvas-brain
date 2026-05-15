@@ -1963,6 +1963,7 @@ const REPORT_ASSETS = {
   frameworkVisual: "/org-graphics/tp-framework-visual.png",
   frequencyWheel: "/org-graphics/tp-frequency-wheel.png",
   rhythmPuzzle: "/org-graphics/rhythm-puzzle.png",
+  teamRoleFitVisual: "/org-graphics/tp-team-role-fit.png",
   icons: {
     welcome: "/icons/tp-welcome-from-chandell.png",
     howToUse: "/icons/tp-how-to-use-report.png",
@@ -1983,7 +1984,7 @@ const REPORT_ASSETS = {
     strategicMap: "/icons/tp-strategic-map.png",
     structure: "/icons/tp-structure.png",
     commonLanguage: "/icons/tp-common-language.png",
-    teamRoleFit: "/org-graphics/tp-team-role-fit.png",
+    teamRoleFit: "/icons/tp-team-role-fit.png",
     valueCreationPathway: "/icons/tp-value-creation-pathway.png",
     collaborationTips: "/icons/tp-collaboration-tips.png",
     developmentRecommendations: "/icons/tp-development-recommendations.png",
@@ -2628,6 +2629,629 @@ function ProfileTextBlocks(props: { blocks: string[]; className?: string }) {
   );
 }
 
+type EnergyMatrixTable = {
+  title: string;
+  headers: string[];
+  rows: Array<{ label: string; cells: string[] }>;
+  tip?: string;
+  reflectionPrompts?: string[];
+};
+
+const ENERGY_MATRIX_TABLES: Record<string, EnergyMatrixTable> = {
+  PROFILE_1: {
+    title: "Visionary Energy Matrix",
+    headers: ["Optimiser (8)", "Visionary (1 – You)", "Catalyst (2)"],
+    rows: [
+      { label: "Drive", cells: ["Refinement, systems and optimisation", "Innovation, strategic thinking and visibility", "Influence, momentum and activation"] },
+      { label: "Strength", cells: ["Improving existing ideas with precision", "Generating bold ideas and direction", "Inspiring action and building energy"] },
+      { label: "Challenge", cells: ["Depth and sustainable delivery", "Starting from scratch without structure", "Follow-through and detail"] },
+      { label: "Support Style", cells: ["Brings process and space to refine", "Needs structure and clarity to scale", "Needs stage and attention to activate"] },
+      { label: "Team Role", cells: ["Solution enhancer", "Vision setter", "Energy driver"] },
+    ],
+    tip: "A high-functioning team often includes all three energy zones. If an idea is struggling to come to life, check whether one of these zones is missing.",
+  },
+  PROFILE_2: {
+    title: "Catalyst Energy Matrix",
+    headers: ["Visionary (1)", "Catalyst (2 – You)", "Motivator (3)"],
+    rows: [
+      { label: "Drive", cells: ["Momentum, innovation and big-picture strategy", "Drive activation, connection and persuasion", "Empathy, uplift and people energy"] },
+      { label: "Strength", cells: ["Vision and strategic direction", "Energy, motivation and buy-in", "Morale building and team support"] },
+      { label: "Challenge", cells: ["Follow-through and focus", "Overcommitment and staying power", "Over-personalising challenges"] },
+      { label: "Support Style", cells: ["Needs a team to carry execution", "Needs structure to pace output", "Needs clarity in priorities"] },
+      { label: "Team Role", cells: ["Architect of direction", "Igniter of action", "Emotional and relational glue"] },
+    ],
+    tip: "Surround yourself with profiles who stabilise and ground your pace. Facilitators, Coordinators, and Optimisers bring implementation, rhythm, and refinement to your ideas.",
+  },
+  PROFILE_3: {
+    title: "Motivator Energy Matrix",
+    headers: ["Catalyst (2)", "Motivator (3 – You)", "Connector (4)"],
+    rows: [
+      { label: "Drive", cells: ["Activation and momentum", "Morale, belief and emotional energy", "Connection, timing and alignment"] },
+      { label: "Strength", cells: ["Gets people moving", "Keeps people encouraged and engaged", "Builds trust across needs"] },
+      { label: "Challenge", cells: ["Moving too fast", "Over-carrying other people’s emotions", "Avoiding direct tension"] },
+      { label: "Support Style", cells: ["Brings urgency", "Creates warmth and belief", "Adds clarity and relational structure"] },
+      { label: "Team Role", cells: ["Spark", "Morale builder", "Relationship bridge"] },
+    ],
+    tip: "Your best energy is protected when you encourage people without becoming responsible for everyone’s emotional state.",
+  },
+  PROFILE_4: {
+    title: "Connector Energy Matrix",
+    headers: ["Motivator (3)", "Connector (4 – You)", "Facilitator (5)"],
+    rows: [
+      { label: "Drive", cells: ["Emotional uplift", "Connection through clarity", "Stability and team rhythm"] },
+      { label: "Strength", cells: ["Building morale and openness", "Creating alignment across needs", "Sensing timing and environment"] },
+      { label: "Challenge", cells: ["Overcommitment to others", "Underestimating influence", "Avoiding direct confrontation"] },
+      { label: "Support Style", cells: ["Energises with emotion", "Aligns with empathy and timing", "Grounds with calm structure"] },
+      { label: "Team Role", cells: ["Morale builder", "Relationship integrator", "Harmonic stabiliser"] },
+    ],
+    tip: "You work best with direct yet sensitive collaborators, those who value connection and bring structure, such as Coordinators, Facilitators, and Optimisers.",
+  },
+  PROFILE_5: {
+    title: "Facilitator Energy Matrix",
+    headers: ["Connector (4)", "Facilitator (5 – You)", "Coordinator (6)"],
+    rows: [
+      { label: "Drive", cells: ["Relationship alignment", "Calm, safety and rhythm", "Planning, delivery and order"] },
+      { label: "Strength", cells: ["Translates needs", "Creates inclusive stability", "Tracks action and responsibilities"] },
+      { label: "Challenge", cells: ["Over-attuning to people", "Avoiding direct decisions", "Becoming too task-led"] },
+      { label: "Support Style", cells: ["Aligns with empathy", "Grounds with presence", "Supports through structure"] },
+      { label: "Team Role", cells: ["Bridge", "Grounder", "Planner"] },
+    ],
+    tip: "Your calm has the greatest impact when it is paired with clear decisions and visible follow-through.",
+  },
+  PROFILE_6: {
+    title: "Coordinator Energy Matrix",
+    headers: ["Facilitator (5)", "Coordinator (6 – You)", "Controller (7)"],
+    rows: [
+      { label: "Drive", cells: ["Stability and presence", "Operational clarity and delivery", "Accuracy and risk awareness"] },
+      { label: "Strength", cells: ["Keeps people steady", "Turns plans into outcomes", "Protects standards and quality"] },
+      { label: "Challenge", cells: ["Avoiding hard calls", "Over-owning execution", "Becoming too critical"] },
+      { label: "Support Style", cells: ["Creates calm", "Builds reliable process", "Tests logic and detail"] },
+      { label: "Team Role", cells: ["Grounder", "Planner", "Analyst"] },
+    ],
+    tip: "Your reliability is powerful, but it becomes leadership when you use it to create clarity, not just carry tasks.",
+  },
+  PROFILE_7: {
+    title: "Controller Energy Matrix",
+    headers: ["Coordinator (6)", "Controller (7 – You)", "Optimiser (8)"],
+    rows: [
+      { label: "Drive", cells: ["Delivery and coordination", "Precision, logic and accountability", "Systems improvement and refinement"] },
+      { label: "Strength", cells: ["Keeps work moving", "Spots risks and protects quality", "Improves what already exists"] },
+      { label: "Challenge", cells: ["Over-managing detail", "Perfectionism or rigidity", "Staying too long in refinement"] },
+      { label: "Support Style", cells: ["Creates practical order", "Applies standards", "Optimises systems"] },
+      { label: "Team Role", cells: ["Planner", "Analyst", "Refiner"] },
+    ],
+    tip: "Your strongest contribution is not just finding what is wrong; it is helping the team build safer, smarter, more reliable ways forward.",
+  },
+  PROFILE_8: {
+    title: "Optimiser Energy Matrix",
+    headers: ["Controller (7)", "Optimiser (8 – You)", "Visionary (1)"],
+    rows: [
+      { label: "Drive", cells: ["Accuracy and quality", "Improvement, systems and refinement", "Innovation and future possibility"] },
+      { label: "Strength", cells: ["Protects integrity", "Makes things work better", "Sees what could be created next"] },
+      { label: "Challenge", cells: ["Over-analysis", "Quietly refining for too long", "Starting without enough grounding"] },
+      { label: "Support Style", cells: ["Provides standards", "Improves structure", "Adds creative direction"] },
+      { label: "Team Role", cells: ["Analyst", "Refiner", "Strategist"] },
+    ],
+    tip: "You create the most value when you are trusted to refine, improve, and rebuild without being rushed out of your thinking process too early.",
+  },
+};
+
+function bulletText(text: string) {
+  return String(text || "").replace(/^•\s*/, "").trim();
+}
+
+function splitValueCreation(blocks: string[]) {
+  const examplesIndex = blocks.findIndex((x) => /real-world examples/i.test(x));
+  const deliverIndex = blocks.findIndex((x) => /you deliver your best value when/i.test(x));
+  const trustIndex = blocks.findIndex((x) => /you build trust when/i.test(x));
+  const leverageIndex = blocks.findIndex((x) => /you leverage value when/i.test(x));
+
+  const introEnd = examplesIndex >= 0 ? examplesIndex : blocks.length;
+  const intro = blocks.slice(0, introEnd).filter((x) => x && !x.startsWith("•"));
+
+  const examples = examplesIndex >= 0
+    ? blocks.slice(examplesIndex + 1, deliverIndex > examplesIndex ? deliverIndex : blocks.length).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+
+  const deliver = deliverIndex >= 0
+    ? blocks.slice(deliverIndex + 1, trustIndex > deliverIndex ? trustIndex : blocks.length).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+  const trust = trustIndex >= 0
+    ? blocks.slice(trustIndex + 1, leverageIndex > trustIndex ? leverageIndex : blocks.length).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+  const leverage = leverageIndex >= 0
+    ? blocks.slice(leverageIndex + 1).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+
+  return { intro, examples, deliver, trust, leverage };
+}
+
+function EnergyMatrixSection(props: {
+  profileCode: string;
+  profileName: string;
+  blocks: string[];
+}) {
+  const table = ENERGY_MATRIX_TABLES[props.profileCode] || ENERGY_MATRIX_TABLES.PROFILE_4;
+  const intro = props.blocks
+    .filter((block) => block && !block.startsWith("•"))
+    .slice(0, 2);
+  const prompts = table.reflectionPrompts || [
+    "How do I respond when team dynamics feel tense or unclear?",
+    "When do I feel most effective when aligning people, ideas, or plans?",
+    "Do I wait for permission to share what I see?",
+    "What systems help me protect my energy while supporting others?",
+    "Who brings structure that complements my natural style?",
+  ];
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[18px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      <h3 className="mt-[22px] text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+        {table.title}
+      </h3>
+
+      <div className="mt-[16px] overflow-x-auto rounded-[14px] border border-white/30 shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+        <table className="w-full min-w-[760px] border-collapse text-center text-[12px] leading-[20px] text-[#084595]">
+          <thead>
+            <tr>
+              <th className="w-[160px] border-r-4 border-white bg-[#16356D] px-4 py-6 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-white">
+                Zone
+              </th>
+              {table.headers.map((header) => (
+                <th
+                  key={header}
+                  className="border-r-4 border-white bg-[#4092C5] px-4 py-6 text-[11px] font-extrabold uppercase tracking-[1px] text-white last:border-r-0"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {table.rows.map((row, rowIndex) => (
+              <tr key={row.label}>
+                <td className="border-r-4 border-t-4 border-white bg-[#B9C6D6] px-4 py-4 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-[#16356D]">
+                  {row.label}
+                </td>
+                {row.cells.map((cell, cellIndex) => (
+                  <td
+                    key={`${row.label}-${cellIndex}`}
+                    className={cls(
+                      "border-r-4 border-t-4 border-white px-4 py-4 last:border-r-0",
+                      rowIndex % 2 === 0 ? "bg-[#CFE4F3]" : "bg-[#BFD3E6]",
+                    )}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {table.tip ? (
+        <div className="mt-[22px] rounded-[10px] border border-[#084595] bg-white px-[20px] py-[16px] text-[12px] leading-[24px] text-[#313C52]">
+          <strong>Tip:</strong> {table.tip}
+        </div>
+      ) : null}
+
+      <div className="mt-[24px]">
+        <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+          Reflection Questions: Your Energy in Action
+        </h3>
+        <div className="mt-[14px] grid gap-[8px] md:grid-cols-2">
+          {prompts.map((prompt) => (
+            <div
+              key={prompt}
+              className="rounded-[8px] bg-[#E7F0FA] px-[16px] py-[11px] text-[12px] italic leading-[20px] text-[#313C52]"
+            >
+              • {prompt}
+            </div>
+          ))}
+        </div>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function TeamRoleFitSection(props: {
+  profileContent: ProfileBasedContent;
+}) {
+  const blocks = props.profileContent.teamRoleFit;
+  const insightsIndex = blocks.findIndex((x) => /TEAM ROLE FIT INSIGHTS/i.test(x));
+  const introBlocks = blocks
+    .slice(0, insightsIndex >= 0 ? insightsIndex : blocks.length)
+    .filter((x) => !/THE FOUR QUADRANTS/i.test(x));
+  const insightBlocks = insightsIndex >= 0 ? blocks.slice(insightsIndex + 1) : [];
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="text-[13px] leading-[28px] text-[#313C52]">
+        {introBlocks.map((block) => {
+          const isBullet = block.trim().startsWith("•");
+          return isBullet ? (
+            <p key={block} className="ml-6 mt-[8px]">
+              {block}
+            </p>
+          ) : (
+            <p key={block} className="mt-[16px] first:mt-0">
+              {block}
+            </p>
+          );
+        })}
+      </div>
+
+      <h3 className="mt-[20px] text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+        The Four Quadrants of Team Role Fit
+      </h3>
+      <div className="mt-[14px] flex justify-start">
+        <ReportAssetImage
+          src={REPORT_ASSETS.teamRoleFitVisual}
+          alt="Team role fit Johari Window"
+          className="h-auto w-full max-w-[470px] rounded-[8px] object-contain"
+        />
+      </div>
+
+      {insightBlocks.length ? (
+        <div className="mt-[24px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Team Role Fit Insights
+          </h3>
+          <ProfileTextBlocks blocks={insightBlocks} className="mt-[14px]" />
+        </div>
+      ) : null}
+    </WhiteCard>
+  );
+}
+
+function ValueCreationPathwaySection(props: {
+  profileContent: ProfileBasedContent;
+}) {
+  const parsed = splitValueCreation(props.profileContent.valueCreationPathway);
+  const exampleNames = ["Example 1", "Example 2"];
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[16px] text-[13px] leading-[28px] text-[#313C52]">
+        {parsed.intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      {parsed.examples.length ? (
+        <div className="mt-[22px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Real-world examples of {props.profileContent.display} energy in action:
+          </h3>
+          <div className="mt-[14px] grid gap-[14px] md:grid-cols-2">
+            {parsed.examples.slice(0, 2).map((example, index) => {
+              const [name, ...rest] = example.split(/,\s|\s+launched\s+|\s+energises\s+|\s+created\s+|\s+anticipated\s+/i);
+              return (
+                <div
+                  key={example}
+                  className="rounded-[8px] border border-[#A9B8CE] bg-white px-[18px] py-[14px] text-[12px] leading-[20px] text-[#313C52]"
+                >
+                  <div className="font-bold text-[#313C52]">
+                    {name && name.length < 40 ? name.replace(/^•\s*/, "") : exampleNames[index]}
+                  </div>
+                  <p className="mt-[6px]">
+                    {name && name.length < 40 && rest.length ? example.replace(name, "").replace(/^,?\s*/, "") : example}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-[18px] overflow-x-auto rounded-[8px]">
+        <table className="w-full min-w-[760px] border-collapse text-[12px] leading-[22px] text-[#084595]">
+          <thead>
+            <tr>
+              {[
+                "You deliver your best value when:",
+                "You build trust when:",
+                "You leverage value when:",
+              ].map((heading, index) => (
+                <th
+                  key={heading}
+                  className={cls(
+                    "border-r-4 border-white px-4 py-4 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-white last:border-r-0",
+                    index === 0 ? "bg-[#16356D]" : index === 1 ? "bg-[#284C9C]" : "bg-[#2E80BD]",
+                  )}
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: Math.max(parsed.deliver.length, parsed.trust.length, parsed.leverage.length, 1) }).map((_, index) => (
+              <tr key={index}>
+                {[parsed.deliver, parsed.trust, parsed.leverage].map((items, cellIndex) => (
+                  <td
+                    key={`${index}-${cellIndex}`}
+                    className={cls(
+                      "w-1/3 border-r-4 border-t-4 border-white px-4 py-4 align-top last:border-r-0",
+                      index % 2 === 0 ? "bg-[#CFE4F3]" : "bg-[#BFD3E6]",
+                    )}
+                  >
+                    {items[index] || ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function stripBulletPrefix(text: string) {
+  return String(text || "").replace(/^•\s*/, "").replace(/^\d+\.\s*/, "").trim();
+}
+
+function stripHeadingPrefix(text: string, heading: string) {
+  return String(text || "").replace(new RegExp(`^${heading}\\s*:?\\s*`, "i"), "").trim();
+}
+
+function pluralProfileToImageName(label: string) {
+  const normalized = String(label || "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/profiles?/gi, "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized.includes("visionar")) return "Visionary";
+  if (normalized.includes("catalyst")) return "Catalyst";
+  if (normalized.includes("motivator")) return "Motivator";
+  if (normalized.includes("connector")) return "Connector";
+  if (normalized.includes("facilitator")) return "Facilitator";
+  if (normalized.includes("coordinator")) return "Coordinator";
+  if (normalized.includes("controller")) return "Controller";
+  if (normalized.includes("optimiser") || normalized.includes("optimizer")) return "Optimiser";
+  return label;
+}
+
+function splitProfileSection(
+  blocks: string[],
+  startPattern: RegExp,
+  endPatterns: RegExp[] = [],
+) {
+  const start = blocks.findIndex((block) => startPattern.test(block));
+  if (start < 0) return [];
+  const end = blocks.findIndex(
+    (block, index) => index > start && endPatterns.some((pattern) => pattern.test(block)),
+  );
+  return blocks.slice(start + 1, end > start ? end : blocks.length);
+}
+
+function CollaborationTipsSection(props: { profileContent: ProfileBasedContent }) {
+  const blocks = props.profileContent.collaborationTips || [];
+  const bestStart = blocks.findIndex((block) => /best collaborators/i.test(block));
+  const tipsStart = blocks.findIndex((block) => /tips for working/i.test(block));
+  const roleIndex = blocks.findIndex((block) => /your role in the team/i.test(block));
+
+  const intro = blocks
+    .slice(0, Math.min(...[roleIndex, bestStart, tipsStart].filter((x) => x >= 0)))
+    .filter((block) => block && !block.trim().startsWith("•"));
+
+  const roleText = roleIndex >= 0 ? stripHeadingPrefix(blocks[roleIndex], "Your Role in the Team") : "";
+
+  const collaboratorBlocks = bestStart >= 0
+    ? blocks.slice(bestStart + 1, tipsStart > bestStart ? tipsStart : blocks.length)
+    : [];
+  const collaborators = collaboratorBlocks
+    .filter((block) => block.trim().startsWith("•"))
+    .map((block) => {
+      const text = stripBulletPrefix(block);
+      const [label, ...rest] = text.split(":");
+      return {
+        label: label.trim(),
+        imageName: pluralProfileToImageName(label),
+        body: rest.join(":").trim(),
+      };
+    })
+    .slice(0, 3);
+
+  const tipBlocks = tipsStart >= 0 ? blocks.slice(tipsStart + 1) : [];
+  const tips = tipBlocks
+    .filter((block) => block.trim().startsWith("•"))
+    .map((block, index) => {
+      const text = stripBulletPrefix(block);
+      const [maybeTitle, ...rest] = text.split(":");
+      const hasExplicitTitle = rest.length > 0 && maybeTitle.length < 70;
+      return {
+        title: hasExplicitTitle ? maybeTitle.trim() : `Tip ${index + 1}`,
+        body: hasExplicitTitle ? rest.join(":").trim() : text,
+      };
+    });
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[18px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+        {roleText ? (
+          <p>
+            <strong>Your Role in the Team:</strong> {roleText}
+          </p>
+        ) : null}
+      </div>
+
+      {collaborators.length ? (
+        <div className="mt-[24px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Best collaborators for you:
+          </h3>
+          <div className="mt-[18px] grid gap-[28px] sm:grid-cols-3">
+            {collaborators.map((collaborator) => {
+              const image = topProfileImage(collaborator.imageName);
+              return (
+                <div key={collaborator.label}>
+                  {image ? (
+                    <ReportAssetImage
+                      src={image}
+                      alt={collaborator.label}
+                      className="h-[124px] w-[124px] object-contain"
+                    />
+                  ) : null}
+                  <div className="mt-[10px] text-[13px] font-bold leading-[20px] text-[#313C52]">
+                    {collaborator.label}
+                  </div>
+                  <p className="mt-[6px] text-[12px] leading-[20px] text-[#313C52]">
+                    {collaborator.body}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {tips.length ? (
+        <div className="mt-[28px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Tips for working with all profiles:
+          </h3>
+          <div className="mt-[14px] space-y-[8px]">
+            {tips.map((tip) => (
+              <div
+                key={`${tip.title}-${tip.body}`}
+                className="rounded-[8px] border border-[#A9B8CE] border-l-[4px] border-l-[#084595] bg-white px-[18px] py-[12px]"
+              >
+                <div className="text-[13px] font-bold leading-[20px] text-[#313C52]">
+                  {tip.title}
+                </div>
+                <p className="mt-[4px] text-[12px] leading-[20px] text-[#313C52]">
+                  {tip.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </WhiteCard>
+  );
+}
+
+function DevelopmentRecommendationsSection(props: { profileContent: ProfileBasedContent }) {
+  const blocks = props.profileContent.developmentRecommendations || [];
+  const elevateHeading = /to elevate performance/i;
+  const anchorsHeading = /daily anchors/i;
+  const promptsHeading = /workshop reflection prompts/i;
+  const firstHeadingIndex = blocks.findIndex((block) => elevateHeading.test(block));
+  const intro = blocks.slice(0, firstHeadingIndex >= 0 ? firstHeadingIndex : blocks.length);
+  const elevate = splitProfileSection(blocks, elevateHeading, [anchorsHeading, promptsHeading]).map(stripBulletPrefix);
+  const anchors = splitProfileSection(blocks, anchorsHeading, [promptsHeading]).map(stripBulletPrefix);
+  const prompts = splitProfileSection(blocks, promptsHeading).map(stripBulletPrefix);
+  const rowCount = Math.max(elevate.length, anchors.length, prompts.length, 1);
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[16px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      <div className="mt-[22px] overflow-x-auto rounded-[8px]">
+        <table className="w-full min-w-[760px] border-collapse text-[12px] leading-[22px] text-[#084595]">
+          <thead>
+            <tr>
+              {["To elevate performance:", "Daily anchors:", "Workshop reflection prompts:"].map((heading, index) => (
+                <th
+                  key={heading}
+                  className={cls(
+                    "w-1/3 border-r-4 border-white px-4 py-4 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-white last:border-r-0",
+                    index === 0 ? "bg-[#16356D]" : index === 1 ? "bg-[#284C9C]" : "bg-[#2E80BD]",
+                  )}
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rowCount }).map((_, index) => (
+              <tr key={index}>
+                {[elevate, anchors, prompts].map((items, cellIndex) => (
+                  <td
+                    key={`${index}-${cellIndex}`}
+                    className={cls(
+                      "w-1/3 border-r-4 border-t-4 border-white px-4 py-5 align-top last:border-r-0",
+                      index % 2 === 0 ? "bg-[#CFE4F3]" : "bg-[#BFD3E6]",
+                    )}
+                  >
+                    {items[index] ? (cellIndex === 2 ? `• ${items[index]}` : items[index]) : ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function HoldingBackSection(props: { profileContent: ProfileBasedContent }) {
+  const blocks = props.profileContent.holdingBack || [];
+  const weeklyHeading = /weekly check-in prompts/i;
+  const monthlyHeading = /monthly calibration metrics/i;
+  const firstHeadingIndex = blocks.findIndex((block) => weeklyHeading.test(block));
+  const intro = blocks.slice(0, firstHeadingIndex >= 0 ? firstHeadingIndex : blocks.length);
+  const weekly = splitProfileSection(blocks, weeklyHeading, [monthlyHeading]).map(stripBulletPrefix);
+  const monthly = splitProfileSection(blocks, monthlyHeading).map(stripBulletPrefix);
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[16px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      <div className="mt-[24px] grid gap-[34px] lg:grid-cols-[1fr_1fr]">
+        <div>
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Weekly Check-In Prompts:
+          </h3>
+          <div className="mt-[14px] space-y-[9px]">
+            {weekly.map((item) => (
+              <div
+                key={item}
+                className="rounded-[8px] bg-[#E7F0FA] px-[16px] py-[13px] text-[12px] italic leading-[20px] text-[#313C52]"
+              >
+                • {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Monthly Calibration Metrics:
+          </h3>
+          <ul className="mt-[14px] space-y-[10px] text-[12px] leading-[22px] text-[#313C52]">
+            {monthly.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </WhiteCard>
+  );
+}
+
 function ProfileList(props: {
   profiles: Array<ProfileLabel & { pct?: number; short_code?: string }>;
   activeCode?: string;
@@ -2989,7 +3613,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
   return (
     <div
       ref={reportRef}
-      className="relative min-h-screen overflow-x-hidden bg-[#061A3A] text-white"
+      className="relative min-h-screen bg-[#061A3A] text-white"
     >
       <AppBackground />
       <div
@@ -3226,7 +3850,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="h-fit self-start rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-4">
+          <aside className="self-start rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
             <div className="text-[10px] font-semibold uppercase leading-[15px] tracking-[2.6px] text-white/45">
               Report Index
             </div>
@@ -3293,32 +3917,41 @@ export default function TeamPuzzleRhythmReportClient(props: {
           </aside>
 
           <div className="space-y-8">
-            <Card>
-              <SectionHeader
-                title="Welcome from Chandell"
-                icon={REPORT_ASSETS.icons.welcome}
-              />
-              <WhiteCard className="p-[24px]">
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <div className="space-y-[12px] text-[13px] leading-[25px] text-[#313C52]">
-                    {GENERIC_CONTENT.welcomeFromChandell.paragraphs.map((paragraph) => (
-                      <p key={paragraph}>{paragraph}</p>
-                    ))}
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.chandell}
-                      alt="Chandell Labbozzetta"
-                      className="mx-auto h-[96px] w-[96px] rounded-full border border-slate-200 object-cover"
-                    />
-                    <p className="mt-4 text-[12px] leading-[20px] text-slate-700">
-                      {GENERIC_CONTENT.welcomeFromChandell.signoff}
-                      <br />
-                      <strong>{GENERIC_CONTENT.welcomeFromChandell.name}</strong>
-                      <br />
-                      {GENERIC_CONTENT.welcomeFromChandell.role}
-                    </p>
-                  </div>
+            <Card className="p-0 bg-transparent shadow-none border-0">
+              <WhiteCard className="rounded-[18px] p-[28px]">
+                <h2 className="text-[18px] font-bold leading-[24px] text-[#111828]">
+                  Welcome to your Team Puzzle Discovery Report
+                </h2>
+                <p className="mt-[6px] text-[14px] font-semibold leading-[22px] text-[#64748B]">
+                  A note from the creator of this framework.
+                </p>
+
+                <div className="mt-[18px] space-y-[14px] text-[14px] leading-[25px] text-[#334155]">
+                  <p>
+                    Welcome to your Team Puzzle Discovery Report. I’m excited to be part of your journey as you uncover your natural strengths, communication style and best-fit contribution at work.
+                  </p>
+                  <p>
+                    This report is designed to give you deep insight into how you work best, where you thrive in a team and how to align your role with your natural energy. When people understand themselves and each other more deeply, culture shifts, communication improves and performance becomes more sustainable.
+                  </p>
+                  <p>
+                    Team Puzzle was created with that in mind. It’s not just a tool for insight — it is a practical system for action. It maps the puzzle pieces of your team so that you can fit together more effectively, reduce friction and increase flow.
+                  </p>
+                  <p>
+                    Whether you are reading this as part of a leadership program, a coaching session or your own development, treat this as a starting point, not an ending. Use what you discover here to guide conversations, make better choices and design the way you want to work going forward.
+                  </p>
+                  <p>Warm regards,</p>
+                  <p>Chandell Labbozzetta, Founder – Life Puzzle &amp; Team Puzzle Discovery Assessment</p>
+                </div>
+
+                <div className="mt-[26px]">
+                  <ReportAssetImage
+                    src={REPORT_ASSETS.chandell}
+                    alt="Chandell Labbozzetta"
+                    className="h-[110px] w-[110px] rounded-full border border-[#3B82F6] object-cover"
+                  />
+                  <p className="mt-[12px] text-[12px] leading-[20px] text-[#64748B]">
+                    Chandell Labbozzetta, Founder – Life Puzzle &amp; Team Puzzle Discovery Assessment
+                  </p>
                 </div>
               </WhiteCard>
             </Card>
@@ -4604,9 +5237,11 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Energy mix – how your profiles work together"
                 icon={REPORT_ASSETS.icons.energyMix}
               />
-              <WhiteCard>
-                <ProfileTextBlocks blocks={profileContent.energyMatrix} />
-              </WhiteCard>
+              <EnergyMatrixSection
+                profileCode={profileCode}
+                profileName={profileName}
+                blocks={profileContent.energyMatrix}
+              />
             </Card>
 
             <Card>
@@ -4614,18 +5249,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Team Role Fit"
                 icon={REPORT_ASSETS.icons.teamRoleFit}
               />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <ProfileTextBlocks blocks={profileContent.teamRoleFit} />
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.icons.teamRoleFit}
-                      alt="Team role fit"
-                      className="mx-auto max-h-[220px] w-full object-contain"
-                    />
-                  </div>
-                </div>
-              </WhiteCard>
+              <TeamRoleFitSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -4633,18 +5257,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Your Value Creation Pathway"
                 icon={REPORT_ASSETS.icons.valueCreationPathway}
               />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <ProfileTextBlocks blocks={profileContent.valueCreationPathway} />
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.icons.valueCreationPathway}
-                      alt="Value creation pathway"
-                      className="mx-auto max-h-[160px] w-full object-contain"
-                    />
-                  </div>
-                </div>
-              </WhiteCard>
+              <ValueCreationPathwaySection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -4652,9 +5265,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Collaboration Tips"
                 icon={REPORT_ASSETS.icons.collaborationTips}
               />
-              <WhiteCard>
-                <ProfileTextBlocks blocks={profileContent.collaborationTips} />
-              </WhiteCard>
+              <CollaborationTipsSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -4662,9 +5273,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Development Recommendations"
                 icon={REPORT_ASSETS.icons.developmentRecommendations}
               />
-              <WhiteCard>
-                <ProfileTextBlocks blocks={profileContent.developmentRecommendations} />
-              </WhiteCard>
+              <DevelopmentRecommendationsSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -4672,18 +5281,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="What Could Be Holding You Back?"
                 icon={REPORT_ASSETS.icons.whatsHoldingYouBack}
               />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <ProfileTextBlocks blocks={profileContent.holdingBack} />
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.icons.whatsHoldingYouBack}
-                      alt="What could be holding you back"
-                      className="mx-auto max-h-[160px] w-full object-contain"
-                    />
-                  </div>
-                </div>
-              </WhiteCard>
+              <HoldingBackSection profileContent={profileContent} />
             </Card>
 
             <Card>
