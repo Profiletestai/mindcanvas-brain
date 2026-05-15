@@ -1,4 +1,4 @@
-//apps/web/app/api/mcas/candidate/score/route.ts
+// apps/web/app/api/mcas/candidate/score/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -106,7 +106,9 @@ export async function POST(req: Request) {
     const org_id = body?.org_id ? String(body.org_id).trim() : "";
     const application_id = String(body?.application_id || "").trim();
     const job_id = body?.job_id ? String(body.job_id).trim() : null;
-    const campaign_id = body?.campaign_id ? String(body.campaign_id).trim() : null;
+    const campaign_id = body?.campaign_id
+      ? String(body.campaign_id).trim()
+      : null;
 
     const framework_slug =
       String(body?.framework_slug || "").trim() || "mcas-core-alignment";
@@ -114,7 +116,9 @@ export async function POST(req: Request) {
       String(body?.framework_version || "").trim() || "v1";
 
     const candidate: CandidatePayload =
-      body?.candidate && typeof body.candidate === "object" ? body.candidate : {};
+      body?.candidate && typeof body.candidate === "object"
+        ? body.candidate
+        : {};
 
     const first_name = String(candidate.first_name || "").trim();
     const last_name = String(candidate.last_name || "").trim();
@@ -483,10 +487,12 @@ export async function POST(req: Request) {
         if (qc === "Q25") {
           if (opt.flag === "overreach_risk") overreachRisk = true;
           if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
-          if (opt.flag === "vertical_confidence_matched")
+          if (opt.flag === "vertical_confidence_matched") {
             verticalConfidence = "matched";
-          if (opt.flag === "vertical_readiness_signal")
+          }
+          if (opt.flag === "vertical_readiness_signal") {
             verticalReadinessSignal = true;
+          }
         } else {
           const mid = opt.vertical_band
             ? verticalBandMidpoint(opt.vertical_band)
@@ -619,7 +625,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const fallbackOss = {
+    const fallbackOperatingStyleSummary = {
       operating_style: primaryOperatingStyle
         ? {
             code: primaryOperatingStyle.code,
@@ -633,19 +639,20 @@ export async function POST(req: Request) {
       friction_points: [],
     };
 
-    const fallbackRfs = {
+    const fallbackRoleFitSummary = {
       top_role_alignment: null,
       ideal_role_types: [],
       capacity_to_perform: null,
       role_risks: [],
     };
 
-    const fallbackCvs = {
+    const fallbackCareerVerticalSummary = {
       career_vertical_expression: null,
       levels: {},
     };
 
-    const cvsContent = reportContentBySection.cvs || fallbackCvs;
+    const careerVerticalSummaryContent =
+      reportContentBySection.cvs || fallbackCareerVerticalSummary;
 
     const responsePayload = {
       ok: true,
@@ -692,17 +699,21 @@ export async function POST(req: Request) {
           confidence,
         },
         report: {
-          oss: reportContentBySection.oss || fallbackOss,
-          rfs: reportContentBySection.rfs || fallbackRfs,
-          cvs: {
-            ...cvsContent,
+          operating_style_summary:
+            reportContentBySection.oss || fallbackOperatingStyleSummary,
+
+          role_fit_summary:
+            reportContentBySection.rfs || fallbackRoleFitSummary,
+
+          career_vertical_summary: {
+            ...careerVerticalSummaryContent,
             current_vertical: {
               code: careerVerticalCode,
               label: careerVerticalLabel,
               avg_score: Number(vAvg.toFixed(2)),
               summary:
-                cvsContent?.levels?.[careerVerticalCode] ||
-                cvsContent?.levels?.[`CV${verticalLevel}`] ||
+                careerVerticalSummaryContent?.levels?.[careerVerticalCode] ||
+                careerVerticalSummaryContent?.levels?.[`CV${verticalLevel}`] ||
                 null,
             },
           },

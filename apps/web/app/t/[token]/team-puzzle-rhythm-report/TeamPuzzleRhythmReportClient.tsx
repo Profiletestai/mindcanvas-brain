@@ -460,6 +460,265 @@ const GROUP_COPY: Record<
   },
 };
 
+
+const GENERIC_CONTENT = {
+  welcomeFromChandell: {
+    paragraphs: [
+      "Welcome to your Team Puzzle Discovery Report. I’m so excited to be part of your journey as you uncover your natural strengths, communication style, and best-fit contribution in the workplace.",
+      "This report is designed to give you deeper insight into how you work best, where you thrive in a team, and how to align your role with your natural energy.",
+      "At Life Puzzle, I’ve worked with leaders, executives, and business owners for over two decades, helping them break through performance barriers, improve communication, and unlock their true potential. One consistent truth I’ve seen across every organisation is this: when people understand themselves and each other more deeply, the entire culture shifts. Results improve, engagement increases, and people feel more fulfilled in the work they do.",
+      "Team Puzzle was created with that in mind. It is not just a tool for insight; it is a system for practical action. It maps the puzzle pieces of your team in a way that helps people fit together more effectively, reducing friction and increasing flow.",
+      "Whether you are reading this report as part of a leadership team, a coaching session, or a personal development journey, I invite you to treat this insight not as an ending, but as a starting point — a map for growth, alignment, and leadership that reflects your natural style.",
+    ],
+    signoff: "Warm regards",
+    name: "Chandell Labbozzetta",
+    role: "CEO of Life Puzzle and Creator of the Team Puzzle Discovery Assessment",
+  },
+  howToUseThisReport: {
+    intro: [
+      "Think of this report as your personal blueprint for working smarter, not harder. It is more than a profile; it is a practical guide for doing your best work, building stronger relationships, and creating long-term impact in your role or business.",
+      "Each section has been designed with real-world application in mind. You will not only learn about your strengths, but also how to use them, where to watch for blind spots, and how to build stronger partnerships with people who complement your style.",
+    ],
+    items: [
+      {
+        title: "Start with curiosity",
+        body: "Read through the full report with an open mind. Notice what feels immediately familiar, what surprises you, and what gives language to things you may already know about yourself.",
+      },
+      {
+        title: "Use it in real time",
+        body: "Bring it into meetings, planning sessions, coaching conversations, or moments where you need to understand your working style more clearly.",
+      },
+      {
+        title: "Share it",
+        body: "Invite your team, leader, coach, or advisor to explore the report with you. Insights become more powerful when they are shared and discussed.",
+      },
+      {
+        title: "Implement gradually",
+        body: "You do not need to act on everything at once. Choose one insight, apply it, observe what changes, and then build from there.",
+      },
+      {
+        title: "Check back often",
+        body: "As you grow, your expression of your profile may mature. This is a working document, not a one-off report.",
+      },
+    ],
+    closing: "Let’s explore what makes you — and your team — truly effective.",
+  },
+  introducingTeamPuzzleFramework: {
+    paragraphs: [
+      "High-performing teams do not happen by accident. They are built with intention, structure, and insight.",
+      "The Team Puzzle Framework was developed to bridge the gap between untapped human potential and practical business results. It is a top-down, ground-up approach to unlocking the genius that already exists within people and teams.",
+    ],
+    question: "How do we get the best from each individual, and even better results from the team as a whole?",
+    afterQuestion: "When people are placed in roles that energise them, when teams communicate using a shared language, and when leaders understand where and how each person adds value, the entire culture transforms. Productivity rises, engagement increases, and trust becomes a business asset.",
+    benefits: [
+      "A clear, structured way to identify natural strengths and working energy.",
+      "A common language that simplifies collaboration and reduces misunderstanding.",
+      "A strategic map to help leaders make better decisions about people, partnerships, and priorities.",
+      "Ideas for charting a course to results by following a path of least resistance.",
+    ],
+    closing: [
+      "The Team Puzzle approach is not about fixing people. It is about fitting people together.",
+      "Just like a real puzzle, each person has a unique shape and contribution. Our role is to help teams see how those pieces connect, so they can operate with more clarity, confidence, and better results.",
+      "This is not theory. It is a tool for action. Once you see how the pieces fit together, you will never look at team performance the same way again.",
+    ],
+  },
+  understandingFrequenciesProfiles: {
+    paragraphs: [
+      "Behind every high-performing team is a diverse mix of energy. In Team Puzzle, we call these core energy types the Frequencies — the foundational patterns that shape how people think, operate, communicate, and contribute.",
+      "These frequencies are not about job titles or technical skills. They describe the natural way you show up in the workplace, the kind of energy you bring to a team, and how you most instinctively create value.",
+      "Understanding the Four Frequencies is like learning the language of performance. Once a team can identify these dynamics, everything becomes clearer: roles, communication, friction, collaboration, decision-making, and results.",
+    ],
+    frequencySummaries: {
+      A: "The energy of ideas, creation, momentum, and possibility.",
+      B: "The energy of people, communication, motivation, and activation.",
+      C: "The energy of grounding, timing, delivery, and practical progress.",
+      D: "The energy of analysis, logic, structure, and precision.",
+    },
+    closing: "Each frequency contributes something essential. None is better than another. True team flow happens when all are present, respected, and used well.",
+  },
+  fourFrequencies: {
+    intro: "Each person leads with one or two dominant frequencies. These frequencies influence where they naturally focus, how they contribute, what energises them, and where they may experience blind spots.",
+    frequencies: {
+      A: {
+        focus: "Ideas, change, and future potential.",
+        strength: "Vision, creativity, possibility, and problem-solving.",
+        blindSpot: "Inconsistency, distraction, impatience, or moving too quickly without enough grounding.",
+        leveragePoint: "Use Innovation energy early in projects for vision-setting, idea generation, creative problem-solving, and prototyping.",
+      },
+      B: {
+        focus: "People, energy, communication, and engagement.",
+        strength: "Connection, empathy, motivation, culture-building, and stakeholder alignment.",
+        blindSpot: "Overcommitment, emotional fatigue, lack of boundaries, or prioritising harmony over clarity.",
+        leveragePoint: "Use Influence energy to build trust, create buy-in, energise teams, and strengthen communication.",
+      },
+      C: {
+        focus: "Timing, delivery, grounded progress, and real-world responsiveness.",
+        strength: "Practical execution, pacing, presence, and stability.",
+        blindSpot: "Avoiding confrontation, delaying decisions, or becoming too cautious under pressure.",
+        leveragePoint: "Use Implementation energy in delivery, client service, meetings, operations, and team rhythm.",
+      },
+      D: {
+        focus: "Systems, logic, quality, and structure.",
+        strength: "Precision, accountability, analysis, risk awareness, and process improvement.",
+        blindSpot: "Rigidity, perfectionism, over-analysis, or difficulty moving before everything is certain.",
+        leveragePoint: "Use Insight energy for systems, quality control, evaluation, compliance, scaling, and decision-making.",
+      },
+    },
+    reflectionPrompts: [
+      "Which frequency do you recognise most in your own energy and thinking style?",
+      "Who in your team operates at a very different frequency? What strength do they bring?",
+      "Where do your projects or meetings usually get stuck? Could it be a missing frequency?",
+      "How could understanding the balance of frequencies help your team function better?",
+    ],
+  },
+  eightProfiles: {
+    intro: "The Team Puzzle Framework maps eight unique Profiles. Each Profile represents a different way of thinking, contributing, communicating, and leading. These Profiles are powered by one or more of the Four Frequencies. Together, they cover the full spectrum of what it takes to build a high-performing team.",
+    closing: "Together, these eight Profiles represent the complete team puzzle — offering diversity not just of personality, but of contribution, energy, and value.",
+  },
+  naturalContributionTypes: {
+    intro: "Each Profile is a blend of one or more Frequencies and represents a unique role in the team. The more diversity you have across the eight Profiles, the more complete and capable your team becomes.",
+    reflectionPrompts: [
+      "Which of these profiles do you recognise in your current or past teammates?",
+      "Which profile frustrates or challenges you, and why?",
+      "Who have you relied on for support, execution, or clarity? Can you now name their profile?",
+      "What gaps do you notice in your current team’s profile mix, and what would complement it?",
+    ],
+  },
+  professionalPerformanceRhythm: {
+    intro: [
+      "Your Team Puzzle Profile explains your natural energy and contribution style. Alongside this, the Professional Performance Rhythm reveals how you approach work and create results across six key drivers.",
+      "Think of it as the tempo behind your profile — the underlying rhythm that influences the way you solve problems, collaborate, adapt, lead, and deliver. Everyone has all six RHYTHM drivers available to them, but we do not express them equally. Some energise us, some feel neutral, and some can drain us if overused.",
+      "By understanding your rhythm, you will see not only where you naturally thrive, but also how to better align with others whose rhythms may differ from yours. This awareness reduces friction, increases trust, and helps you and your team find greater flow.",
+    ],
+    whatThisMeans: [
+      "Your Professional Performance RHYTHM shows how you naturally approach work, decisions, and collaboration across six key drivers.",
+      "While your Profile explains what you bring, your RHYTHM explains how you operate day to day. It reflects the patterns you default to when working under pressure, leading others, solving problems, or delivering results.",
+      "Everyone has access to all six drivers. The difference is in how much energy each driver requires from you. Some drivers feel natural and energising. Others can be used when needed. Some may feel draining if used too often.",
+    ],
+    helps: [
+      "Work in a way that feels more natural and sustainable.",
+      "Reduce friction in how you approach tasks and people.",
+      "Build stronger, more balanced team dynamics.",
+    ],
+    sixDriversIntro: "Each driver represents a different way of working within a team or organisation.",
+    whyThisMatters: {
+      intro: "Your Professional Performance Rhythm offers a practical lens on how you show up day to day — not just what you contribute, but how you do it. By knowing your Flow, Stabilising, and Frustration drivers, you can:",
+      bullets: [
+        "Align your role with the areas that energise you most.",
+        "Spot where you may be overextending into draining drivers.",
+        "Build complementary partnerships with colleagues who balance your rhythm.",
+        "Lead and collaborate with more awareness, trust, and effectiveness.",
+      ],
+      closing: "Like a real rhythm, it is about balance. No one driver is better than another — the power comes from recognising your unique combination and how it fits into the wider team puzzle.",
+    },
+    rhythmMeans: {
+      intro: "Your RHYTHM is not about being good or bad at certain behaviours.",
+      understanding: [
+        "Where you naturally create the most impact",
+        "Where you can adapt when needed",
+        "Where you may experience friction over time",
+      ],
+      goal: "The goal is not to change your RHYTHM, but to use it more effectively.",
+      alignedWork: [
+        "Work more efficiently",
+        "Feel more energised",
+        "Contribute more consistently",
+      ],
+      closing: "And most importantly, you will better understand how your way of working fits into the wider team puzzle.",
+    },
+  },
+  threeLevelEnergyModel: {
+    flow: [
+      "Where energy is highest",
+      "Natural, effortless",
+      "Creates momentum and impact",
+      "Core contribution to team",
+    ],
+    stabilising: [
+      "Can use when needed",
+      "Not energising, but not draining",
+      "Provides balance and adaptability",
+    ],
+    frustration: [
+      "Requires effort",
+      "Draining over time",
+      "Often avoided or resisted",
+      "Key source of friction in teams",
+    ],
+  },
+  nextSteps: {
+    intro: "Your Team Puzzle RHYTHM report is designed to give you insight, language, and practical direction. The next step is to turn that insight into action.",
+    cards: [
+      {
+        title: "Download Your Report",
+        body: "Save a copy of your report so you can return to it during planning, reflection, performance reviews, or coaching conversations.",
+        button: "Download PDF",
+      },
+      {
+        title: "Discuss with Your Advisor",
+        body: "Take your insights further with a debrief session, team workshop, or advisory conversation. The value of this report grows when you explore it with someone who can help you apply it.",
+        button: "Explore Now",
+      },
+      {
+        title: "Explore Team Puzzle",
+        body: "Use this report as the beginning of a bigger conversation about team fit, communication, contribution, and performance. The more clearly people understand their own puzzle piece, the easier it becomes to build a stronger team.",
+        button: "Visit Now",
+      },
+    ],
+  },
+} as const;
+
+const GENERIC_PROFILE_CONTENT = {
+  PROFILE_1: {
+    display: "Visionary",
+    role: "Strategist",
+    summary: "An innovative strategist who sees what is possible before others do. Visionaries bring bold ideas, challenge the status quo, and drive future-focused thinking.",
+    naturalContribution: "The Visionary sees possibilities that others do not. They are future-focused creators who thrive in white space, ideas, and ambiguity. Their strength lies in charting new directions and reimagining what is possible for a business, a team, or an entire industry. They start movements, not just projects, but they need others to help carry ideas into execution. Visionaries add immense value when they are encouraged to focus and when their ideas are caught, shaped, and implemented by more grounded profiles.",
+  },
+  PROFILE_2: {
+    display: "Catalyst",
+    role: "Spark",
+    summary: "An energetic influencer who builds momentum and belief. Catalysts thrive in early-stage projects and energise others through dynamic communication.",
+    naturalContribution: "The Catalyst brings a dynamic blend of innovation and influence. They energise people and ideas, often acting as the momentum-builder in early-stage projects or change efforts. Catalysts inspire belief and action with their contagious passion, helping others move quickly and decisively. They thrive in fast-paced, people-centred environments, but benefit from calmer profiles who help manage delivery and sustainability.",
+  },
+  PROFILE_3: {
+    display: "Motivator",
+    role: "Heart",
+    summary: "A people-first leader who inspires connection, morale, and trust. Motivators lead with empathy and are often the emotional heart of the team.",
+    naturalContribution: "The Motivator uplifts, engages, and builds emotional connection within teams. They are deeply people-oriented and bring energy through empathy, optimism, and emotional presence. Motivators keep morale high and ensure others feel seen and valued. They are vital to team culture, but need to balance care for others with strong personal boundaries and focus.",
+  },
+  PROFILE_4: {
+    display: "Connector",
+    role: "Bridge",
+    summary: "A bridge-builder who creates alignment between people, timing, and goals. Connectors translate strategy into relationships and communication.",
+    naturalContribution: "The Connector brings people together through empathy, timing, and intuition. They instinctively sense how individuals, teams, and needs align, and act as the social and emotional glue of a project or business. Their strength lies in translating strategy into relationships and relationships into movement. They lead best when trusted to guide communication and pacing.",
+  },
+  PROFILE_5: {
+    display: "Facilitator",
+    role: "Grounder",
+    summary: "A harmoniser and integrator who grounds the team in calm consistency. Facilitators create safety, rhythm, and inclusive space for all voices.",
+    naturalContribution: "The Facilitator provides stability, rhythm, and presence. They are intuitive team stabilisers who excel at creating calm in complexity. They listen well, hold space for others, and gently guide group energy and decisions. Their power lies in their ability to lead without dominating. Facilitators thrive when given ownership of the human side of operations and culture.",
+  },
+  PROFILE_6: {
+    display: "Coordinator",
+    role: "Planner",
+    summary: "An operational planner who brings structure, tracking, and reliability. Coordinators excel in execution and turning plans into outcomes.",
+    naturalContribution: "The Coordinator thrives on execution and operational clarity. They know what needs to happen, when, and how. They track timelines, manage deliverables, and support consistency. Coordinators are natural project leads and back-end organisers who bring confidence and predictability to fast-moving environments. Their challenge is learning to lead beyond tasks and step into broader systems and strategy.",
+  },
+  PROFILE_7: {
+    display: "Controller",
+    role: "Analyst",
+    summary: "A detail-oriented analyst who ensures accuracy, quality, and accountability. Controllers anticipate risks and protect the integrity of work.",
+    naturalContribution: "The Controller brings accuracy, logic, and accountability. They see potential failure points before others and build systems to prevent them. They thrive in technical, regulatory, or back-end roles where detail matters most. They challenge assumptions, uphold standards, and protect the integrity of a system. Their leadership comes from consistency and rigour, not charisma.",
+  },
+  PROFILE_8: {
+    display: "Optimiser",
+    role: "Refiner",
+    summary: "A systems-driven refiner who improves processes, performance, and outcomes. Optimisers combine insight and innovation to make things better over time.",
+    naturalContribution: "The Optimiser improves systems, processes, and outcomes. They bridge data and design, identifying small shifts that make a big difference. Their strength lies in quietly enhancing what already exists so it performs better, scales easier, or lasts longer. Optimisers combine structure with creativity and thrive when given time, space, and trust to refine and rebuild.",
+  },
+} as const;
+
 const REPORT_ASSETS = {
   logo: "/org-graphics/tp-logo.png",
   chandell: "/org-graphics/tp-chandell.png",
@@ -1051,28 +1310,7 @@ function IntroTextBlock(props: {
 }
 
 function HowToUseCards() {
-  const items = [
-    [
-      "Start with curiosity",
-      "Read through the full report to understand your natural energy and profile.",
-    ],
-    [
-      "Use it in real time",
-      "Bring it to meetings, planning sessions, coaching conversations, or reviews.",
-    ],
-    [
-      "Share it",
-      "Invite your team, coach, or leader to explore the insights with you.",
-    ],
-    [
-      "Implement gradually",
-      "Start with one recommendation, test it, then layer in more.",
-    ],
-    [
-      "Check back often",
-      "As you grow, how you express your profile will continue to mature.",
-    ],
-  ];
+  const content = GENERIC_CONTENT.howToUseThisReport;
 
   return (
     <Card>
@@ -1081,26 +1319,28 @@ function HowToUseCards() {
         icon={REPORT_ASSETS.icons.howToUse}
       />
       <WhiteCard>
-        <p className="text-sm leading-7 text-slate-700">
-          Think of this report as your personal blueprint for working smarter,
-          not harder. It is more than a profile; it is a practical manual for
-          doing your best work, building stronger relationships, and creating
-          long-term impact.
-        </p>
+        <div className="space-y-4 text-sm leading-7 text-slate-700">
+          {content.intro.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
         <div className="mt-5 grid gap-3 md:grid-cols-5">
-          {items.map(([title, body], index) => (
+          {content.items.map((item, index) => (
             <div
-              key={title}
+              key={item.title}
               className="rounded-2xl bg-[#084595] p-4 text-white"
             >
               <div className="text-2xl font-bold text-white/60">
                 {index + 1}
               </div>
-              <div className="mt-3 text-sm font-bold">{title}</div>
-              <p className="mt-2 text-xs leading-5 text-white/80">{body}</p>
+              <div className="mt-3 text-sm font-bold">{item.title}</div>
+              <p className="mt-2 text-xs leading-5 text-white/80">{item.body}</p>
             </div>
           ))}
         </div>
+        <p className="mt-5 text-sm leading-7 text-slate-700">
+          {content.closing}
+        </p>
       </WhiteCard>
     </Card>
   );
@@ -1738,23 +1978,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
               title="Welcome from Chandell"
               icon={REPORT_ASSETS.icons.welcome}
             >
-              <p>
-                Welcome to your Team Puzzle Discovery Report. I am so excited to
-                be part of your journey as you uncover your natural strengths,
-                communication style, and best-fit contribution in the workplace.
-              </p>
-              <p>
-                Team Puzzle was created to help people understand themselves and
-                each other more deeply. When this happens, the entire culture
-                shifts, results improve, engagement increases, and people are
-                genuinely more fulfilled.
-              </p>
-              <p>
-                Whether you are reading this as part of a leadership team, a
-                coaching session, or a personal development journey, treat this
-                insight as a starting point: a map for growth, alignment, and
-                leadership that reflects your natural style.
-              </p>
+              {GENERIC_CONTENT.welcomeFromChandell.paragraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
               <div className="not-prose mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
                 <ReportAssetImage
                   src={REPORT_ASSETS.chandell}
@@ -1762,14 +1988,11 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   className="h-20 w-20 rounded-full border border-slate-200 object-cover"
                 />
                 <p className="m-0 text-sm leading-7 text-slate-700">
-                  <strong>
-                    Warm regards
-                    <br />
-                    Chandell Labbozzetta
-                  </strong>
+                  {GENERIC_CONTENT.welcomeFromChandell.signoff}
                   <br />
-                  CEO of Life Puzzle, and Creator of the Team Puzzle Discovery
-                  Assessment
+                  <strong>{GENERIC_CONTENT.welcomeFromChandell.name}</strong>
+                  <br />
+                  {GENERIC_CONTENT.welcomeFromChandell.role}
                 </p>
               </div>
             </IntroTextBlock>
@@ -1783,28 +2006,14 @@ export default function TeamPuzzleRhythmReportClient(props: {
               />
               <WhiteCard className="p-0">
                 <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
+                  {GENERIC_CONTENT.introducingTeamPuzzleFramework.paragraphs.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
                   <p>
-                    High-performing teams do not happen by accident. They are
-                    built with intention, structure, and insight. The Team
-                    Puzzle Framework bridges the gap between untapped human
-                    potential and practical business results. It is a top-down,
-                    ground-up approach to unlocking the genius that already
-                    exists in your people.
+                    At its core, Team Puzzle helps organisations answer one fundamental question: {" "}
+                    <em>{GENERIC_CONTENT.introducingTeamPuzzleFramework.question}</em>
                   </p>
-                  <p>
-                    At its core, Team Puzzle helps organisations answer one
-                    fundamental question:{" "}
-                    <em>
-                      How do we get the best from each individual, and even
-                      better results from the team as a whole?
-                    </em>
-                  </p>
-                  <p>
-                    When people are placed in roles that energise them, when
-                    teams communicate in a shared language, and when leadership
-                    knows where and how each person adds value, the entire
-                    culture transforms.
-                  </p>
+                  <p>{GENERIC_CONTENT.introducingTeamPuzzleFramework.afterQuestion}</p>
                 </div>
                 <div className="mx-5 mb-6 overflow-hidden rounded-2xl border border-[#4092C5] bg-white shadow-sm">
                   <div className="grid lg:grid-cols-[210px_1fr]">
@@ -1813,34 +2022,22 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     </div>
                     <div className="grid gap-0 divide-y divide-slate-100 p-5 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
                       {[
-                        {
-                          icon: REPORT_ASSETS.icons.structure,
-                          text: "A clear, structured way to identify natural strengths and working energy.",
-                        },
-                        {
-                          icon: REPORT_ASSETS.icons.commonLanguage,
-                          text: "A common language that simplifies collaboration and reduces misunderstanding.",
-                        },
-                        {
-                          icon: REPORT_ASSETS.icons.strategicMap,
-                          text: "A strategic map to help leaders make better decisions about people, partnerships, and priorities.",
-                        },
-                        {
-                          icon: REPORT_ASSETS.icons.ideas,
-                          text: "Ideas for charting a course to results following a path of least resistance.",
-                        },
-                      ].map((item) => (
+                        REPORT_ASSETS.icons.structure,
+                        REPORT_ASSETS.icons.commonLanguage,
+                        REPORT_ASSETS.icons.strategicMap,
+                        REPORT_ASSETS.icons.ideas,
+                      ].map((icon, index) => (
                         <div
-                          key={item.text}
+                          key={GENERIC_CONTENT.introducingTeamPuzzleFramework.benefits[index]}
                           className="flex flex-col items-start gap-4 p-5"
                         >
                           <ReportAssetImage
-                            src={item.icon}
+                            src={icon}
                             alt=""
                             className="h-16 w-16 object-contain"
                           />
                           <p className="text-sm leading-6 text-slate-700">
-                            {item.text}
+                            {GENERIC_CONTENT.introducingTeamPuzzleFramework.benefits[index]}
                           </p>
                         </div>
                       ))}
@@ -1848,21 +2045,18 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   </div>
                 </div>
                 <div className="space-y-3 px-6 pb-6 text-sm leading-7 text-slate-700">
-                  <p>
-                    The Team Puzzle approach is not about fixing people. It is
-                    about <strong>fitting people together.</strong>
-                  </p>
-                  <p>
-                    Just like a real puzzle, each person has a unique shape and
-                    contribution. Our role is to help teams see how those pieces
-                    connect, so they can operate with more clarity, more
-                    confidence, and far better results.
-                  </p>
-                  <p>
-                    This is not theory; it is a tool for action. Once you see
-                    how the pieces fit together, you will never look at team
-                    performance the same way again.
-                  </p>
+                  {GENERIC_CONTENT.introducingTeamPuzzleFramework.closing.map((paragraph, index) => (
+                    <p key={paragraph}>
+                      {index === 0 ? (
+                        <>
+                          The Team Puzzle approach is not about fixing people. It is about {" "}
+                          <strong>fitting people together.</strong>
+                        </>
+                      ) : (
+                        paragraph
+                      )}
+                    </p>
+                  ))}
                 </div>
               </WhiteCard>
             </Card>
@@ -1874,24 +2068,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
               />
               <WhiteCard className="p-0">
                 <div className="space-y-5 p-6 text-sm leading-7 text-slate-700">
-                  <p>
-                    Behind every high-performing team is a diverse mix of
-                    energy. In Team Puzzle, we call these core energy types the
-                    Frequencies: the foundational rhythms that drive how people
-                    think, operate, and contribute.
-                  </p>
-                  <p>
-                    These frequencies are not about job titles or skills. They
-                    are about the natural way you show up in the workplace, the
-                    kind of energy you bring to the table, and how you most
-                    instinctively create value.
-                  </p>
-                  <p>
-                    Understanding the Four Frequencies is like learning the
-                    language of performance. Once your team can identify these
-                    dynamics, everything becomes clearer: roles, communication,
-                    conflict, collaboration, and ultimately, results.
-                  </p>
+                  {GENERIC_CONTENT.understandingFrequenciesProfiles.paragraphs.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
                 </div>
                 <div className="flex justify-center px-6 pb-6">
                   <ReportAssetImage
@@ -1907,18 +2086,16 @@ export default function TeamPuzzleRhythmReportClient(props: {
                       className="rounded-2xl border border-[#084595] bg-white p-4"
                     >
                       <h3 className="font-semibold text-[#084595]">
-                        {FREQUENCY_COPY[code].title} ({code})
+                        {FREQUENCY_COPY[code].title.replace(" Frequency", " Frequency")} ({code})
                       </h3>
                       <p className="mt-3 text-sm leading-6 text-slate-700">
-                        {FREQUENCY_COPY[code].description}
+                        {GENERIC_CONTENT.understandingFrequenciesProfiles.frequencySummaries[code]}
                       </p>
                     </div>
                   ))}
                 </div>
                 <p className="px-6 pb-6 text-sm leading-7 text-slate-700">
-                  Each Frequency contributes something essential. None is more
-                  valuable than another. True team flow happens when all are
-                  present, and honoured.
+                  {GENERIC_CONTENT.understandingFrequenciesProfiles.closing}
                 </p>
               </WhiteCard>
             </Card>
@@ -1930,14 +2107,12 @@ export default function TeamPuzzleRhythmReportClient(props: {
               />
               <WhiteCard>
                 <p className="text-sm leading-7 text-slate-700">
-                  Each person leads with one or two of these frequencies. Each
-                  frequency has a focus, a strength, and a potential blind spot.
-                  Understanding these allows teams to work with, not against,
-                  their people’s natural flow.
+                  {GENERIC_CONTENT.fourFrequencies.intro}
                 </p>
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   {(["A", "B", "C", "D"] as FrequencyCode[]).map((code) => {
                     const item = FREQUENCY_COPY[code];
+                    const content = GENERIC_CONTENT.fourFrequencies.frequencies[code];
                     return (
                       <div
                         key={code}
@@ -1949,24 +2124,42 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         <dl className="mt-4 grid gap-3 text-sm leading-6 text-slate-700">
                           <div>
                             <dt className="font-bold text-slate-900">Focus:</dt>
-                            <dd>{item.focus}</dd>
+                            <dd>{content.focus}</dd>
                           </div>
                           <div>
                             <dt className="font-bold text-slate-900">
                               Strength:
                             </dt>
-                            <dd>{item.strength}</dd>
+                            <dd>{content.strength}</dd>
                           </div>
                           <div>
                             <dt className="font-bold text-slate-900">
                               Blind Spot:
                             </dt>
-                            <dd>{item.blindSpot}</dd>
+                            <dd>{content.blindSpot}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-bold text-slate-900">
+                              Leverage point:
+                            </dt>
+                            <dd>{content.leveragePoint}</dd>
                           </div>
                         </dl>
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-6 rounded-2xl bg-slate-50 p-5">
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-slate-800">
+                    Reflection prompts
+                  </h3>
+                  <ol className="mt-4 grid gap-3 text-sm leading-6 text-slate-700 md:grid-cols-2">
+                    {GENERIC_CONTENT.fourFrequencies.reflectionPrompts.map((prompt, index) => (
+                      <li key={prompt}>
+                        <strong>{index + 1}.</strong> {prompt}
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               </WhiteCard>
             </Card>
@@ -1978,13 +2171,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
               />
               <WhiteCard className="p-0">
                 <div className="px-[35px] pt-[26px] text-[13px] leading-[28px] text-slate-700">
-                  <p>
-                    The Team Puzzle framework maps eight unique Profiles, each
-                    representing a different way of thinking, contributing, and
-                    leading. These Profiles are powered by one or more of the
-                    Four Frequencies, and together they cover the full spectrum
-                    of what it takes to build a high-performing team.
-                  </p>
+                  <p>{GENERIC_CONTENT.eightProfiles.intro}</p>
                 </div>
 
                 <div className="flex justify-center px-6 pt-[48px]">
@@ -1997,7 +2184,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
                 <div className="grid gap-x-[18px] gap-y-[28px] px-[22px] pt-[48px] pb-[38px] md:grid-cols-2 xl:grid-cols-4">
                   {orderedProfileItems(data.result.profile_labels).map((p) => {
-                    const copy = PROFILE_COPY[p.code];
+                    const copy = GENERIC_PROFILE_CONTENT[p.code as keyof typeof GENERIC_PROFILE_CONTENT];
                     const active = p.code === profileCode;
                     const image = topProfileImage(p.name);
                     const freq =
@@ -2051,13 +2238,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
                 <div className="px-[35px] pb-[30px] text-[13px] leading-[28px] text-slate-700">
                   <p>
-                    Together, these eight Profiles represent the complete “team
-                    puzzle”, offering diversity not just of personality, but of
-                    contribution, energy, and value.
+                    {GENERIC_CONTENT.eightProfiles.closing}
                     <br />
-                    In the pages ahead, we’ll explore each profile in depth. For
-                    now, remember: every team has a puzzle. The most successful
-                    ones know how the pieces fit together.
+                    In the pages ahead, we’ll explore each profile in depth. For now, remember: every team has a puzzle. The most successful ones know how the pieces fit together.
                   </p>
                 </div>
               </WhiteCard>
@@ -2070,18 +2253,13 @@ export default function TeamPuzzleRhythmReportClient(props: {
               />
 
               <div className="rounded-[18px] bg-white px-[17px] py-[23px] text-[13px] leading-[28px] text-[#313C52]">
-                <p>
-                  Each profile is a blend of one or more Frequencies and
-                  represents a unique role in the team. The more diversity you
-                  have across these eight, the more complete and capable your
-                  team becomes.
-                </p>
+                <p>{GENERIC_CONTENT.naturalContributionTypes.intro}</p>
               </div>
 
               <div className="mt-[16px] space-y-[16px]">
                 {orderedProfileItems(data.result.profile_labels).map(
                   (p, index) => {
-                    const copy = PROFILE_COPY[p.code];
+                    const copy = GENERIC_PROFILE_CONTENT[p.code as keyof typeof GENERIC_PROFILE_CONTENT];
                     const image = topProfileImage(p.name);
                     const freq =
                       p.frequency_code || PROFILE_FREQUENCIES[p.code] || "A";
@@ -2104,7 +2282,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                             Profile {index + 1} · Frequency {freq}
                           </div>
                           <h3 className="mt-[7px] text-[15px] font-semibold leading-[19.2px] text-[#111828]">
-                            {copy?.title || p.name}{" "}
+                            {copy ? `The ${copy.display}` : p.name}{" "}
                             {copy?.role ? (
                               <span className="font-normal italic">
                                 – {copy.role}
@@ -2112,7 +2290,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                             ) : null}
                           </h3>
                           <p className="mt-[18px] max-w-[898px] text-[13px] font-normal leading-[28px] text-[#313C52]">
-                            {copy?.summary ||
+                            {copy?.naturalContribution ||
                               "A distinct contribution pattern within the Team Puzzle framework."}
                           </p>
                         </div>
@@ -2139,19 +2317,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     ))}
                   </div>
                   <div className="space-y-[20px] pt-[7px] text-[13px] leading-[27px] text-[#313C52]">
-                    <p>
-                      Which of these profiles do you recognise in your current
-                      or past teammates?
-                    </p>
-                    <p>Which profile frustrates or challenges you, and why?</p>
-                    <p>
-                      Who have you relied on for support, execution, or clarity?
-                      Can you now name their profile?
-                    </p>
-                    <p>
-                      What gaps do you notice in your current team’s profile
-                      mix, and what would complement it?
-                    </p>
+                    {GENERIC_CONTENT.naturalContributionTypes.reflectionPrompts.map((prompt) => (
+                      <p key={prompt}>{prompt}</p>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -2558,30 +2726,18 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
               <WhiteCard className="p-[20px]">
                 <div className="text-[13px] leading-[28px] text-[#313C52]">
-                  <p>
-                    Your Team Puzzle profile explains your natural energy and
-                    contribution style. Alongside this, the{" "}
-                    <strong>Professional Performance Rhythm</strong> reveals{" "}
-                    <em>
-                      how you approach work and create results across six key
-                      drivers.
-                    </em>
-                  </p>
-                  <p className="mt-[18px]">
-                    Think of it as the tempo behind your profile — the
-                    underlying rhythm that influences the way you solve
-                    problems, collaborate, adapt, and lead. Everyone has all six
-                    drivers available to them, but we don&apos;t express them
-                    equally. Some energise us, some feel neutral, and some can
-                    drain us if overused.
-                  </p>
-                  <p className="mt-[18px]">
-                    By understanding your rhythm, you&apos;ll see not only where
-                    you naturally thrive, but also how to better align with
-                    others whose rhythms may differ from yours. This awareness
-                    reduces friction, increases trust, and helps you and your
-                    team find greater flow.
-                  </p>
+                  {GENERIC_CONTENT.professionalPerformanceRhythm.intro.map((paragraph, index) => (
+                    <p key={paragraph} className={index === 0 ? undefined : "mt-[18px]"}>
+                      {index === 0 ? (
+                        <>
+                          Your Team Puzzle Profile explains your natural energy and contribution style. Alongside this, the {" "}
+                          <strong>Professional Performance Rhythm</strong> reveals how you approach work and create results across six key drivers.
+                        </>
+                      ) : (
+                        paragraph
+                      )}
+                    </p>
+                  ))}
                 </div>
 
                 <div className="mt-[24px] grid max-w-[780px] grid-cols-3 overflow-hidden rounded-[18px] bg-white shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
@@ -2611,21 +2767,17 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     <h3 className="text-[13px] font-bold leading-[20.8px] text-[#313C52]">
                       What This Means
                     </h3>
-                    <p className="mt-[16px] text-[13px] leading-[28px] text-[#313C52]">
-                      Your Professional Performance RHYTHM shows how you
-                      naturally approach work, decisions, and collaboration
-                      across six key drivers. While your Profile explains what
-                      you bring, your RHYTHM explains how you operate day to
-                      day. It reflects the patterns you default to when working
-                      under pressure, leading others, or delivering results.
-                    </p>
-                    <p className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
-                      Everyone has access to all six drivers. The difference is
-                      in how much energy each one requires from you. Some
-                      drivers feel natural and energising. Others you can use
-                      when needed. And some will feel draining if used too
-                      often.
-                    </p>
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.whatThisMeans.map((paragraph, index) => (
+                      <p
+                        key={paragraph}
+                        className={cls(
+                          "text-[13px] leading-[28px] text-[#313C52]",
+                          index === 0 ? "mt-[16px]" : "mt-[18px]",
+                        )}
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
                   </div>
 
                   <div className="rounded-[18px] bg-white p-[24px] shadow-[0_6px_32px_rgba(58,110,212,0.12)] ring-1 ring-[#4092C5]">
@@ -2633,13 +2785,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
                       Understanding this helps you:
                     </h3>
                     <ul className="mt-[16px] space-y-[10px] text-[13px] leading-[28px] text-[#313C52]">
-                      <li>
-                        • Work in a way that feels more natural and sustainable
-                      </li>
-                      <li>
-                        • Reduce friction in how you approach tasks and people
-                      </li>
-                      <li>• Build stronger, more balanced team dynamics</li>
+                      {GENERIC_CONTENT.professionalPerformanceRhythm.helps.map((item) => (
+                        <li key={item}>• {item}</li>
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -2834,34 +2982,14 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   Why This Matters
                 </div>
                 <div className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
-                  <p>
-                    Your Professional Performance Rhythm offers a practical lens
-                    on how you show up day to day — not just what you
-                    contribute, but how you do it. By knowing your Flow,
-                    Stabilising, and Frustration drivers, you can:
-                  </p>
+                  <p>{GENERIC_CONTENT.professionalPerformanceRhythm.whyThisMatters.intro}</p>
                   <ul className="mt-[10px] space-y-[4px]">
-                    <li>
-                      • Align your role with the areas that energise you most.
-                    </li>
-                    <li>
-                      • Spot where you may be overextending into draining
-                      drivers.
-                    </li>
-                    <li>
-                      • Build complementary partnerships with colleagues who
-                      balance your rhythm.
-                    </li>
-                    <li>
-                      • Lead and collaborate with more awareness, trust, and
-                      effectiveness.
-                    </li>
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.whyThisMatters.bullets.map((item) => (
+                      <li key={item}>• {item}</li>
+                    ))}
                   </ul>
                   <p className="mt-[18px]">
-                    Like a real rhythm, it&apos;s about balance. No one driver
-                    is better than another — the power comes from recognising
-                    your unique combination and how it fits into the wider team
-                    puzzle.
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.whyThisMatters.closing}
                   </p>
                 </div>
               </WhiteCard>
@@ -2871,32 +2999,26 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   What Your RHYTHM Means for You
                 </div>
                 <div className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
-                  <p>
-                    Your RHYTHM is not about being good or bad at certain
-                    behaviours.
-                  </p>
+                  <p>{GENERIC_CONTENT.professionalPerformanceRhythm.rhythmMeans.intro}</p>
                   <p className="mt-[18px]">It is about understanding:</p>
                   <ul className="mt-[8px] space-y-[4px]">
-                    <li>• Where you naturally create the most impact</li>
-                    <li>• Where you can adapt when needed</li>
-                    <li>• Where you may experience friction over time</li>
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.rhythmMeans.understanding.map((item) => (
+                      <li key={item}>• {item}</li>
+                    ))}
                   </ul>
                   <p className="mt-[18px]">
-                    The goal is not to change your RHYTHM, but to use it more
-                    effectively.
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.rhythmMeans.goal}
                   </p>
                   <p className="mt-[18px]">
-                    When you align your work, your role, and your team
-                    interactions with your natural drivers, you will:
+                    When you align your work, your role, and your team interactions with your natural drivers, you will:
                   </p>
                   <ul className="mt-[8px] space-y-[4px]">
-                    <li>• Work more efficiently</li>
-                    <li>• Feel more energised</li>
-                    <li>• Contribute more consistently</li>
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.rhythmMeans.alignedWork.map((item) => (
+                      <li key={item}>• {item}</li>
+                    ))}
                   </ul>
                   <p className="mt-[18px]">
-                    And most importantly, you will better understand how your
-                    way of working fits into the wider team puzzle.
+                    {GENERIC_CONTENT.professionalPerformanceRhythm.rhythmMeans.closing}
                   </p>
                 </div>
               </WhiteCard>
@@ -2913,26 +3035,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     ["flow", "stabilising", "frustration"] as DriverGroup[]
                   ).map((group, index) => {
                     const g = GROUP_COPY[group];
-                    const text =
-                      group === "flow"
-                        ? [
-                            "Where energy is highest",
-                            "Natural, effortless",
-                            "Creates momentum and impact",
-                            "Core contribution to team",
-                          ]
-                        : group === "stabilising"
-                          ? [
-                              "Can use when needed",
-                              "Not energising, but not draining",
-                              "Provides balance and adaptability",
-                            ]
-                          : [
-                              "Requires effort",
-                              "Draining over time",
-                              "Often avoided or resisted",
-                              "Key source of friction in teams",
-                            ];
+                    const text = GENERIC_CONTENT.threeLevelEnergyModel[group];
                     return (
                       <div
                         key={group}
@@ -3293,24 +3396,27 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 icon={REPORT_ASSETS.icons.nextSteps}
               />
               <WhiteCard>
+                <p className="mb-5 text-sm leading-7 text-slate-700">
+                  {GENERIC_CONTENT.nextSteps.intro}
+                </p>
                 <div className="grid gap-4 md:grid-cols-3">
                   <NextStepCard
-                    title="Download Your Report"
-                    body="Save a PDF copy of your Team Puzzle RHYTHM report for reference."
-                    button="Download PDF"
+                    title={GENERIC_CONTENT.nextSteps.cards[0].title}
+                    body={GENERIC_CONTENT.nextSteps.cards[0].body}
+                    button={GENERIC_CONTENT.nextSteps.cards[0].button}
                     href={null}
                   />
                   <NextStepCard
-                    title="Discuss with Your Advisor"
-                    body="Take your insights further with a debrief session or team workshop."
-                    button="Explore Now"
+                    title={GENERIC_CONTENT.nextSteps.cards[1].title}
+                    body={GENERIC_CONTENT.nextSteps.cards[1].body}
+                    button={GENERIC_CONTENT.nextSteps.cards[1].button}
                     href={nextStepsUrl}
                     primary
                   />
                   <NextStepCard
-                    title="Explore Team Puzzle"
-                    body="Find more resources, join coaching communities and accelerators."
-                    button="Visit Now"
+                    title={GENERIC_CONTENT.nextSteps.cards[2].title}
+                    body={GENERIC_CONTENT.nextSteps.cards[2].body}
+                    button={GENERIC_CONTENT.nextSteps.cards[2].button}
                     href={data.org?.website_url || nextStepsUrl}
                   />
                 </div>
