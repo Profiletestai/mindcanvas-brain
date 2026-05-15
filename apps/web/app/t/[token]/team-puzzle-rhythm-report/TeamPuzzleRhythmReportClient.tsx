@@ -2254,94 +2254,222 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Profile mix"
                 icon={REPORT_ASSETS.icons.profileMix}
               />
-              <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">
-                  Your profile mix shows how strongly you match each of the
-                  eight Profiles. Higher percentages show patterns you use
-                  often; lower ones are backup styles you can lean on when
-                  needed.
-                </p>
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
-                  {[primary, secondary, tertiary]
-                    .filter(Boolean)
-                    .map((p, index) => {
-                      const item = p as ProfileLabel & {
-                        pct: number;
-                        short_code: string;
-                      };
-                      const labels = [
-                        "Primary profile",
-                        "Secondary profile",
-                        "Tertiary profile",
-                      ];
-                      return (
-                        <div
-                          key={`${item.code}-${index}`}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
-                        >
-                          <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                            {labels[index]}
-                          </div>
-                          <div className="mt-3 text-3xl font-bold text-[#084595]">
-                            {Math.round(item.pct || 0)}%
-                          </div>
-                          <div className="mt-2 font-bold text-slate-900">
-                            {item.name}{" "}
-                            {item.short_code || profileCodeToShort(item.code)}
-                          </div>
+              <WhiteCard className="p-0">
+                <div className="p-[16px]">
+                  <p className="text-[13px] leading-[28px] text-[#313C52]">
+                    Your profile mix shows how strongly you match each of the
+                    eight Profiles. Higher percentages show patterns you use
+                    often; lower ones are backup styles you can lean on when
+                    needed.
+                  </p>
+
+                  <div className="mt-[18px] grid gap-[15px] lg:grid-cols-2">
+                    {[
+                      orderedProfileItems(data.result.profile_labels).slice(0, 4),
+                      orderedProfileItems(data.result.profile_labels).slice(4, 8),
+                    ].map((group, groupIndex) => (
+                      <div
+                        key={`profile-mix-bars-${groupIndex}`}
+                        className="rounded-[18px] bg-white/90 px-[17px] py-[17px] shadow-[0_6px_32px_rgba(58,110,212,0.12)] ring-1 ring-white"
+                      >
+                        <div className="space-y-[22px]">
+                          {group.map((profile) => {
+                            const pct = Math.round(
+                              data.result.profile_percentages?.[profile.code] || 0,
+                            );
+                            const frequency =
+                              profile.frequency_code || PROFILE_FREQUENCIES[profile.code];
+                            const barColor = PROFILE_ACCENT[frequency || "B"] || "#4092C5";
+
+                            return (
+                              <div
+                                key={`profile-mix-row-${profile.code}`}
+                                className="grid grid-cols-[150px_1fr_34px] items-center gap-[12px]"
+                              >
+                                <div className="text-[12px] leading-[19px] text-[#3D4163]">
+                                  {profile.name}
+                                </div>
+                                <div className="h-[5px] overflow-hidden rounded-full bg-[#A0A5C0]/20">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                      width: `${clamp(pct)}%`,
+                                      backgroundColor: barColor,
+                                    }}
+                                  />
+                                </div>
+                                <div className="text-right text-[11px] font-medium leading-[17px] text-[#3D4163]">
+                                  {pct}%
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-[17px] text-[13px] leading-[28px] text-[#313C52]">
+                    Overall, your strongest profile pattern is{" "}
+                    <strong>
+                      {primary?.name || profileName} ({primary?.short_code || profileCodeToShort(profileCode)}),
+                    </strong>{" "}
+                    supported by{" "}
+                    <strong>
+                      {secondary?.name || "your secondary profile"}{secondary ? ` (${secondary.short_code || profileCodeToShort(secondary.code)})` : ""}
+                    </strong>{" "}
+                    and{" "}
+                    <strong>
+                      {tertiary?.name || "your tertiary profile"}{tertiary ? ` (${tertiary.short_code || profileCodeToShort(tertiary.code)})` : ""}.
+                    </strong>
+                  </p>
                 </div>
               </WhiteCard>
+
+              <div className="mt-[18px] grid gap-[15px] lg:grid-cols-3">
+                {[primary, secondary, tertiary]
+                  .filter(Boolean)
+                  .map((p, index) => {
+                    const item = p as ProfileLabel & {
+                      pct: number;
+                      short_code: string;
+                    };
+                    const labels = [
+                      "Primary profile",
+                      "Secondary profile",
+                      "Tertiary profile",
+                    ];
+                    const borderColors = ["#6BAED6", "#91C3F5", "#C6E1FC"];
+                    const pctColors = ["#6BAED6", "#4092C5", "#022B61"];
+                    const image = topProfileImage(item.name);
+
+                    return (
+                      <div
+                        key={`${item.code}-${index}-profile-card`}
+                        className="min-h-[303px] rounded-[18px] border-t-4 bg-white p-[21px] text-[#313C52] shadow-sm"
+                        style={{ borderTopColor: borderColors[index] }}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="text-[10px] uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                              {labels[index]}
+                            </div>
+                            {image ? (
+                              <ReportAssetImage
+                                src={image}
+                                alt={item.name}
+                                className="mt-[14px] h-[54px] w-[54px] object-contain"
+                              />
+                            ) : null}
+                          </div>
+                          <div
+                            className="pt-[25px] text-[40px] font-semibold leading-[19px]"
+                            style={{ color: pctColors[index] }}
+                          >
+                            {Math.round(item.pct || 0)}%
+                          </div>
+                        </div>
+
+                        <h3 className="mt-[12px] text-[15px] font-semibold leading-[19.2px] text-[#111828]">
+                          {item.name} {item.short_code || profileCodeToShort(item.code)}
+                        </h3>
+
+                        <div className="mt-[14px] text-[11px] leading-[16.5px] text-[#313C52]">
+                          <p>
+                            <strong>Key traits:</strong> How this profile most
+                            naturally contributes when things are going well.
+                          </p>
+                          <p className="mt-[14px]">
+                            <strong>Motivators:</strong> Conditions that help this
+                            style feel energising and sustainable.
+                          </p>
+                          <p className="mt-[14px]">
+                            <strong>Watch outs:</strong> Things to watch out for
+                            when this style is over-used or under pressure.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             </Card>
 
             <Card>
               <SectionHeader
-                title={`Your profile in depth: ${profileName}`}
+                title={`Your profile in depth: ${profileCopy.title.replace(/^The\s+/i, "The ")}`}
                 icon={REPORT_ASSETS.icons.profileInDepth}
               />
-              <WhiteCard>
-                <div className="grid gap-6 md:grid-cols-[1fr_260px]">
-                  <div>
-                    <h3 className="text-2xl font-bold text-slate-900">
-                      {profileCopy.title} · {profileCopy.role}
-                    </h3>
-                    <p className="mt-4 text-sm leading-7 text-slate-700">
-                      {profileCopy.summary}
-                    </p>
-                    <div className="mt-6 grid gap-4 md:grid-cols-2">
-                      <div className="rounded-xl bg-slate-50 p-4">
-                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Core Traits
+              <WhiteCard className="p-0">
+                <div className="grid gap-[20px] p-[17px] lg:grid-cols-[527px_1fr]">
+                  <div className="space-y-[17px]">
+                    <div className="rounded-[18px] bg-[#4092C5] p-[20px] shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+                      <div className="grid min-h-[172px] grid-cols-[166px_1fr] gap-[30px] items-center">
+                        {heroImage ? (
+                          <ReportAssetImage
+                            src={heroImage}
+                            alt={profileName}
+                            className="h-[158px] w-[166px] object-contain"
+                          />
+                        ) : null}
+                        <div className="text-white">
+                          <div className="text-[10px] uppercase leading-[16px] tracking-[1px] text-white/90">
+                            Core Details
+                          </div>
+                          <div className="mt-[8px] text-[13px] leading-[20.8px]">
+                            <p>
+                              <strong>Frequency:</strong>{" "}
+                              {FREQUENCY_COPY[topFreq]?.title.replace(" Frequency", "") || topFreqName} ({topFreq})
+                            </p>
+                            <p className="mt-[12px]">
+                              <strong>Core Traits:</strong> {profileCopy.coreTraits}
+                            </p>
+                            <p className="mt-[12px]">
+                              <strong>Ideal Environment:</strong>{" "}
+                              {profileCopy.idealEnvironment}
+                            </p>
+                          </div>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">
-                          {profileCopy.coreTraits}
-                        </p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-4">
-                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Ideal Environment
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">
-                          {profileCopy.idealEnvironment}
-                        </p>
                       </div>
                     </div>
-                    {profileCopy.famous ? (
-                      <p className="mt-5 text-sm leading-7 text-slate-700">
-                        <strong>Famous examples include:</strong>{" "}
-                        {profileCopy.famous}
+
+                    <div className="rounded-[18px] bg-white p-[24px] shadow-[0_6px_32px_rgba(58,110,212,0.12)] ring-1 ring-[#4092C5]">
+                      <p className="text-[13px] leading-[20.8px] text-[#313C52]">
+                        <strong>You may have been called:</strong>
+                        <br />
+                        the people whisperer, the translator, the empathic
+                        leader, the harmoniser.
                       </p>
-                    ) : null}
+                      <p className="mt-[18px] text-[13px] leading-[20.8px] text-[#313C52]">
+                        <strong>Famous {profileName}s include:</strong>
+                        <br />
+                        {profileCopy.famous ||
+                          "Recognised leaders and contributors who create value through this style."}
+                      </p>
+                    </div>
                   </div>
-                  {heroImage ? (
-                    <img
-                      src={heroImage}
-                      alt={profileName}
-                      className="rounded-3xl border border-slate-200 object-cover"
-                    />
-                  ) : null}
+
+                  <div className="text-[13px] leading-[28px] text-[#313C52]">
+                    <p>
+                      {profileCopy.summary} You have a natural gift for using
+                      your strongest contribution style in a way that helps
+                      people, plans, and priorities move forward with more
+                      clarity.
+                    </p>
+                    <p className="mt-[20px]">
+                      You are often the person people turn to when they need
+                      your particular blend of energy, timing, and contribution.
+                      You may not always notice how much this shapes the room,
+                      but others often experience your strengths as a stabilising
+                      or activating force.
+                    </p>
+                    <p className="mt-[20px]">
+                      To deepen your self-awareness and leadership impact, use
+                      this section as a prompt to notice where your profile gives
+                      you energy, where it may be over-used, and where support
+                      from complementary profiles can help you create even more
+                      value.
+                    </p>
+                  </div>
                 </div>
               </WhiteCard>
             </Card>
