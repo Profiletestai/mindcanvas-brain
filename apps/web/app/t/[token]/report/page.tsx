@@ -61,7 +61,9 @@ function resolveSourceTestIdFromMeta(meta: any): string | null {
   if (direct && isUuidLike(direct)) return direct;
 
   if (Array.isArray(m.source_tests)) {
-    const first = m.source_tests.find((x: any) => typeof x === "string" && isUuidLike(x));
+    const first = m.source_tests.find(
+      (x: any) => typeof x === "string" && isUuidLike(x)
+    );
     if (first) return first;
   }
 
@@ -75,8 +77,12 @@ function looksLikeQscTest(test: PortalTestRow | null) {
 
   const kind = String(meta?.kind || "").toLowerCase();
   const family = String(meta?.test_family || "").toLowerCase();
-  const frameworkType = String(meta?.frameworkType || meta?.frameworktype || "").toLowerCase();
-  const resultType = String(meta?.resultType || meta?.resulttype || "").toLowerCase();
+  const frameworkType = String(
+    meta?.frameworkType || meta?.frameworktype || ""
+  ).toLowerCase();
+  const resultType = String(
+    meta?.resultType || meta?.resulttype || ""
+  ).toLowerCase();
   const canonical = String(meta?.canonical_slug || "").toLowerCase();
   const qscVariant = String(meta?.qsc_variant || meta?.variant || "").toLowerCase();
 
@@ -94,7 +100,28 @@ function looksLikeQscTest(test: PortalTestRow | null) {
   );
 }
 
-async function fetchPortalTestRow(sb: ReturnType<typeof portal>, testId: string): Promise<PortalTestRow | null> {
+function looksLikeTeamPuzzleRhythmTest(test: PortalTestRow | null) {
+  const slug = String(test?.slug || "").toLowerCase();
+  const name = String(test?.name || "").toLowerCase();
+  const meta = test?.meta && typeof test.meta === "object" ? test.meta : {};
+
+  const reportLayout = String(meta?.report_layout || "").toLowerCase();
+  const variant = String(meta?.variant || "").toLowerCase();
+  const family = String(meta?.test_family || "").toLowerCase();
+
+  return (
+    reportLayout === "team_puzzle_rhythm_v1" ||
+    variant === "rhythm_edition" ||
+    meta?.has_rhythm_layer === true ||
+    meta?.rhythm?.enabled === true ||
+    (family === "team_puzzle" && (slug.includes("rhythm") || name.includes("rhythm")))
+  );
+}
+
+async function fetchPortalTestRow(
+  sb: ReturnType<typeof portal>,
+  testId: string
+): Promise<PortalTestRow | null> {
   const { data, error } = await sb
     .from("tests")
     .select("id, slug, name, meta")
@@ -118,6 +145,18 @@ async function resolveEffectiveTestRow(
   return sourceRow || wrapperTestRow;
 }
 
+function buildQueryString(params: Record<string, string | null | undefined>) {
+  const qs = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value.trim()) {
+      qs.set(key, value.trim());
+    }
+  }
+
+  return qs.toString();
+}
+
 export default async function ReportPage({
   params,
   searchParams,
@@ -133,6 +172,8 @@ export default async function ReportPage({
     return <ReportGateClient token={token} tid={tid} src={src} />;
   }
 
+  let redirectTarget: string | null = null;
+
   try {
     const sb = portal();
     const vis = visibility();
@@ -144,6 +185,8 @@ export default async function ReportPage({
       .maybeSingle();
 
     if (!linkErr && link?.test_id) {
+      const commonQs = buildQueryString({ tid, src });
+
       // 1) Visibility hard route
       const { data: vTest, error: vErr } = await vis
         .from("tests")
@@ -152,28 +195,42 @@ export default async function ReportPage({
         .maybeSingle();
 
       if (!vErr && vTest?.id) {
-        const qs = new URLSearchParams();
-        qs.set("tid", tid);
-        if (src) qs.set("src", src);
-        redirect(`/t/${encodeURIComponent(token)}/visibility/report?${qs.toString()}`);
+        redirectTarget = `/t/${encodeURIComponent(token)}/visibility/report?${commonQs}`;
       }
 
-      // 2) Resolve wrapper + effective source for robust QSC detection
-      const wrapperTestRow = await fetchPortalTestRow(sb, link.test_id);
-      const effectiveTestRow = await resolveEffectiveTestRow(sb, wrapperTestRow);
+      // 2) Team Puzzle RHYTHM hard route
+      // This keeps the RHYTHM Edition report separate from the existing generic report.
+      if (!redirectTarget) {
+        const wrapperTestRow = await fetchPortalTestRow(sb, link.test_id);
 
-      const isQsc =
-        looksLikeQscTest(wrapperTestRow) ||
-        looksLikeQscTest(effectiveTestRow);
+        if (looksLikeTeamPuzzleRhythmTest(wrapperTestRow)) {
+          redirectTarget = `/t/${encodeURIComponent(token)}/team-puzzle-rhythm-report?${commonQs}`;
+        }
 
-      if (isQsc) {
-        const qs = new URLSearchParams();
-        qs.set("tid", tid);
-        redirect(`/qsc/${encodeURIComponent(token)}/entrepreneur?${qs.toString()}`);
+        // 3) Resolve wrapper + effective source for robust QSC detection
+        if (!redirectTarget) {
+          const effectiveTestRow = await resolveEffectiveTestRow(sb, wrapperTestRow);
+
+          const isQsc =
+            looksLikeQscTest(wrapperTestRow) || looksLikeQscTest(effectiveTestRow);
+
+          if (isQsc) {
+            const qscQs = buildQueryString({ tid });
+            redirectTarget = `/qsc/${encodeURIComponent(token)}/entrepreneur?${qscQs}`;
+          }
+        }
       }
     }
-  } catch {
-    // fall through to existing report gate
+  } catch (error) {
+    console.warn("[report/page] Report routing lookup failed", error);
+  }
+
+  // Important: call redirect outside the try/catch.
+  // Next.js implements redirect() by throwing a special redirect error. If we call
+  // redirect() inside the try block, our catch swallows it and the page falls back
+  // to the old ReportGateClient instead of redirecting.
+  if (redirectTarget) {
+    redirect(redirectTarget);
   }
 
   return <ReportGateClient token={token} tid={tid} src={src} />;
