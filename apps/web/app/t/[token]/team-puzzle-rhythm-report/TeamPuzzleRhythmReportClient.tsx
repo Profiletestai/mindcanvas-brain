@@ -84,6 +84,32 @@ type ReportData = {
 
 type ReportAPI = { ok: boolean; data?: ReportData; error?: string };
 
+
+type FrequencyAlignedProfile = {
+  profile: string;
+  bullets: string[];
+};
+
+type FrequencyContent = {
+  code: FrequencyCode;
+  name: string;
+  label: string;
+  definition: string;
+  coreAttributes: string[];
+  potentialBlindSpots: string[];
+  alignedProfiles: FrequencyAlignedProfile[];
+  howItShowsUp: {
+    trait: string;
+    expression: string;
+  }[];
+  idealRoles: string[];
+  avoidEnvironments: string[];
+  coachingTips: string[];
+  reflectionPrompts: string[];
+  finalThoughts: string;
+  nextStep?: string;
+};
+
 const FREQUENCY_COPY: Record<
   FrequencyCode,
   {
@@ -127,6 +153,355 @@ const FREQUENCY_COPY: Record<
     blindSpot: "Rigidity, analysis paralysis, perfectionism",
   },
 };
+
+
+const FREQUENCY_CONTENT: Record<FrequencyCode, FrequencyContent> = {
+  A: {
+    code: "A",
+    name: "Innovation",
+    label: "Innovation Frequency",
+    definition:
+      "The Innovation Frequency is the energy of ideas, momentum, and possibility. People with this frequency are naturally future-oriented. They thrive on change, pursue progress, and often see possibilities long before others do.",
+    coreAttributes: [
+      "Big-picture thinking",
+      "Strategic vision",
+      "Pattern recognition",
+      "Restlessness with ‘the way things have always been’",
+      "Comfortable with risk and uncertainty",
+    ],
+    potentialBlindSpots: [
+      "May skip over details or structure",
+      "Impatience with slower-moving personalities",
+      "Can abandon ideas before they’re fully formed",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 1: The Visionary",
+        bullets: [
+          "Brings bold ideas and future-focused strategy",
+          "Often sparks the direction for teams or organisations",
+          "Needs space and trust to explore and innovate",
+        ],
+      },
+      {
+        profile: "Profile 2: The Catalyst",
+        bullets: [
+          "Brings activation energy to ideas",
+          "Motivates and excites people to take action",
+          "Communicates vision with passion",
+        ],
+      },
+      {
+        profile: "Profile 8: The Optimiser",
+        bullets: [
+          "Uses systems-thinking to improve and evolve",
+          "Brings innovation to process and structure",
+          "Often blends creativity with precision",
+        ],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Idea generation",
+        expression: "Comes up with multiple strategic options or future states",
+      },
+      {
+        trait: "Fast momentum",
+        expression: "Thrives in sprints, launches, or disruption projects",
+      },
+      {
+        trait: "Strategic alignment",
+        expression: "Helps refocus the team on long-term goals",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Gets bored or disconnected in repetitive roles",
+      },
+    ],
+    idealRoles: [
+      "Early-stage ideation and strategy",
+      "Business development or product creation",
+      "Campaign innovation or market repositioning",
+    ],
+    avoidEnvironments: [
+      "Stifle creativity",
+      "Prioritise slow consensus",
+      "Punish mistakes over experimentation",
+    ],
+    coachingTips: [
+      "Provide Visionaries/Catalysts space to think and autonomy to act",
+      "Don’t rush them into structure, bring in support to implement",
+      "Pair them with Coordinators or Controllers for grounded execution",
+      "Create short cycles: Plan–Test–Reflect–Refine",
+    ],
+    reflectionPrompts: [
+      "Where have I been most energised lately?",
+      "Which ideas am I sitting on that I haven’t acted on?",
+      "How could I communicate my vision more clearly to my team?",
+      "Who could help bring my ideas to life?",
+    ],
+    finalThoughts:
+      "Innovation energy is a precious asset, and like all energy, it needs to be directed. When you learn how to honour your natural strengths while building the right partnerships around you, you unlock exponential results.",
+    nextStep:
+      "Want help mapping the rest of your team? Visit lifepuzzle.com.au to explore how Team Puzzle can support your organisation in building a team aligned for flow, performance, and fulfilment.",
+  },
+
+  B: {
+    code: "B",
+    name: "Influence",
+    label: "Influence Frequency",
+    definition:
+      "The Influence Frequency is the energy of connection, charisma, and communication. People with this frequency are energised by interaction, thrive on meaningful conversations, and naturally rally people around a cause.",
+    coreAttributes: [
+      "Strong interpersonal awareness",
+      "Communication-driven problem solving",
+      "Intuitive understanding of motivation",
+      "High energy and emotional expressiveness",
+      "Naturally builds rapport and trust",
+    ],
+    potentialBlindSpots: [
+      "May overcommit to please others",
+      "Can avoid difficult conversations",
+      "Easily distracted without relational anchors",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 2: The Catalyst",
+        bullets: [
+          "Brings social energy and momentum to new ideas",
+          "Communicates vision with contagious enthusiasm",
+          "Initiates movement and early-stage engagement",
+        ],
+      },
+      {
+        profile: "Profile 3: The Motivator",
+        bullets: [
+          "Empowers others through encouragement and team spirit",
+          "Creates psychological safety and morale",
+          "Often the cultural heart of the team",
+        ],
+      },
+      {
+        profile: "Profile 4: The Connector",
+        bullets: [
+          "Links people, ideas, and timing into a collaborative path",
+          "Ensures others feel seen, heard, and aligned",
+          "Drives harmony in relationships and communication",
+        ],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Relational leadership",
+        expression: "Leads by earning trust, showing empathy",
+      },
+      {
+        trait: "Team cohesion",
+        expression: "Bridges gaps between personalities and priorities",
+      },
+      {
+        trait: "Energy transfer",
+        expression: "Lifts energy during low-motivation periods",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Overwhelmed when relationships break down or if isolated",
+      },
+    ],
+    idealRoles: [
+      "Relationship management",
+      "Customer or team experience",
+      "Engagement, culture, or internal communications",
+    ],
+    avoidEnvironments: [
+      "Deprioritise human interaction",
+      "Are siloed or excessively technical",
+      "Expect motivation without relationship",
+    ],
+    coachingTips: [
+      "Empower them to influence, don’t contain them with overstructure",
+      "Allow space for collaborative problem solving",
+      "Use them to build bridges across teams or departments",
+      "Celebrate small wins to keep energy high",
+    ],
+    reflectionPrompts: [
+      "Who have I positively impacted this week?",
+      "Where can I better use my influence to align the team?",
+      "What boundaries do I need to set to stay energised?",
+      "How can I inspire others around the mission?",
+    ],
+    finalThoughts:
+      "Influence is not about volume, it’s about impact. When influence energy is channelled with clarity and care, it drives cultural transformation.",
+    nextStep:
+      "Want to understand how this energy impacts your team dynamics? Visit lifepuzzle.com.au to explore coaching and alignment tools tailored to Frequency B profiles.",
+  },
+
+  C: {
+    code: "C",
+    name: "Implementation",
+    label: "Implementation Frequency",
+    definition:
+      "The Implementation Frequency is the energy of grounding, timing, and dependable action. These individuals bring structure to chaos, carry plans through to execution, and stabilise emotions under pressure.",
+    coreAttributes: [
+      "Grounded presence and calm under stress",
+      "Attentive to timing and sequence",
+      "Reliable with follow-through",
+      "Practical, consistent, and service-driven",
+    ],
+    potentialBlindSpots: [
+      "May resist change or ambiguity",
+      "Can prioritise process over innovation",
+      "May underplay their own leadership or creativity",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 4: The Connector",
+        bullets: ["Balances relational intelligence with grounded timing"],
+      },
+      {
+        profile: "Profile 5: The Facilitator",
+        bullets: [
+          "Brings calm, inclusive rhythm to group dynamics",
+          "Stabilises projects and people with equanimity",
+        ],
+      },
+      {
+        profile: "Profile 6: The Coordinator",
+        bullets: [
+          "Converts strategies into tracked, completed actions",
+          "Excels in operations, checklists, and follow-through",
+        ],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Process discipline",
+        expression: "Keeps projects structured and grounded",
+      },
+      {
+        trait: "Stability",
+        expression: "Maintains consistent emotional tone",
+      },
+      {
+        trait: "Reliability",
+        expression: "Follows through when others drop the ball",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Gets overwhelmed if scope is unclear or constantly shifting",
+      },
+    ],
+    idealRoles: [
+      "Project and operations management",
+      "Delivery coordination and logistics",
+      "Ground-level support and maintenance",
+    ],
+    avoidEnvironments: [
+      "Lack structure or shifting deadlines",
+      "Expect rapid ideation or high ambiguity",
+      "Don’t appreciate process-driven work",
+    ],
+    coachingTips: [
+      "Involve early in project planning, not just the rollout",
+      "Give them ownership of execution timelines",
+      "Pair them with visionaries to balance pace and precision",
+      "Acknowledge progress, not just results",
+    ],
+    reflectionPrompts: [
+      "Where have I brought calm or clarity to a situation this week?",
+      "What process needs refinement?",
+      "How can I better communicate my capacity and timing?",
+      "What energises me most about completion?",
+    ],
+    finalThoughts:
+      "Implementation energy is the muscle of a high-performing team. Without it, ideas stay stuck and momentum stalls. Honour this frequency as the glue that holds execution together.",
+    nextStep:
+      "Curious how to optimise your systems for flow? Explore our resources at lifepuzzle.com.au.",
+  },
+
+  D: {
+    code: "D",
+    name: "Insight",
+    label: "Insight Frequency",
+    definition:
+      "Insight Frequency is the energy of analysis, structure, and systems. These individuals go deep, seek precision, and often spot patterns, risks, or optimisations long before anyone else.",
+    coreAttributes: [
+      "Highly analytical and detail-focused",
+      "Values accuracy, logic, and reliability",
+      "Builds frameworks and systems to scale quality",
+      "Operates with intellectual depth and independence",
+    ],
+    potentialBlindSpots: [
+      "Can be rigid, perfectionistic, or resistant to ambiguity",
+      "May lack emotional fluency or overlook people dynamics",
+      "Sometimes delays action in search of more data",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 6: The Coordinator",
+        bullets: ["Brings logic and timing to team execution"],
+      },
+      {
+        profile: "Profile 7: The Controller",
+        bullets: ["Sees the gaps, builds systems, checks compliance"],
+      },
+      {
+        profile: "Profile 8: The Optimiser",
+        bullets: ["Fuses logic and innovation to improve systems"],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Detail orientation",
+        expression: "Spots risks, inconsistencies, and inefficiencies",
+      },
+      {
+        trait: "Structured thinking",
+        expression: "Breaks complex issues into clear systems",
+      },
+      {
+        trait: "Predictive analysis",
+        expression: "Forecasts future outcomes through patterns",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Overwhelmed if logic is ignored or dismissed",
+      },
+    ],
+    idealRoles: [
+      "Data, systems, risk, finance, operations",
+      "Quality control and policy design",
+      "Strategic scaling and diagnostics",
+    ],
+    avoidEnvironments: [
+      "Value intuition over logic without balance",
+      "Disregard structure or long-term implications",
+      "Prioritise social consensus over truth",
+    ],
+    coachingTips: [
+      "Give time to reflect before major decisions",
+      "Provide data or structure for confidence",
+      "Use them to test, audit, or optimise systems",
+      "Pair them with Catalysts or Facilitators for communication balance",
+    ],
+    reflectionPrompts: [
+      "What risk did I help the team avoid this week?",
+      "Where am I overanalysing instead of acting?",
+      "What system or process could I improve today?",
+      "How can I share my insights in a more actionable way?",
+    ],
+    finalThoughts:
+      "Insight frequency is the backbone of scalable, sustainable success. When this energy is empowered, not dismissed, it protects the future.",
+    nextStep:
+      "Need help integrating this into your team structure? Book a team strategy session via lifepuzzle.com.au.",
+  },
+};
+
+function getFrequencyContent(code?: string | null): FrequencyContent {
+  const normalized = String(code || "").toUpperCase() as FrequencyCode;
+  return FREQUENCY_CONTENT[normalized] || FREQUENCY_CONTENT.A;
+}
+
 
 const PROFILE_COPY: Record<
   string,
@@ -1591,6 +1966,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
       profileCopy,
       topFreq,
       topFreqName,
+      topFreqContent: getFrequencyContent(topFreq),
       sortedProfiles,
       primary,
       secondary,
@@ -1661,6 +2037,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
     profileCopy,
     topFreq,
     topFreqName,
+    topFreqContent,
     sortedProfiles,
     primary,
     secondary,
@@ -2334,7 +2711,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 <p className="text-[13px] leading-[28px] text-[#313C52]">
                   Your strongest overall frequency is{" "}
                   <strong className="text-[#4092C5]">
-                    {topFreqName} ({topFreq})
+                    {topFreqContent.name} ({topFreqContent.code})
                   </strong>
                   , which shapes how you approach problems and make decisions.
                   Higher percentages indicate where you naturally spend more
@@ -2413,7 +2790,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 <div className="mt-[28px] grid overflow-hidden rounded-[18px] border border-[#4092C5] shadow-[0_6px_32px_rgba(58,110,212,0.12)] lg:grid-cols-[231px_1fr]">
                   <div className="flex min-h-[198px] flex-col items-center justify-center bg-[#4092C5] px-[24px] text-center text-white">
                     <div className="text-[28px] font-semibold leading-[38px]">
-                      {topFreqName} ({topFreq})
+                      {topFreqContent.name} ({topFreqContent.code})
                     </div>
                     <div className="mt-[6px] text-[13px] leading-[19px]">
                       Your Dominant Frequency:
@@ -2427,19 +2804,19 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         className="h-[66px] w-[60px] object-contain"
                       />
                       <p className="mt-[12px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Key traits:</strong> The energy you rely on most
-                        when you need to move things forward.
+                        <strong>Key traits:</strong>{" "}
+                        {topFreqContent.coreAttributes.slice(0, 3).join(", ")}.
                       </p>
                     </div>
                     <div>
                       <ReportAssetImage
                         src="/icons/tp-key-trait2.png"
-                        alt="Motivators"
+                        alt="Ideal roles"
                         className="h-[66px] w-[60px] object-contain"
                       />
                       <p className="mt-[12px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Motivators:</strong> Conditions that help this
-                        way of working feel energising and sustainable.
+                        <strong>Ideal roles:</strong>{" "}
+                        {topFreqContent.idealRoles.join(", ")}.
                       </p>
                     </div>
                     <div>
@@ -2449,11 +2826,149 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         className="h-[66px] w-[60px] object-contain"
                       />
                       <p className="mt-[12px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Watch outs:</strong> Things to notice when this
-                        frequency is over-used, such as ignoring other
-                        perspectives or pushing your preferred style too hard.
+                        <strong>Watch outs:</strong>{" "}
+                        {topFreqContent.potentialBlindSpots.join(", ")}.
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="mt-[28px] rounded-[18px] border border-slate-200 bg-slate-50 p-[22px]">
+                  <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                    Understanding {topFreqContent.name} Frequency
+                  </h3>
+                  <p className="mt-[12px] text-[13px] leading-[28px] text-[#313C52]">
+                    {topFreqContent.definition}
+                  </p>
+
+                  <div className="mt-[20px] grid gap-[16px] lg:grid-cols-2">
+                    <div className="rounded-[14px] bg-white p-[18px] shadow-sm">
+                      <h4 className="text-[13px] font-bold text-[#111828]">
+                        Core Attributes
+                      </h4>
+                      <ul className="mt-[10px] list-disc space-y-[6px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                        {topFreqContent.coreAttributes.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-[14px] bg-white p-[18px] shadow-sm">
+                      <h4 className="text-[13px] font-bold text-[#111828]">
+                        Potential Blind Spots
+                      </h4>
+                      <ul className="mt-[10px] list-disc space-y-[6px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                        {topFreqContent.potentialBlindSpots.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-[18px] rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                  <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                    Profiles Aligned to the {topFreqContent.name} Frequency
+                  </h3>
+                  <div className="mt-[16px] grid gap-[14px] lg:grid-cols-3">
+                    {topFreqContent.alignedProfiles.map((profile) => (
+                      <div
+                        key={profile.profile}
+                        className="rounded-[14px] border border-slate-200 bg-slate-50 p-[16px]"
+                      >
+                        <h4 className="text-[13px] font-bold text-[#111828]">
+                          {profile.profile}
+                        </h4>
+                        <ul className="mt-[10px] list-disc space-y-[6px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                          {profile.bullets.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-[18px] rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                  <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                    How {topFreqContent.name} Shows Up in Teams
+                  </h3>
+                  <div className="mt-[16px] overflow-hidden rounded-[12px] border border-slate-200">
+                    <div className="grid grid-cols-[210px_1fr] bg-[#084595] text-[13px] font-bold text-white">
+                      <div className="border-r border-white/20 p-[12px]">
+                        Trait
+                      </div>
+                      <div className="p-[12px]">Expression in Team Setting</div>
+                    </div>
+                    {topFreqContent.howItShowsUp.map((row) => (
+                      <div
+                        key={row.trait}
+                        className="grid grid-cols-[210px_1fr] border-t border-slate-200 text-[13px] leading-[22px] text-[#313C52]"
+                      >
+                        <div className="border-r border-slate-200 p-[12px] font-medium">
+                          {row.trait}
+                        </div>
+                        <div className="p-[12px]">{row.expression}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-[18px] grid gap-[18px] lg:grid-cols-2">
+                  <div className="rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      Ideal Roles and Environments
+                    </h3>
+                    <ul className="mt-[14px] list-disc space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.idealRoles.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                    <h4 className="mt-[18px] text-[13px] font-bold text-[#111828]">
+                      Avoid environments that:
+                    </h4>
+                    <ul className="mt-[8px] list-disc space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.avoidEnvironments.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      {topFreqContent.name} Frequency in Practice: Coaching Tips
+                    </h3>
+                    <ul className="mt-[14px] list-disc space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.coachingTips.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-[18px] grid gap-[18px] lg:grid-cols-2">
+                  <div className="rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      Reflection Prompts
+                    </h3>
+                    <ol className="mt-[14px] list-decimal space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.reflectionPrompts.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[#4092C5] bg-[#4092C5]/10 p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      Final Thoughts and Next Step
+                    </h3>
+                    <p className="mt-[14px] text-[13px] leading-[24px] text-[#313C52]">
+                      {topFreqContent.finalThoughts}
+                    </p>
+                    {topFreqContent.nextStep ? (
+                      <p className="mt-[14px] text-[13px] font-semibold leading-[24px] text-[#313C52]">
+                        {topFreqContent.nextStep}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </WhiteCard>
