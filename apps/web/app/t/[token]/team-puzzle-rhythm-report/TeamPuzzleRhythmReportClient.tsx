@@ -611,6 +611,32 @@ function ReportAssetImage(props: {
   );
 }
 
+function RhythmPuzzlePieceImage(props: {
+  file: string;
+  alt: string;
+  className?: string;
+}) {
+  const [src, setSrc] = useState(`/icons/${props.file}`);
+  const [failedOnce, setFailedOnce] = useState(false);
+
+  return (
+    <img
+      src={src}
+      alt={props.alt}
+      loading="lazy"
+      className={props.className}
+      onError={(e) => {
+        if (!failedOnce) {
+          setFailedOnce(true);
+          setSrc(`/org-graphics/${props.file}`);
+          return;
+        }
+        (e.currentTarget as HTMLImageElement).style.display = "none";
+      }}
+    />
+  );
+}
+
 function Card(props: { children: ReactNode; className?: string }) {
   return (
     <section
@@ -2292,8 +2318,14 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
                   <div className="mt-[18px] grid gap-[15px] lg:grid-cols-2">
                     {[
-                      orderedProfileItems(data.result.profile_labels).slice(0, 4),
-                      orderedProfileItems(data.result.profile_labels).slice(4, 8),
+                      orderedProfileItems(data.result.profile_labels).slice(
+                        0,
+                        4,
+                      ),
+                      orderedProfileItems(data.result.profile_labels).slice(
+                        4,
+                        8,
+                      ),
                     ].map((group, groupIndex) => (
                       <div
                         key={`profile-mix-bars-${groupIndex}`}
@@ -2302,11 +2334,14 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         <div className="space-y-[22px]">
                           {group.map((profile) => {
                             const pct = Math.round(
-                              data.result.profile_percentages?.[profile.code] || 0,
+                              data.result.profile_percentages?.[profile.code] ||
+                                0,
                             );
                             const frequency =
-                              profile.frequency_code || PROFILE_FREQUENCIES[profile.code];
-                            const barColor = PROFILE_ACCENT[frequency || "B"] || "#4092C5";
+                              profile.frequency_code ||
+                              PROFILE_FREQUENCIES[profile.code];
+                            const barColor =
+                              PROFILE_ACCENT[frequency || "B"] || "#4092C5";
 
                             return (
                               <div
@@ -2339,15 +2374,23 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   <p className="mt-[17px] text-[13px] leading-[28px] text-[#313C52]">
                     Overall, your strongest profile pattern is{" "}
                     <strong>
-                      {primary?.name || profileName} ({primary?.short_code || profileCodeToShort(profileCode)}),
+                      {primary?.name || profileName} (
+                      {primary?.short_code || profileCodeToShort(profileCode)}),
                     </strong>{" "}
                     supported by{" "}
                     <strong>
-                      {secondary?.name || "your secondary profile"}{secondary ? ` (${secondary.short_code || profileCodeToShort(secondary.code)})` : ""}
+                      {secondary?.name || "your secondary profile"}
+                      {secondary
+                        ? ` (${secondary.short_code || profileCodeToShort(secondary.code)})`
+                        : ""}
                     </strong>{" "}
                     and{" "}
                     <strong>
-                      {tertiary?.name || "your tertiary profile"}{tertiary ? ` (${tertiary.short_code || profileCodeToShort(tertiary.code)})` : ""}.
+                      {tertiary?.name || "your tertiary profile"}
+                      {tertiary
+                        ? ` (${tertiary.short_code || profileCodeToShort(tertiary.code)})`
+                        : ""}
+                      .
                     </strong>
                   </p>
                 </div>
@@ -2398,7 +2441,8 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         </div>
 
                         <h3 className="mt-[12px] text-[15px] font-semibold leading-[19.2px] text-[#111828]">
-                          {item.name} {item.short_code || profileCodeToShort(item.code)}
+                          {item.name}{" "}
+                          {item.short_code || profileCodeToShort(item.code)}
                         </h3>
 
                         <div className="mt-[14px] text-[11px] leading-[16.5px] text-[#313C52]">
@@ -2407,8 +2451,8 @@ export default function TeamPuzzleRhythmReportClient(props: {
                             naturally contributes when things are going well.
                           </p>
                           <p className="mt-[14px]">
-                            <strong>Motivators:</strong> Conditions that help this
-                            style feel energising and sustainable.
+                            <strong>Motivators:</strong> Conditions that help
+                            this style feel energising and sustainable.
                           </p>
                           <p className="mt-[14px]">
                             <strong>Watch outs:</strong> Things to watch out for
@@ -2445,10 +2489,15 @@ export default function TeamPuzzleRhythmReportClient(props: {
                           <div className="mt-[8px] text-[13px] leading-[20.8px]">
                             <p>
                               <strong>Frequency:</strong>{" "}
-                              {FREQUENCY_COPY[topFreq]?.title.replace(" Frequency", "") || topFreqName} ({topFreq})
+                              {FREQUENCY_COPY[topFreq]?.title.replace(
+                                " Frequency",
+                                "",
+                              ) || topFreqName}{" "}
+                              ({topFreq})
                             </p>
                             <p className="mt-[12px]">
-                              <strong>Core Traits:</strong> {profileCopy.coreTraits}
+                              <strong>Core Traits:</strong>{" "}
+                              {profileCopy.coreTraits}
                             </p>
                             <p className="mt-[12px]">
                               <strong>Ideal Environment:</strong>{" "}
@@ -2486,15 +2535,15 @@ export default function TeamPuzzleRhythmReportClient(props: {
                       You are often the person people turn to when they need
                       your particular blend of energy, timing, and contribution.
                       You may not always notice how much this shapes the room,
-                      but others often experience your strengths as a stabilising
-                      or activating force.
+                      but others often experience your strengths as a
+                      stabilising or activating force.
                     </p>
                     <p className="mt-[20px]">
                       To deepen your self-awareness and leadership impact, use
-                      this section as a prompt to notice where your profile gives
-                      you energy, where it may be over-used, and where support
-                      from complementary profiles can help you create even more
-                      value.
+                      this section as a prompt to notice where your profile
+                      gives you energy, where it may be over-used, and where
+                      support from complementary profiles can help you create
+                      even more value.
                     </p>
                   </div>
                 </div>
@@ -2506,30 +2555,195 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Professional Performance Rhythm"
                 icon={REPORT_ASSETS.icons.professionalPerformanceRhythm}
               />
-              <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">
-                  Your Team Puzzle profile explains your natural energy and
-                  contribution style. Alongside this, the Professional
-                  Performance Rhythm reveals how you approach work and create
-                  results across six key drivers.
-                </p>
-                <div className="grid gap-6 lg:grid-cols-[1fr_280px] lg:items-start">
-                  <div>
-                    <p className="mt-4 text-sm leading-7 text-slate-700">
-                      Think of it as the tempo behind your profile — the
-                      underlying rhythm that influences the way you solve
-                      problems, collaborate, adapt, and lead.
+
+              <WhiteCard className="p-[20px]">
+                <div className="text-[13px] leading-[28px] text-[#313C52]">
+                  <p>
+                    Your Team Puzzle profile explains your natural energy and
+                    contribution style. Alongside this, the{" "}
+                    <strong>Professional Performance Rhythm</strong> reveals{" "}
+                    <em>
+                      how you approach work and create results across six key
+                      drivers.
+                    </em>
+                  </p>
+                  <p className="mt-[18px]">
+                    Think of it as the tempo behind your profile — the
+                    underlying rhythm that influences the way you solve
+                    problems, collaborate, adapt, and lead. Everyone has all six
+                    drivers available to them, but we don&apos;t express them
+                    equally. Some energise us, some feel neutral, and some can
+                    drain us if overused.
+                  </p>
+                  <p className="mt-[18px]">
+                    By understanding your rhythm, you&apos;ll see not only where
+                    you naturally thrive, but also how to better align with
+                    others whose rhythms may differ from yours. This awareness
+                    reduces friction, increases trust, and helps you and your
+                    team find greater flow.
+                  </p>
+                </div>
+
+                <div className="mt-[24px] grid max-w-[780px] grid-cols-3 overflow-hidden rounded-[18px] bg-white shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+                  {[
+                    { file: "tp-r-puzzle.png", label: "Resourceful" },
+                    { file: "tp-h-puzzle.png", label: "Human-Centred" },
+                    { file: "tp-y-puzzle.png", label: "Yielding" },
+                    { file: "tp-t-puzzle.png", label: "Tactical" },
+                    { file: "tp-h-puzzle.png", label: "Hopeful" },
+                    { file: "tp-m-puzzle.png", label: "Measured" },
+                  ].map((piece) => (
+                    <div
+                      key={piece.label}
+                      className="aspect-[1.48] overflow-hidden"
+                    >
+                      <RhythmPuzzlePieceImage
+                        file={piece.file}
+                        alt={piece.label}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-[28px] grid gap-[16px] lg:grid-cols-2">
+                  <div className="rounded-[18px] bg-white p-[24px] shadow-[0_6px_32px_rgba(58,110,212,0.12)] ring-1 ring-[#4092C5]">
+                    <h3 className="text-[13px] font-bold leading-[20.8px] text-[#313C52]">
+                      What This Means
+                    </h3>
+                    <p className="mt-[16px] text-[13px] leading-[28px] text-[#313C52]">
+                      Your Professional Performance RHYTHM shows how you
+                      naturally approach work, decisions, and collaboration
+                      across six key drivers. While your Profile explains what
+                      you bring, your RHYTHM explains how you operate day to
+                      day. It reflects the patterns you default to when working
+                      under pressure, leading others, or delivering results.
+                    </p>
+                    <p className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
+                      Everyone has access to all six drivers. The difference is
+                      in how much energy each one requires from you. Some
+                      drivers feel natural and energising. Others you can use
+                      when needed. And some will feel draining if used too
+                      often.
                     </p>
                   </div>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.rhythmPuzzle}
-                      alt="RHYTHM puzzle visual"
-                      className="mx-auto max-h-[220px] w-full object-contain"
-                    />
+
+                  <div className="rounded-[18px] bg-white p-[24px] shadow-[0_6px_32px_rgba(58,110,212,0.12)] ring-1 ring-[#4092C5]">
+                    <h3 className="text-[13px] font-bold leading-[20.8px] text-[#313C52]">
+                      Understanding this helps you:
+                    </h3>
+                    <ul className="mt-[16px] space-y-[10px] text-[13px] leading-[28px] text-[#313C52]">
+                      <li>
+                        • Work in a way that feels more natural and sustainable
+                      </li>
+                      <li>
+                        • Reduce friction in how you approach tasks and people
+                      </li>
+                      <li>• Build stronger, more balanced team dynamics</li>
+                    </ul>
                   </div>
                 </div>
-                <div className="mt-6 grid gap-3 md:grid-cols-3">
+              </WhiteCard>
+
+              <WhiteCard className="mt-[22px] p-[22px]">
+                <div className="text-[10px] font-bold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                  How to Interpret Your Results
+                </div>
+                <p className="mt-[8px] text-[13px] leading-[28px] text-[#313C52]">
+                  Your six drivers are grouped into three categories:
+                </p>
+                <div className="mt-[20px] grid gap-[18px] lg:grid-cols-3">
+                  <div className="overflow-hidden rounded-[12px] border border-[#16A34A] bg-white">
+                    <div className="bg-[#16A34A] py-[7px] text-center text-[13px] font-semibold leading-[28px] text-white">
+                      (Your Top 2)
+                    </div>
+                    <div className="p-[20px] text-[13px] leading-[28px] text-[#313C52]">
+                      <p>
+                        <span className="font-bold text-[#16A34A]">
+                          ● Flow Drivers
+                        </span>{" "}
+                        — These are your strongest and most natural ways of
+                        working. You use these instinctively, and they give you
+                        energy rather than drain it.
+                      </p>
+                      <p className="mt-[16px]">
+                        When you are working in your Flow Drivers:
+                      </p>
+                      <ul className="mt-[8px] space-y-[4px]">
+                        <li>• You perform at your best</li>
+                        <li>• You feel more engaged and confident</li>
+                        <li>• You create the most value for your team</li>
+                        <li>• It feels fun and fulfilling</li>
+                        <li>• It&apos;s where your genius lives</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-[12px] border border-[#F59E0B] bg-white">
+                    <div className="bg-[#F59E0B] py-[7px] text-center text-[13px] font-semibold leading-[28px] text-white">
+                      (Your Middle 2)
+                    </div>
+                    <div className="p-[20px] text-[13px] leading-[28px] text-[#313C52]">
+                      <p>
+                        <span className="font-bold text-[#F59E0B]">
+                          ● Stabilising Drivers
+                        </span>{" "}
+                        — These are drivers you can use when needed, but they
+                        are not your default.
+                      </p>
+                      <ul className="mt-[12px] space-y-[4px]">
+                        <li>
+                          • They help you stay flexible and balanced, but they
+                          require more conscious effort.
+                        </li>
+                        <li>• Can add variety and differences.</li>
+                        <li>
+                          • You are effective here, but it is not where you gain
+                          energy long term.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-[12px] border border-[#BC1823] bg-white">
+                    <div className="bg-[#BC1823] py-[7px] text-center text-[13px] font-semibold leading-[28px] text-white">
+                      (Your Bottom 2)
+                    </div>
+                    <div className="p-[20px] text-[13px] leading-[28px] text-[#313C52]">
+                      <p>
+                        <span className="font-bold text-[#BC1823]">
+                          ● Frustration Drivers
+                        </span>{" "}
+                        — These are the drivers that require the most effort
+                        from you. You can still operate in them, but doing so
+                        consistently may feel draining or frustrating.
+                      </p>
+                      <p className="mt-[16px]">These areas often highlight:</p>
+                      <ul className="mt-[8px] space-y-[4px]">
+                        <li>• Where you may avoid certain tasks</li>
+                        <li>• Where you feel less confident or slower</li>
+                        <li>
+                          • Where you benefit most from support or collaboration
+                        </li>
+                        <li>
+                          • Can be the source of emotional trauma/stress
+                          elevation
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </WhiteCard>
+
+              <WhiteCard className="mt-[22px] p-[26px]">
+                <div className="text-[10px] font-bold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                  The Six RHYTHM Drivers
+                </div>
+                <p className="mt-[14px] text-[13px] leading-[28px] text-[#313C52]">
+                  Each driver represents a different way of working within a
+                  team or organisation.
+                </p>
+                <div className="mt-[24px] space-y-[28px]">
                   {(
                     [
                       "resourceful",
@@ -2539,19 +2753,157 @@ export default function TeamPuzzleRhythmReportClient(props: {
                       "hopeful",
                       "measured",
                     ] as RhythmDriverKey[]
-                  ).map((driver) => (
-                    <DriverTile
-                      key={driver}
-                      driver={driver}
-                      group={
-                        flow.includes(driver)
-                          ? "flow"
-                          : stabilising.includes(driver)
-                            ? "stabilising"
-                            : "frustration"
-                      }
-                    />
-                  ))}
+                  ).map((driver) => {
+                    const d = DRIVER_COPY[driver];
+                    const letterColours: Record<
+                      RhythmDriverKey,
+                      { bg: string; text: string }
+                    > = {
+                      resourceful: { bg: "#C6E1FC", text: "#022B61" },
+                      human_centred: { bg: "#B1D3F5", text: "#022B61" },
+                      yielding: { bg: "#6BAED6", text: "#022B61" },
+                      tactical: { bg: "#022B61", text: "#FFFFFF" },
+                      hopeful: { bg: "#084594", text: "#FFFFFF" },
+                      measured: { bg: "#4292C6", text: "#FFFFFF" },
+                    };
+                    const colours = letterColours[driver];
+                    return (
+                      <div
+                        key={driver}
+                        className="grid gap-[22px] lg:grid-cols-[101px_1fr]"
+                      >
+                        <div
+                          className="flex h-[82px] w-[101px] items-center justify-center rounded-[8px] text-[47px] font-semibold leading-none"
+                          style={{
+                            background: colours.bg,
+                            color: colours.text,
+                          }}
+                        >
+                          {d.letter}
+                        </div>
+                        <div className="text-[13px] leading-[28px] text-[#313C52]">
+                          <h3 className="font-bold">{d.label}</h3>
+                          <p>
+                            You focus on{" "}
+                            {driver === "resourceful"
+                              ? "finding practical solutions and moving things forward"
+                              : driver === "human_centred"
+                                ? "people, relationships, and team connection"
+                                : driver === "yielding"
+                                  ? "flexibility, adaptability, and openness"
+                                  : driver === "tactical"
+                                    ? "structure, priorities, and execution"
+                                    : driver === "hopeful"
+                                      ? "energy, belief, and forward momentum"
+                                      : "logic, structure, and consistency"}
+                            .
+                          </p>
+                          <p>
+                            At your best,{" "}
+                            {driver === "resourceful"
+                              ? "you are quick to respond to challenges and comfortable working with incomplete information. You prioritise progress and action, helping teams maintain momentum when things become unclear or complex"
+                              : driver === "human_centred"
+                                ? "you build trust, create alignment, and bring people together. You are aware of how others feel and naturally work to create a positive and supportive environment"
+                                : driver === "yielding"
+                                  ? "you adjust easily to change and are willing to shift direction when needed. You support different perspectives and help teams stay agile in changing environments"
+                                  : driver === "tactical"
+                                    ? "you create clear plans, break work into steps, and ensure things get delivered. You are focused on outcomes and bring direction to complex tasks"
+                                    : driver === "hopeful"
+                                      ? "you bring optimism and encouragement, especially during challenges. You help others stay motivated and maintain focus on what is possible"
+                                      : "you rely on data, systems, and careful thinking to guide decisions. You bring stability and ensure work is done accurately and effectively"}
+                            .
+                          </p>
+                          <p>
+                            This driver is{" "}
+                            {driver === "resourceful"
+                              ? "often seen in environments that require speed, adaptability, and problem-solving under pressure"
+                              : driver === "human_centred"
+                                ? "essential for collaboration, leadership, and maintaining strong team culture"
+                                : driver === "yielding"
+                                  ? "valuable in fast-moving teams where priorities and situations evolve quickly"
+                                  : driver === "tactical"
+                                    ? "critical for turning ideas into results and maintaining progress toward goals"
+                                    : driver === "hopeful"
+                                      ? "important in resilience, leadership, and sustaining team morale over time"
+                                      : "key for maintaining quality, reducing risk, and creating dependable processes"}
+                            .
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </WhiteCard>
+
+              <WhiteCard className="mt-[22px] p-[26px]">
+                <div className="text-[10px] font-bold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                  Why This Matters
+                </div>
+                <div className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
+                  <p>
+                    Your Professional Performance Rhythm offers a practical lens
+                    on how you show up day to day — not just what you
+                    contribute, but how you do it. By knowing your Flow,
+                    Stabilising, and Frustration drivers, you can:
+                  </p>
+                  <ul className="mt-[10px] space-y-[4px]">
+                    <li>
+                      • Align your role with the areas that energise you most.
+                    </li>
+                    <li>
+                      • Spot where you may be overextending into draining
+                      drivers.
+                    </li>
+                    <li>
+                      • Build complementary partnerships with colleagues who
+                      balance your rhythm.
+                    </li>
+                    <li>
+                      • Lead and collaborate with more awareness, trust, and
+                      effectiveness.
+                    </li>
+                  </ul>
+                  <p className="mt-[18px]">
+                    Like a real rhythm, it&apos;s about balance. No one driver
+                    is better than another — the power comes from recognising
+                    your unique combination and how it fits into the wider team
+                    puzzle.
+                  </p>
+                </div>
+              </WhiteCard>
+
+              <WhiteCard className="mt-[22px] p-[26px]">
+                <div className="text-[10px] font-bold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                  What Your RHYTHM Means for You
+                </div>
+                <div className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
+                  <p>
+                    Your RHYTHM is not about being good or bad at certain
+                    behaviours.
+                  </p>
+                  <p className="mt-[18px]">It is about understanding:</p>
+                  <ul className="mt-[8px] space-y-[4px]">
+                    <li>• Where you naturally create the most impact</li>
+                    <li>• Where you can adapt when needed</li>
+                    <li>• Where you may experience friction over time</li>
+                  </ul>
+                  <p className="mt-[18px]">
+                    The goal is not to change your RHYTHM, but to use it more
+                    effectively.
+                  </p>
+                  <p className="mt-[18px]">
+                    When you align your work, your role, and your team
+                    interactions with your natural drivers, you will:
+                  </p>
+                  <ul className="mt-[8px] space-y-[4px]">
+                    <li>• Work more efficiently</li>
+                    <li>• Feel more energised</li>
+                    <li>• Contribute more consistently</li>
+                  </ul>
+                  <p className="mt-[18px]">
+                    And most importantly, you will better understand how your
+                    way of working fits into the wider team puzzle.
+                  </p>
                 </div>
               </WhiteCard>
             </Card>
