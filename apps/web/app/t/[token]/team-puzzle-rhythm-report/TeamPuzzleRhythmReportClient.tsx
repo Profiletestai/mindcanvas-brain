@@ -2755,31 +2755,25 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     ] as RhythmDriverKey[]
                   ).map((driver) => {
                     const d = DRIVER_COPY[driver];
-                    const letterColours: Record<
-                      RhythmDriverKey,
-                      { bg: string; text: string }
-                    > = {
-                      resourceful: { bg: "#C6E1FC", text: "#022B61" },
-                      human_centred: { bg: "#B1D3F5", text: "#022B61" },
-                      yielding: { bg: "#6BAED6", text: "#022B61" },
-                      tactical: { bg: "#022B61", text: "#FFFFFF" },
-                      hopeful: { bg: "#084594", text: "#FFFFFF" },
-                      measured: { bg: "#4292C6", text: "#FFFFFF" },
+                    const puzzleFiles: Record<RhythmDriverKey, string> = {
+                      resourceful: "tp-r-puzzle.png",
+                      human_centred: "tp-h-puzzle.png",
+                      yielding: "tp-y-puzzle.png",
+                      tactical: "tp-t-puzzle.png",
+                      hopeful: "tp-h-puzzle.png",
+                      measured: "tp-m-puzzle.png",
                     };
-                    const colours = letterColours[driver];
                     return (
                       <div
                         key={driver}
                         className="grid gap-[22px] lg:grid-cols-[101px_1fr]"
                       >
-                        <div
-                          className="flex h-[82px] w-[101px] items-center justify-center rounded-[8px] text-[47px] font-semibold leading-none"
-                          style={{
-                            background: colours.bg,
-                            color: colours.text,
-                          }}
-                        >
-                          {d.letter}
+                        <div className="flex h-[82px] w-[101px] items-center justify-center overflow-visible">
+                          <RhythmPuzzlePieceImage
+                            file={puzzleFiles[driver]}
+                            alt={`${d.label} RHYTHM puzzle piece`}
+                            className="h-[82px] w-[101px] object-contain"
+                          />
                         </div>
                         <div className="text-[13px] leading-[28px] text-[#313C52]">
                           <h3 className="font-bold">{d.label}</h3>

@@ -53,6 +53,11 @@ type FrameworkQuestion = {
   options: FrameworkOption[];
 };
 
+type ReportContentBlock = {
+  section_key: "oss" | "rfs" | "cvs";
+  content: any;
+};
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -98,6 +103,7 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const partner_key = String(body?.partner_key || "").trim();
+    const org_id = body?.org_id ? String(body.org_id).trim() : "";
     const application_id = String(body?.application_id || "").trim();
     const job_id = body?.job_id ? String(body.job_id).trim() : null;
     const campaign_id = body?.campaign_id ? String(body.campaign_id).trim() : null;
@@ -121,6 +127,13 @@ export async function POST(req: Request) {
     if (!partner_key) {
       return NextResponse.json(
         { ok: false, error: "partner_key is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!org_id) {
+      return NextResponse.json(
+        { ok: false, error: "org_id is required" },
         { status: 400 }
       );
     }
@@ -173,17 +186,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const requestedOrgId = body?.org_id ? String(body.org_id).trim() : null;
-    const resolvedOrgId = requestedOrgId || partner?.allowed_org_id || null;
-
-    if (!resolvedOrgId) {
+    if (partner.allowed_org_id && partner.allowed_org_id !== org_id) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "org_id is required for this partner because no default allowed_org_id is configured",
+          error: "Partner is not authorised for this org_id",
         },
-        { status: 400 }
+        { status: 403 }
       );
     }
 
@@ -252,7 +261,7 @@ export async function POST(req: Request) {
         .insert({
           partner_key,
           application_id,
-          org_id: resolvedOrgId,
+          org_id,
           framework_slug,
           framework_version,
           status: "started",
@@ -282,7 +291,7 @@ export async function POST(req: Request) {
       const { data: updatedApp, error: updateAppErr } = await sb
         .from("partner_applications")
         .update({
-          org_id: applicationRow.org_id || resolvedOrgId,
+          org_id,
           framework_slug,
           framework_version,
           candidate_first_name: first_name,
@@ -313,41 +322,40 @@ export async function POST(req: Request) {
 
     let individualId: string | null = null;
 
-    if (applicationRow.org_id) {
-      const { data: existingInd } = await sb
+    const { data: existingInd } = await sb
+      .from("individuals")
+      .select("id")
+      .eq("org_id", org_id)
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingInd?.id) {
+      individualId = existingInd.id;
+      await sb
         .from("individuals")
+        .update({ first_name, last_name })
+        .eq("id", individualId);
+    } else {
+      const { data: createdInd, error: indErr } = await sb
+        .from("individuals")
+        .insert({
+          org_id,
+          email,
+          first_name,
+          last_name,
+          external_ref: `${partner_key}:${application_id}`,
+        })
         .select("id")
-        .eq("org_id", applicationRow.org_id)
-        .eq("email", email)
-        .maybeSingle();
+        .single();
 
-      if (existingInd?.id) {
-        individualId = existingInd.id;
-        await sb
-          .from("individuals")
-          .update({ first_name, last_name })
-          .eq("id", individualId);
-      } else {
-        const { data: createdInd, error: indErr } = await sb
-          .from("individuals")
-          .insert({
-            org_id: applicationRow.org_id,
-            email,
-            first_name,
-            last_name,
-            external_ref: `${partner_key}:${application_id}`,
-          })
-          .select("id")
-          .single();
-
-        if (indErr) {
-          return NextResponse.json(
-            { ok: false, error: "Failed to create individual" },
-            { status: 500 }
-          );
-        }
-        individualId = createdInd.id;
+      if (indErr) {
+        return NextResponse.json(
+          { ok: false, error: "Failed to create individual" },
+          { status: 500 }
+        );
       }
+
+      individualId = createdInd.id;
     }
 
     const { data: existingAssessment, error: findAssessmentErr } = await sb
@@ -396,14 +404,18 @@ export async function POST(req: Request) {
 
     await sb.from("assessment_answers").delete().eq("assessment_id", assessmentId);
 
-    const answerRows = Object.entries(answers).map(([question_code, option_code]) => ({
-      assessment_id: assessmentId!,
-      question_code,
-      option_code,
-      response_time_ms: null,
-    }));
+    const answerRows = Object.entries(answers).map(
+      ([question_code, option_code]) => ({
+        assessment_id: assessmentId!,
+        question_code,
+        option_code,
+        response_time_ms: null,
+      })
+    );
 
-    const { error: ansErr } = await sb.from("assessment_answers").insert(answerRows);
+    const { error: ansErr } = await sb
+      .from("assessment_answers")
+      .insert(answerRows);
 
     if (ansErr) {
       return NextResponse.json(
@@ -471,22 +483,29 @@ export async function POST(req: Request) {
         if (qc === "Q25") {
           if (opt.flag === "overreach_risk") overreachRisk = true;
           if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
-          if (opt.flag === "vertical_confidence_matched") verticalConfidence = "matched";
-          if (opt.flag === "vertical_readiness_signal") verticalReadinessSignal = true;
+          if (opt.flag === "vertical_confidence_matched")
+            verticalConfidence = "matched";
+          if (opt.flag === "vertical_readiness_signal")
+            verticalReadinessSignal = true;
         } else {
-          const mid = opt.vertical_band ? verticalBandMidpoint(opt.vertical_band) : null;
+          const mid = opt.vertical_band
+            ? verticalBandMidpoint(opt.vertical_band)
+            : null;
+
           if (mid == null) {
             return NextResponse.json(
               { ok: false, error: `Missing vertical_band on ${qc}:${oc}` },
               { status: 500 }
             );
           }
+
           verticalValues.push(mid);
         }
       }
     }
 
     const flags: Array<{ code: string; severity: string }> = [];
+
     if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
     if (verticalConfidence === "low") {
       flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
@@ -505,6 +524,7 @@ export async function POST(req: Request) {
       .sort((a, b) => b.raw - a.raw);
 
     const osSum = osDistArr.reduce((acc, x) => acc + x.raw, 0) || 1;
+
     const osDist = osDistArr.map((x, idx) => ({
       code: x.code,
       label: osLabels[x.code] || x.code,
@@ -514,7 +534,10 @@ export async function POST(req: Request) {
 
     const primaryOperatingStyle = osDist[0] || null;
 
-    const vAvg = verticalValues.reduce((acc, v) => acc + v, 0) / (verticalValues.length || 1);
+    const vAvg =
+      verticalValues.reduce((acc, v) => acc + v, 0) /
+      (verticalValues.length || 1);
+
     const verticalLevel = clamp(Math.round(vAvg), 1, 6);
 
     const confidence = {
@@ -568,6 +591,62 @@ export async function POST(req: Request) {
     const careerVerticalLabel =
       cvLabels[careerVerticalCode] || careerVerticalCode;
 
+    let reportContentBySection: Record<"oss" | "rfs" | "cvs", any> = {
+      oss: null,
+      rfs: null,
+      cvs: null,
+    };
+
+    if (primaryOperatingStyle?.code) {
+      const { data: reportBlocks, error: reportErr } = await sb
+        .from("report_content_blocks")
+        .select("section_key, content")
+        .eq("framework_slug", framework_slug)
+        .eq("framework_version", framework_version)
+        .eq("operating_style_code", primaryOperatingStyle.code)
+        .eq("is_active", true)
+        .in("section_key", ["oss", "rfs", "cvs"]);
+
+      if (reportErr) {
+        return NextResponse.json(
+          { ok: false, error: reportErr.message },
+          { status: 500 }
+        );
+      }
+
+      for (const block of (reportBlocks || []) as ReportContentBlock[]) {
+        reportContentBySection[block.section_key] = block.content;
+      }
+    }
+
+    const fallbackOss = {
+      operating_style: primaryOperatingStyle
+        ? {
+            code: primaryOperatingStyle.code,
+            label: primaryOperatingStyle.label,
+          }
+        : null,
+      summary: null,
+      natural_strengths: [],
+      team_contribution_style: null,
+      decision_making_style: null,
+      friction_points: [],
+    };
+
+    const fallbackRfs = {
+      top_role_alignment: null,
+      ideal_role_types: [],
+      capacity_to_perform: null,
+      role_risks: [],
+    };
+
+    const fallbackCvs = {
+      career_vertical_expression: null,
+      levels: {},
+    };
+
+    const cvsContent = reportContentBySection.cvs || fallbackCvs;
+
     const responsePayload = {
       ok: true,
       type: "candidate_profile_result",
@@ -586,6 +665,9 @@ export async function POST(req: Request) {
       },
       partner: {
         partner_key,
+      },
+      org: {
+        org_id,
       },
       job: {
         job_id,
@@ -610,29 +692,19 @@ export async function POST(req: Request) {
           confidence,
         },
         report: {
-          operating_style_summary: {
-            operating_style: primaryOperatingStyle
-              ? {
-                  code: primaryOperatingStyle.code,
-                  label: primaryOperatingStyle.label,
-                }
-              : null,
-            summary: null,
-            natural_strengths: [],
-            team_contribution_style: null,
-            decision_making_style: null,
-            friction_points: [],
-          },
-          career_vertical_summary: {
-            top_career_verticals: [
-              {
-                code: careerVerticalCode,
-                label: careerVerticalLabel,
-              },
-            ],
-            ideal_role_types: [],
-            capacity_to_perform: null,
-            career_risks: [],
+          oss: reportContentBySection.oss || fallbackOss,
+          rfs: reportContentBySection.rfs || fallbackRfs,
+          cvs: {
+            ...cvsContent,
+            current_vertical: {
+              code: careerVerticalCode,
+              label: careerVerticalLabel,
+              avg_score: Number(vAvg.toFixed(2)),
+              summary:
+                cvsContent?.levels?.[careerVerticalCode] ||
+                cvsContent?.levels?.[`CV${verticalLevel}`] ||
+                null,
+            },
           },
         },
         audit: {
