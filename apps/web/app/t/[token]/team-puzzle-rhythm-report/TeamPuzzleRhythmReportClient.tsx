@@ -1645,15 +1645,15 @@ export default function TeamPuzzleRhythmReportClient(props: {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="h-fit rounded-3xl border border-white/10 bg-[#0C203A]/80 p-5 shadow-2xl shadow-black/20 lg:sticky lg:top-4">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
+          <aside className="h-fit rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-4">
+            <div className="text-[10px] font-semibold uppercase leading-[15px] tracking-[2.6px] text-white/45">
               Report Index
             </div>
-            <ol className="mt-4 space-y-2 text-sm leading-6 text-white/80">
+            <ol className="mt-[14px] space-y-[7px]">
               {[
                 "Welcome from Chandell",
-                "How to Use This Report",
-                "Introducing The Team Puzzle Framework",
+                "How to use this report",
+                "Introducing the Team Puzzle Framework",
                 "Understanding the Four Frequencies & Eight Profiles",
                 "The Four Frequencies – Energies That Drive Contribution",
                 "The Eight Profiles",
@@ -1673,11 +1673,38 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 "What Could Be Holding You Back?",
                 "Your Next Steps",
               ].map((item, index) => (
-                <li key={item}>
-                  <span className="text-white/40">{index + 1}.</span> {item}
+                <li
+                  key={item}
+                  className="rounded-[10px] border border-white/[0.06] bg-white/[0.035] px-[10px] py-[8px] text-[10px] font-medium leading-[15px] text-white/85"
+                >
+                  <span className="text-white/45">{index + 1}.</span> {item}
                 </li>
               ))}
             </ol>
+            <div className="mt-[28px] flex flex-col items-start gap-[8px]">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                className="inline-flex h-[31px] items-center justify-center rounded-[8px] border border-white/12 bg-[rgba(8,22,43,0.72)] px-[14px] text-[11px] font-semibold leading-[16px] text-[#F8FAFC] shadow-sm"
+              >
+                Download PDF
+              </button>
+              {nextStepsUrl ? (
+                <a
+                  href={nextStepsUrl}
+                  className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
+                >
+                  Next step
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
+                >
+                  Next step
+                </button>
+              )}
+            </div>
           </aside>
 
           <div className="space-y-8">
