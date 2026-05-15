@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { PhoneField } from "../_components/PhoneField";
@@ -52,7 +52,11 @@ export default function ContactPage() {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<ContactFormInput, unknown, ContactFormOutput>({
-    resolver: zodResolver(contactSchema),
+    resolver: zodResolver(contactSchema) as unknown as Resolver<
+      ContactFormInput,
+      unknown,
+      ContactFormOutput
+    >,
     defaultValues: EMPTY,
     mode: "onTouched",
   });

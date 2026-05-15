@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { OtpInput } from "../_components/OtpInput";
@@ -27,7 +27,11 @@ export default function VerifyPage() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<VerifyFormInput, unknown, VerifyFormOutput>({
-    resolver: zodResolver(verifyOtpSchema),
+    resolver: zodResolver(verifyOtpSchema) as unknown as Resolver<
+      VerifyFormInput,
+      unknown,
+      VerifyFormOutput
+    >,
     defaultValues: { email: "", token: "" },
     mode: "onSubmit",
   });

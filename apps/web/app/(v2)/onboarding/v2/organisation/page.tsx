@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import countries from "i18n-iso-countries";
@@ -58,7 +58,11 @@ export default function OrganisationPage() {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<OrgFormInput, unknown, OrgFormOutput>({
-    resolver: zodResolver(orgSchema),
+    resolver: zodResolver(orgSchema) as unknown as Resolver<
+      OrgFormInput,
+      unknown,
+      OrgFormOutput
+    >,
     defaultValues: EMPTY,
     mode: "onTouched",
   });
