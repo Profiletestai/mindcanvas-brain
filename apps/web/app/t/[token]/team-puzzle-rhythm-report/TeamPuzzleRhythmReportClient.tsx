@@ -1983,7 +1983,7 @@ const REPORT_ASSETS = {
     strategicMap: "/icons/tp-strategic-map.png",
     structure: "/icons/tp-structure.png",
     commonLanguage: "/icons/tp-common-language.png",
-    teamRoleFit: "/icons/tp-team-role-fit.png",
+    teamRoleFit: "/org-graphics/tp-team-role-fit.png",
     valueCreationPathway: "/icons/tp-value-creation-pathway.png",
     collaborationTips: "/icons/tp-collaboration-tips.png",
     developmentRecommendations: "/icons/tp-development-recommendations.png",
@@ -2175,7 +2175,7 @@ function SectionHeader(props: {
           <ReportAssetImage
             src={props.icon || ""}
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         ) : (
           props.icon || "✉"
@@ -2276,10 +2276,10 @@ function ProfileRadar(props: {
   percentages: Record<string, number>;
 }) {
   const labels = props.labels?.length ? props.labels : [];
-  const size = 520;
+  const size = 640;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = 205;
+  const radius = 230;
   const max = 50;
 
   function point(i: number, valuePct: number) {
@@ -2315,8 +2315,8 @@ function ProfileRadar(props: {
       <div className="mt-4 flex justify-center rounded-2xl border border-slate-200 bg-slate-50 p-3">
         {labels.length ? (
           <svg
-            viewBox={`0 0 ${size} ${size}`}
-            className="h-auto w-full max-w-[520px]"
+            viewBox="-120 -80 880 800"
+            className="h-auto w-full max-w-[760px] overflow-visible"
           >
             {[10, 20, 30, 40, 50].map((ring) => (
               <polygon
@@ -2331,7 +2331,9 @@ function ProfileRadar(props: {
             ))}
             {labels.map((label, i) => {
               const p = axisPoint(i, 1);
-              const t = axisPoint(i, 1.17);
+              const t = axisPoint(i, 1.24);
+              const anchor = t.x > cx + 20 ? "start" : t.x < cx - 20 ? "end" : "middle";
+              const labelX = anchor === "start" ? t.x + 8 : anchor === "end" ? t.x - 8 : t.x;
               return (
                 <g key={label.code}>
                   <line
@@ -2342,11 +2344,11 @@ function ProfileRadar(props: {
                     stroke="rgba(15,23,42,0.12)"
                   />
                   <text
-                    x={t.x}
+                    x={labelX}
                     y={t.y}
-                    textAnchor="middle"
+                    textAnchor={anchor}
                     dominantBaseline="middle"
-                    fontSize="12"
+                    fontSize="11"
                     fontWeight="700"
                     fill="rgba(15,23,42,0.62)"
                   >
@@ -2695,7 +2697,9 @@ function NextStepCard(props: {
   body: string;
   button: string;
   href?: string | null;
+  onClick?: () => void;
   primary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
@@ -2703,19 +2707,25 @@ function NextStepCard(props: {
         <ReportAssetImage
           src={REPORT_ASSETS.icons.nextSteps}
           alt="Next steps"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
       </div>
       <h4 className="mt-4 font-semibold text-slate-800">{props.title}</h4>
       <p className="mt-2 text-sm leading-6 text-slate-600">{props.body}</p>
-      {props.href ? (
+      {props.onClick || props.href ? (
         <button
           type="button"
-          onClick={() =>
-            window.open(props.href || "#", "_blank", "noopener,noreferrer")
-          }
+          disabled={props.disabled}
+          data-html2canvas-ignore="true"
+          onClick={() => {
+            if (props.onClick) {
+              props.onClick();
+              return;
+            }
+            window.open(props.href || "#", "_blank", "noopener,noreferrer");
+          }}
           className={cls(
-            "mt-4 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold",
+            "mt-4 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60",
             props.primary
               ? "bg-slate-900 text-white hover:bg-slate-700"
               : "border border-slate-900 text-slate-900 hover:bg-slate-50",
@@ -2742,6 +2752,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const isPortalViewer = src === "portal";
 
@@ -2788,20 +2799,43 @@ export default function TeamPuzzleRhythmReportClient(props: {
   }, [token, tid, src, isPortalViewer]);
 
   async function handleDownloadPdf() {
-    if (!reportRef.current) return;
+    if (!reportRef.current || pdfBusy) return;
+
     const element = reportRef.current;
     const prevScroll = window.scrollY;
+    setPdfBusy(true);
     window.scrollTo(0, 0);
 
     try {
+      await Promise.all(
+        Array.from(element.querySelectorAll("img")).map((img) => {
+          const image = img as HTMLImageElement;
+          if (image.complete) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            image.onload = () => resolve();
+            image.onerror = () => resolve();
+          });
+        }),
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 1.25,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: "#061A3A",
-        scrollY: -window.scrollY,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        logging: false,
+        imageTimeout: 15000,
+        ignoreElements: (node) =>
+          node instanceof HTMLElement &&
+          node.getAttribute("data-html2canvas-ignore") === "true",
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -2811,18 +2845,22 @@ export default function TeamPuzzleRhythmReportClient(props: {
       let heightLeft = imgHeight;
       let position = 0;
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
 
       pdf.save(`team-puzzle-rhythm-report-${token}.pdf`);
+    } catch (e) {
+      console.error("PDF download failed", e);
+      window.print();
     } finally {
+      setPdfBusy(false);
       window.scrollTo(0, prevScroll);
     }
   }
@@ -2951,7 +2989,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
   return (
     <div
       ref={reportRef}
-      className="relative min-h-screen overflow-hidden bg-[#061A3A] text-white"
+      className="relative min-h-screen overflow-x-hidden bg-[#061A3A] text-white"
     >
       <AppBackground />
       <div
@@ -2968,9 +3006,11 @@ export default function TeamPuzzleRhythmReportClient(props: {
             <button
               type="button"
               onClick={handleDownloadPdf}
-              className="h-[37px] rounded-lg border border-white/15 bg-[#08162B]/70 px-[15px] text-[13px] font-semibold leading-[20px] text-white hover:bg-[#08162B]/90"
+              disabled={pdfBusy}
+              data-html2canvas-ignore="true"
+              className="h-[37px] rounded-lg border border-white/15 bg-[#08162B]/70 px-[15px] text-[13px] font-semibold leading-[20px] text-white hover:bg-[#08162B]/90 disabled:cursor-wait disabled:opacity-60"
             >
-              Download PDF
+              {pdfBusy ? "Preparing..." : "Download PDF"}
             </button>
             {nextStepsUrl ? (
               <button
@@ -2978,6 +3018,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 onClick={() =>
                   window.open(nextStepsUrl, "_blank", "noopener,noreferrer")
                 }
+                data-html2canvas-ignore="true"
                 className="h-[37px] rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[13px] font-semibold leading-[20px] text-[#071C36]"
               >
                 Next steps
@@ -3185,7 +3226,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="h-fit rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-4">
+          <aside className="h-fit self-start rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-4">
             <div className="text-[10px] font-semibold uppercase leading-[15px] tracking-[2.6px] text-white/45">
               Report Index
             </div>
@@ -3225,13 +3266,16 @@ export default function TeamPuzzleRhythmReportClient(props: {
               <button
                 type="button"
                 onClick={handleDownloadPdf}
-                className="inline-flex h-[31px] items-center justify-center rounded-[8px] border border-white/12 bg-[rgba(8,22,43,0.72)] px-[14px] text-[11px] font-semibold leading-[16px] text-[#F8FAFC] shadow-sm"
+                disabled={pdfBusy}
+                data-html2canvas-ignore="true"
+                className="inline-flex h-[31px] items-center justify-center rounded-[8px] border border-white/12 bg-[rgba(8,22,43,0.72)] px-[14px] text-[11px] font-semibold leading-[16px] text-[#F8FAFC] shadow-sm disabled:cursor-wait disabled:opacity-60"
               >
-                Download PDF
+                {pdfBusy ? "Preparing..." : "Download PDF"}
               </button>
               {nextStepsUrl ? (
                 <a
                   href={nextStepsUrl}
+                  data-html2canvas-ignore="true"
                   className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
                 >
                   Next step
@@ -3239,6 +3283,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
               ) : (
                 <button
                   type="button"
+                  data-html2canvas-ignore="true"
                   className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
                 >
                   Next step
@@ -3248,28 +3293,35 @@ export default function TeamPuzzleRhythmReportClient(props: {
           </aside>
 
           <div className="space-y-8">
-            <IntroTextBlock
-              title="Welcome from Chandell"
-              icon={REPORT_ASSETS.icons.welcome}
-            >
-              {GENERIC_CONTENT.welcomeFromChandell.paragraphs.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-              <div className="not-prose mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
-                <ReportAssetImage
-                  src={REPORT_ASSETS.chandell}
-                  alt="Chandell Labbozzetta"
-                  className="h-20 w-20 rounded-full border border-slate-200 object-cover"
-                />
-                <p className="m-0 text-sm leading-7 text-slate-700">
-                  {GENERIC_CONTENT.welcomeFromChandell.signoff}
-                  <br />
-                  <strong>{GENERIC_CONTENT.welcomeFromChandell.name}</strong>
-                  <br />
-                  {GENERIC_CONTENT.welcomeFromChandell.role}
-                </p>
-              </div>
-            </IntroTextBlock>
+            <Card>
+              <SectionHeader
+                title="Welcome from Chandell"
+                icon={REPORT_ASSETS.icons.welcome}
+              />
+              <WhiteCard className="p-[24px]">
+                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
+                  <div className="space-y-[12px] text-[13px] leading-[25px] text-[#313C52]">
+                    {GENERIC_CONTENT.welcomeFromChandell.paragraphs.map((paragraph) => (
+                      <p key={paragraph}>{paragraph}</p>
+                    ))}
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                    <ReportAssetImage
+                      src={REPORT_ASSETS.chandell}
+                      alt="Chandell Labbozzetta"
+                      className="mx-auto h-[96px] w-[96px] rounded-full border border-slate-200 object-cover"
+                    />
+                    <p className="mt-4 text-[12px] leading-[20px] text-slate-700">
+                      {GENERIC_CONTENT.welcomeFromChandell.signoff}
+                      <br />
+                      <strong>{GENERIC_CONTENT.welcomeFromChandell.name}</strong>
+                      <br />
+                      {GENERIC_CONTENT.welcomeFromChandell.role}
+                    </p>
+                  </div>
+                </div>
+              </WhiteCard>
+            </Card>
 
             <HowToUseCards />
 
@@ -3483,12 +3535,12 @@ export default function TeamPuzzleRhythmReportClient(props: {
                           ) : null}
                         </div>
                         <div className="px-[15px] pt-[72px] text-center">
-                          <div className="relative inline-flex items-center justify-center gap-2">
+                          <div className="flex flex-wrap items-center justify-center gap-2 px-2">
                             <h3 className="text-[12px] font-semibold leading-[19px] text-[#111828]">
                               {p.name}
                             </h3>
                             {active ? (
-                              <span className="absolute left-full ml-2 whitespace-nowrap rounded-full bg-[#0FCD5E] px-[7px] py-[2px] text-[8px] font-bold leading-[10px] text-white">
+                              <span className="whitespace-nowrap rounded-full bg-[#0FCD5E] px-[7px] py-[2px] text-[8px] font-bold leading-[10px] text-white">
                                 Your Profile
                               </span>
                             ) : null}
@@ -4051,7 +4103,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 icon={REPORT_ASSETS.icons.profileInDepth}
               />
               <WhiteCard className="p-0">
-                <div className="grid gap-[20px] p-[17px] lg:grid-cols-[527px_1fr]">
+                <div className="grid gap-[20px] p-[17px] lg:grid-cols-[minmax(390px,527px)_minmax(0,1fr)]">
                   <div className="space-y-[17px]">
                     <div className="rounded-[18px] bg-[#4092C5] p-[20px] shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
                       <div className="grid min-h-[172px] grid-cols-[166px_1fr] gap-[30px] items-center">
@@ -4101,7 +4153,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
                   <ProfileTextBlocks
                     blocks={profileContent.profileInDepth}
-                    className="text-[13px] leading-[28px]"
+                    className="min-w-0 text-[12.5px] leading-[25px]"
                   />
                 </div>
               </WhiteCard>
@@ -4129,26 +4181,12 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   ))}
                 </div>
 
-                <div className="mt-[24px] grid max-w-[780px] grid-cols-3 overflow-hidden rounded-[18px] bg-white shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
-                  {[
-                    { file: "tp-r-puzzle.png", label: "Resourceful" },
-                    { file: "tp-h-puzzle.png", label: "Human-Centred" },
-                    { file: "tp-y-puzzle.png", label: "Yielding" },
-                    { file: "tp-t-puzzle.png", label: "Tactical" },
-                    { file: "tp-h-puzzle.png", label: "Hopeful" },
-                    { file: "tp-m-puzzle.png", label: "Measured" },
-                  ].map((piece) => (
-                    <div
-                      key={piece.label}
-                      className="aspect-[1.48] overflow-hidden"
-                    >
-                      <RhythmPuzzlePieceImage
-                        file={piece.file}
-                        alt={piece.label}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ))}
+                <div className="mt-[24px] flex justify-center rounded-[18px] bg-white p-2 shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+                  <ReportAssetImage
+                    src={REPORT_ASSETS.rhythmPuzzle}
+                    alt="Professional Performance Rhythm puzzle"
+                    className="h-auto w-full max-w-[780px] object-contain"
+                  />
                 </div>
 
                 <div className="mt-[28px] grid gap-[16px] lg:grid-cols-2">
@@ -4418,39 +4456,90 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="The 3-Level Energy Model"
                 icon={REPORT_ASSETS.icons.energyModel}
               />
-              <WhiteCard>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {(
-                    ["flow", "stabilising", "frustration"] as DriverGroup[]
-                  ).map((group, index) => {
-                    const g = GROUP_COPY[group];
-                    const text = GENERIC_CONTENT.threeLevelEnergyModel[group];
-                    return (
-                      <div
-                        key={group}
-                        className={cls(
-                          "rounded-2xl border p-5",
-                          g.bg,
-                          g.border,
-                        )}
-                      >
-                        <div className={cls("text-5xl font-bold", g.text)}>
-                          {index + 1}
-                        </div>
-                        <h3 className={cls("mt-4 font-bold", g.text)}>
-                          {g.heading
-                            .replace(" — Your Top 2", "")
-                            .replace(" — Your Middle 2", "")
-                            .replace(" — Your Bottom 2", "")}
-                        </h3>
-                        <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                          {text.map((x) => (
-                            <li key={x}>• {x}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
+              <WhiteCard className="p-[24px]">
+                <h3 className="text-[14px] font-bold leading-[22px] text-[#111828]">
+                  Professional Performance Rhythm – Driver Framework
+                </h3>
+                <div className="mt-[18px] text-[10px] font-bold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                  Understanding the RHYTHM Model
+                </div>
+                <div className="mt-[18px] grid gap-[16px] lg:grid-cols-2">
+                  <div className="rounded-[18px] border border-[#4092C5] bg-white p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <p>
+                      The Professional Performance Rhythm framework is grounded in established organisational psychology principles, particularly:
+                    </p>
+                    <ul className="mt-[10px] space-y-[4px]">
+                      <li>• Person–Job Fit Theory (Kristof-Brown, 2005)</li>
+                      <li>• Self-Determination Theory (Deci & Ryan, 2000)</li>
+                      <li>• Strengths-Based Performance Research (Clifton & Harter, Gallup)</li>
+                      <li>• Cognitive Load and Decision-Making Models (Kahneman, 2011)</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-[18px] border border-[#4092C5] bg-white p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <p>These frameworks consistently show that:</p>
+                    <ul className="mt-[10px] space-y-[4px]">
+                      <li>• Individuals perform best when working in areas of natural cognitive and behavioural preference.</li>
+                      <li>• Sustained performance declines when individuals operate outside these zones for extended periods.</li>
+                      <li>• Teams perform optimally when complementary strengths are distributed, not duplicated.</li>
+                    </ul>
+                  </div>
+                </div>
+                <p className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
+                  The RHYTHM model translates these principles into six observable workplace drivers, providing a practical lens for understanding how individuals contribute to team performance and project execution.
+                </p>
+              </WhiteCard>
+
+              <WhiteCard className="mt-[22px] p-[24px]">
+                <h3 className="text-[14px] font-bold leading-[22px] text-[#111828]">
+                  Driver Categories and Performance Energy
+                </h3>
+                <p className="mt-[14px] text-[13px] leading-[28px] text-[#313C52]">
+                  Each driver operates across three levels:
+                </p>
+                <div className="mt-[22px] grid gap-[18px] md:grid-cols-3">
+                  <div className="rounded-[12px] border border-[#16A34A] bg-green-50 p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <h4 className="text-[15px] font-bold text-[#16A34A]">Flow Drivers</h4>
+                    <div className="mt-[4px] font-bold text-[#16A34A]">(High Energy / High Alignment)</div>
+                    <p className="mt-[14px]">These represent areas of natural alignment between:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Cognitive preference</li>
+                      <li>• Behavioural tendency</li>
+                      <li>• Motivational energy</li>
+                    </ul>
+                    <p className="mt-[14px]">Research shows that individuals working in these zones experience:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Higher engagement</li>
+                      <li>• Faster decision-making</li>
+                      <li>• Greater resilience under pressure</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-[12px] border border-[#F59E0B] bg-amber-50 p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <h4 className="text-[15px] font-bold text-[#F59E0B]">Stabilising Drivers</h4>
+                    <div className="mt-[4px] font-bold text-[#F59E0B]">(Moderate Energy / Adaptive Use)</div>
+                    <p className="mt-[14px]">These drivers sit within an individual's functional capability but are not intrinsically energising.</p>
+                    <p className="mt-[14px]">They are associated with:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Learned behaviours</li>
+                      <li>• Situational adaptability</li>
+                      <li>• Role-based necessity</li>
+                    </ul>
+                    <p className="mt-[14px]">While useful, over-reliance can lead to:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Reduced engagement</li>
+                      <li>• Increased cognitive effort</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-[12px] border border-[#BC1823] bg-red-50 p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <h4 className="text-[15px] font-bold text-[#BC1823]">Frustration Drivers</h4>
+                    <div className="mt-[4px] font-bold text-[#BC1823]">(Low Energy / High Effort)</div>
+                    <p className="mt-[14px]">These represent areas of misalignment between natural preference and required behaviour. Operating in these areas consistently is linked to:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Cognitive fatigue</li>
+                      <li>• Reduced performance quality</li>
+                      <li>• Increased stress and disengagement</li>
+                    </ul>
+                    <p className="mt-[14px]">These are not weaknesses, but energy-draining zones.</p>
+                  </div>
                 </div>
               </WhiteCard>
             </Card>
@@ -4532,7 +4621,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     <ReportAssetImage
                       src={REPORT_ASSETS.icons.teamRoleFit}
                       alt="Team role fit"
-                      className="mx-auto max-h-[160px] w-full object-contain"
+                      className="mx-auto max-h-[220px] w-full object-contain"
                     />
                   </div>
                 </div>
@@ -4610,8 +4699,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   <NextStepCard
                     title={GENERIC_CONTENT.nextSteps.cards[0].title}
                     body={GENERIC_CONTENT.nextSteps.cards[0].body}
-                    button={GENERIC_CONTENT.nextSteps.cards[0].button}
-                    href={null}
+                    button={pdfBusy ? "Preparing..." : GENERIC_CONTENT.nextSteps.cards[0].button}
+                    onClick={handleDownloadPdf}
+                    disabled={pdfBusy}
                   />
                   <NextStepCard
                     title={GENERIC_CONTENT.nextSteps.cards[1].title}
