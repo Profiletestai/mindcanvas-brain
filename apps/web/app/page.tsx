@@ -3,8 +3,7 @@ import Link from "next/link";
 
 const P = { c1: "#64bae2", c2: "#2d8fc4", c3: "#015a8b" }; // your palette
 
-const CREATE_ACCOUNT_URL =
-  "https://profiletest.ai/order-qsc?utm_source=profiletest.app&utm_medium=organic&utm_campaign=none&utm_term=clicked_create_account";
+const CREATE_ACCOUNT_URL = "/onboarding/v2";
 
 export default function Landing() {
   return (
