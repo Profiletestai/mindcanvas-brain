@@ -196,3 +196,40 @@ export async function getOrgName(orgId: string): Promise<string | null> {
     .maybeSingle();
   return (data?.name as string) ?? null;
 }
+
+// ── Sub-account authorization ────────────────────────────────────────────────
+// Allow callers who are an `org_owner` of the target org, or who have a row in
+// portal.superadmin. Returns { ok: true } on success, or a structured failure.
+export type AssertOrgOwnerResult =
+  | { ok: true }
+  | { ok: false; status: 403 | 404; error: string };
+
+export async function assertOrgOwner(
+  userId: string,
+  orgId: string
+): Promise<AssertOrgOwnerResult> {
+  const sb = await getAdminClient();
+
+  const { data: row } = await sb
+    .schema("portal")
+    .from("user_orgs")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  if (row?.role === "org_owner") return { ok: true };
+
+  const { data: sa } = await sb
+    .schema("portal")
+    .from("superadmin")
+    .select("user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (sa) return { ok: true };
+
+  return row
+    ? { ok: false, status: 403, error: "forbidden" }
+    : { ok: false, status: 404, error: "org_not_found_or_no_access" };
+}
