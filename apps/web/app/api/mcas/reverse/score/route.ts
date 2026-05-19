@@ -1,4 +1,4 @@
-//apps/web/app/api/mcas/reverse/score/route.ts
+// apps/web/app/api/mcas/reverse/score/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -67,7 +67,9 @@ function clamp(n: number, min: number, max: number) {
 function normalize(obj: Record<string, number>) {
   const sum = Object.values(obj).reduce((acc, v) => acc + v, 0) || 1;
   const out: Record<string, number> = {};
-  for (const k of Object.keys(obj)) out[k] = Number((obj[k] / sum).toFixed(4));
+  for (const k of Object.keys(obj)) {
+    out[k] = Number((obj[k] / sum).toFixed(4));
+  }
   return out;
 }
 
@@ -94,9 +96,7 @@ async function getWordMappings(
     .eq("mapping_code", mappingCode)
     .order("sort_order", { ascending: true });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   return (data || [])
     .map((x: any) => String(x.word_or_phrase || "").trim())
@@ -113,6 +113,57 @@ async function nextRunNumber(sb: ReturnType<typeof supa>): Promise<string> {
   return String(data);
 }
 
+function buildIdealCandidateProfile(input: {
+  primaryOperatingStyle: any;
+  careerVertical: any;
+  operatingWords: string[];
+  careerWords: string[];
+}) {
+  const primaryStyle = input.primaryOperatingStyle?.label || "this profile";
+  const careerVertical =
+    input.careerVertical?.label || "the required level of responsibility";
+
+  const operatingWords = Array.isArray(input.operatingWords)
+    ? input.operatingWords.filter(Boolean)
+    : [];
+
+  const careerWords = Array.isArray(input.careerWords)
+    ? input.careerWords.filter(Boolean)
+    : [];
+
+  const operatingPhrase = operatingWords.length
+    ? operatingWords.join(", ")
+    : "clear behavioural strengths";
+
+  const careerPhrase = careerWords.length
+    ? careerWords.join(", ")
+    : "perform consistently at the required career vertical";
+
+  return {
+    thinking_style: {
+      title: "How this ideal candidate thinks",
+      summary:
+        `This ideal candidate shows the thinking pattern of ${primaryStyle}. ` +
+        `They are likely to approach work through ${operatingPhrase} and will naturally focus on what creates movement, clarity, and useful outcomes. ` +
+        `At ${careerVertical} level, they need to think beyond isolated tasks and consider the broader impact of decisions, priorities, and trade-offs.`,
+    },
+    execution_style: {
+      title: "How they execute and perform",
+      summary:
+        `This ideal candidate is expected to execute through ${operatingPhrase}. ` +
+        `They should be able to turn direction into action, maintain momentum, and produce outcomes that match the level of responsibility required. ` +
+        `The role is likely to need someone who can ${careerPhrase}.`,
+    },
+    team_style: {
+      title: "How they operate in a team",
+      summary:
+        `In a team context, this ideal candidate should contribute through the behavioural strengths associated with ${primaryStyle}. ` +
+        `They are expected to support the system by bringing the right balance of contribution, ownership, and collaboration for the role. ` +
+        `At ${careerVertical} level, their team impact should extend beyond personal delivery and support wider alignment, performance, and execution.`,
+    },
+  };
+}
+
 export async function POST(req: Request) {
   try {
     if (!isAuthorized(req)) {
@@ -126,7 +177,9 @@ export async function POST(req: Request) {
 
     const partner_key = String(body?.partner_key || "").trim();
     const job_id = String(body?.job_id || "").trim();
-    const campaign_id = body?.campaign_id ? String(body.campaign_id).trim() : null;
+    const campaign_id = body?.campaign_id
+      ? String(body.campaign_id).trim()
+      : null;
     const title = String(body?.title || "").trim();
     const framework_slug =
       String(body?.framework_slug || "").trim() || "mcas-core-alignment";
@@ -317,7 +370,10 @@ export async function POST(req: Request) {
       if (q.section === "operating_style") {
         if (typeof opt.points !== "number" || !opt.os || !opt.core) {
           return NextResponse.json(
-            { ok: false, error: `Missing scoring metadata on ${qCode}:${optionCode}` },
+            {
+              ok: false,
+              error: `Missing scoring metadata on ${qCode}:${optionCode}`,
+            },
             { status: 500 }
           );
         }
@@ -330,16 +386,27 @@ export async function POST(req: Request) {
         if (qCode === "Q25") {
           if (opt.flag === "overreach_risk") overreachRisk = true;
           if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
-          if (opt.flag === "vertical_confidence_matched") verticalConfidence = "matched";
-          if (opt.flag === "vertical_readiness_signal") verticalReadinessSignal = true;
+          if (opt.flag === "vertical_confidence_matched") {
+            verticalConfidence = "matched";
+          }
+          if (opt.flag === "vertical_readiness_signal") {
+            verticalReadinessSignal = true;
+          }
         } else {
-          const mid = opt.vertical_band ? verticalBandMidpoint(opt.vertical_band) : null;
+          const mid = opt.vertical_band
+            ? verticalBandMidpoint(opt.vertical_band)
+            : null;
+
           if (mid == null) {
             return NextResponse.json(
-              { ok: false, error: `Missing vertical_band on ${qCode}:${optionCode}` },
+              {
+                ok: false,
+                error: `Missing vertical_band on ${qCode}:${optionCode}`,
+              },
               { status: 500 }
             );
           }
+
           verticalValues.push(mid);
         }
       }
@@ -351,7 +418,9 @@ export async function POST(req: Request) {
       .map(([code, raw]) => ({ code, raw }))
       .sort((a, b) => b.raw - a.raw);
 
-    const osSum = operatingStyleRanking.reduce((acc, x) => acc + x.raw, 0) || 1;
+    const osSum =
+      operatingStyleRanking.reduce((acc, x) => acc + x.raw, 0) || 1;
+
     const operatingStyleEnriched = operatingStyleRanking.map((x, idx) => ({
       code: x.code,
       label: osLabels[x.code] || x.code,
@@ -362,7 +431,9 @@ export async function POST(req: Request) {
     const topOperatingStyle = operatingStyleEnriched[0] || null;
 
     const vAvg =
-      verticalValues.reduce((acc, v) => acc + v, 0) / (verticalValues.length || 1);
+      verticalValues.reduce((acc, v) => acc + v, 0) /
+      (verticalValues.length || 1);
+
     const verticalLevel = clamp(Math.round(vAvg), 1, 6);
     const verticalCode = `V${verticalLevel}`;
 
@@ -433,6 +504,13 @@ export async function POST(req: Request) {
       },
     };
 
+    const idealCandidateProfile = buildIdealCandidateProfile({
+      primaryOperatingStyle: topOperatingStyle,
+      careerVertical,
+      operatingWords: topOsWords,
+      careerWords: cvWords,
+    });
+
     const resultPayload = {
       scoring: {
         model_version: "mcas-score-v1",
@@ -454,6 +532,15 @@ export async function POST(req: Request) {
         },
       },
       wording,
+
+      // Kept for backward compatibility
+      ideal_candidate_profile: idealCandidateProfile,
+
+      // Added so reverse/IJP response also has result.report, matching candidate API shape
+      report: {
+        ideal_candidate_profile: idealCandidateProfile,
+      },
+
       audit: {
         answers: answerAudit,
       },

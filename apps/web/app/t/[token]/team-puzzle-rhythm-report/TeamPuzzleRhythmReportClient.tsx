@@ -84,6 +84,32 @@ type ReportData = {
 
 type ReportAPI = { ok: boolean; data?: ReportData; error?: string };
 
+
+type FrequencyAlignedProfile = {
+  profile: string;
+  bullets: string[];
+};
+
+type FrequencyContent = {
+  code: FrequencyCode;
+  name: string;
+  label: string;
+  definition: string;
+  coreAttributes: string[];
+  potentialBlindSpots: string[];
+  alignedProfiles: FrequencyAlignedProfile[];
+  howItShowsUp: {
+    trait: string;
+    expression: string;
+  }[];
+  idealRoles: string[];
+  avoidEnvironments: string[];
+  coachingTips: string[];
+  reflectionPrompts: string[];
+  finalThoughts: string;
+  nextStep?: string;
+};
+
 const FREQUENCY_COPY: Record<
   FrequencyCode,
   {
@@ -127,6 +153,355 @@ const FREQUENCY_COPY: Record<
     blindSpot: "Rigidity, analysis paralysis, perfectionism",
   },
 };
+
+
+const FREQUENCY_CONTENT: Record<FrequencyCode, FrequencyContent> = {
+  A: {
+    code: "A",
+    name: "Innovation",
+    label: "Innovation Frequency",
+    definition:
+      "The Innovation Frequency is the energy of ideas, momentum, and possibility. People with this frequency are naturally future-oriented. They thrive on change, pursue progress, and often see possibilities long before others do.",
+    coreAttributes: [
+      "Big-picture thinking",
+      "Strategic vision",
+      "Pattern recognition",
+      "Restlessness with ‘the way things have always been’",
+      "Comfortable with risk and uncertainty",
+    ],
+    potentialBlindSpots: [
+      "May skip over details or structure",
+      "Impatience with slower-moving personalities",
+      "Can abandon ideas before they’re fully formed",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 1: The Visionary",
+        bullets: [
+          "Brings bold ideas and future-focused strategy",
+          "Often sparks the direction for teams or organisations",
+          "Needs space and trust to explore and innovate",
+        ],
+      },
+      {
+        profile: "Profile 2: The Catalyst",
+        bullets: [
+          "Brings activation energy to ideas",
+          "Motivates and excites people to take action",
+          "Communicates vision with passion",
+        ],
+      },
+      {
+        profile: "Profile 8: The Optimiser",
+        bullets: [
+          "Uses systems-thinking to improve and evolve",
+          "Brings innovation to process and structure",
+          "Often blends creativity with precision",
+        ],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Idea generation",
+        expression: "Comes up with multiple strategic options or future states",
+      },
+      {
+        trait: "Fast momentum",
+        expression: "Thrives in sprints, launches, or disruption projects",
+      },
+      {
+        trait: "Strategic alignment",
+        expression: "Helps refocus the team on long-term goals",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Gets bored or disconnected in repetitive roles",
+      },
+    ],
+    idealRoles: [
+      "Early-stage ideation and strategy",
+      "Business development or product creation",
+      "Campaign innovation or market repositioning",
+    ],
+    avoidEnvironments: [
+      "Stifle creativity",
+      "Prioritise slow consensus",
+      "Punish mistakes over experimentation",
+    ],
+    coachingTips: [
+      "Provide Visionaries/Catalysts space to think and autonomy to act",
+      "Don’t rush them into structure, bring in support to implement",
+      "Pair them with Coordinators or Controllers for grounded execution",
+      "Create short cycles: Plan–Test–Reflect–Refine",
+    ],
+    reflectionPrompts: [
+      "Where have I been most energised lately?",
+      "Which ideas am I sitting on that I haven’t acted on?",
+      "How could I communicate my vision more clearly to my team?",
+      "Who could help bring my ideas to life?",
+    ],
+    finalThoughts:
+      "Innovation energy is a precious asset, and like all energy, it needs to be directed. When you learn how to honour your natural strengths while building the right partnerships around you, you unlock exponential results.",
+    nextStep:
+      "Want help mapping the rest of your team? Visit lifepuzzle.com.au to explore how Team Puzzle can support your organisation in building a team aligned for flow, performance, and fulfilment.",
+  },
+
+  B: {
+    code: "B",
+    name: "Influence",
+    label: "Influence Frequency",
+    definition:
+      "The Influence Frequency is the energy of connection, charisma, and communication. People with this frequency are energised by interaction, thrive on meaningful conversations, and naturally rally people around a cause.",
+    coreAttributes: [
+      "Strong interpersonal awareness",
+      "Communication-driven problem solving",
+      "Intuitive understanding of motivation",
+      "High energy and emotional expressiveness",
+      "Naturally builds rapport and trust",
+    ],
+    potentialBlindSpots: [
+      "May overcommit to please others",
+      "Can avoid difficult conversations",
+      "Easily distracted without relational anchors",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 2: The Catalyst",
+        bullets: [
+          "Brings social energy and momentum to new ideas",
+          "Communicates vision with contagious enthusiasm",
+          "Initiates movement and early-stage engagement",
+        ],
+      },
+      {
+        profile: "Profile 3: The Motivator",
+        bullets: [
+          "Empowers others through encouragement and team spirit",
+          "Creates psychological safety and morale",
+          "Often the cultural heart of the team",
+        ],
+      },
+      {
+        profile: "Profile 4: The Connector",
+        bullets: [
+          "Links people, ideas, and timing into a collaborative path",
+          "Ensures others feel seen, heard, and aligned",
+          "Drives harmony in relationships and communication",
+        ],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Relational leadership",
+        expression: "Leads by earning trust, showing empathy",
+      },
+      {
+        trait: "Team cohesion",
+        expression: "Bridges gaps between personalities and priorities",
+      },
+      {
+        trait: "Energy transfer",
+        expression: "Lifts energy during low-motivation periods",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Overwhelmed when relationships break down or if isolated",
+      },
+    ],
+    idealRoles: [
+      "Relationship management",
+      "Customer or team experience",
+      "Engagement, culture, or internal communications",
+    ],
+    avoidEnvironments: [
+      "Deprioritise human interaction",
+      "Are siloed or excessively technical",
+      "Expect motivation without relationship",
+    ],
+    coachingTips: [
+      "Empower them to influence, don’t contain them with overstructure",
+      "Allow space for collaborative problem solving",
+      "Use them to build bridges across teams or departments",
+      "Celebrate small wins to keep energy high",
+    ],
+    reflectionPrompts: [
+      "Who have I positively impacted this week?",
+      "Where can I better use my influence to align the team?",
+      "What boundaries do I need to set to stay energised?",
+      "How can I inspire others around the mission?",
+    ],
+    finalThoughts:
+      "Influence is not about volume, it’s about impact. When influence energy is channelled with clarity and care, it drives cultural transformation.",
+    nextStep:
+      "Want to understand how this energy impacts your team dynamics? Visit lifepuzzle.com.au to explore coaching and alignment tools tailored to Frequency B profiles.",
+  },
+
+  C: {
+    code: "C",
+    name: "Implementation",
+    label: "Implementation Frequency",
+    definition:
+      "The Implementation Frequency is the energy of grounding, timing, and dependable action. These individuals bring structure to chaos, carry plans through to execution, and stabilise emotions under pressure.",
+    coreAttributes: [
+      "Grounded presence and calm under stress",
+      "Attentive to timing and sequence",
+      "Reliable with follow-through",
+      "Practical, consistent, and service-driven",
+    ],
+    potentialBlindSpots: [
+      "May resist change or ambiguity",
+      "Can prioritise process over innovation",
+      "May underplay their own leadership or creativity",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 4: The Connector",
+        bullets: ["Balances relational intelligence with grounded timing"],
+      },
+      {
+        profile: "Profile 5: The Facilitator",
+        bullets: [
+          "Brings calm, inclusive rhythm to group dynamics",
+          "Stabilises projects and people with equanimity",
+        ],
+      },
+      {
+        profile: "Profile 6: The Coordinator",
+        bullets: [
+          "Converts strategies into tracked, completed actions",
+          "Excels in operations, checklists, and follow-through",
+        ],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Process discipline",
+        expression: "Keeps projects structured and grounded",
+      },
+      {
+        trait: "Stability",
+        expression: "Maintains consistent emotional tone",
+      },
+      {
+        trait: "Reliability",
+        expression: "Follows through when others drop the ball",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Gets overwhelmed if scope is unclear or constantly shifting",
+      },
+    ],
+    idealRoles: [
+      "Project and operations management",
+      "Delivery coordination and logistics",
+      "Ground-level support and maintenance",
+    ],
+    avoidEnvironments: [
+      "Lack structure or shifting deadlines",
+      "Expect rapid ideation or high ambiguity",
+      "Don’t appreciate process-driven work",
+    ],
+    coachingTips: [
+      "Involve early in project planning, not just the rollout",
+      "Give them ownership of execution timelines",
+      "Pair them with visionaries to balance pace and precision",
+      "Acknowledge progress, not just results",
+    ],
+    reflectionPrompts: [
+      "Where have I brought calm or clarity to a situation this week?",
+      "What process needs refinement?",
+      "How can I better communicate my capacity and timing?",
+      "What energises me most about completion?",
+    ],
+    finalThoughts:
+      "Implementation energy is the muscle of a high-performing team. Without it, ideas stay stuck and momentum stalls. Honour this frequency as the glue that holds execution together.",
+    nextStep:
+      "Curious how to optimise your systems for flow? Explore our resources at lifepuzzle.com.au.",
+  },
+
+  D: {
+    code: "D",
+    name: "Insight",
+    label: "Insight Frequency",
+    definition:
+      "Insight Frequency is the energy of analysis, structure, and systems. These individuals go deep, seek precision, and often spot patterns, risks, or optimisations long before anyone else.",
+    coreAttributes: [
+      "Highly analytical and detail-focused",
+      "Values accuracy, logic, and reliability",
+      "Builds frameworks and systems to scale quality",
+      "Operates with intellectual depth and independence",
+    ],
+    potentialBlindSpots: [
+      "Can be rigid, perfectionistic, or resistant to ambiguity",
+      "May lack emotional fluency or overlook people dynamics",
+      "Sometimes delays action in search of more data",
+    ],
+    alignedProfiles: [
+      {
+        profile: "Profile 6: The Coordinator",
+        bullets: ["Brings logic and timing to team execution"],
+      },
+      {
+        profile: "Profile 7: The Controller",
+        bullets: ["Sees the gaps, builds systems, checks compliance"],
+      },
+      {
+        profile: "Profile 8: The Optimiser",
+        bullets: ["Fuses logic and innovation to improve systems"],
+      },
+    ],
+    howItShowsUp: [
+      {
+        trait: "Detail orientation",
+        expression: "Spots risks, inconsistencies, and inefficiencies",
+      },
+      {
+        trait: "Structured thinking",
+        expression: "Breaks complex issues into clear systems",
+      },
+      {
+        trait: "Predictive analysis",
+        expression: "Forecasts future outcomes through patterns",
+      },
+      {
+        trait: "Disengagement warning",
+        expression: "Overwhelmed if logic is ignored or dismissed",
+      },
+    ],
+    idealRoles: [
+      "Data, systems, risk, finance, operations",
+      "Quality control and policy design",
+      "Strategic scaling and diagnostics",
+    ],
+    avoidEnvironments: [
+      "Value intuition over logic without balance",
+      "Disregard structure or long-term implications",
+      "Prioritise social consensus over truth",
+    ],
+    coachingTips: [
+      "Give time to reflect before major decisions",
+      "Provide data or structure for confidence",
+      "Use them to test, audit, or optimise systems",
+      "Pair them with Catalysts or Facilitators for communication balance",
+    ],
+    reflectionPrompts: [
+      "What risk did I help the team avoid this week?",
+      "Where am I overanalysing instead of acting?",
+      "What system or process could I improve today?",
+      "How can I share my insights in a more actionable way?",
+    ],
+    finalThoughts:
+      "Insight frequency is the backbone of scalable, sustainable success. When this energy is empowered, not dismissed, it protects the future.",
+    nextStep:
+      "Need help integrating this into your team structure? Book a team strategy session via lifepuzzle.com.au.",
+  },
+};
+
+function getFrequencyContent(code?: string | null): FrequencyContent {
+  const normalized = String(code || "").toUpperCase() as FrequencyCode;
+  return FREQUENCY_CONTENT[normalized] || FREQUENCY_CONTENT.A;
+}
+
 
 const PROFILE_COPY: Record<
   string,
@@ -214,6 +589,869 @@ const PROFILE_COPY: Record<
       "Settings where refinement, process improvement, and long-term performance matter",
   },
 };
+
+
+type ProfileBasedContent = {
+  display: string;
+  title: string;
+  role: string;
+  frequency: string;
+  coreTraits: string;
+  idealEnvironment: string;
+  youMayHaveBeenCalled: string;
+  famousExamples: string;
+  profileInDepth: string[];
+  energyMatrix: string[];
+  teamRoleFit: string[];
+  valueCreationPathway: string[];
+  collaborationTips: string[];
+  developmentRecommendations: string[];
+  holdingBack: string[];
+  closingThoughts?: string[];
+};
+
+const PROFILE_BASED_CONTENT: Record<string, ProfileBasedContent> = {
+  "PROFILE_1": {
+    "display": "Visionary",
+    "title": "The Visionary",
+    "role": "Strategist",
+    "frequency": "Innovation (A)",
+    "coreTraits": "Creative, big-picture, driven by possibility, risk-tolerant, original thinker",
+    "idealEnvironment": "Autonomy, flexibility, freedom to innovate",
+    "youMayHaveBeenCalled": "ahead of your time, always thinking, or too many ideas, not enough hours",
+    "famousExamples": "Recognised founders, strategists, and change-makers who turn bold ideas into movements.",
+    "profileInDepth": [
+      "The Visionary is the initiator. They often see things before others do, solutions, strategies, innovations, and are most energised when creating what’s new, what’s next, and what’s bold. Visionaries are strategic thinkers with a powerful internal drive and often make ideal founders, strategists, or change-makers.",
+      "As a Visionary, you are not content with maintaining the status quo. You are wired to pursue progress, challenge outdated thinking, and reshape the future before others can even see the cracks in the present. Your ability to see patterns where others see problems makes you a rare and valuable force in any environment.",
+      "This profile thrives on ideas, big, brave, world-shifting ideas. But beyond just imagining the future, you’re compelled to begin building it. At your best, you're not simply a dreamer, you're a doer, when paired with the right collaborators who can help anchor your vision.",
+      "You may have been described as “ahead of your time,” “always thinking,” or “too many ideas, not enough hours.” While some may struggle to keep up with your pace, your gift is helping people see what’s possible, and daring them to go with you.",
+      "The key to unlocking your potential lies not in slowing down your thinking, but in learning how to focus your energy, articulate your ideas clearly, and structure your world to support follow-through.",
+      "Let this section of the report help you validate what you’ve always sensed, and give you a language, a strategy, and a rhythm to express it more fully in your work and leadership.",
+      "Workshop Reflection Questions:",
+      "• What was the last idea you felt genuinely excited about?",
+      "• When do you feel most energised, starting something new, or completing something old?",
+      "• How do you typically share your vision with others? Do they easily understand it?",
+      "• What role do you play in meetings, are you leading from the front or pitching from the edge?",
+      "• Who helps you transform your ideas into action?",
+      "Take 10 minutes to reflect on these prompts. Use a journal, a whiteboard, or even a voice note, whatever helps you make your ideas more tangible. These questions aren’t just for clarity, they're for activation."
+    ],
+    "energyMatrix": [
+      "Understanding your Energy Matrix means identifying the conditions under which your strengths can truly shine. It's not just about how you work, it’s about how you thrive.",
+      "As a Visionary, your energy is fast-paced, idea-driven, and fuelled by the future. But working at your best doesn’t just happen. It requires strategy, knowing when to focus, when to hand off, and how to operate in your unique zone of contribution.",
+      "The best way to master your energy is to recognise how your energy interacts with others. While your core profile is Visionary, you also share qualities with two other profiles:",
+      "• The Catalyst (Profile 2) on your right: energised, expressive, people-facing",
+      "• The Optimiser (Profile 8) on your left: reflective, systems-driven, outcome-focused",
+      "These adjacent profiles act as your ‘wing collaborators.’ Learning from their strengths, and being aware of where you differ, helps you become more adaptable and strategic in how you show up.",
+      "VISIONARY ENERGY MATRIX",
+      "Catalyst (Next Optimiser Zone Visionary (You) Profile) (Opposite Profile)",
+      "Refinement, Influence, Innovation, systems, Drive momentum, strategic thinking long-term visibility optimisation",
+      "Generating bold Inspiring action Improving Strength ideas and and building existing ideas with direction energy precision",
+      "Depth and Follow-through Starting from Challenge sustainable and detail scratch delivery",
+      "Needs stage and Needs process Needs structure Support Style attention to and space to and clarity to scale activate refine",
+      "Team Role Vision setter Energy driver Solution enhancer",
+      "Tip: A high-functioning team often includes all three. If you find yourself struggling to bring an idea to life, check who you're collaborating with, and if one of these energy zones is missing."
+    ],
+    "teamRoleFit": [
+      "As a Visionary, your role in the team is often instinctive, people come to you for direction, for ideas, and for energy. But the value you bring goes beyond your visible creativity. It includes the things you do without thinking, the things you keep to yourself, and the potential you haven’t even tapped into yet.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "By mapping your contribution through the Johari Window, you not only deepen your self-awareness, you expand your impact. For Visionaries, this model highlights the creative influence you bring, the unspoken expectations you carry, and the potential legacy you may be shaping without realising it.",
+      "Use this model as a mirror and a map. Reflect on each quadrant regularly, ask for feedback to grow your Open Area, and don’t be afraid to share more of the thinking behind your ideas. When your role is understood, and your rhythm",
+      "supported, you’ll find the space to lead boldly without carrying the full weight alone."
+    ],
+    "valueCreationPathway": [
+      "Creating value isn’t just about output, it’s about transforming potential into momentum and results. For the Visionary, value begins at the moment of insight, when a pattern is recognised, a need is anticipated, or a new direction becomes clear. Your ability to reimagine what’s possible is what sets you apart. But true leadership lies in turning that vision into something others can see, support, and sustain.",
+      "Visionaries bring value through:",
+      "• Disruptive thinking that challenges stagnant models",
+      "• Uncovering opportunity in uncertainty",
+      "• Reframing problems to find unexpected solutions",
+      "• Painting a future people want to be part of",
+      "Real-World Examples of Visionary Contribution:",
+      "• Sara Blakely, founder of Spanx, created value by identifying a gap no one else saw, then followed through with tenacity and bold storytelling to disrupt an entire industry.",
+      "• Reed Hastings, co-founder of Netflix, anticipated the decline of physical media and envisioned a streaming model years before it was mainstream, leading a transformation that redefined how the world consumes entertainment.",
+      "What these leaders had in common with you: they started with an idea, but knew that ideas alone don’t create results. They structured their vision, invited executional support, and pivoted strategically to stay relevant.",
+      "As a Visionary, your value is maximised when your ideas gain traction, when you connect them to action. This is where building with others becomes your leverage point.",
+      "Your Strength: Lateral thinking, problem reframing, originality Your Growth Lever: Structured support and delegation Your Output Multiplier: Collaborating early with strong implementers"
+    ],
+    "collaborationTips": [
+      "No matter how visionary your ideas may be, you can't bring them to life alone. Great execution comes from great collaboration, and the best collaborators aren’t always the most similar to you. In fact, they’re often the opposite.",
+      "As a Visionary, your success is amplified when you're surrounded by profiles who can catch your ideas, translate them, and carry them through to completion. That’s why understanding how you interact with all 8 Team Puzzle profiles is so valuable, it gives you the ability to lead with intention, partner strategically, and build high-functioning teams.",
+      "Why collaboration matters:",
+      "• It anchors your strengths in reality",
+      "• It provides feedback loops that sharpen your ideas",
+      "• It prevents burnout by distributing energy across the team",
+      "• It creates buy-in by involving diverse styles from the start",
+      "What role you play: You bring the “what if.” You are the source of new direction, big-picture thinking, and conceptual framing. In the team ecosystem, you're the one who helps people think bigger, move faster, and align with purpose.",
+      "How to collaborate well with other profiles:",
+      "• Catalyst (2): They can amplify your ideas and inspire quick action, but together, you’ll need grounding. Bring in a Coordinator or Facilitator early.",
+      "• Motivator (3): They’re brilliant at rallying people around your vision. Be clear about timelines and give them space to connect.",
+      "• Connector (4): Excellent at translating your vision into partnerships or stakeholder alignment. Use their relationship sense to guide communication.",
+      "• Facilitator (5): They’ll ensure your idea is realistic and people-focused. Respect their timing instincts, they often sense what the team needs before you do.",
+      "• Coordinator (6): Your best stabilising force. Trust them with your implementation roadmap and review checkpoints.",
+      "• Controller (7): They’ll test your assumptions and safeguard the details. Let them help refine your plan, but avoid micromanaging them.",
+      "• Optimiser (8): Can perfect what you initiate. Involve them early in the structure phase to minimise rework later on.",
+      "Recommended Collaborators:",
+      "• Facilitator (5) – Empathy and reality-checking",
+      "• Coordinator (6) – Process and implementation",
+      "• Optimiser (8) – Refinement and systemisation",
+      "Working Well With All 8 Profiles:",
+      "• Use a shared language (e.g. this framework!) so people feel seen and understood",
+      "• Frame your vision clearly, but allow others to influence the path",
+      "• Recognise that different profiles move at different speeds, create check-in points, not pressure"
+    ],
+    "developmentRecommendations": [
+      "Growth isn’t just something to pursue when problems arise, it’s what enables a Visionary to consistently lead from a place of clarity, focus, and effectiveness. While your strengths come naturally, their impact is amplified when you refine them, test them, and align them with purpose.",
+      "Your development pathway is not about changing who you are, it’s about evolving how you work. Small shifts in habits, mindsets, and systems can dramatically increase the real-world outcomes of your ideas.",
+      "This section is designed to help you turn insight into traction. Use it to reflect, reset, and recommit to your next level of impact.",
+      "To Elevate Performance:",
+      "• Limit the number of open “big ideas” to 1–2 per quarter",
+      "• Set clear metrics for success before starting new initiatives",
+      "• Document ideas visually or through rapid prototyping",
+      "Daily Habits to Anchor Your Strengths:",
+      "• Visualise end results before communicating plans",
+      "• Start each day with 15 mins of strategic reflection",
+      "• Use digital tools (e.g., whiteboards, mind maps) to organise ideas",
+      "Workshop Reflection Prompts:",
+      "• What’s one idea you could complete this quarter?",
+      "• What support systems are missing from your process?",
+      "• How can your next big idea serve both vision and execution?"
+    ],
+    "holdingBack": [
+      "Even the most visionary thinkers face moments of inertia, times when momentum stalls or motivation wanes. Sometimes it’s because we’ve outgrown a system or routine. Sometimes it’s because our ideas outpace the support structures around us. This section is designed to help you spot the friction early, before it becomes a blocker.",
+      "Use these short prompts and practical indicators to reflect honestly on what might be preventing you from delivering your full value. Think of it as a regular reset, a performance pit stop that keeps your engine running in sync with your ambition.",
+      "Weekly Reflection Prompts:",
+      "• What project energised me most this week?",
+      "• Am I delegating or holding back others with rapid shifts?",
+      "• Where could I simplify before expanding?",
+      "Monthly Action Metrics:",
+      "• % of time in ideation vs. execution",
+      "• Top 3 innovations or concepts seeded this month",
+      "• One person I supported with my strategic thinking"
+    ],
+    "closingThoughts": [
+      "Your strengths are not accidental, they’re your contribution blueprint. As a Visionary, you are here to see what others don’t, and spark change before it’s needed. When paired with the right team, your ideas become movements.",
+      "Use this report as your reference, your challenge, and your encouragement. You already have the blueprint. Now build with it."
+    ]
+  },
+  "PROFILE_2": {
+    "display": "Catalyst",
+    "title": "The Catalyst",
+    "role": "Spark",
+    "frequency": "Innovation + Influence (A-B)",
+    "coreTraits": "Energetic, expressive, persuasive, proactive, inspirational",
+    "idealEnvironment": "Dynamic teams, creative autonomy, early-stage projects",
+    "youMayHaveBeenCalled": "the cheerleader, the energiser, the persuader, the influencer, the face of the brand",
+    "famousExamples": "Oprah Winfrey, Tony Robbins, Richard Branson (Virgin), Brené Brown",
+    "profileInDepth": [
+      "Catalysts are idea accelerators. You’re the person who sees a spark and turns it into a flame, fast. Whether pitching a new initiative, rallying a team, or bringing energy to a stagnant project, you help people believe in possibility and move toward it with urgency.",
+      "Your power lies in your ability to inspire action. You are often the first to speak up, the one others look to for energy, and the motivator who gets people excited about what’s next. You naturally combine creative thinking with high-energy communication, making you a force in team dynamics.",
+      "Workshop Reflection Questions",
+      "• What environments bring out my energy naturally?",
+      "• When was the last time I inspired action in others? What made it work?",
+      "• What happens when I’m in a room with low energy, do I compensate, or disengage?",
+      "• What structures help me stay focused once the excitement fades?"
+    ],
+    "energyMatrix": [
+      "Your natural energy is high-energy and fast-moving. As a Catalyst, your strength lies in activating ideas, people, and momentum. You’re wired for initiation and inspiration, not necessarily for long-term follow-through or solitary detail work. This means mastering your energy is about knowing when to jump in, when to hand off, and how to balance drive with direction.",
+      "You sit between the Visionary and Motivator profiles, drawing energy from both forward-thinking strategy and people-focused influence. Your performance energy is strongest when you start things, ignite engagement, and trust others to help carry the execution.",
+      "CATALYST ENERGY MATRIX",
+      "Zone Visionary (1) Catalyst (2 - You) Motivator (3)",
+      "Momentum, Innovation, Connection, Drive activation, big-picture strategy empathy, uplift persuasion",
+      "Vision, strategic Energy, motivation, Morale building, Strength direction buy-in team support",
+      "Follow-through, Overcommitment, Over-personalising Challenge focus staying power challenges",
+      "Needs a team to Needs structure to Needs clarity in Support Style carry execution pace output priorities",
+      "Architect of Emotional and Team Role Igniter of action direction relational glue",
+      "Tip: Surround yourself with profiles who stabilise and ground your pace. Facilitators (5), Coordinators (6), and Optimisers (8) all bring implementation, rhythm, and refinement to your ideas."
+    ],
+    "teamRoleFit": [
+      "For a Catalyst, team success starts with energy, creating it, shifting it, and amplifying it. You are often the person who gets things started when others hesitate. But real performance isn’t just about launching something new; it’s also about knowing when to hold back, when to lead, and when to pass the baton.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "As a Catalyst, your team role is to spark action, shape belief, and cut through inertia. You are invaluable in the early stages of a project or during times of change, transition, or challenge. But your success depends on knowing when to lead, and when to partner.",
+      "To stay in your lane of highest value:",
+      "• Surround yourself with Anchors, profiles who manage detail, timing, and delivery",
+      "• Clarify your vision early, and communicate it beyond emotion, add structure",
+      "• Step back to invite contribution before charging forward again",
+      "Your energy is contagious. When channeled intentionally, it doesn’t just start change, it sustains it."
+    ],
+    "valueCreationPathway": [
+      "Catalysts create value through energy, urgency, and belief. You see opportunity in motion. Where others hesitate, you initiate. Whether influencing decision-makers, rallying a hesitant team, or bringing visibility to a bold idea, your strength is in making things happen.",
+      "Your influence isn’t limited to communication, it’s in how you bring momentum. Your ability to generate buy-in early is your strategic advantage. But value doesn’t end with enthusiasm. Learning to sustain influence without needing constant adrenaline is where your next level lies.",
+      "Real-World Examples of Catalyst Energy in Action:",
+      "• Oprah Winfrey launched a global media brand not just through vision, but through personal influence and emotional connection.",
+      "• Tony Robbins energises millions through activation, creating instant commitment from audiences and clients.",
+      "You deliver your best value when:",
+      "• Leading early-stage ideas or transformation projects",
+      "• Working cross-functionally to align diverse personalities",
+      "• Acting as an ambassador or internal advocate for change",
+      "You build trust when:",
+      "• Your energy matches substance with delivery",
+      "• You follow through on the momentum you create",
+      "• You energise without overpowering others",
+      "You leverage value when:",
+      "• You pair with process-led partners who can ground and execute",
+      "• You align energy with strategy, not just speed"
+    ],
+    "collaborationTips": [
+      "Catalysts thrive in relationships, but not all relationships fuel them equally. For you to perform at your best, you need to be surrounded by people who can harness your pace, support your vision, and build rhythm around your energy.",
+      "Your Role in the Team: You are the spark, the voice, the momentum. You help others believe in a bold direction and act with confidence. But without the right ecosystem, you may exhaust yourself, or others, before results appear.",
+      "Best Collaborators for You:",
+      "• Facilitators (5): They ground your energy and help translate urgency into steady action.",
+      "• Coordinators (6): They help build process and prioritisation around your activity.",
+      "• Optimisers (8): They help you evolve ideas into sustainable frameworks.",
+      "Tips for Working with All 8 Profiles:",
+      "• Be mindful of quieter profiles (7 & 6) who may process at a different speed.",
+      "• Use your influence to amplify other voices, not just your own.",
+      "• Invite feedback early, especially from those with grounding or refining energy."
+    ],
+    "developmentRecommendations": [
+      "The most effective Catalysts aren’t just energetic, they’re strategic. It’s not enough to lead with inspiration. Your development lies in learning when to hold space, when to push forward, and how to make energy scalable.",
+      "To Elevate Performance:",
+      "• Channel your passion into structured influence, don’t rely on charisma alone",
+      "• Define the “why now” behind your ideas and communicate it clearly",
+      "• Choose a system to track priorities and reduce mental clutter",
+      "Daily Anchors:",
+      "• Begin the day with one core outcome, not ten ideas",
+      "• Journal moments when your energy made a measurable difference",
+      "• Schedule pause moments to assess impact vs. pace",
+      "Workshop Reflection Prompts:",
+      "1. What happens when I lose momentum, do I disengage or react?",
+      "2. Am I creating clarity, or just movement?",
+      "3. Who helps me convert my energy into lasting change?",
+      "4. What’s the legacy of my leadership in this season?"
+    ],
+    "holdingBack": [
+      "Even high-energy profiles like the Catalyst can face plateaus. Sometimes you overcommit, other times you speed past signs that a team or project isn’t ready. This section helps you spot what’s slowing you down or spreading you too thin.",
+      "Weekly Check-In Prompts:",
+      "• Where did I create traction this week?",
+      "• What message or movement did I push too fast?",
+      "• What feedback did I ignore, or delay responding to?",
+      "Monthly Calibration Metrics:",
+      "• % of meetings where I created buy-in or alignment",
+      "• Top 3 moments I led energy or belief in others",
+      "• Number of unfinished initiatives still demanding energy"
+    ],
+    "closingThoughts": []
+  },
+  "PROFILE_3": {
+    "display": "Motivator",
+    "title": "The Motivator",
+    "role": "Heart",
+    "frequency": "Influence (B)",
+    "coreTraits": "Empathetic, expressive, relationship-focused, supportive, inspiring",
+    "idealEnvironment": "Collaborative, communicative, emotionally attuned teams",
+    "youMayHaveBeenCalled": "the heart of the team, the culture carrier, the listener, the encourager",
+    "famousExamples": "Brené Brown, Howard Schultz (Starbucks), Sheryl Sandberg (Meta), Jacinda Ardern",
+    "profileInDepth": [
+      "Motivators are the relational engine of any group. You create connection, build trust, and often act as the glue that holds people together during both calm and chaos. You may not always be the loudest voice, but your presence is felt because you genuinely care about how others feel, engage, and succeed.",
+      "Your superpower is empathy in action. People open up to you. You’re a natural listener, coach, and encourager. You’re often the first to welcome someone in, check in on someone quietly struggling, or speak up for the needs others didn’t express.",
+      "Workshop Reflection Questions",
+      "• When do I feel most valued in a team setting?",
+      "• How do I handle emotional tension, do I absorb, deflect, or resolve?",
+      "• What spaces give me the freedom to connect and express openly?",
+      "• Do I sometimes say yes to avoid conflict or keep harmony?"
+    ],
+    "energyMatrix": [
+      "As a Motivator, your performance energy is shaped by people. You thrive in environments where emotional connection, clear communication, and collaboration are valued. You’re the voice that calms, lifts, and brings cohesion to groups. But you can also become emotionally over-invested or pulled in too many directions if boundaries aren’t in place.",
+      "You sit between the Catalyst (A-B) and Connector (B-C) profiles. From the Catalyst, you draw contagious energy and inspiration. From the Connector, you absorb empathy and intuition. Your sweet spot is morale, motivation, and emotional leadership.",
+      "MOTIVATOR ENERGY MATRIX",
+      "Zone Catalyst (2) Motivator (3 - You) Connector (4)",
+      "Momentum, Connection, Drive Harmony, timing influence belonging",
+      "Boosting Inspiring others to Sensing needs and Strength confidence and act building bridges unity",
+      "Over-committing Avoiding conflict or Challenge Staying consistent emotionally stagnation",
+      "Responds Support Style Energises outwardly Supports internally empathetically",
+      "Interpersonal Team Role Igniter Morale leader integrator",
+      "Tip: You’re most effective when paired with structured profiles (6: Coordinator or 8: Optimiser) to help you channel your relational energy toward outcomes."
+    ],
+    "teamRoleFit": [
+      "Motivators are the emotional glue in teams. They build confidence, foster connection, and help others feel seen. But motivation alone isn’t enough, it needs to be paired with awareness, boundaries, and consistency.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "Motivators hold the emotional rhythm of a team. You bring consistency, heart, and cohesion. But to thrive in this role, you must balance people-care with personal clarity. Set boundaries. Say no when needed.",
+      "Your best partnerships come from working with vision-driven or detail-focused profiles. You bring the soul, they bring the structure. Together, you build teams that don’t just perform, but care."
+    ],
+    "valueCreationPathway": [
+      "You create value by making people feel seen, heard, and capable. While others may focus on output or process, your greatest contributions come from engagement, building the emotional momentum that allows teams to perform at their best.",
+      "Whether mediating team tensions, offering encouragement, or bringing calm in chaos, you foster an environment where people believe in themselves and each other. Your presence enables others to thrive.",
+      "Real-World Examples of Motivator Contribution:",
+      "• Brené Brown shares vulnerability as a leadership strength, encouraging leaders to lead with heart, not just strategy.",
+      "• Sheryl Sandberg, through initiatives like Lean In, has empowered countless professionals to feel heard, valued, and supported.",
+      "You deliver your best value when:",
+      "• Helping team members unlock their potential",
+      "• Creating clarity and confidence in difficult conversations",
+      "• Rebuilding morale in challenging situations",
+      "You build trust when:",
+      "• You speak truth with kindness",
+      "• You honour emotions without letting them take over",
+      "• You back encouragement with accountability",
+      "You leverage value when:",
+      "• You partner with strategic thinkers and operational leads",
+      "• You connect morale building with team objectives",
+      "• You embed psychological safety into outcomes, not just culture"
+    ],
+    "collaborationTips": [
+      "Motivators thrive when surrounded by a variety of energy types. You don’t need to lead the room, you lead through connection. Your collaboration sweet spot is partnering with people who balance structure, action, and strategy while respecting your relational lens.",
+      "Your Role in the Team: You’re the one who asks, \"How is everyone really doing?\" You help resolve invisible tension, lift team energy, and spot what’s unsaid but deeply felt. You're also a vital link between the voices in the room and the heart of the mission.",
+      "Best Collaborators for You:",
+      "• Visionary (1): For direction and inspiration",
+      "• Facilitator (5): For emotional pacing and steadiness",
+      "• Coordinator (6): For structure and reliability",
+      "Tips for Working with All Profiles:",
+      "• With high-speed profiles (1, 2): Ask for clarity and pacing without feeling ‘slow’",
+      "• With detailed profiles (6, 7): Align emotionally before focusing on precision",
+      "• With quiet profiles (4, 7): Give space and check in gently, don’t fill every silence"
+    ],
+    "developmentRecommendations": [
+      "Your strength in connection is powerful, but unrefined empathy can lead to emotional fatigue or blurred boundaries. This section helps you shift from automatic support to intentional, strategic influence.",
+      "To Elevate Performance:",
+      "• Establish clear agreements with yourself and your team: what’s yours to carry, and what’s not",
+      "• Create feedback loops with other profiles so you don’t carry emotional data alone",
+      "• Know when to speak up and when to step back",
+      "Daily Anchors:",
+      "• Begin with a check-in: how are you, not just how are they?",
+      "• Debrief emotionally intense days with a trusted peer or mentor",
+      "• Practice saying “no” with compassion, not guilt",
+      "Workshop Reflection Prompts:",
+      "• When did I last support someone well, and what made it sustainable?",
+      "• How do I protect my own wellbeing while being available to others?",
+      "• Am I trusted for my consistency, not just my kindness?",
+      "• What personal boundaries strengthen my leadership?"
+    ],
+    "holdingBack": [
+      "You may be holding emotional weight you don’t need to carry. Sometimes, your empathy becomes over-functioning. You prioritise relationships so strongly that tasks, performance, or self-care get deprioritised.",
+      "This section is a quick weekly and monthly pulse-check to keep your rhythm aligned.",
+      "Weekly Check-In Prompts:",
+      "• Where did I say yes when I meant no?",
+      "• Whose emotions am I carrying that I need to release?",
+      "• Did I model boundaries, or only encouragement?",
+      "Monthly Calibration Metrics:",
+      "• % of time spent in 1:1s, team dialogue, or emotional labour",
+      "• Number of situations where I mediated or supported morale",
+      "• One boundary I upheld this month that protected my energy"
+    ],
+    "closingThoughts": []
+  },
+  "PROFILE_4": {
+    "display": "Connector",
+    "title": "The Connector",
+    "role": "Bridge",
+    "frequency": "Influence + Implementation (B-C)",
+    "coreTraits": "Empathetic, observant, timing-sensitive, trusted, intuitive communicator",
+    "idealEnvironment": "Collaborative, values-driven teams with responsive leadership",
+    "youMayHaveBeenCalled": "the people whisperer, the translator, the empathic leader, the harmoniser",
+    "famousExamples": "Michelle Obama, Satya Nadella (Microsoft), Angela Merkel, Malala Yousafzai",
+    "profileInDepth": [
+      "Connectors are the human bridge between intention and action. You have a natural gift for sensing not only what people need, but when they need it. You don’t force connection, you create space for it. Your relational energy is warm and steady, making others feel safe and seen, while your practical instincts mean you know how to move things forward with care and accuracy.",
+      "You’re often the person people turn to when there’s tension in the room, or confusion in the workflow. You speak up not for visibility, but for clarity and cohesion. You translate vision into connection, and connection into momentum.",
+      "Merkel, Malala Yousafzai.",
+      "Connectors often hold relationships, timing, and delivery in harmony. But because you work subtly, your strengths can go unnoticed, even by yourself. To deepen",
+      "your self-awareness and leadership impact, use the prompts below to reflect on how you show up and where you can refine your influence."
+    ],
+    "energyMatrix": [
+      "As a Connector, your energy is relational and responsive. You sense when to step in and when to hold space. You don’t impose structure, you observe the emotional and social flow, then act with precision. Your work is rarely loud, but it’s deeply impactful.",
+      "You sit between the Motivator and Facilitator profiles. From the Motivator, you draw emotional insight and expressive energy. From the Facilitator, you share an instinct for timing, grounded presence, and calm leadership.",
+      "CONNECTOR ENERGY MATRIX",
+      "Zone Motivator (3) Connector (4 - You) Facilitator (5)",
+      "Connection through Stability and team Drive Emotional uplift clarity rhythm",
+      "Building morale and Creating alignment Sensing timing and Strength openness across needs environment",
+      "Overcommitment to Underestimating Avoiding direct Challenge others influence confrontation",
+      "Energises with Aligns with empathy Grounds with calm Support Style emotion and timing structure",
+      "Relationship Team Role Morale builder Harmonic stabiliser integrator",
+      "Tip: You work best with direct yet sensitive collaborators, those who value connection and bring structure, such as Coordinators (6), Facilitators (5), and Optimisers (8)."
+    ],
+    "teamRoleFit": [
+      "Connectors are the relational glue in teams. You create trust between people and help projects succeed by aligning communication, timing, and needs. This section uses a quadrant-based view to explore how your natural strengths and relational instincts show up, and where you can grow your influence even further.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "As a Connector, your power lies in alignment. You see what others need, often before they realise it. But lasting alignment requires clarity, not just compassion.",
+      "You thrive when paired with Catalysts or Coordinators, balancing movement and structure. Protect your own energy as much as you protect others’."
+    ],
+    "valueCreationPathway": [
+      "Connectors create value by turning understanding into alignment. You take insight about people, their needs, frustrations, timing, and bring them together in a way that creates shared progress. You make people feel part of something. That feeling alone can increase trust, motivation, and retention.",
+      "Real-World Examples of Connector Energy in Action:",
+      "• Michelle Obama, a powerful example of grace, timing, advocacy, and inclusion. She builds consensus through empathy and message clarity.",
+      "• Satya Nadella, CEO of Microsoft, is known for turning one of the world’s most technical companies into one of the most emotionally intelligent cultures.",
+      "You deliver your best value when:",
+      "• Guiding conversations across emotional, cultural, or strategic gaps",
+      "• Acting as the conscience or compass in a growing organisation",
+      "• Supporting transitions where sensitivity and people-knowledge matter",
+      "You build trust when:",
+      "• You name the quiet truths with calm clarity",
+      "• You support without absorbing",
+      "• You remain consistent in timing and tone",
+      "You leverage value when:",
+      "• You link people who need each other but can’t find the words",
+      "• You embed emotional intelligence into structure, not just culture",
+      "• You act before things break, because you saw it coming"
+    ],
+    "collaborationTips": [
+      "You thrive in teams where emotional awareness and mutual respect are alive. You do not seek the spotlight, but you are often the bridge that allows others to share it. Effective collaboration for you isn’t about structure, it’s about presence, alignment, and subtle momentum.",
+      "Your Role in the Team: You create glue. You intuitively sense where there are gaps, in process, communication, or trust, and you gently build the bridges to close them. You influence through timing, empathy, and clarity, not volume.",
+      "Best Collaborators for You:",
+      "• Facilitator (5): For calm and pacing",
+      "• Coordinator (6): For clarity and follow-through",
+      "• Motivator (3): For emotional backup and morale",
+      "Tips for Working with All Profiles:",
+      "• With Visionaries or Catalysts (1, 2): Let them lead but gently translate their fast vision into people-aligned messages",
+      "• With Controllers or Optimisers (7, 8): Offer insight when needed, but know they value precision over pace, give them structure",
+      "• With other Connectors, Motivators, or Facilitators (3–5): Balance empathy with action, don’t drown in compassion without movement"
+    ],
+    "developmentRecommendations": [
+      "You bring harmony, but harmony isn’t always the goal. Sometimes growth needs disruption, and clarity needs challenge. Your development lies in honouring your gift for connection while building the courage to step into discomfort when it matters.",
+      "To Elevate Performance:",
+      "• Practise naming tension early before it turns into disconnection",
+      "• Trust that your voice adds value, even when you’re not 100% ready",
+      "• Let others carry emotional weight too, it’s not all yours",
+      "Daily Anchors:",
+      "• Ask yourself: “What needs to be said today that hasn’t been?”",
+      "• Build one habit that structures your follow-through",
+      "• Identify one area where you’re holding back for fear of conflict",
+      "Workshop Reflection Prompts:",
+      "• What is my impact when I speak up early versus when I delay?",
+      "• Where am I creating harmony at the cost of clarity?",
+      "• When do I listen too long instead of responding?",
+      "• How can I develop more influence without losing empathy?"
+    ],
+    "holdingBack": [
+      "Sometimes your desire to support and protect others leads to avoidance. You may prioritise stability over progress, or peace over possibility. Without reflection, this can quietly limit your influence and create internal burnout.",
+      "Use this section to self-audit and rebalance.",
+      "Weekly Check-In Prompts:",
+      "• What emotional weight am I carrying for the team?",
+      "• Where am I compromising too often?",
+      "• What’s one thing I noticed but didn’t say?",
+      "Monthly Calibration Metrics:",
+      "• Number of times I redirected confusion or conflict constructively",
+      "• % of team discussions where I contributed a bridge or resolution",
+      "• One opportunity this month where I influenced direction without needing credit"
+    ],
+    "closingThoughts": []
+  },
+  "PROFILE_5": {
+    "display": "Facilitator",
+    "title": "The Facilitator",
+    "role": "Grounder",
+    "frequency": "Implementation (C)",
+    "coreTraits": "Grounded, responsive, empathetic, calm under pressure, steady presence",
+    "idealEnvironment": "Consistent, values-driven teams with space to support others.",
+    "youMayHaveBeenCalled": "the calm one, the team rock, the trusted listener, the reliable one",
+    "famousExamples": "Mary Barra (GM), Fred Rogers (Mr. Rogers), Susan Cain, Ruth Bader Ginsburg",
+    "profileInDepth": [
+      "Facilitators are the emotional and operational stabilisers in high-functioning teams. You work behind the scenes to keep momentum steady, manage interpersonal balance, and ensure the right things happen at the right time. You’re not reactive, you’re responsive. You don’t dominate the room, you steady it.",
+      "While others may charge forward or step into the spotlight, you’re observing, guiding, and creating the environment where others can thrive. That quiet leadership is your power.",
+      "Cain, and Ruth Bader Ginsburg.",
+      "Facilitators often find themselves carrying more emotional labour than they realise. To truly step into your leadership potential, you need to honour your",
+      "instincts and boundaries equally. Trust that your presence is powerful, especially when paired with a clear voice and strong alignment."
+    ],
+    "energyMatrix": [
+      "As a Facilitator, your energy is deeply attuned to others. You read the emotional undercurrents of a group. You feel when to pause, when to move, and how to maintain a sustainable team tempo. Your energy isn’t fast or forceful, it’s responsive, reliable, and relational.",
+      "You sit between the Connector and Coordinator profiles. From the Connector, you inherit people-awareness and sensitivity. From the Coordinator, you share a grounding in process, detail, and delivery. Your strength is bridging what people need and what systems require, quietly, calmly, and with conviction.",
+      "FACILITATOR ENERGY MATRIX",
+      "Zone Connector (4) Facilitator (5 - You) Coordinator (6)",
+      "Connection and Team stability and Drive Structure and clarity timing care",
+      "Translating human Creating safe and Implementing Strength needs steady space repeatable systems",
+      "Absorbing too much Rigidity or resistance Challenge Avoiding discomfort responsibility to change",
+      "Empathetic and Grounded and Logical and Support Style present calming systematic",
+      "Emotional and Planning and delivery Team Role Relationship guide operational anchor lead",
+      "Tip: You’re most energised in teams that value steady progress over flashy wins. You don’t chase status, you protect the people and the process."
+    ],
+    "teamRoleFit": [
+      "Facilitators keep teams grounded and centred. You help others move forward by creating a sense of rhythm, fairness, and consistency. This section explores your stabilising role in a team using a quadrant-based view, so you can sharpen your presence and influence with clarity.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "Facilitators make workplaces humane. You hold the middle. But don’t let the middle hold you back.",
+      "To grow, pair with Visionaries or Controllers who bring ideas and structure. Your magic is turning chaos into care, but you must care for yourself too."
+    ],
+    "valueCreationPathway": [
+      "Facilitators create value by holding the space that allows others to rise. You build a culture where clarity, trust, and safety grow. That is not passive, it’s leadership in its most grounded form.",
+      "Real-World Examples of Facilitator Energy in Action:",
+      "• Susan Cain, championing the power of quiet in work and leadership",
+      "• Mary Barra, CEO of GM, known for calm resolve and clear team communication",
+      "You deliver your best value when:",
+      "• Teams are misaligned and need steady recalibration",
+      "• People need emotional safety and thoughtful guidance",
+      "• Change or crisis requires level-headed continuity",
+      "You build trust when:",
+      "• You speak simply and consistently",
+      "• You make space for others while knowing your own limits",
+      "• You bring emotional depth to logical execution",
+      "You leverage value when:",
+      "• You insert rhythm into workflow and pace",
+      "• You lead transitions, coaching moments, and debriefs",
+      "• You offer feedback without overpowering"
+    ],
+    "collaborationTips": [
+      "You collaborate best in calm, relational teams where trust is built over time. You don't need speed, you need space. Your role is not to lead every discussion, but to shape its tone and rhythm. When paired with stronger directional energy, you help balance out urgency with presence.",
+      "Your Role in the Team: You create emotional and operational stability. You hold space, ensure needs are heard, and help teams land on solid ground before they take off again.",
+      "Best Collaborators for You:",
+      "• Connector (4): Matches your relational pace and supports your intuition",
+      "• Coordinator (6): Brings structure that complements your steadiness",
+      "• Motivator (3): Adds morale and energy to your stability",
+      "Tips for Working with All Profiles:",
+      "• With fast-paced profiles (1, 2): Ask for clarity and planning to avoid burnout",
+      "• With high-detail profiles (6, 7): Provide human context and rhythm so systems serve people",
+      "• With other calm profiles (4, 8): Make sure there's direction as well as depth"
+    ],
+    "developmentRecommendations": [
+      "Your development edge is learning to lead not just through presence, but through voice. You don’t need to change your rhythm, you just need to know how powerful it already is. Speaking from that place is where your influence expands.",
+      "To Elevate Performance:",
+      "• Practise using your voice to reset tension, not just absorb it",
+      "• Lead meetings or touchpoints where your energy sets the tone",
+      "• Know when to anchor and when to challenge, even gently",
+      "Daily Anchors:",
+      "• Set boundaries and reflect on what’s yours to carry",
+      "• Protect quiet thinking time so your wisdom doesn’t get lost",
+      "• Start each day by checking in on who needs your steadiness most",
+      "Workshop Reflection Prompts:",
+      "• Where am I providing support when I could be guiding?",
+      "• What does assertiveness look like for me?",
+      "• What message do I need to share, even if it feels uncomfortable?",
+      "• How does my presence influence energy in the room?"
+    ],
+    "holdingBack": [
+      "Your greatest strength, being the grounded one, can sometimes become your trap. You may put others first too often, avoid discomfort, or silence your intuition to maintain peace. These reflection prompts are designed to help you find your true centre.",
+      "Weekly Check-In Prompts:",
+      "• What emotional energy am I carrying that’s not mine?",
+      "• Where am I waiting instead of acting?",
+      "• What conversation am I delaying?",
+      "Monthly Calibration Metrics:",
+      "• Number of times I offered steadiness or resolution in tension",
+      "• One moment I chose voice over comfort this month",
+      "• Percentage of meetings or interactions where I stayed centred"
+    ],
+    "closingThoughts": []
+  },
+  "PROFILE_6": {
+    "display": "Coordinator",
+    "title": "The Coordinator",
+    "role": "Planner",
+    "frequency": "Implementation + Insight (C-D)",
+    "coreTraits": "Structured, practical, detail-oriented, dependable, plan-driven",
+    "idealEnvironment": "Stable, organised teams that value planning and consistency",
+    "youMayHaveBeenCalled": "the planner, the organiser, the safe pair of hands, the follow-through expert",
+    "famousExamples": "Indra Nooyi (PepsiCo), Tim Cook (Apple), Angela Ahrendts (Burberry/Apple), and Ngozi Okonjo-Iweala (WTO)",
+    "profileInDepth": [
+      "Coordinators are the taskmasters and operational planners of successful teams. You know how to turn vision into action. You thrive when there are processes to improve, timelines to manage, and people to keep on track. While some profiles chase energy or ideas, you bring calm through clarity.",
+      "You’re often the person others rely on when things are vague or messy. You provide not just structure, but reassurance that structure will be followed. You aren’t seeking control, you’re providing certainty. Your work clears the fog so others can move.",
+      "Ahrendts (Burberry/Apple), and Ngozi Okonjo-Iweala (WTO).",
+      "Coordinators often lead without needing the limelight. But that doesn’t mean you should fade into the background. Your challenge is to own your influence and step forward when leadership needs a grounded, consistent presence."
+    ],
+    "energyMatrix": [
+      "As a Coordinator, your energy is structured and intentional. You operate best when there is a clear plan, predictable outcomes, and a logical sequence of steps to follow. Your ability to track moving parts and organise complex efforts makes you the backbone of team delivery.",
+      "You sit between the Facilitator and Controller profiles. From the Facilitator, you share a sense of timing and team awareness. From the Controller, you gain focus, precision, and a need for order. Your rhythm shines in environments where predictability and pace must align.",
+      "COORDINATOR ENERGY MATRIX",
+      "Zone Facilitator (5) Coordinator (6 - You) Controller (7)",
+      "Team harmony and Execution and Drive Accuracy and control pacing consistency",
+      "Risk mitigation and data Strength Stabilising team flow Planning and delivery clarity",
+      "Avoiding Over-reliance on Challenge Over-analysis or rigidity confrontation systems",
+      "Support Calm and Organised and Directive and structured Style collaborative dependable",
+      "Supportive rhythm Team Role Operational organiser Systems enforcer setter",
+      "Tip: Your greatest impact is felt when others understand how to collaborate with your process, not just your results."
+    ],
+    "teamRoleFit": [
+      "Coordinators bring structure, tracking, and order to teams. You’re the steady hands that help vision become reality. The quadrant-based view will help you reflect on how your planning and process skills are seen, and how you can own them more confidently.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "You help teams breathe. Your gift is repeatability, accountability, and structure. You thrive when paired with vision-led or people-led profiles.",
+      "Own your voice, systems leadership isn’t second-tier. It’s foundational."
+    ],
+    "valueCreationPathway": [
+      "Coordinators create value through execution excellence. You’re the one who makes sure the vision happens, the client is informed, the spreadsheet is updated, and nothing slips through the cracks.",
+      "Real-World Examples of Coordinator Energy in Action:",
+      "• Tim Cook, CEO of Apple, transformed logistics and delivery to scale one of the most valuable companies in history",
+      "• Indra Nooyi led PepsiCo through complex global growth with strategic clarity and steady leadership",
+      "You deliver your best value when:",
+      "• Systems are needed to scale people, teams, or processes",
+      "• Consistency is more important than charisma",
+      "• Visibility is less valuable than reliability",
+      "You build trust when:",
+      "• You create visible clarity others can depend on",
+      "• You take responsibility without being controlling",
+      "• You follow through on even the smallest commitments",
+      "You leverage value when:",
+      "• You partner with fast-moving visionaries who need delivery partners",
+      "• You optimise systems for efficiency, not just maintenance",
+      "• You help people understand their part in the bigger picture"
+    ],
+    "collaborationTips": [
+      "You collaborate best when others respect the process and follow through. You don’t need micromanagement or chaos, you need aligned expectations, a plan to follow, and partners who don’t overpromise and underdeliver.",
+      "Your Role in the Team: You’re the anchor that allows others to take risks. Your structure is what lets creative, relational, and visionary profiles operate with more freedom.",
+      "Best Collaborators for You:",
+      "• Visionary (1): For ideas that need grounding",
+      "• Facilitator (5): For rhythm and presence",
+      "• Optimiser (8): For refining systems with precision",
+      "Tips for Working with All Profiles:",
+      "• With visionary types (1, 2): Set timelines early and agree on boundaries for flexibility",
+      "• With people-focused types (3, 4): Clarify expectations, don’t assume they know the plan",
+      "• With detail-driven types (7, 8): Align early so you aren’t duplicating systems"
+    ],
+    "developmentRecommendations": [
+      "Your challenge isn’t doing more, it’s letting go. Great Coordinators build systems that empower others, not systems that make others depend on them. Growth comes when you shift from being the manager of everything to the enabler of high-functioning flow.",
+      "To Elevate Performance:",
+      "• Build systems that others can maintain",
+      "• Focus on clarity more than control",
+      "• Trust that others may do things differently, and still succeed",
+      "Daily Anchors:",
+      "• Prioritise communication just as much as tracking",
+      "• Ask once per day: “Who needs visibility into this?”",
+      "• Share the ‘why’ behind your process, not just the what",
+      "Workshop Reflection Prompts:",
+      "• What am I holding onto that someone else could own?",
+      "• Where is structure serving people, and where is it limiting them?",
+      "• What would it look like to trust my influence, not just my spreadsheets?",
+      "• Where can I simplify or automate without losing control?"
+    ],
+    "holdingBack": [
+      "Your value lies in consistency, but your growth lies in flexibility. You may over-engineer solutions, take on too much silently, or let frustration build when others move too fast or loose.",
+      "Use these prompts to stay clear, centred, and sustainable.",
+      "Weekly Check-In Prompts:",
+      "• What system or process needs updating this week?",
+      "• Where am I holding on too tightly?",
+      "• Who have I supported silently but not communicated with?",
+      "Monthly Calibration Metrics:",
+      "• Number of check-ins that created clarity this month",
+      "• % of tasks owned vs. shared",
+      "• One process I simplified or delegated this month"
+    ],
+    "closingThoughts": []
+  },
+  "PROFILE_7": {
+    "display": "Controller",
+    "title": "The Controller",
+    "role": "Analyst",
+    "frequency": "Insight (D)",
+    "coreTraits": "Analytical, consistent, systems-focused, detail-driven, independent",
+    "idealEnvironment": "Structured, logic-based teams that value clarity and precision",
+    "youMayHaveBeenCalled": "the quality control, the systems thinker, the risk spotter, the spreadsheet genius",
+    "famousExamples": "Angela Merkel, Warren Buffett, Katherine Johnson (NASA), and Jeff Bezos",
+    "profileInDepth": [
+      "Controllers are the gatekeepers of quality. You see risks before they become problems and find inconsistencies that could lead to breakdowns. You bring a level of rigour that ensures teams stay accountable, focused, and aligned with what matters most.",
+      "Where others may rely on gut instinct or rapid energy, you trust in patterns, logic, and careful analysis. You don’t just solve problems, you prevent them. And you don’t just correct errors, you design systems that stop them happening again.",
+      "Controllers often hold a high bar, and sometimes don’t realise just how high. You are most effective when your voice is heard early in the process, not just when something goes wrong. Learning to communicate your insights without overwhelming others is one of your most powerful growth edges."
+    ],
+    "energyMatrix": [
+      "As a Controller, your energy is measured, deliberate, and structured. You don’t move for the sake of movement, you act when the data makes sense, the risk is managed, and the outcome is defensible. Your consistency, logic, and depth of analysis provide a solid foundation that teams rely on to make quality decisions.",
+      "You sit between the Coordinator and Optimiser profiles. From the Coordinator, you share an affinity for process and delivery. From the Optimiser, you borrow systems thinking and a desire to improve through data and insight. Your rhythm shines in environments that demand both rigour and responsibility.",
+      "CONTROLLER ENERGY MATRIX",
+      "Zone Coordinator (6) Controller (7 - You) Optimiser (8)",
+      "Accuracy and System Drive Reliable execution control improvement",
+      "Planning and Analytical depth Designing scalable Strength tracking and foresight solutions",
+      "Inflexibility or Over-analysis and Perfectionism or Challenge over-planning rigidity isolation",
+      "Dependable and Precise and Logical and Support Style clear thorough structured",
+      "Quality control and Team Role Delivery coordinator System enhancer risk assessor",
+      "Tip: You’re most energised when working independently within a trusted structure, especially if your expertise is respected and your standards are matched."
+    ],
+    "teamRoleFit": [
+      "Controllers are the protectors of detail, data, and integrity. You focus on what’s true, measurable, and accountable. This quadrant-based view helps you see where your analytical gifts shine, and where to soften to increase impact.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "Controllers see what others miss. Your value is depth and discernment, but don’t isolate behind analysis. Build with, not just against. Collaborate with Visionaries and Connectors to translate rigour into relevance."
+    ],
+    "valueCreationPathway": [
+      "Controllers create value by identifying what could go wrong, and building systems so it doesn’t. You offer assurance, clarity, and accountability. You stop problems before they happen and help teams scale by refining the way they work.",
+      "Real-World Examples of Controller Energy in Action:",
+      "• Warren Buffett’s long-game investment strategy, based on precision, discipline, and pattern recognition",
+      "• Katherine Johnson (NASA), whose maths and checks underpinned the success of the US space program",
+      "You deliver your best value when:",
+      "• Others are unsure what’s real, reliable, or safe",
+      "• The organisation is growing fast and needs more structure",
+      "• A critical system or product is being built",
+      "You build trust when:",
+      "• You speak with logic and care, not just correctness",
+      "• You give others confidence in the data, decision, or plan",
+      "• You manage your perfectionism with prioritisation",
+      "You leverage value when:",
+      "• You share your observations early enough to shape direction",
+      "• You partner with visionary, relational, or implementation profiles to balance speed with rigour",
+      "• You develop systems that others can understand and maintain"
+    ],
+    "collaborationTips": [
+      "You collaborate best when there are clear expectations, respect for process, and space for independent work. You bring substance to the conversation, not surface talk. You value outcomes that are repeatable, trackable, and grounded in reality.",
+      "Your Role in the Team: You are the team’s quality compass. You assess, advise, and improve. You may not always be loud, but when you speak, your input helps ensure work is thorough and resilient.",
+      "Best Collaborators for You:",
+      "• Visionary (1): To provide big ideas you can ground",
+      "• Coordinator (6): To align with your structure and rhythm",
+      "• Optimiser (8): To sharpen and refine systems alongside you",
+      "Tips for Working with All Profiles:",
+      "• With fast-paced types (1, 2): Offer process, not pushback",
+      "• With people-led profiles (3, 4): Acknowledge emotion while keeping logic clear",
+      "• With flexible or vague leaders: Ask clear questions to get the clarity you need"
+    ],
+    "developmentRecommendations": [
+      "Growth for Controllers comes not from doing more, but from showing up earlier. Your logic and structure are powerful, but they must be shared proactively, not reactively. Speak when your instincts notice the gap, not just when it’s too late to fix it.",
+      "To Elevate Performance:",
+      "• Contribute to planning, not just editing or reviewing",
+      "• Let go of being right in favour of creating clarity",
+      "• Share context for your high standards, help others understand your why",
+      "Daily Anchors:",
+      "• Share one insight each day with a teammate, even if it feels obvious",
+      "• Choose clarity over perfection, what’s 80% good enough?",
+      "• Invite others to stress-test your ideas so they grow too",
+      "Workshop Reflection Prompts:",
+      "• What’s one insight I’m sitting on that could help someone now?",
+      "• What would more visibility look like for my strengths?",
+      "• When does my need for correctness limit innovation?",
+      "• Where am I assuming others understand my logic, but they don’t?"
+    ],
+    "holdingBack": [
+      "Your strengths can become limits when you stop trusting others, overcompensate with systems, or let your need for proof delay your participation. These reflection questions will help you balance high standards with timely action.",
+      "Weekly Check-In Prompts:",
+      "• Where am I holding back feedback until it’s “perfect”?",
+      "• Where could I add value now, even with a partial answer?",
+      "• Who could benefit from a question I’m asking myself?",
+      "Monthly Calibration Metrics:",
+      "• Number of times I spoke up early in the process this month",
+      "• % of decisions where my insights shaped clarity or safety",
+      "• One process I improved with foresight and collaboration"
+    ],
+    "closingThoughts": []
+  },
+  "PROFILE_8": {
+    "display": "Optimiser",
+    "title": "The Optimiser",
+    "role": "Refiner",
+    "frequency": "Insight + Innovation (D-A)",
+    "coreTraits": "Analytical, creative, strategic, systems-oriented, precise",
+    "idealEnvironment": "Teams that value continuous improvement, thoughtful execution, and results that scale",
+    "youMayHaveBeenCalled": "the fixer, the behind-the-scenes strategist, the system builder, the efficiency expert",
+    "famousExamples": "Bill Gates, Ruth Bader Ginsburg, Marie Kondo, and Reed Hastings (Netflix)",
+    "profileInDepth": [
+      "Optimisers are problem-solvers at their core. You thrive on asking: How can this be better? You bring together logic and creativity to fix what’s broken, or to enhance what already works. You’re often the one refining, iterating, and improving silently while others move loudly.",
+      "You may work quietly, but your work speaks volumes. Others may not always see how much better something could be, but you do. And your ability to fine-tune at scale makes you one of the most valuable profiles in growing or complex organisations.",
+      "You don’t need attention, you need space. The more you’re trusted to work independently and improve what matters most, the more successful your team becomes."
+    ],
+    "energyMatrix": [
+      "As an Optimiser, your energy is thoughtful, deliberate, and future-oriented. You don’t chase movement, you engineer improvement. While others rush into action, you pause to evaluate, refine, and ensure the long-term solution is better than the quick fix.",
+      "You sit between the Controller and Visionary profiles. From the Controller, you gain structure, logic, and depth. From the Visionary, you borrow strategic insight and long-range thinking. You marry improvement with innovation.",
+      "OPTIMISER ENERGY MATRIX",
+      "Zone Controller (7) Optimiser (8 - You) Visionary (1)",
+      "Accuracy and Improvement and Possibility and Drive prevention innovation disruption",
+      "Strength Systems that protect Systems that scale Ideas that inspire",
+      "Perfectionism and Inconsistency or Challenge Over-analysis isolation impatience",
+      "Strategic Support Style Rigor and checks Vision and direction improvement",
+      "Ideator and change Team Role Quality enforcer Refiner and optimiser initiator",
+      "Tip: You’re most effective when given time and trust to improve things properly, without being forced to cut corners or rush excellence."
+    ],
+    "teamRoleFit": [
+      "Optimisers make good things better. You refine, systemise, and improve everything you touch. Using the quadrant-based model, this section helps you reflect on how your strength as a ‘completer-finisher’ shows up, and where it can grow.",
+      "In this section, we use the Johari Window, a powerful model for self-awareness and interpersonal understanding, to frame your team role through four critical dimensions:",
+      "• Open Area – What’s visible to both you and others",
+      "• Blind Spot – What others notice but you may not",
+      "• Hidden Area – What you know but tend to hold back",
+      "• Unknown Area – The unseen potential still to emerge",
+      "By viewing your natural contribution through these lenses, you can sharpen your strengths, anticipate friction, and build trust across any team or project.",
+      "THE FOUR QUADRANTS OF TEAM ROLE FIT",
+      "TEAM ROLE FIT INSIGHTS",
+      "You are the quiet force behind sustainable excellence. Partner with Catalysts for momentum and Coordinators for execution.",
+      "Don’t just fix, frame. Your value grows when others see your why, not just your what."
+    ],
+    "valueCreationPathway": [
+      "Optimisers create value by turning effort into excellence. You don’t just finish the job, you perfect it. While others chase novelty or speed, you ensure systems, processes, and strategies are continually refined to deliver better outcomes over time.",
+      "Real-World Examples of Optimiser Energy in Action:",
+      "• Bill Gates, whose post-launch work on Microsoft infrastructure made it one of the world’s most resilient tech ecosystems",
+      "• Marie Kondo, who built a global brand by refining how people organise, think, and live",
+      "You deliver your best value when:",
+      "• Something needs to evolve, not just work once, but work better",
+      "• A system is starting to break under growth or pressure",
+      "• A product, project, or team is ready for refinement and scale",
+      "You build trust when:",
+      "• You communicate not just what to improve, but why",
+      "• You balance your depth with empathy and timing",
+      "• You help others understand the implications of staying the same",
+      "You leverage value when:",
+      "• You work alongside bold visionaries, organised coordinators, and relational communicators",
+      "• You insert improvement loops into team habits",
+      "• You teach others to spot and solve issues, not just fix them"
+    ],
+    "collaborationTips": [
+      "You collaborate best when given space to think, respect for your depth, and a clear understanding of the problem to solve. You’re not interested in being the loudest voice, you want to bring the most useful solution.",
+      "Your Role in the Team: You are the system upgrader. You help others see what’s not working and offer a practical path to make it better. Your input raises the quality of everyone’s output.",
+      "Best Collaborators for You:",
+      "• Visionary (1): Brings big ideas you can refine into workable systems",
+      "• Controller (7): Matches your love for rigour, while checking your perfectionism",
+      "• Coordinator (6): Keeps momentum going while you make the system stronger",
+      "Tips for Working with All Profiles:",
+      "• With fast-paced types (1, 2): Agree on version one vs. version forever",
+      "• With emotional profiles (3, 4): Let them feel heard before refining the plan",
+      "• With structure-led types (6, 7): Balance responsibility without overloading each other"
+    ],
+    "developmentRecommendations": [
+      "Your development lies in knowing when “better” is actually good enough. You will always see ways to improve something, but growth comes from acting before things are perfect, and sharing your insights even when they’re still forming.",
+      "To Elevate Performance:",
+      "• Speak up sooner, improvement matters more than timing it perfectly",
+      "• Collaborate early rather than correcting later",
+      "• Trust that influence grows through contribution, not just results",
+      "Daily Anchors:",
+      "• Ask: What’s the most useful thing I can fix or improve today?",
+      "• Share an idea before it’s complete, get input, not just approval",
+      "• Close at least one loop daily, ship, finish, or deliver",
+      "Workshop Reflection Prompts:",
+      "• What is “good enough” for this project or moment?",
+      "• Where am I waiting when I could be acting?",
+      "• Who can support my strengths by helping move things forward?",
+      "• What’s the opportunity if I trust progress more than perfection?"
+    ],
+    "holdingBack": [
+      "Your strengths, depth, refinement, and systems thinking, can trap you when you go too far. Perfectionism, over-isolation, or reluctance to share early ideas may limit your influence.",
+      "Weekly Check-In Prompts:",
+      "• What am I refining that doesn’t need more work?",
+      "• What feedback loop am I avoiding?",
+      "• Where can I share something at 80% and let others build with me?",
+      "Monthly Calibration Metrics:",
+      "• Number of finished improvements vs. started ideas",
+      "• Times I asked for input before finalising a solution",
+      "• One system or process I delivered that simplified something complex"
+    ],
+    "closingThoughts": []
+  }
+};
+
+function getProfileContent(code?: string | null): ProfileBasedContent {
+  const normalized = String(code || "").toUpperCase();
+  return PROFILE_BASED_CONTENT[normalized] || PROFILE_BASED_CONTENT.PROFILE_1;
+}
+
 
 const DRIVER_COPY: Record<
   RhythmDriverKey,
@@ -725,6 +1963,7 @@ const REPORT_ASSETS = {
   frameworkVisual: "/org-graphics/tp-framework-visual.png",
   frequencyWheel: "/org-graphics/tp-frequency-wheel.png",
   rhythmPuzzle: "/org-graphics/rhythm-puzzle.png",
+  teamRoleFitVisual: "/org-graphics/tp-team-role-fit.png",
   icons: {
     welcome: "/icons/tp-welcome-from-chandell.png",
     howToUse: "/icons/tp-how-to-use-report.png",
@@ -937,7 +2176,7 @@ function SectionHeader(props: {
           <ReportAssetImage
             src={props.icon || ""}
             alt=""
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         ) : (
           props.icon || "✉"
@@ -1038,10 +2277,10 @@ function ProfileRadar(props: {
   percentages: Record<string, number>;
 }) {
   const labels = props.labels?.length ? props.labels : [];
-  const size = 520;
+  const size = 640;
   const cx = size / 2;
   const cy = size / 2;
-  const radius = 205;
+  const radius = 230;
   const max = 50;
 
   function point(i: number, valuePct: number) {
@@ -1077,8 +2316,8 @@ function ProfileRadar(props: {
       <div className="mt-4 flex justify-center rounded-2xl border border-slate-200 bg-slate-50 p-3">
         {labels.length ? (
           <svg
-            viewBox={`0 0 ${size} ${size}`}
-            className="h-auto w-full max-w-[520px]"
+            viewBox="-120 -80 880 800"
+            className="h-auto w-full max-w-[760px] overflow-visible"
           >
             {[10, 20, 30, 40, 50].map((ring) => (
               <polygon
@@ -1093,7 +2332,9 @@ function ProfileRadar(props: {
             ))}
             {labels.map((label, i) => {
               const p = axisPoint(i, 1);
-              const t = axisPoint(i, 1.17);
+              const t = axisPoint(i, 1.24);
+              const anchor = t.x > cx + 20 ? "start" : t.x < cx - 20 ? "end" : "middle";
+              const labelX = anchor === "start" ? t.x + 8 : anchor === "end" ? t.x - 8 : t.x;
               return (
                 <g key={label.code}>
                   <line
@@ -1104,11 +2345,11 @@ function ProfileRadar(props: {
                     stroke="rgba(15,23,42,0.12)"
                   />
                   <text
-                    x={t.x}
+                    x={labelX}
                     y={t.y}
-                    textAnchor="middle"
+                    textAnchor={anchor}
                     dominantBaseline="middle"
-                    fontSize="12"
+                    fontSize="11"
                     fontWeight="700"
                     fill="rgba(15,23,42,0.62)"
                   >
@@ -1346,6 +2587,671 @@ function HowToUseCards() {
   );
 }
 
+
+function ProfileTextBlocks(props: { blocks: string[]; className?: string }) {
+  return (
+    <div
+      className={cls(
+        "space-y-3 text-[13px] leading-[28px] text-[#313C52]",
+        props.className,
+      )}
+    >
+      {props.blocks.map((block, index) => {
+        const trimmed = String(block || "").trim();
+        if (!trimmed) return null;
+        const isBullet = trimmed.startsWith("•");
+        const isHeading =
+          !isBullet &&
+          trimmed.length < 90 &&
+          (trimmed.endsWith(":") || /^[A-Z0-9 &–—-]+$/.test(trimmed));
+
+        if (isHeading) {
+          return (
+            <h4
+              key={`${trimmed}-${index}`}
+              className="pt-2 text-[11px] font-extrabold uppercase leading-[18px] tracking-[1px] text-[#313C52]"
+            >
+              {trimmed}
+            </h4>
+          );
+        }
+
+        return (
+          <p
+            key={`${trimmed}-${index}`}
+            className={cls(isBullet && "pl-4")}
+          >
+            {trimmed}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+type EnergyMatrixTable = {
+  title: string;
+  headers: string[];
+  rows: Array<{ label: string; cells: string[] }>;
+  tip?: string;
+  reflectionPrompts?: string[];
+};
+
+const ENERGY_MATRIX_TABLES: Record<string, EnergyMatrixTable> = {
+  PROFILE_1: {
+    title: "Visionary Energy Matrix",
+    headers: ["Optimiser (8)", "Visionary (1 – You)", "Catalyst (2)"],
+    rows: [
+      { label: "Drive", cells: ["Refinement, systems and optimisation", "Innovation, strategic thinking and visibility", "Influence, momentum and activation"] },
+      { label: "Strength", cells: ["Improving existing ideas with precision", "Generating bold ideas and direction", "Inspiring action and building energy"] },
+      { label: "Challenge", cells: ["Depth and sustainable delivery", "Starting from scratch without structure", "Follow-through and detail"] },
+      { label: "Support Style", cells: ["Brings process and space to refine", "Needs structure and clarity to scale", "Needs stage and attention to activate"] },
+      { label: "Team Role", cells: ["Solution enhancer", "Vision setter", "Energy driver"] },
+    ],
+    tip: "A high-functioning team often includes all three energy zones. If an idea is struggling to come to life, check whether one of these zones is missing.",
+  },
+  PROFILE_2: {
+    title: "Catalyst Energy Matrix",
+    headers: ["Visionary (1)", "Catalyst (2 – You)", "Motivator (3)"],
+    rows: [
+      { label: "Drive", cells: ["Momentum, innovation and big-picture strategy", "Drive activation, connection and persuasion", "Empathy, uplift and people energy"] },
+      { label: "Strength", cells: ["Vision and strategic direction", "Energy, motivation and buy-in", "Morale building and team support"] },
+      { label: "Challenge", cells: ["Follow-through and focus", "Overcommitment and staying power", "Over-personalising challenges"] },
+      { label: "Support Style", cells: ["Needs a team to carry execution", "Needs structure to pace output", "Needs clarity in priorities"] },
+      { label: "Team Role", cells: ["Architect of direction", "Igniter of action", "Emotional and relational glue"] },
+    ],
+    tip: "Surround yourself with profiles who stabilise and ground your pace. Facilitators, Coordinators, and Optimisers bring implementation, rhythm, and refinement to your ideas.",
+  },
+  PROFILE_3: {
+    title: "Motivator Energy Matrix",
+    headers: ["Catalyst (2)", "Motivator (3 – You)", "Connector (4)"],
+    rows: [
+      { label: "Drive", cells: ["Activation and momentum", "Morale, belief and emotional energy", "Connection, timing and alignment"] },
+      { label: "Strength", cells: ["Gets people moving", "Keeps people encouraged and engaged", "Builds trust across needs"] },
+      { label: "Challenge", cells: ["Moving too fast", "Over-carrying other people’s emotions", "Avoiding direct tension"] },
+      { label: "Support Style", cells: ["Brings urgency", "Creates warmth and belief", "Adds clarity and relational structure"] },
+      { label: "Team Role", cells: ["Spark", "Morale builder", "Relationship bridge"] },
+    ],
+    tip: "Your best energy is protected when you encourage people without becoming responsible for everyone’s emotional state.",
+  },
+  PROFILE_4: {
+    title: "Connector Energy Matrix",
+    headers: ["Motivator (3)", "Connector (4 – You)", "Facilitator (5)"],
+    rows: [
+      { label: "Drive", cells: ["Emotional uplift", "Connection through clarity", "Stability and team rhythm"] },
+      { label: "Strength", cells: ["Building morale and openness", "Creating alignment across needs", "Sensing timing and environment"] },
+      { label: "Challenge", cells: ["Overcommitment to others", "Underestimating influence", "Avoiding direct confrontation"] },
+      { label: "Support Style", cells: ["Energises with emotion", "Aligns with empathy and timing", "Grounds with calm structure"] },
+      { label: "Team Role", cells: ["Morale builder", "Relationship integrator", "Harmonic stabiliser"] },
+    ],
+    tip: "You work best with direct yet sensitive collaborators, those who value connection and bring structure, such as Coordinators, Facilitators, and Optimisers.",
+  },
+  PROFILE_5: {
+    title: "Facilitator Energy Matrix",
+    headers: ["Connector (4)", "Facilitator (5 – You)", "Coordinator (6)"],
+    rows: [
+      { label: "Drive", cells: ["Relationship alignment", "Calm, safety and rhythm", "Planning, delivery and order"] },
+      { label: "Strength", cells: ["Translates needs", "Creates inclusive stability", "Tracks action and responsibilities"] },
+      { label: "Challenge", cells: ["Over-attuning to people", "Avoiding direct decisions", "Becoming too task-led"] },
+      { label: "Support Style", cells: ["Aligns with empathy", "Grounds with presence", "Supports through structure"] },
+      { label: "Team Role", cells: ["Bridge", "Grounder", "Planner"] },
+    ],
+    tip: "Your calm has the greatest impact when it is paired with clear decisions and visible follow-through.",
+  },
+  PROFILE_6: {
+    title: "Coordinator Energy Matrix",
+    headers: ["Facilitator (5)", "Coordinator (6 – You)", "Controller (7)"],
+    rows: [
+      { label: "Drive", cells: ["Stability and presence", "Operational clarity and delivery", "Accuracy and risk awareness"] },
+      { label: "Strength", cells: ["Keeps people steady", "Turns plans into outcomes", "Protects standards and quality"] },
+      { label: "Challenge", cells: ["Avoiding hard calls", "Over-owning execution", "Becoming too critical"] },
+      { label: "Support Style", cells: ["Creates calm", "Builds reliable process", "Tests logic and detail"] },
+      { label: "Team Role", cells: ["Grounder", "Planner", "Analyst"] },
+    ],
+    tip: "Your reliability is powerful, but it becomes leadership when you use it to create clarity, not just carry tasks.",
+  },
+  PROFILE_7: {
+    title: "Controller Energy Matrix",
+    headers: ["Coordinator (6)", "Controller (7 – You)", "Optimiser (8)"],
+    rows: [
+      { label: "Drive", cells: ["Delivery and coordination", "Precision, logic and accountability", "Systems improvement and refinement"] },
+      { label: "Strength", cells: ["Keeps work moving", "Spots risks and protects quality", "Improves what already exists"] },
+      { label: "Challenge", cells: ["Over-managing detail", "Perfectionism or rigidity", "Staying too long in refinement"] },
+      { label: "Support Style", cells: ["Creates practical order", "Applies standards", "Optimises systems"] },
+      { label: "Team Role", cells: ["Planner", "Analyst", "Refiner"] },
+    ],
+    tip: "Your strongest contribution is not just finding what is wrong; it is helping the team build safer, smarter, more reliable ways forward.",
+  },
+  PROFILE_8: {
+    title: "Optimiser Energy Matrix",
+    headers: ["Controller (7)", "Optimiser (8 – You)", "Visionary (1)"],
+    rows: [
+      { label: "Drive", cells: ["Accuracy and quality", "Improvement, systems and refinement", "Innovation and future possibility"] },
+      { label: "Strength", cells: ["Protects integrity", "Makes things work better", "Sees what could be created next"] },
+      { label: "Challenge", cells: ["Over-analysis", "Quietly refining for too long", "Starting without enough grounding"] },
+      { label: "Support Style", cells: ["Provides standards", "Improves structure", "Adds creative direction"] },
+      { label: "Team Role", cells: ["Analyst", "Refiner", "Strategist"] },
+    ],
+    tip: "You create the most value when you are trusted to refine, improve, and rebuild without being rushed out of your thinking process too early.",
+  },
+};
+
+function bulletText(text: string) {
+  return String(text || "").replace(/^•\s*/, "").trim();
+}
+
+function splitValueCreation(blocks: string[]) {
+  const examplesIndex = blocks.findIndex((x) => /real-world examples/i.test(x));
+  const deliverIndex = blocks.findIndex((x) => /you deliver your best value when/i.test(x));
+  const trustIndex = blocks.findIndex((x) => /you build trust when/i.test(x));
+  const leverageIndex = blocks.findIndex((x) => /you leverage value when/i.test(x));
+
+  const introEnd = examplesIndex >= 0 ? examplesIndex : blocks.length;
+  const intro = blocks.slice(0, introEnd).filter((x) => x && !x.startsWith("•"));
+
+  const examples = examplesIndex >= 0
+    ? blocks.slice(examplesIndex + 1, deliverIndex > examplesIndex ? deliverIndex : blocks.length).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+
+  const deliver = deliverIndex >= 0
+    ? blocks.slice(deliverIndex + 1, trustIndex > deliverIndex ? trustIndex : blocks.length).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+  const trust = trustIndex >= 0
+    ? blocks.slice(trustIndex + 1, leverageIndex > trustIndex ? leverageIndex : blocks.length).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+  const leverage = leverageIndex >= 0
+    ? blocks.slice(leverageIndex + 1).filter((x) => x.trim().startsWith("•")).map(bulletText)
+    : [];
+
+  return { intro, examples, deliver, trust, leverage };
+}
+
+function EnergyMatrixSection(props: {
+  profileCode: string;
+  profileName: string;
+  blocks: string[];
+}) {
+  const table = ENERGY_MATRIX_TABLES[props.profileCode] || ENERGY_MATRIX_TABLES.PROFILE_4;
+  const intro = props.blocks
+    .filter((block) => block && !block.startsWith("•"))
+    .slice(0, 2);
+  const prompts = table.reflectionPrompts || [
+    "How do I respond when team dynamics feel tense or unclear?",
+    "When do I feel most effective when aligning people, ideas, or plans?",
+    "Do I wait for permission to share what I see?",
+    "What systems help me protect my energy while supporting others?",
+    "Who brings structure that complements my natural style?",
+  ];
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[18px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      <h3 className="mt-[22px] text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+        {table.title}
+      </h3>
+
+      <div className="mt-[16px] overflow-x-auto rounded-[14px] border border-white/30 shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+        <table className="w-full min-w-[760px] border-collapse text-center text-[12px] leading-[20px] text-[#084595]">
+          <thead>
+            <tr>
+              <th className="w-[160px] border-r-4 border-white bg-[#16356D] px-4 py-6 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-white">
+                Zone
+              </th>
+              {table.headers.map((header) => (
+                <th
+                  key={header}
+                  className="border-r-4 border-white bg-[#4092C5] px-4 py-6 text-[11px] font-extrabold uppercase tracking-[1px] text-white last:border-r-0"
+                >
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {table.rows.map((row, rowIndex) => (
+              <tr key={row.label}>
+                <td className="border-r-4 border-t-4 border-white bg-[#B9C6D6] px-4 py-4 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-[#16356D]">
+                  {row.label}
+                </td>
+                {row.cells.map((cell, cellIndex) => (
+                  <td
+                    key={`${row.label}-${cellIndex}`}
+                    className={cls(
+                      "border-r-4 border-t-4 border-white px-4 py-4 last:border-r-0",
+                      rowIndex % 2 === 0 ? "bg-[#CFE4F3]" : "bg-[#BFD3E6]",
+                    )}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {table.tip ? (
+        <div className="mt-[22px] rounded-[10px] border border-[#084595] bg-white px-[20px] py-[16px] text-[12px] leading-[24px] text-[#313C52]">
+          <strong>Tip:</strong> {table.tip}
+        </div>
+      ) : null}
+
+      <div className="mt-[24px]">
+        <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+          Reflection Questions: Your Energy in Action
+        </h3>
+        <div className="mt-[14px] grid gap-[8px] md:grid-cols-2">
+          {prompts.map((prompt) => (
+            <div
+              key={prompt}
+              className="rounded-[8px] bg-[#E7F0FA] px-[16px] py-[11px] text-[12px] italic leading-[20px] text-[#313C52]"
+            >
+              • {prompt}
+            </div>
+          ))}
+        </div>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function TeamRoleFitSection(props: {
+  profileContent: ProfileBasedContent;
+}) {
+  const blocks = props.profileContent.teamRoleFit;
+  const insightsIndex = blocks.findIndex((x) => /TEAM ROLE FIT INSIGHTS/i.test(x));
+  const introBlocks = blocks
+    .slice(0, insightsIndex >= 0 ? insightsIndex : blocks.length)
+    .filter((x) => !/THE FOUR QUADRANTS/i.test(x));
+  const insightBlocks = insightsIndex >= 0 ? blocks.slice(insightsIndex + 1) : [];
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="text-[13px] leading-[28px] text-[#313C52]">
+        {introBlocks.map((block) => {
+          const isBullet = block.trim().startsWith("•");
+          return isBullet ? (
+            <p key={block} className="ml-6 mt-[8px]">
+              {block}
+            </p>
+          ) : (
+            <p key={block} className="mt-[16px] first:mt-0">
+              {block}
+            </p>
+          );
+        })}
+      </div>
+
+      <h3 className="mt-[20px] text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+        The Four Quadrants of Team Role Fit
+      </h3>
+      <div className="mt-[14px] flex justify-start">
+        <ReportAssetImage
+          src={REPORT_ASSETS.teamRoleFitVisual}
+          alt="Team role fit Johari Window"
+          className="h-auto w-full max-w-[470px] rounded-[8px] object-contain"
+        />
+      </div>
+
+      {insightBlocks.length ? (
+        <div className="mt-[24px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Team Role Fit Insights
+          </h3>
+          <ProfileTextBlocks blocks={insightBlocks} className="mt-[14px]" />
+        </div>
+      ) : null}
+    </WhiteCard>
+  );
+}
+
+function ValueCreationPathwaySection(props: {
+  profileContent: ProfileBasedContent;
+}) {
+  const parsed = splitValueCreation(props.profileContent.valueCreationPathway);
+  const exampleNames = ["Example 1", "Example 2"];
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[16px] text-[13px] leading-[28px] text-[#313C52]">
+        {parsed.intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      {parsed.examples.length ? (
+        <div className="mt-[22px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Real-world examples of {props.profileContent.display} energy in action:
+          </h3>
+          <div className="mt-[14px] grid gap-[14px] md:grid-cols-2">
+            {parsed.examples.slice(0, 2).map((example, index) => {
+              const [name, ...rest] = example.split(/,\s|\s+launched\s+|\s+energises\s+|\s+created\s+|\s+anticipated\s+/i);
+              return (
+                <div
+                  key={example}
+                  className="rounded-[8px] border border-[#A9B8CE] bg-white px-[18px] py-[14px] text-[12px] leading-[20px] text-[#313C52]"
+                >
+                  <div className="font-bold text-[#313C52]">
+                    {name && name.length < 40 ? name.replace(/^•\s*/, "") : exampleNames[index]}
+                  </div>
+                  <p className="mt-[6px]">
+                    {name && name.length < 40 && rest.length ? example.replace(name, "").replace(/^,?\s*/, "") : example}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-[18px] overflow-x-auto rounded-[8px]">
+        <table className="w-full min-w-[760px] border-collapse text-[12px] leading-[22px] text-[#084595]">
+          <thead>
+            <tr>
+              {[
+                "You deliver your best value when:",
+                "You build trust when:",
+                "You leverage value when:",
+              ].map((heading, index) => (
+                <th
+                  key={heading}
+                  className={cls(
+                    "border-r-4 border-white px-4 py-4 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-white last:border-r-0",
+                    index === 0 ? "bg-[#16356D]" : index === 1 ? "bg-[#284C9C]" : "bg-[#2E80BD]",
+                  )}
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: Math.max(parsed.deliver.length, parsed.trust.length, parsed.leverage.length, 1) }).map((_, index) => (
+              <tr key={index}>
+                {[parsed.deliver, parsed.trust, parsed.leverage].map((items, cellIndex) => (
+                  <td
+                    key={`${index}-${cellIndex}`}
+                    className={cls(
+                      "w-1/3 border-r-4 border-t-4 border-white px-4 py-4 align-top last:border-r-0",
+                      index % 2 === 0 ? "bg-[#CFE4F3]" : "bg-[#BFD3E6]",
+                    )}
+                  >
+                    {items[index] || ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function stripBulletPrefix(text: string) {
+  return String(text || "").replace(/^•\s*/, "").replace(/^\d+\.\s*/, "").trim();
+}
+
+function stripHeadingPrefix(text: string, heading: string) {
+  return String(text || "").replace(new RegExp(`^${heading}\\s*:?\\s*`, "i"), "").trim();
+}
+
+function pluralProfileToImageName(label: string) {
+  const normalized = String(label || "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/profiles?/gi, "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized.includes("visionar")) return "Visionary";
+  if (normalized.includes("catalyst")) return "Catalyst";
+  if (normalized.includes("motivator")) return "Motivator";
+  if (normalized.includes("connector")) return "Connector";
+  if (normalized.includes("facilitator")) return "Facilitator";
+  if (normalized.includes("coordinator")) return "Coordinator";
+  if (normalized.includes("controller")) return "Controller";
+  if (normalized.includes("optimiser") || normalized.includes("optimizer")) return "Optimiser";
+  return label;
+}
+
+function splitProfileSection(
+  blocks: string[],
+  startPattern: RegExp,
+  endPatterns: RegExp[] = [],
+) {
+  const start = blocks.findIndex((block) => startPattern.test(block));
+  if (start < 0) return [];
+  const end = blocks.findIndex(
+    (block, index) => index > start && endPatterns.some((pattern) => pattern.test(block)),
+  );
+  return blocks.slice(start + 1, end > start ? end : blocks.length);
+}
+
+function CollaborationTipsSection(props: { profileContent: ProfileBasedContent }) {
+  const blocks = props.profileContent.collaborationTips || [];
+  const bestStart = blocks.findIndex((block) => /best collaborators/i.test(block));
+  const tipsStart = blocks.findIndex((block) => /tips for working/i.test(block));
+  const roleIndex = blocks.findIndex((block) => /your role in the team/i.test(block));
+
+  const intro = blocks
+    .slice(0, Math.min(...[roleIndex, bestStart, tipsStart].filter((x) => x >= 0)))
+    .filter((block) => block && !block.trim().startsWith("•"));
+
+  const roleText = roleIndex >= 0 ? stripHeadingPrefix(blocks[roleIndex], "Your Role in the Team") : "";
+
+  const collaboratorBlocks = bestStart >= 0
+    ? blocks.slice(bestStart + 1, tipsStart > bestStart ? tipsStart : blocks.length)
+    : [];
+  const collaborators = collaboratorBlocks
+    .filter((block) => block.trim().startsWith("•"))
+    .map((block) => {
+      const text = stripBulletPrefix(block);
+      const [label, ...rest] = text.split(":");
+      return {
+        label: label.trim(),
+        imageName: pluralProfileToImageName(label),
+        body: rest.join(":").trim(),
+      };
+    })
+    .slice(0, 3);
+
+  const tipBlocks = tipsStart >= 0 ? blocks.slice(tipsStart + 1) : [];
+  const tips = tipBlocks
+    .filter((block) => block.trim().startsWith("•"))
+    .map((block, index) => {
+      const text = stripBulletPrefix(block);
+      const [maybeTitle, ...rest] = text.split(":");
+      const hasExplicitTitle = rest.length > 0 && maybeTitle.length < 70;
+      return {
+        title: hasExplicitTitle ? maybeTitle.trim() : `Tip ${index + 1}`,
+        body: hasExplicitTitle ? rest.join(":").trim() : text,
+      };
+    });
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[18px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+        {roleText ? (
+          <p>
+            <strong>Your Role in the Team:</strong> {roleText}
+          </p>
+        ) : null}
+      </div>
+
+      {collaborators.length ? (
+        <div className="mt-[24px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Best collaborators for you:
+          </h3>
+          <div className="mt-[18px] grid gap-[28px] sm:grid-cols-3">
+            {collaborators.map((collaborator) => {
+              const image = topProfileImage(collaborator.imageName);
+              return (
+                <div key={collaborator.label}>
+                  {image ? (
+                    <ReportAssetImage
+                      src={image}
+                      alt={collaborator.label}
+                      className="h-[124px] w-[124px] object-contain"
+                    />
+                  ) : null}
+                  <div className="mt-[10px] text-[13px] font-bold leading-[20px] text-[#313C52]">
+                    {collaborator.label}
+                  </div>
+                  <p className="mt-[6px] text-[12px] leading-[20px] text-[#313C52]">
+                    {collaborator.body}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {tips.length ? (
+        <div className="mt-[28px]">
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Tips for working with all profiles:
+          </h3>
+          <div className="mt-[14px] space-y-[8px]">
+            {tips.map((tip) => (
+              <div
+                key={`${tip.title}-${tip.body}`}
+                className="rounded-[8px] border border-[#A9B8CE] border-l-[4px] border-l-[#084595] bg-white px-[18px] py-[12px]"
+              >
+                <div className="text-[13px] font-bold leading-[20px] text-[#313C52]">
+                  {tip.title}
+                </div>
+                <p className="mt-[4px] text-[12px] leading-[20px] text-[#313C52]">
+                  {tip.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </WhiteCard>
+  );
+}
+
+function DevelopmentRecommendationsSection(props: { profileContent: ProfileBasedContent }) {
+  const blocks = props.profileContent.developmentRecommendations || [];
+  const elevateHeading = /to elevate performance/i;
+  const anchorsHeading = /daily anchors/i;
+  const promptsHeading = /workshop reflection prompts/i;
+  const firstHeadingIndex = blocks.findIndex((block) => elevateHeading.test(block));
+  const intro = blocks.slice(0, firstHeadingIndex >= 0 ? firstHeadingIndex : blocks.length);
+  const elevate = splitProfileSection(blocks, elevateHeading, [anchorsHeading, promptsHeading]).map(stripBulletPrefix);
+  const anchors = splitProfileSection(blocks, anchorsHeading, [promptsHeading]).map(stripBulletPrefix);
+  const prompts = splitProfileSection(blocks, promptsHeading).map(stripBulletPrefix);
+  const rowCount = Math.max(elevate.length, anchors.length, prompts.length, 1);
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[16px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      <div className="mt-[22px] overflow-x-auto rounded-[8px]">
+        <table className="w-full min-w-[760px] border-collapse text-[12px] leading-[22px] text-[#084595]">
+          <thead>
+            <tr>
+              {["To elevate performance:", "Daily anchors:", "Workshop reflection prompts:"].map((heading, index) => (
+                <th
+                  key={heading}
+                  className={cls(
+                    "w-1/3 border-r-4 border-white px-4 py-4 text-left text-[10px] font-extrabold uppercase tracking-[1px] text-white last:border-r-0",
+                    index === 0 ? "bg-[#16356D]" : index === 1 ? "bg-[#284C9C]" : "bg-[#2E80BD]",
+                  )}
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rowCount }).map((_, index) => (
+              <tr key={index}>
+                {[elevate, anchors, prompts].map((items, cellIndex) => (
+                  <td
+                    key={`${index}-${cellIndex}`}
+                    className={cls(
+                      "w-1/3 border-r-4 border-t-4 border-white px-4 py-5 align-top last:border-r-0",
+                      index % 2 === 0 ? "bg-[#CFE4F3]" : "bg-[#BFD3E6]",
+                    )}
+                  >
+                    {items[index] ? (cellIndex === 2 ? `• ${items[index]}` : items[index]) : ""}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </WhiteCard>
+  );
+}
+
+function HoldingBackSection(props: { profileContent: ProfileBasedContent }) {
+  const blocks = props.profileContent.holdingBack || [];
+  const weeklyHeading = /weekly check-in prompts/i;
+  const monthlyHeading = /monthly calibration metrics/i;
+  const firstHeadingIndex = blocks.findIndex((block) => weeklyHeading.test(block));
+  const intro = blocks.slice(0, firstHeadingIndex >= 0 ? firstHeadingIndex : blocks.length);
+  const weekly = splitProfileSection(blocks, weeklyHeading, [monthlyHeading]).map(stripBulletPrefix);
+  const monthly = splitProfileSection(blocks, monthlyHeading).map(stripBulletPrefix);
+
+  return (
+    <WhiteCard className="p-[20px]">
+      <div className="space-y-[16px] text-[13px] leading-[28px] text-[#313C52]">
+        {intro.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </div>
+
+      <div className="mt-[24px] grid gap-[34px] lg:grid-cols-[1fr_1fr]">
+        <div>
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Weekly Check-In Prompts:
+          </h3>
+          <div className="mt-[14px] space-y-[9px]">
+            {weekly.map((item) => (
+              <div
+                key={item}
+                className="rounded-[8px] bg-[#E7F0FA] px-[16px] py-[13px] text-[12px] italic leading-[20px] text-[#313C52]"
+              >
+                • {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-[10px] font-extrabold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+            Monthly Calibration Metrics:
+          </h3>
+          <ul className="mt-[14px] space-y-[10px] text-[12px] leading-[22px] text-[#313C52]">
+            {monthly.map((item) => (
+              <li key={item}>• {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </WhiteCard>
+  );
+}
+
 function ProfileList(props: {
   profiles: Array<ProfileLabel & { pct?: number; short_code?: string }>;
   activeCode?: string;
@@ -1415,7 +3321,9 @@ function NextStepCard(props: {
   body: string;
   button: string;
   href?: string | null;
+  onClick?: () => void;
   primary?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
@@ -1423,19 +3331,25 @@ function NextStepCard(props: {
         <ReportAssetImage
           src={REPORT_ASSETS.icons.nextSteps}
           alt="Next steps"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
       </div>
       <h4 className="mt-4 font-semibold text-slate-800">{props.title}</h4>
       <p className="mt-2 text-sm leading-6 text-slate-600">{props.body}</p>
-      {props.href ? (
+      {props.onClick || props.href ? (
         <button
           type="button"
-          onClick={() =>
-            window.open(props.href || "#", "_blank", "noopener,noreferrer")
-          }
+          disabled={props.disabled}
+          data-html2canvas-ignore="true"
+          onClick={() => {
+            if (props.onClick) {
+              props.onClick();
+              return;
+            }
+            window.open(props.href || "#", "_blank", "noopener,noreferrer");
+          }}
           className={cls(
-            "mt-4 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold",
+            "mt-4 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-wait disabled:opacity-60",
             props.primary
               ? "bg-slate-900 text-white hover:bg-slate-700"
               : "border border-slate-900 text-slate-900 hover:bg-slate-50",
@@ -1462,6 +3376,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ReportData | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const isPortalViewer = src === "portal";
 
@@ -1508,42 +3423,284 @@ export default function TeamPuzzleRhythmReportClient(props: {
   }, [token, tid, src, isPortalViewer]);
 
   async function handleDownloadPdf() {
-    if (!reportRef.current) return;
-    const element = reportRef.current;
-    const prevScroll = window.scrollY;
-    window.scrollTo(0, 0);
+    if (!reportRef.current || pdfBusy) return;
 
-    try {
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#061A3A",
-        scrollY: -window.scrollY,
+    setPdfBusy(true);
+
+    const originalScrollY = window.scrollY;
+
+    function waitForImages(container: HTMLElement, timeoutMs = 3500) {
+      const images = Array.from(
+        container.querySelectorAll("img"),
+      ) as HTMLImageElement[];
+
+      return Promise.all(
+        images.map(
+          (image) =>
+            new Promise<void>((resolve) => {
+              try {
+                image.loading = "eager";
+                image.decoding = "sync";
+              } catch {
+                // Older browsers may not allow these fields. Safe to ignore.
+              }
+
+              if (image.complete) {
+                resolve();
+                return;
+              }
+
+              let settled = false;
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timer);
+                image.removeEventListener("load", finish);
+                image.removeEventListener("error", finish);
+                resolve();
+              };
+
+              const timer = window.setTimeout(finish, timeoutMs);
+              image.addEventListener("load", finish, { once: true });
+              image.addEventListener("error", finish, { once: true });
+
+              // Lazy images that are far down the report may never start loading
+              // while we are at the top of the page. Re-applying src nudges the
+              // browser to fetch them now, and the timeout prevents the button
+              // from getting stuck on "Preparing...".
+              const src = image.currentSrc || image.src;
+              if (src) {
+                try {
+                  image.src = src;
+                } catch {
+                  finish();
+                }
+              }
+
+              if (typeof image.decode === "function") {
+                image.decode().then(finish).catch(() => {
+                  // decode can reject for cross-origin or already-broken images.
+                  // onerror/timeout will resolve the wait.
+                });
+              }
+            }),
+        ),
+      ).then(() => undefined);
+    }
+
+    function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+      let timer: number | undefined;
+
+      const timeout = new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => {
+          reject(new Error(label));
+        }, timeoutMs);
       });
 
-      const imgData = canvas.toDataURL("image/png");
+      return Promise.race([promise, timeout]).finally(() => {
+        if (timer) window.clearTimeout(timer);
+      }) as Promise<T>;
+    }
+
+    try {
+      const root = reportRef.current;
+      const main = root.querySelector("main") as HTMLElement | null;
+
+      if (!main) {
+        throw new Error("Could not find report main element.");
+      }
+
+      window.scrollTo(0, 0);
+      await waitForImages(root, 4000);
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
       const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      const mainWidth = Math.ceil(main.getBoundingClientRect().width || 1180);
+      const maxPageHeightPx = Math.floor(
+        mainWidth * (pdfHeight / pdfWidth) * 0.92,
+      );
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      const reportGrid = Array.from(main.children).find((child) => {
+        return (
+          child instanceof HTMLElement &&
+          child.querySelector("aside") &&
+          child.querySelector("aside + div")
+        );
+      }) as HTMLElement | undefined;
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      const preReportBlocks: HTMLElement[] = [];
+
+      Array.from(main.children).forEach((child) => {
+        if (!(child instanceof HTMLElement)) return;
+        if (child === reportGrid) return;
+        preReportBlocks.push(child);
+      });
+
+      const contentColumn = reportGrid?.querySelector(
+        "aside + div",
+      ) as HTMLElement | null;
+
+      const reportContentBlocks = contentColumn
+        ? Array.from(contentColumn.children).filter(
+            (child): child is HTMLElement => child instanceof HTMLElement,
+          )
+        : [];
+
+      const blocks = [...preReportBlocks, ...reportContentBlocks].filter(
+        (block) => {
+          if (block.getAttribute("data-html2canvas-ignore") === "true") {
+            return false;
+          }
+          if (block.getAttribute("data-pdf-exclude") === "true") {
+            return false;
+          }
+          return true;
+        },
+      );
+
+      if (!blocks.length) {
+        throw new Error("No report blocks found for PDF export.");
+      }
+
+      function getOuterHeight(el: HTMLElement) {
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        const marginTop = Number.parseFloat(style.marginTop || "0") || 0;
+        const marginBottom = Number.parseFloat(style.marginBottom || "0") || 0;
+        return Math.ceil(rect.height + marginTop + marginBottom);
+      }
+
+      const pages: HTMLElement[][] = [];
+      let currentPage: HTMLElement[] = [];
+      let currentHeight = 0;
+
+      for (const block of blocks) {
+        const blockHeight = getOuterHeight(block);
+        const shouldStartNewPage =
+          currentPage.length > 0 && currentHeight + blockHeight > maxPageHeightPx;
+
+        if (shouldStartNewPage) {
+          pages.push(currentPage);
+          currentPage = [];
+          currentHeight = 0;
+        }
+
+        currentPage.push(block);
+        currentHeight += blockHeight;
+      }
+
+      if (currentPage.length) {
+        pages.push(currentPage);
+      }
+
+      const stage = document.createElement("div");
+      stage.style.position = "fixed";
+      stage.style.left = "-100000px";
+      stage.style.top = "0";
+      stage.style.width = `${mainWidth}px`;
+      stage.style.background = "#061A3A";
+      stage.style.color = "white";
+      stage.style.zIndex = "-1";
+      stage.style.pointerEvents = "none";
+      stage.style.opacity = "1";
+
+      document.body.appendChild(stage);
+
+      try {
+        for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+          stage.innerHTML = "";
+
+          const pageShell = document.createElement("div");
+          pageShell.style.width = `${mainWidth}px`;
+          pageShell.style.background = "#061A3A";
+          pageShell.style.padding = "24px";
+          pageShell.style.boxSizing = "border-box";
+
+          for (const originalBlock of pages[pageIndex]) {
+            const clone = originalBlock.cloneNode(true) as HTMLElement;
+
+            clone
+              .querySelectorAll("[data-html2canvas-ignore='true']")
+              .forEach((node) => {
+                node.remove();
+              });
+
+            clone.querySelectorAll("[data-pdf-exclude='true']").forEach((node) => {
+              node.remove();
+            });
+
+            clone.querySelectorAll("img").forEach((node) => {
+              const image = node as HTMLImageElement;
+              image.loading = "eager";
+              image.decoding = "sync";
+            });
+
+            clone.style.position = "relative";
+            clone.style.transform = "none";
+            clone.style.breakInside = "avoid";
+            clone.style.pageBreakInside = "avoid";
+
+            pageShell.appendChild(clone);
+          }
+
+          stage.appendChild(pageShell);
+
+          await waitForImages(pageShell, 4000);
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+
+          const canvas = await withTimeout(
+            html2canvas(pageShell, {
+              scale: 1.8,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: "#061A3A",
+              scrollX: 0,
+              scrollY: 0,
+              logging: false,
+              imageTimeout: 8000,
+              ignoreElements: (node) =>
+                node instanceof HTMLElement &&
+                (node.getAttribute("data-html2canvas-ignore") === "true" ||
+                  node.getAttribute("data-pdf-exclude") === "true"),
+            }),
+            30000,
+            `PDF page ${pageIndex + 1} took too long to render.`,
+          );
+
+          const imgData = canvas.toDataURL("image/jpeg", 0.94);
+
+          let imgWidth = pdfWidth;
+          let imgHeight = (canvas.height * imgWidth) / canvas.width;
+          let x = 0;
+          const y = 0;
+
+          if (imgHeight > pdfHeight) {
+            imgHeight = pdfHeight;
+            imgWidth = (canvas.width * imgHeight) / canvas.height;
+            x = (pdfWidth - imgWidth) / 2;
+          }
+
+          if (pageIndex > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
+        }
+      } finally {
+        stage.remove();
       }
 
       pdf.save(`team-puzzle-rhythm-report-${token}.pdf`);
+    } catch (e) {
+      console.error("PDF download failed", e);
+      window.print();
     } finally {
-      window.scrollTo(0, prevScroll);
+      setPdfBusy(false);
+      window.scrollTo(0, originalScrollY);
     }
   }
 
@@ -1554,15 +3711,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
     const orgName = data.org?.name || "Life Puzzle";
     const profileName = data.result.top_profile_name || "Your Profile";
     const profileCode = data.result.top_profile_code || "";
-    const profileCopy = PROFILE_COPY[profileCode] || {
-      title: profileName,
-      role: "Contribution Style",
-      summary:
-        "Your profile describes how you most naturally create value inside a team.",
-      coreTraits: "Natural strengths, working energy, contribution style",
-      idealEnvironment:
-        "A role and environment that lets you use your strengths consistently",
-    };
+    const profileContent = getProfileContent(profileCode);
 
     const topFreq = data.result.top_freq;
     const topFreqName = data.result.top_freq_name || topFreq;
@@ -1588,9 +3737,10 @@ export default function TeamPuzzleRhythmReportClient(props: {
       orgName,
       profileName,
       profileCode,
-      profileCopy,
+      profileContent,
       topFreq,
       topFreqName,
+      topFreqContent: getFrequencyContent(topFreq),
       sortedProfiles,
       primary,
       secondary,
@@ -1658,9 +3808,10 @@ export default function TeamPuzzleRhythmReportClient(props: {
     orgName,
     profileName,
     profileCode,
-    profileCopy,
+    profileContent,
     topFreq,
     topFreqName,
+    topFreqContent,
     sortedProfiles,
     primary,
     secondary,
@@ -1677,7 +3828,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
   return (
     <div
       ref={reportRef}
-      className="relative min-h-screen overflow-hidden bg-[#061A3A] text-white"
+      className="relative min-h-screen bg-[#061A3A] text-white"
     >
       <AppBackground />
       <div
@@ -1694,9 +3845,11 @@ export default function TeamPuzzleRhythmReportClient(props: {
             <button
               type="button"
               onClick={handleDownloadPdf}
-              className="h-[37px] rounded-lg border border-white/15 bg-[#08162B]/70 px-[15px] text-[13px] font-semibold leading-[20px] text-white hover:bg-[#08162B]/90"
+              disabled={pdfBusy}
+              data-html2canvas-ignore="true"
+              className="h-[37px] rounded-lg border border-white/15 bg-[#08162B]/70 px-[15px] text-[13px] font-semibold leading-[20px] text-white hover:bg-[#08162B]/90 disabled:cursor-wait disabled:opacity-60"
             >
-              Download PDF
+              {pdfBusy ? "Preparing..." : "Download PDF"}
             </button>
             {nextStepsUrl ? (
               <button
@@ -1704,6 +3857,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 onClick={() =>
                   window.open(nextStepsUrl, "_blank", "noopener,noreferrer")
                 }
+                data-html2canvas-ignore="true"
                 className="h-[37px] rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[13px] font-semibold leading-[20px] text-[#071C36]"
               >
                 Next steps
@@ -1911,7 +4065,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="h-fit rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-4">
+          <aside className="self-start rounded-[24px] border border-white/10 bg-gradient-to-b from-[rgba(27,60,99,0.78)] to-[rgba(12,32,58,0.84)] p-[18px] shadow-[0_14px_42px_rgba(0,0,0,0.32)] lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
             <div className="text-[10px] font-semibold uppercase leading-[15px] tracking-[2.6px] text-white/45">
               Report Index
             </div>
@@ -1951,13 +4105,16 @@ export default function TeamPuzzleRhythmReportClient(props: {
               <button
                 type="button"
                 onClick={handleDownloadPdf}
-                className="inline-flex h-[31px] items-center justify-center rounded-[8px] border border-white/12 bg-[rgba(8,22,43,0.72)] px-[14px] text-[11px] font-semibold leading-[16px] text-[#F8FAFC] shadow-sm"
+                disabled={pdfBusy}
+                data-html2canvas-ignore="true"
+                className="inline-flex h-[31px] items-center justify-center rounded-[8px] border border-white/12 bg-[rgba(8,22,43,0.72)] px-[14px] text-[11px] font-semibold leading-[16px] text-[#F8FAFC] shadow-sm disabled:cursor-wait disabled:opacity-60"
               >
-                Download PDF
+                {pdfBusy ? "Preparing..." : "Download PDF"}
               </button>
               {nextStepsUrl ? (
                 <a
                   href={nextStepsUrl}
+                  data-html2canvas-ignore="true"
                   className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
                 >
                   Next step
@@ -1965,6 +4122,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
               ) : (
                 <button
                   type="button"
+                  data-html2canvas-ignore="true"
                   className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
                 >
                   Next step
@@ -1974,28 +4132,44 @@ export default function TeamPuzzleRhythmReportClient(props: {
           </aside>
 
           <div className="space-y-8">
-            <IntroTextBlock
-              title="Welcome from Chandell"
-              icon={REPORT_ASSETS.icons.welcome}
-            >
-              {GENERIC_CONTENT.welcomeFromChandell.paragraphs.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-              <div className="not-prose mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
-                <ReportAssetImage
-                  src={REPORT_ASSETS.chandell}
-                  alt="Chandell Labbozzetta"
-                  className="h-20 w-20 rounded-full border border-slate-200 object-cover"
-                />
-                <p className="m-0 text-sm leading-7 text-slate-700">
-                  {GENERIC_CONTENT.welcomeFromChandell.signoff}
-                  <br />
-                  <strong>{GENERIC_CONTENT.welcomeFromChandell.name}</strong>
-                  <br />
-                  {GENERIC_CONTENT.welcomeFromChandell.role}
+            <Card className="p-0 bg-transparent shadow-none border-0">
+              <WhiteCard className="rounded-[18px] p-[28px]">
+                <h2 className="text-[18px] font-bold leading-[24px] text-[#111828]">
+                  Welcome to your Team Puzzle Discovery Report
+                </h2>
+                <p className="mt-[6px] text-[14px] font-semibold leading-[22px] text-[#64748B]">
+                  A note from the creator of this framework.
                 </p>
-              </div>
-            </IntroTextBlock>
+
+                <div className="mt-[18px] space-y-[14px] text-[14px] leading-[25px] text-[#334155]">
+                  <p>
+                    Welcome to your Team Puzzle Discovery Report. I’m excited to be part of your journey as you uncover your natural strengths, communication style and best-fit contribution at work.
+                  </p>
+                  <p>
+                    This report is designed to give you deep insight into how you work best, where you thrive in a team and how to align your role with your natural energy. When people understand themselves and each other more deeply, culture shifts, communication improves and performance becomes more sustainable.
+                  </p>
+                  <p>
+                    Team Puzzle was created with that in mind. It’s not just a tool for insight — it is a practical system for action. It maps the puzzle pieces of your team so that you can fit together more effectively, reduce friction and increase flow.
+                  </p>
+                  <p>
+                    Whether you are reading this as part of a leadership program, a coaching session or your own development, treat this as a starting point, not an ending. Use what you discover here to guide conversations, make better choices and design the way you want to work going forward.
+                  </p>
+                  <p>Warm regards,</p>
+                  <p>Chandell Labbozzetta, Founder – Life Puzzle &amp; Team Puzzle Discovery Assessment</p>
+                </div>
+
+                <div className="mt-[26px]">
+                  <ReportAssetImage
+                    src={REPORT_ASSETS.chandell}
+                    alt="Chandell Labbozzetta"
+                    className="h-[110px] w-[110px] rounded-full border border-[#3B82F6] object-cover"
+                  />
+                  <p className="mt-[12px] text-[12px] leading-[20px] text-[#64748B]">
+                    Chandell Labbozzetta, Founder – Life Puzzle &amp; Team Puzzle Discovery Assessment
+                  </p>
+                </div>
+              </WhiteCard>
+            </Card>
 
             <HowToUseCards />
 
@@ -2209,12 +4383,12 @@ export default function TeamPuzzleRhythmReportClient(props: {
                           ) : null}
                         </div>
                         <div className="px-[15px] pt-[72px] text-center">
-                          <div className="relative inline-flex items-center justify-center gap-2">
+                          <div className="flex flex-wrap items-center justify-center gap-2 px-2">
                             <h3 className="text-[12px] font-semibold leading-[19px] text-[#111828]">
                               {p.name}
                             </h3>
                             {active ? (
-                              <span className="absolute left-full ml-2 whitespace-nowrap rounded-full bg-[#0FCD5E] px-[7px] py-[2px] text-[8px] font-bold leading-[10px] text-white">
+                              <span className="whitespace-nowrap rounded-full bg-[#0FCD5E] px-[7px] py-[2px] text-[8px] font-bold leading-[10px] text-white">
                                 Your Profile
                               </span>
                             ) : null}
@@ -2334,7 +4508,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 <p className="text-[13px] leading-[28px] text-[#313C52]">
                   Your strongest overall frequency is{" "}
                   <strong className="text-[#4092C5]">
-                    {topFreqName} ({topFreq})
+                    {topFreqContent.name} ({topFreqContent.code})
                   </strong>
                   , which shapes how you approach problems and make decisions.
                   Higher percentages indicate where you naturally spend more
@@ -2413,7 +4587,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 <div className="mt-[28px] grid overflow-hidden rounded-[18px] border border-[#4092C5] shadow-[0_6px_32px_rgba(58,110,212,0.12)] lg:grid-cols-[231px_1fr]">
                   <div className="flex min-h-[198px] flex-col items-center justify-center bg-[#4092C5] px-[24px] text-center text-white">
                     <div className="text-[28px] font-semibold leading-[38px]">
-                      {topFreqName} ({topFreq})
+                      {topFreqContent.name} ({topFreqContent.code})
                     </div>
                     <div className="mt-[6px] text-[13px] leading-[19px]">
                       Your Dominant Frequency:
@@ -2427,19 +4601,19 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         className="h-[66px] w-[60px] object-contain"
                       />
                       <p className="mt-[12px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Key traits:</strong> The energy you rely on most
-                        when you need to move things forward.
+                        <strong>Key traits:</strong>{" "}
+                        {topFreqContent.coreAttributes.slice(0, 3).join(", ")}.
                       </p>
                     </div>
                     <div>
                       <ReportAssetImage
                         src="/icons/tp-key-trait2.png"
-                        alt="Motivators"
+                        alt="Ideal roles"
                         className="h-[66px] w-[60px] object-contain"
                       />
                       <p className="mt-[12px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Motivators:</strong> Conditions that help this
-                        way of working feel energising and sustainable.
+                        <strong>Ideal roles:</strong>{" "}
+                        {topFreqContent.idealRoles.join(", ")}.
                       </p>
                     </div>
                     <div>
@@ -2449,11 +4623,149 @@ export default function TeamPuzzleRhythmReportClient(props: {
                         className="h-[66px] w-[60px] object-contain"
                       />
                       <p className="mt-[12px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Watch outs:</strong> Things to notice when this
-                        frequency is over-used, such as ignoring other
-                        perspectives or pushing your preferred style too hard.
+                        <strong>Watch outs:</strong>{" "}
+                        {topFreqContent.potentialBlindSpots.join(", ")}.
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="mt-[28px] rounded-[18px] border border-slate-200 bg-slate-50 p-[22px]">
+                  <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                    Understanding {topFreqContent.name} Frequency
+                  </h3>
+                  <p className="mt-[12px] text-[13px] leading-[28px] text-[#313C52]">
+                    {topFreqContent.definition}
+                  </p>
+
+                  <div className="mt-[20px] grid gap-[16px] lg:grid-cols-2">
+                    <div className="rounded-[14px] bg-white p-[18px] shadow-sm">
+                      <h4 className="text-[13px] font-bold text-[#111828]">
+                        Core Attributes
+                      </h4>
+                      <ul className="mt-[10px] list-disc space-y-[6px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                        {topFreqContent.coreAttributes.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-[14px] bg-white p-[18px] shadow-sm">
+                      <h4 className="text-[13px] font-bold text-[#111828]">
+                        Potential Blind Spots
+                      </h4>
+                      <ul className="mt-[10px] list-disc space-y-[6px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                        {topFreqContent.potentialBlindSpots.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-[18px] rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                  <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                    Profiles Aligned to the {topFreqContent.name} Frequency
+                  </h3>
+                  <div className="mt-[16px] grid gap-[14px] lg:grid-cols-3">
+                    {topFreqContent.alignedProfiles.map((profile) => (
+                      <div
+                        key={profile.profile}
+                        className="rounded-[14px] border border-slate-200 bg-slate-50 p-[16px]"
+                      >
+                        <h4 className="text-[13px] font-bold text-[#111828]">
+                          {profile.profile}
+                        </h4>
+                        <ul className="mt-[10px] list-disc space-y-[6px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                          {profile.bullets.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-[18px] rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                  <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                    How {topFreqContent.name} Shows Up in Teams
+                  </h3>
+                  <div className="mt-[16px] overflow-hidden rounded-[12px] border border-slate-200">
+                    <div className="grid grid-cols-[210px_1fr] bg-[#084595] text-[13px] font-bold text-white">
+                      <div className="border-r border-white/20 p-[12px]">
+                        Trait
+                      </div>
+                      <div className="p-[12px]">Expression in Team Setting</div>
+                    </div>
+                    {topFreqContent.howItShowsUp.map((row) => (
+                      <div
+                        key={row.trait}
+                        className="grid grid-cols-[210px_1fr] border-t border-slate-200 text-[13px] leading-[22px] text-[#313C52]"
+                      >
+                        <div className="border-r border-slate-200 p-[12px] font-medium">
+                          {row.trait}
+                        </div>
+                        <div className="p-[12px]">{row.expression}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-[18px] grid gap-[18px] lg:grid-cols-2">
+                  <div className="rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      Ideal Roles and Environments
+                    </h3>
+                    <ul className="mt-[14px] list-disc space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.idealRoles.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                    <h4 className="mt-[18px] text-[13px] font-bold text-[#111828]">
+                      Avoid environments that:
+                    </h4>
+                    <ul className="mt-[8px] list-disc space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.avoidEnvironments.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      {topFreqContent.name} Frequency in Practice: Coaching Tips
+                    </h3>
+                    <ul className="mt-[14px] list-disc space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.coachingTips.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-[18px] grid gap-[18px] lg:grid-cols-2">
+                  <div className="rounded-[18px] border border-slate-200 bg-white p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      Reflection Prompts
+                    </h3>
+                    <ol className="mt-[14px] list-decimal space-y-[7px] pl-[18px] text-[13px] leading-[22px] text-[#313C52]">
+                      {topFreqContent.reflectionPrompts.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[#4092C5] bg-[#4092C5]/10 p-[22px]">
+                    <h3 className="text-[15px] font-bold uppercase tracking-[0.12em] text-[#084595]">
+                      Final Thoughts and Next Step
+                    </h3>
+                    <p className="mt-[14px] text-[13px] leading-[24px] text-[#313C52]">
+                      {topFreqContent.finalThoughts}
+                    </p>
+                    {topFreqContent.nextStep ? (
+                      <p className="mt-[14px] text-[13px] font-semibold leading-[24px] text-[#313C52]">
+                        {topFreqContent.nextStep}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </WhiteCard>
@@ -2580,6 +4892,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     const borderColors = ["#6BAED6", "#91C3F5", "#C6E1FC"];
                     const pctColors = ["#6BAED6", "#4092C5", "#022B61"];
                     const image = topProfileImage(item.name);
+                    const itemContent = getProfileContent(item.code);
+                    const watchOut = itemContent.holdingBack?.[0] ||
+                      "Things to watch out for when this style is over-used or under pressure.";
 
                     return (
                       <div
@@ -2615,16 +4930,13 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
                         <div className="mt-[14px] text-[11px] leading-[16.5px] text-[#313C52]">
                           <p>
-                            <strong>Key traits:</strong> How this profile most
-                            naturally contributes when things are going well.
+                            <strong>Key traits:</strong> {itemContent.coreTraits}
                           </p>
                           <p className="mt-[14px]">
-                            <strong>Motivators:</strong> Conditions that help
-                            this style feel energising and sustainable.
+                            <strong>Motivators:</strong> {itemContent.idealEnvironment}
                           </p>
                           <p className="mt-[14px]">
-                            <strong>Watch outs:</strong> Things to watch out for
-                            when this style is over-used or under pressure.
+                            <strong>Watch outs:</strong> {watchOut}
                           </p>
                         </div>
                       </div>
@@ -2635,11 +4947,11 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
             <Card>
               <SectionHeader
-                title={`Your profile in depth: ${profileCopy.title.replace(/^The\s+/i, "The ")}`}
+                title={`Your profile in depth: ${profileContent.title}`}
                 icon={REPORT_ASSETS.icons.profileInDepth}
               />
               <WhiteCard className="p-0">
-                <div className="grid gap-[20px] p-[17px] lg:grid-cols-[527px_1fr]">
+                <div className="grid gap-[20px] p-[17px] lg:grid-cols-[minmax(390px,527px)_minmax(0,1fr)]">
                   <div className="space-y-[17px]">
                     <div className="rounded-[18px] bg-[#4092C5] p-[20px] shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
                       <div className="grid min-h-[172px] grid-cols-[166px_1fr] gap-[30px] items-center">
@@ -2657,19 +4969,15 @@ export default function TeamPuzzleRhythmReportClient(props: {
                           <div className="mt-[8px] text-[13px] leading-[20.8px]">
                             <p>
                               <strong>Frequency:</strong>{" "}
-                              {FREQUENCY_COPY[topFreq]?.title.replace(
-                                " Frequency",
-                                "",
-                              ) || topFreqName}{" "}
-                              ({topFreq})
+                              {profileContent.frequency}
                             </p>
                             <p className="mt-[12px]">
                               <strong>Core Traits:</strong>{" "}
-                              {profileCopy.coreTraits}
+                              {profileContent.coreTraits}
                             </p>
                             <p className="mt-[12px]">
                               <strong>Ideal Environment:</strong>{" "}
-                              {profileCopy.idealEnvironment}
+                              {profileContent.idealEnvironment}
                             </p>
                           </div>
                         </div>
@@ -2680,40 +4988,21 @@ export default function TeamPuzzleRhythmReportClient(props: {
                       <p className="text-[13px] leading-[20.8px] text-[#313C52]">
                         <strong>You may have been called:</strong>
                         <br />
-                        the people whisperer, the translator, the empathic
-                        leader, the harmoniser.
+                        {profileContent.youMayHaveBeenCalled || "Recognised for this natural contribution style."}
                       </p>
                       <p className="mt-[18px] text-[13px] leading-[20.8px] text-[#313C52]">
-                        <strong>Famous {profileName}s include:</strong>
+                        <strong>Famous {profileContent.display}s include:</strong>
                         <br />
-                        {profileCopy.famous ||
+                        {profileContent.famousExamples ||
                           "Recognised leaders and contributors who create value through this style."}
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-[13px] leading-[28px] text-[#313C52]">
-                    <p>
-                      {profileCopy.summary} You have a natural gift for using
-                      your strongest contribution style in a way that helps
-                      people, plans, and priorities move forward with more
-                      clarity.
-                    </p>
-                    <p className="mt-[20px]">
-                      You are often the person people turn to when they need
-                      your particular blend of energy, timing, and contribution.
-                      You may not always notice how much this shapes the room,
-                      but others often experience your strengths as a
-                      stabilising or activating force.
-                    </p>
-                    <p className="mt-[20px]">
-                      To deepen your self-awareness and leadership impact, use
-                      this section as a prompt to notice where your profile
-                      gives you energy, where it may be over-used, and where
-                      support from complementary profiles can help you create
-                      even more value.
-                    </p>
-                  </div>
+                  <ProfileTextBlocks
+                    blocks={profileContent.profileInDepth}
+                    className="min-w-0 text-[12.5px] leading-[25px]"
+                  />
                 </div>
               </WhiteCard>
             </Card>
@@ -2740,26 +5029,12 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   ))}
                 </div>
 
-                <div className="mt-[24px] grid max-w-[780px] grid-cols-3 overflow-hidden rounded-[18px] bg-white shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
-                  {[
-                    { file: "tp-r-puzzle.png", label: "Resourceful" },
-                    { file: "tp-h-puzzle.png", label: "Human-Centred" },
-                    { file: "tp-y-puzzle.png", label: "Yielding" },
-                    { file: "tp-t-puzzle.png", label: "Tactical" },
-                    { file: "tp-h-puzzle.png", label: "Hopeful" },
-                    { file: "tp-m-puzzle.png", label: "Measured" },
-                  ].map((piece) => (
-                    <div
-                      key={piece.label}
-                      className="aspect-[1.48] overflow-hidden"
-                    >
-                      <RhythmPuzzlePieceImage
-                        file={piece.file}
-                        alt={piece.label}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ))}
+                <div className="mt-[24px] flex justify-center rounded-[18px] bg-white p-2 shadow-[0_6px_32px_rgba(58,110,212,0.12)]">
+                  <ReportAssetImage
+                    src={REPORT_ASSETS.rhythmPuzzle}
+                    alt="Professional Performance Rhythm puzzle"
+                    className="h-auto w-full max-w-[780px] object-contain"
+                  />
                 </div>
 
                 <div className="mt-[28px] grid gap-[16px] lg:grid-cols-2">
@@ -3029,39 +5304,90 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="The 3-Level Energy Model"
                 icon={REPORT_ASSETS.icons.energyModel}
               />
-              <WhiteCard>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {(
-                    ["flow", "stabilising", "frustration"] as DriverGroup[]
-                  ).map((group, index) => {
-                    const g = GROUP_COPY[group];
-                    const text = GENERIC_CONTENT.threeLevelEnergyModel[group];
-                    return (
-                      <div
-                        key={group}
-                        className={cls(
-                          "rounded-2xl border p-5",
-                          g.bg,
-                          g.border,
-                        )}
-                      >
-                        <div className={cls("text-5xl font-bold", g.text)}>
-                          {index + 1}
-                        </div>
-                        <h3 className={cls("mt-4 font-bold", g.text)}>
-                          {g.heading
-                            .replace(" — Your Top 2", "")
-                            .replace(" — Your Middle 2", "")
-                            .replace(" — Your Bottom 2", "")}
-                        </h3>
-                        <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                          {text.map((x) => (
-                            <li key={x}>• {x}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
+              <WhiteCard className="p-[24px]">
+                <h3 className="text-[14px] font-bold leading-[22px] text-[#111828]">
+                  Professional Performance Rhythm – Driver Framework
+                </h3>
+                <div className="mt-[18px] text-[10px] font-bold uppercase leading-[16px] tracking-[1px] text-[#313C52]">
+                  Understanding the RHYTHM Model
+                </div>
+                <div className="mt-[18px] grid gap-[16px] lg:grid-cols-2">
+                  <div className="rounded-[18px] border border-[#4092C5] bg-white p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <p>
+                      The Professional Performance Rhythm framework is grounded in established organisational psychology principles, particularly:
+                    </p>
+                    <ul className="mt-[10px] space-y-[4px]">
+                      <li>• Person–Job Fit Theory (Kristof-Brown, 2005)</li>
+                      <li>• Self-Determination Theory (Deci & Ryan, 2000)</li>
+                      <li>• Strengths-Based Performance Research (Clifton & Harter, Gallup)</li>
+                      <li>• Cognitive Load and Decision-Making Models (Kahneman, 2011)</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-[18px] border border-[#4092C5] bg-white p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <p>These frameworks consistently show that:</p>
+                    <ul className="mt-[10px] space-y-[4px]">
+                      <li>• Individuals perform best when working in areas of natural cognitive and behavioural preference.</li>
+                      <li>• Sustained performance declines when individuals operate outside these zones for extended periods.</li>
+                      <li>• Teams perform optimally when complementary strengths are distributed, not duplicated.</li>
+                    </ul>
+                  </div>
+                </div>
+                <p className="mt-[18px] text-[13px] leading-[28px] text-[#313C52]">
+                  The RHYTHM model translates these principles into six observable workplace drivers, providing a practical lens for understanding how individuals contribute to team performance and project execution.
+                </p>
+              </WhiteCard>
+
+              <WhiteCard className="mt-[22px] p-[24px]">
+                <h3 className="text-[14px] font-bold leading-[22px] text-[#111828]">
+                  Driver Categories and Performance Energy
+                </h3>
+                <p className="mt-[14px] text-[13px] leading-[28px] text-[#313C52]">
+                  Each driver operates across three levels:
+                </p>
+                <div className="mt-[22px] grid gap-[18px] md:grid-cols-3">
+                  <div className="rounded-[12px] border border-[#16A34A] bg-green-50 p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <h4 className="text-[15px] font-bold text-[#16A34A]">Flow Drivers</h4>
+                    <div className="mt-[4px] font-bold text-[#16A34A]">(High Energy / High Alignment)</div>
+                    <p className="mt-[14px]">These represent areas of natural alignment between:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Cognitive preference</li>
+                      <li>• Behavioural tendency</li>
+                      <li>• Motivational energy</li>
+                    </ul>
+                    <p className="mt-[14px]">Research shows that individuals working in these zones experience:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Higher engagement</li>
+                      <li>• Faster decision-making</li>
+                      <li>• Greater resilience under pressure</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-[12px] border border-[#F59E0B] bg-amber-50 p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <h4 className="text-[15px] font-bold text-[#F59E0B]">Stabilising Drivers</h4>
+                    <div className="mt-[4px] font-bold text-[#F59E0B]">(Moderate Energy / Adaptive Use)</div>
+                    <p className="mt-[14px]">These drivers sit within an individual's functional capability but are not intrinsically energising.</p>
+                    <p className="mt-[14px]">They are associated with:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Learned behaviours</li>
+                      <li>• Situational adaptability</li>
+                      <li>• Role-based necessity</li>
+                    </ul>
+                    <p className="mt-[14px]">While useful, over-reliance can lead to:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Reduced engagement</li>
+                      <li>• Increased cognitive effort</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-[12px] border border-[#BC1823] bg-red-50 p-[24px] text-[13px] leading-[28px] text-[#313C52]">
+                    <h4 className="text-[15px] font-bold text-[#BC1823]">Frustration Drivers</h4>
+                    <div className="mt-[4px] font-bold text-[#BC1823]">(Low Energy / High Effort)</div>
+                    <p className="mt-[14px]">These represent areas of misalignment between natural preference and required behaviour. Operating in these areas consistently is linked to:</p>
+                    <ul className="mt-[8px] space-y-[4px]">
+                      <li>• Cognitive fatigue</li>
+                      <li>• Reduced performance quality</li>
+                      <li>• Increased stress and disengagement</li>
+                    </ul>
+                    <p className="mt-[14px]">These are not weaknesses, but energy-draining zones.</p>
+                  </div>
                 </div>
               </WhiteCard>
             </Card>
@@ -3126,45 +5452,11 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Energy mix – how your profiles work together"
                 icon={REPORT_ASSETS.icons.energyMix}
               />
-              <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">
-                  As a <strong>{profileName}</strong>, your core contribution is
-                  shaped by {topFreqName} energy. Your RHYTHM adds another
-                  layer: it shows the conditions and behaviours that help you
-                  create results sustainably.
-                </p>
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl border border-green-500 bg-green-50 p-4">
-                    <div className="font-bold text-green-700">Lean into</div>
-                    <p className="mt-2 text-sm text-slate-700">
-                      {flow.map((d) => DRIVER_COPY[d].label).join(" and ")} when
-                      you need momentum, confidence, and stronger contribution.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-amber-500 bg-amber-50 p-4">
-                    <div className="font-bold text-amber-700">
-                      Use consciously
-                    </div>
-                    <p className="mt-2 text-sm text-slate-700">
-                      {stabilising
-                        .map((d) => DRIVER_COPY[d].label)
-                        .join(" and ")}{" "}
-                      can support balance, but may require more intention.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-red-500 bg-red-50 p-4">
-                    <div className="font-bold text-red-700">
-                      Get support around
-                    </div>
-                    <p className="mt-2 text-sm text-slate-700">
-                      {frustration
-                        .map((d) => DRIVER_COPY[d].label)
-                        .join(" and ")}{" "}
-                      may drain energy if overused for too long.
-                    </p>
-                  </div>
-                </div>
-              </WhiteCard>
+              <EnergyMatrixSection
+                profileCode={profileCode}
+                profileName={profileName}
+                blocks={profileContent.energyMatrix}
+              />
             </Card>
 
             <Card>
@@ -3172,43 +5464,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Team Role Fit"
                 icon={REPORT_ASSETS.icons.teamRoleFit}
               />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <p className="text-sm leading-7 text-slate-700">
-                    Your profile gives language to your natural team role. Use
-                    this section as a Johari-style reflection: what others see
-                    clearly, what you may underplay, what you hold back, and
-                    what potential is still emerging.
-                  </p>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.icons.teamRoleFit}
-                      alt="Team role fit"
-                      className="mx-auto max-h-[160px] w-full object-contain"
-                    />
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {[
-                    "Open Area — visible strengths",
-                    "Blind Spot — what others may notice",
-                    "Hidden Area — what you may hold back",
-                    "Unknown Area — potential still emerging",
-                  ].map((title) => (
-                    <div
-                      key={title}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <h4 className="font-semibold text-slate-900">{title}</h4>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">
-                        Reflect on how your {profileName} style shows up here
-                        and what support helps you contribute with more
-                        confidence.
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </WhiteCard>
+              <TeamRoleFitSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -3216,49 +5472,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Your Value Creation Pathway"
                 icon={REPORT_ASSETS.icons.valueCreationPathway}
               />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <p className="text-sm leading-7 text-slate-700">
-                    You create value when your profile contribution and your
-                    RHYTHM drivers work together. Your strongest pathway is to
-                    use your natural contribution style while designing your
-                    work around the drivers that create energy rather than drain
-                    it.
-                  </p>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.icons.valueCreationPathway}
-                      alt="Value creation pathway"
-                      className="mx-auto max-h-[160px] w-full object-contain"
-                    />
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">
-                      You deliver your best value when
-                    </h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      You work in roles and projects that let you express{" "}
-                      {profileName} strengths and your Flow Drivers.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">You build trust when</h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      You communicate your needs clearly and help others
-                      understand your natural working rhythm.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">You leverage value when</h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      You partner with people whose strengths complement your
-                      Frustration Drivers.
-                    </p>
-                  </div>
-                </div>
-              </WhiteCard>
+              <ValueCreationPathwaySection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -3266,37 +5480,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Collaboration Tips"
                 icon={REPORT_ASSETS.icons.collaborationTips}
               />
-              <WhiteCard>
-                <p className="text-sm leading-7 text-slate-700">
-                  You thrive in teams that respect both contribution and rhythm.
-                  Use these tips to collaborate with more awareness.
-                </p>
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">Best collaborators</h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      People who bring structure, clarity, emotional
-                      intelligence, or complementary execution energy.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">When working with fast movers</h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      Translate vision into people-aligned messages and
-                      practical next steps.
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">
-                      When working with detail thinkers
-                    </h4>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
-                      Give structure, evidence, and enough clarity for them to
-                      trust the process.
-                    </p>
-                  </div>
-                </div>
-              </WhiteCard>
+              <CollaborationTipsSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -3304,42 +5488,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="Development Recommendations"
                 icon={REPORT_ASSETS.icons.developmentRecommendations}
               />
-              <WhiteCard>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div>
-                    <h4 className="font-bold text-slate-900">
-                      To elevate performance
-                    </h4>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                      <li>• Protect time for your Flow Drivers.</li>
-                      <li>
-                        • Build simple support around your Frustration Drivers.
-                      </li>
-                      <li>
-                        • Use Stabilising Drivers without over-relying on them.
-                      </li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900">Daily anchors</h4>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                      <li>• What gives me energy today?</li>
-                      <li>• What task needs support or structure?</li>
-                      <li>• Where am I pushing against my rhythm?</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900">
-                      Reflection prompts
-                    </h4>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                      <li>• When do I feel most effective?</li>
-                      <li>• Who complements my working rhythm?</li>
-                      <li>• What should I stop carrying alone?</li>
-                    </ul>
-                  </div>
-                </div>
-              </WhiteCard>
+              <DevelopmentRecommendationsSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -3347,47 +5496,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                 title="What Could Be Holding You Back?"
                 icon={REPORT_ASSETS.icons.whatsHoldingYouBack}
               />
-              <WhiteCard>
-                <div className="grid gap-6 lg:grid-cols-[1fr_220px] lg:items-start">
-                  <p className="text-sm leading-7 text-slate-700">
-                    Sometimes the behaviours that make you valuable can also
-                    become limiting when overused. Use this section to
-                    self-audit and rebalance.
-                  </p>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <ReportAssetImage
-                      src={REPORT_ASSETS.icons.whatsHoldingYouBack}
-                      alt="What could be holding you back"
-                      className="mx-auto max-h-[160px] w-full object-contain"
-                    />
-                  </div>
-                </div>
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">Weekly check-in prompts</h4>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                      <li>
-                        • What emotional or practical weight am I carrying?
-                      </li>
-                      <li>• Where am I compromising too often?</li>
-                      <li>• What did I notice but not say?</li>
-                    </ul>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <h4 className="font-bold">Monthly calibration metrics</h4>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-                      <li>• Times I redirected confusion constructively.</li>
-                      <li>
-                        • Discussions where I contributed a bridge or solution.
-                      </li>
-                      <li>
-                        • One opportunity where I influenced direction without
-                        needing credit.
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </WhiteCard>
+              <HoldingBackSection profileContent={profileContent} />
             </Card>
 
             <Card>
@@ -3403,8 +5512,9 @@ export default function TeamPuzzleRhythmReportClient(props: {
                   <NextStepCard
                     title={GENERIC_CONTENT.nextSteps.cards[0].title}
                     body={GENERIC_CONTENT.nextSteps.cards[0].body}
-                    button={GENERIC_CONTENT.nextSteps.cards[0].button}
-                    href={null}
+                    button={pdfBusy ? "Preparing..." : GENERIC_CONTENT.nextSteps.cards[0].button}
+                    onClick={handleDownloadPdf}
+                    disabled={pdfBusy}
                   />
                   <NextStepCard
                     title={GENERIC_CONTENT.nextSteps.cards[1].title}
@@ -3431,3 +5541,4 @@ export default function TeamPuzzleRhythmReportClient(props: {
     </div>
   );
 }
+
