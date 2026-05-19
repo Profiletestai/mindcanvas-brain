@@ -2,8 +2,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import AppBackground from "@/components/ui/AppBackground";
 
 type FrequencyCode = "A" | "B" | "C" | "D";
@@ -3423,69 +3421,38 @@ export default function TeamPuzzleRhythmReportClient(props: {
   }, [token, tid, src, isPortalViewer]);
 
   async function handleDownloadPdf() {
-    if (!reportRef.current || pdfBusy) return;
+    if (pdfBusy) return;
 
-    const element = reportRef.current;
-    const prevScroll = window.scrollY;
     setPdfBusy(true);
-    window.scrollTo(0, 0);
 
     try {
-      await Promise.all(
-        Array.from(element.querySelectorAll("img")).map((img) => {
-          const image = img as HTMLImageElement;
-          if (image.complete) return Promise.resolve();
-          return new Promise<void>((resolve) => {
-            image.onload = () => resolve();
-            image.onerror = () => resolve();
-          });
-        }),
+      const qs = new URLSearchParams({ token, tid });
+      if (src) qs.set("src", src);
+
+      const res = await fetch(
+        `/api/reports/team-puzzle-rhythm-pdf?${qs.toString()}`,
+        { cache: "no-store" },
       );
-      await new Promise((resolve) => requestAnimationFrame(resolve));
 
-      const canvas = await html2canvas(element, {
-        scale: 1.25,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#061A3A",
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-        logging: false,
-        imageTimeout: 15000,
-        ignoreElements: (node) =>
-          node instanceof HTMLElement &&
-          node.getAttribute("data-html2canvas-ignore") === "true",
-      });
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      if (!res.ok) {
+        const message = await res.text().catch(() => "");
+        throw new Error(message || `PDF download failed with HTTP ${res.status}`);
       }
 
-      pdf.save(`team-puzzle-rhythm-report-${token}.pdf`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `team-puzzle-rhythm-report-${token}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("PDF download failed", e);
+      console.error("Server PDF download failed", e);
       window.print();
     } finally {
       setPdfBusy(false);
-      window.scrollTo(0, prevScroll);
     }
   }
 
