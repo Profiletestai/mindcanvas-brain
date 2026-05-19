@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import AppBackground from "@/components/ui/AppBackground";
 
 type FrequencyCode = "A" | "B" | "C" | "D";
@@ -3421,38 +3423,224 @@ export default function TeamPuzzleRhythmReportClient(props: {
   }, [token, tid, src, isPortalViewer]);
 
   async function handleDownloadPdf() {
-    if (pdfBusy) return;
+    if (!reportRef.current || pdfBusy) return;
 
     setPdfBusy(true);
 
+    const originalScrollY = window.scrollY;
+
     try {
-      const qs = new URLSearchParams({ token, tid });
-      if (src) qs.set("src", src);
+      const root = reportRef.current;
+      const main = root.querySelector("main") as HTMLElement | null;
 
-      const res = await fetch(
-        `/api/reports/team-puzzle-rhythm-pdf?${qs.toString()}`,
-        { cache: "no-store" },
-      );
-
-      if (!res.ok) {
-        const message = await res.text().catch(() => "");
-        throw new Error(message || `PDF download failed with HTTP ${res.status}`);
+      if (!main) {
+        throw new Error("Could not find report main element.");
       }
 
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `team-puzzle-rhythm-report-${token}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      window.scrollTo(0, 0);
+
+      await Promise.all(
+        Array.from(root.querySelectorAll("img")).map((img) => {
+          const image = img as HTMLImageElement;
+          if (image.complete) return Promise.resolve();
+
+          return new Promise<void>((resolve) => {
+            image.onload = () => resolve();
+            image.onerror = () => resolve();
+          });
+        }),
+      );
+
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      const mainWidth = Math.ceil(main.getBoundingClientRect().width || 1180);
+      const maxPageHeightPx = Math.floor(
+        mainWidth * (pdfHeight / pdfWidth) * 0.92,
+      );
+
+      const reportGrid = Array.from(main.children).find((child) => {
+        return (
+          child instanceof HTMLElement &&
+          child.querySelector("aside") &&
+          child.querySelector("aside + div")
+        );
+      }) as HTMLElement | undefined;
+
+      const preReportBlocks: HTMLElement[] = [];
+
+      Array.from(main.children).forEach((child) => {
+        if (!(child instanceof HTMLElement)) return;
+        if (child === reportGrid) return;
+        preReportBlocks.push(child);
+      });
+
+      const contentColumn = reportGrid?.querySelector(
+        "aside + div",
+      ) as HTMLElement | null;
+
+      const reportContentBlocks = contentColumn
+        ? Array.from(contentColumn.children).filter(
+            (child): child is HTMLElement => child instanceof HTMLElement,
+          )
+        : [];
+
+      const blocks = [...preReportBlocks, ...reportContentBlocks].filter(
+        (block) => {
+          if (block.getAttribute("data-html2canvas-ignore") === "true") {
+            return false;
+          }
+          if (block.getAttribute("data-pdf-exclude") === "true") {
+            return false;
+          }
+          return true;
+        },
+      );
+
+      if (!blocks.length) {
+        throw new Error("No report blocks found for PDF export.");
+      }
+
+      function getOuterHeight(el: HTMLElement) {
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        const marginTop = Number.parseFloat(style.marginTop || "0") || 0;
+        const marginBottom = Number.parseFloat(style.marginBottom || "0") || 0;
+        return Math.ceil(rect.height + marginTop + marginBottom);
+      }
+
+      const pages: HTMLElement[][] = [];
+      let currentPage: HTMLElement[] = [];
+      let currentHeight = 0;
+
+      for (const block of blocks) {
+        const blockHeight = getOuterHeight(block);
+        const shouldStartNewPage =
+          currentPage.length > 0 && currentHeight + blockHeight > maxPageHeightPx;
+
+        if (shouldStartNewPage) {
+          pages.push(currentPage);
+          currentPage = [];
+          currentHeight = 0;
+        }
+
+        currentPage.push(block);
+        currentHeight += blockHeight;
+      }
+
+      if (currentPage.length) {
+        pages.push(currentPage);
+      }
+
+      const stage = document.createElement("div");
+      stage.style.position = "fixed";
+      stage.style.left = "-100000px";
+      stage.style.top = "0";
+      stage.style.width = `${mainWidth}px`;
+      stage.style.background = "#061A3A";
+      stage.style.color = "white";
+      stage.style.zIndex = "-1";
+      stage.style.pointerEvents = "none";
+      stage.style.opacity = "1";
+
+      document.body.appendChild(stage);
+
+      try {
+        for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+          stage.innerHTML = "";
+
+          const pageShell = document.createElement("div");
+          pageShell.style.width = `${mainWidth}px`;
+          pageShell.style.background = "#061A3A";
+          pageShell.style.padding = "24px";
+          pageShell.style.boxSizing = "border-box";
+
+          for (const originalBlock of pages[pageIndex]) {
+            const clone = originalBlock.cloneNode(true) as HTMLElement;
+
+            clone
+              .querySelectorAll("[data-html2canvas-ignore='true']")
+              .forEach((node) => {
+                node.remove();
+              });
+
+            clone.querySelectorAll("[data-pdf-exclude='true']").forEach((node) => {
+              node.remove();
+            });
+
+            clone.style.position = "relative";
+            clone.style.transform = "none";
+            clone.style.breakInside = "avoid";
+            clone.style.pageBreakInside = "avoid";
+
+            pageShell.appendChild(clone);
+          }
+
+          stage.appendChild(pageShell);
+
+          await Promise.all(
+            Array.from(stage.querySelectorAll("img")).map((img) => {
+              const image = img as HTMLImageElement;
+              if (image.complete) return Promise.resolve();
+
+              return new Promise<void>((resolve) => {
+                image.onload = () => resolve();
+                image.onerror = () => resolve();
+              });
+            }),
+          );
+
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+
+          const canvas = await html2canvas(pageShell, {
+            scale: 1.8,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: "#061A3A",
+            scrollX: 0,
+            scrollY: 0,
+            logging: false,
+            imageTimeout: 15000,
+            ignoreElements: (node) =>
+              node instanceof HTMLElement &&
+              (node.getAttribute("data-html2canvas-ignore") === "true" ||
+                node.getAttribute("data-pdf-exclude") === "true"),
+          });
+
+          const imgData = canvas.toDataURL("image/jpeg", 0.94);
+
+          let imgWidth = pdfWidth;
+          let imgHeight = (canvas.height * imgWidth) / canvas.width;
+          let x = 0;
+          const y = 0;
+
+          if (imgHeight > pdfHeight) {
+            imgHeight = pdfHeight;
+            imgWidth = (canvas.width * imgHeight) / canvas.height;
+            x = (pdfWidth - imgWidth) / 2;
+          }
+
+          if (pageIndex > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
+        }
+      } finally {
+        stage.remove();
+      }
+
+      pdf.save(`team-puzzle-rhythm-report-${token}.pdf`);
     } catch (e) {
-      console.error("Server PDF download failed", e);
+      console.error("PDF download failed", e);
       window.print();
     } finally {
       setPdfBusy(false);
+      window.scrollTo(0, originalScrollY);
     }
   }
 
