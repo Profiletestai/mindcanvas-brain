@@ -45,6 +45,11 @@ type FrameworkQuestion = {
   options: FrameworkOption[];
 };
 
+type ReportContentBlock = {
+  section_key: "oss" | "rfs" | "cvs";
+  content: any;
+};
+
 function verticalBandMidpoint(band: string): number | null {
   switch (band) {
     case "1-2":
@@ -160,6 +165,75 @@ function buildIdealCandidateProfile(input: {
         `In a team context, this ideal candidate should contribute through the behavioural strengths associated with ${primaryStyle}. ` +
         `They are expected to support the system by bringing the right balance of contribution, ownership, and collaboration for the role. ` +
         `At ${careerVertical} level, their team impact should extend beyond personal delivery and support wider alignment, performance, and execution.`,
+    },
+  };
+}
+
+async function fetchReportSections(input: {
+  sb: ReturnType<typeof supa>;
+  frameworkSlug: string;
+  frameworkVersion: string;
+  operatingStyleCode: string | null;
+  careerVertical: any;
+}) {
+  const fallback = {
+    operating_style_summary: null,
+    role_fit_summary: null,
+    career_vertical_summary: input.careerVertical
+      ? {
+          current_vertical: {
+            code: input.careerVertical.code,
+            label: input.careerVertical.label,
+            avg_score: input.careerVertical.avg_score,
+            summary: null,
+          },
+        }
+      : null,
+  };
+
+  if (!input.operatingStyleCode) return fallback;
+
+  const { data, error } = await input.sb
+    .from("report_content_blocks")
+    .select("section_key, content")
+    .eq("framework_slug", input.frameworkSlug)
+    .eq("framework_version", input.frameworkVersion)
+    .eq("operating_style_code", input.operatingStyleCode)
+    .eq("is_active", true)
+    .in("section_key", ["oss", "rfs", "cvs"]);
+
+  if (error) throw new Error(error.message);
+
+  const bySection: Record<"oss" | "rfs" | "cvs", any> = {
+    oss: null,
+    rfs: null,
+    cvs: null,
+  };
+
+  for (const block of (data || []) as ReportContentBlock[]) {
+    bySection[block.section_key] = block.content;
+  }
+
+  const cvsContent = bySection.cvs || {};
+
+  return {
+    operating_style_summary: bySection.oss,
+    role_fit_summary: bySection.rfs,
+    career_vertical_summary: {
+      ...cvsContent,
+      current_vertical: input.careerVertical
+        ? {
+            code: input.careerVertical.code,
+            label: input.careerVertical.label,
+            avg_score: input.careerVertical.avg_score,
+            summary:
+              cvsContent?.levels?.[input.careerVertical.code] ||
+              cvsContent?.levels?.[
+                `CV${String(input.careerVertical.code).replace("V", "")}`
+              ] ||
+              null,
+          }
+        : null,
     },
   };
 }
@@ -511,6 +585,14 @@ export async function POST(req: Request) {
       careerWords: cvWords,
     });
 
+    const reportSections = await fetchReportSections({
+      sb,
+      frameworkSlug: framework_slug,
+      frameworkVersion: framework_version,
+      operatingStyleCode: topOperatingStyle?.code || null,
+      careerVertical,
+    });
+
     const resultPayload = {
       scoring: {
         model_version: "mcas-score-v1",
@@ -532,15 +614,13 @@ export async function POST(req: Request) {
         },
       },
       wording,
-
-      // Kept for backward compatibility
       ideal_candidate_profile: idealCandidateProfile,
-
-      // Added so reverse/IJP response also has result.report, matching candidate API shape
       report: {
         ideal_candidate_profile: idealCandidateProfile,
+        operating_style_summary: reportSections.operating_style_summary,
+        role_fit_summary: reportSections.role_fit_summary,
+        career_vertical_summary: reportSections.career_vertical_summary,
       },
-
       audit: {
         answers: answerAudit,
       },
