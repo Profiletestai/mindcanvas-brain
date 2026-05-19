@@ -3429,6 +3429,79 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
     const originalScrollY = window.scrollY;
 
+    function waitForImages(container: HTMLElement, timeoutMs = 3500) {
+      const images = Array.from(
+        container.querySelectorAll("img"),
+      ) as HTMLImageElement[];
+
+      return Promise.all(
+        images.map(
+          (image) =>
+            new Promise<void>((resolve) => {
+              try {
+                image.loading = "eager";
+                image.decoding = "sync";
+              } catch {
+                // Older browsers may not allow these fields. Safe to ignore.
+              }
+
+              if (image.complete) {
+                resolve();
+                return;
+              }
+
+              let settled = false;
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timer);
+                image.removeEventListener("load", finish);
+                image.removeEventListener("error", finish);
+                resolve();
+              };
+
+              const timer = window.setTimeout(finish, timeoutMs);
+              image.addEventListener("load", finish, { once: true });
+              image.addEventListener("error", finish, { once: true });
+
+              // Lazy images that are far down the report may never start loading
+              // while we are at the top of the page. Re-applying src nudges the
+              // browser to fetch them now, and the timeout prevents the button
+              // from getting stuck on "Preparing...".
+              const src = image.currentSrc || image.src;
+              if (src) {
+                try {
+                  image.src = src;
+                } catch {
+                  finish();
+                }
+              }
+
+              if (typeof image.decode === "function") {
+                image.decode().then(finish).catch(() => {
+                  // decode can reject for cross-origin or already-broken images.
+                  // onerror/timeout will resolve the wait.
+                });
+              }
+            }),
+        ),
+      ).then(() => undefined);
+    }
+
+    function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+      let timer: number | undefined;
+
+      const timeout = new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => {
+          reject(new Error(label));
+        }, timeoutMs);
+      });
+
+      return Promise.race([promise, timeout]).finally(() => {
+        if (timer) window.clearTimeout(timer);
+      }) as Promise<T>;
+    }
+
     try {
       const root = reportRef.current;
       const main = root.querySelector("main") as HTMLElement | null;
@@ -3438,19 +3511,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
       }
 
       window.scrollTo(0, 0);
-
-      await Promise.all(
-        Array.from(root.querySelectorAll("img")).map((img) => {
-          const image = img as HTMLImageElement;
-          if (image.complete) return Promise.resolve();
-
-          return new Promise<void>((resolve) => {
-            image.onload = () => resolve();
-            image.onerror = () => resolve();
-          });
-        }),
-      );
-
+      await waitForImages(root, 4000);
       await new Promise((resolve) => requestAnimationFrame(resolve));
       await new Promise((resolve) => setTimeout(resolve, 250));
 
@@ -3572,6 +3633,12 @@ export default function TeamPuzzleRhythmReportClient(props: {
               node.remove();
             });
 
+            clone.querySelectorAll("img").forEach((node) => {
+              const image = node as HTMLImageElement;
+              image.loading = "eager";
+              image.decoding = "sync";
+            });
+
             clone.style.position = "relative";
             clone.style.transform = "none";
             clone.style.breakInside = "avoid";
@@ -3582,34 +3649,27 @@ export default function TeamPuzzleRhythmReportClient(props: {
 
           stage.appendChild(pageShell);
 
-          await Promise.all(
-            Array.from(stage.querySelectorAll("img")).map((img) => {
-              const image = img as HTMLImageElement;
-              if (image.complete) return Promise.resolve();
-
-              return new Promise<void>((resolve) => {
-                image.onload = () => resolve();
-                image.onerror = () => resolve();
-              });
-            }),
-          );
-
+          await waitForImages(pageShell, 4000);
           await new Promise((resolve) => requestAnimationFrame(resolve));
 
-          const canvas = await html2canvas(pageShell, {
-            scale: 1.8,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: "#061A3A",
-            scrollX: 0,
-            scrollY: 0,
-            logging: false,
-            imageTimeout: 15000,
-            ignoreElements: (node) =>
-              node instanceof HTMLElement &&
-              (node.getAttribute("data-html2canvas-ignore") === "true" ||
-                node.getAttribute("data-pdf-exclude") === "true"),
-          });
+          const canvas = await withTimeout(
+            html2canvas(pageShell, {
+              scale: 1.8,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: "#061A3A",
+              scrollX: 0,
+              scrollY: 0,
+              logging: false,
+              imageTimeout: 8000,
+              ignoreElements: (node) =>
+                node instanceof HTMLElement &&
+                (node.getAttribute("data-html2canvas-ignore") === "true" ||
+                  node.getAttribute("data-pdf-exclude") === "true"),
+            }),
+            30000,
+            `PDF page ${pageIndex + 1} took too long to render.`,
+          );
 
           const imgData = canvas.toDataURL("image/jpeg", 0.94);
 
@@ -5481,3 +5541,4 @@ export default function TeamPuzzleRhythmReportClient(props: {
     </div>
   );
 }
+
