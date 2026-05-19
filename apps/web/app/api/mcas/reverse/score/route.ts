@@ -67,7 +67,9 @@ function clamp(n: number, min: number, max: number) {
 function normalize(obj: Record<string, number>) {
   const sum = Object.values(obj).reduce((acc, v) => acc + v, 0) || 1;
   const out: Record<string, number> = {};
-  for (const k of Object.keys(obj)) out[k] = Number((obj[k] / sum).toFixed(4));
+  for (const k of Object.keys(obj)) {
+    out[k] = Number((obj[k] / sum).toFixed(4));
+  }
   return out;
 }
 
@@ -94,9 +96,7 @@ async function getWordMappings(
     .eq("mapping_code", mappingCode)
     .order("sort_order", { ascending: true });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
   return (data || [])
     .map((x: any) => String(x.word_or_phrase || "").trim())
@@ -177,7 +177,9 @@ export async function POST(req: Request) {
 
     const partner_key = String(body?.partner_key || "").trim();
     const job_id = String(body?.job_id || "").trim();
-    const campaign_id = body?.campaign_id ? String(body.campaign_id).trim() : null;
+    const campaign_id = body?.campaign_id
+      ? String(body.campaign_id).trim()
+      : null;
     const title = String(body?.title || "").trim();
     const framework_slug =
       String(body?.framework_slug || "").trim() || "mcas-core-alignment";
@@ -391,13 +393,20 @@ export async function POST(req: Request) {
             verticalReadinessSignal = true;
           }
         } else {
-          const mid = opt.vertical_band ? verticalBandMidpoint(opt.vertical_band) : null;
+          const mid = opt.vertical_band
+            ? verticalBandMidpoint(opt.vertical_band)
+            : null;
+
           if (mid == null) {
             return NextResponse.json(
-              { ok: false, error: `Missing vertical_band on ${qCode}:${optionCode}` },
+              {
+                ok: false,
+                error: `Missing vertical_band on ${qCode}:${optionCode}`,
+              },
               { status: 500 }
             );
           }
+
           verticalValues.push(mid);
         }
       }
@@ -409,7 +418,9 @@ export async function POST(req: Request) {
       .map(([code, raw]) => ({ code, raw }))
       .sort((a, b) => b.raw - a.raw);
 
-    const osSum = operatingStyleRanking.reduce((acc, x) => acc + x.raw, 0) || 1;
+    const osSum =
+      operatingStyleRanking.reduce((acc, x) => acc + x.raw, 0) || 1;
+
     const operatingStyleEnriched = operatingStyleRanking.map((x, idx) => ({
       code: x.code,
       label: osLabels[x.code] || x.code,
@@ -420,7 +431,9 @@ export async function POST(req: Request) {
     const topOperatingStyle = operatingStyleEnriched[0] || null;
 
     const vAvg =
-      verticalValues.reduce((acc, v) => acc + v, 0) / (verticalValues.length || 1);
+      verticalValues.reduce((acc, v) => acc + v, 0) /
+      (verticalValues.length || 1);
+
     const verticalLevel = clamp(Math.round(vAvg), 1, 6);
     const verticalCode = `V${verticalLevel}`;
 
@@ -519,7 +532,15 @@ export async function POST(req: Request) {
         },
       },
       wording,
+
+      // Kept for backward compatibility
       ideal_candidate_profile: idealCandidateProfile,
+
+      // Added so reverse/IJP response also has result.report, matching candidate API shape
+      report: {
+        ideal_candidate_profile: idealCandidateProfile,
+      },
+
       audit: {
         answers: answerAudit,
       },
