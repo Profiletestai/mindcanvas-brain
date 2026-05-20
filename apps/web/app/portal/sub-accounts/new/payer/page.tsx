@@ -123,7 +123,7 @@ export default function SubPayerPage() {
     const parentSlug = getParentOrgSlug();
     clearDraft();
     const dest = parentSlug
-      ? `/portal/${encodeURIComponent(parentSlug)}/dashboard?created=${encodeURIComponent(res.org_slug)}`
+      ? `/portal/${encodeURIComponent(parentSlug)}/sub-accounts?created=${encodeURIComponent(res.org_slug)}`
       : `/portal/dashboard-v2?created=${encodeURIComponent(res.org_slug)}`;
     router.push(dest);
   });

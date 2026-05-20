@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, type Resolver } from "react-hook-form";
+import { Controller, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { PhoneField } from "@/app/(v2)/onboarding/v2/_components/PhoneField";
 import { StepCard } from "@/app/(v2)/onboarding/v2/_components/StepCard";
 import {
   subOwnerSchema,
@@ -44,6 +45,7 @@ export default function SubOwnerPage() {
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<SubOwnerInput, unknown, SubOwnerOutput>({
@@ -85,12 +87,8 @@ export default function SubOwnerPage() {
     return <div className="py-8 text-center text-white/70">Loading…</div>;
   }
 
-  const errMsg =
-    errors.owner_first_name?.message ??
-    errors.owner_last_name?.message ??
-    errors.owner_email?.message ??
-    errors.owner_phone?.message ??
-    errors.root?.message;
+  const fieldError = (msg?: string) =>
+    msg ? <p className="mt-1 text-xs text-rose-500">{msg}</p> : null;
 
   return (
     <StepCard
@@ -124,6 +122,7 @@ export default function SubOwnerPage() {
               className={inputClass}
               style={inputStyle}
             />
+            {fieldError(errors.owner_first_name?.message)}
           </div>
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
@@ -136,6 +135,7 @@ export default function SubOwnerPage() {
               className={inputClass}
               style={inputStyle}
             />
+            {fieldError(errors.owner_last_name?.message)}
           </div>
         </div>
 
@@ -150,22 +150,31 @@ export default function SubOwnerPage() {
             className={inputClass}
             style={inputStyle}
           />
+          {fieldError(errors.owner_email?.message)}
         </div>
 
         <div className="mt-5">
           <label className="block mb-1.5" style={eyebrowStyle}>
             Phone <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
           </label>
-          <input
-            type="tel"
-            placeholder="+1 555 555 5555"
-            {...register("owner_phone")}
-            className={inputClass}
-            style={inputStyle}
+          <Controller
+            control={control}
+            name="owner_phone"
+            render={({ field }) => (
+              <PhoneField
+                value={(field.value as string | undefined) ?? ""}
+                onChange={field.onChange}
+              />
+            )}
           />
+          {fieldError(errors.owner_phone?.message)}
         </div>
 
-        {errMsg && <div className="mt-4 text-sm text-rose-500">{errMsg}</div>}
+        {errors.root?.message && (
+          <div className="mt-4 text-sm text-rose-500">
+            {errors.root.message}
+          </div>
+        )}
 
         <div className="mt-6 flex gap-3">
           <button
