@@ -2,40 +2,33 @@ import { NextResponse } from "next/server";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { assertOrgOwner } from "@/app/_lib/portal";
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
+import { patchSubAccountSchema, uuidWithMsg } from "../_lib/schema";
+import { PATCH_RPC_ERRORS, mapRpcError, parseOr400 } from "../_lib/errors";
 
 export const dynamic = "force-dynamic";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type PatchBody = { action?: "suspend" | "reactivate" | "archive" };
+const childOrgIdSchema = uuidWithMsg("childOrgId must be a UUID");
 
 export async function PATCH(
   req: Request,
-  ctx: { params: Promise<{ childOrgId: string }> }
+  ctx: { params: Promise<{ childOrgId: string }> },
 ) {
   try {
     const { user, error: authError } = await getAuthUser();
     if (authError) return authError;
 
     const { childOrgId } = await ctx.params;
-    if (!UUID_RE.test(childOrgId))
+    const idParsed = childOrgIdSchema.safeParse(childOrgId);
+    if (!idParsed.success)
       return NextResponse.json(
-        { ok: false, error: "childOrgId must be a UUID" },
-        { status: 400 }
+        { ok: false, error: idParsed.error.issues[0].message },
+        { status: 400 },
       );
 
-    const body = (await req.json().catch(() => ({}))) as PatchBody;
-    const action = body.action;
-    if (action !== "suspend" && action !== "reactivate" && action !== "archive")
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "action must be 'suspend', 'reactivate', or 'archive'",
-          field: "action",
-        },
-        { status: 400 }
-      );
+    const raw = await req.json().catch(() => ({}));
+    const parsed = parseOr400(patchSubAccountSchema, raw);
+    if (!parsed.ok) return parsed.response;
+    const { action } = parsed.data;
 
     const admin = portalAdmin();
 
@@ -49,19 +42,19 @@ export async function PATCH(
     if (relError)
       return NextResponse.json(
         { ok: false, error: relError.message },
-        { status: 500 }
+        { status: 500 },
       );
     if (!rel)
       return NextResponse.json(
         { ok: false, error: "child_not_found" },
-        { status: 404 }
+        { status: 404 },
       );
 
     const access = await assertOrgOwner(user.id, rel.parent_org_id);
     if (!access.ok)
       return NextResponse.json(
         { ok: false, error: access.error },
-        { status: access.status }
+        { status: access.status },
       );
 
     const { data: newStatus, error: rpcError } = await admin.rpc(
@@ -70,29 +63,19 @@ export async function PATCH(
         p_caller_user_id: user.id,
         p_child_org_id: childOrgId,
         p_action: action,
-      }
+      },
     );
 
     if (rpcError) {
-      const msg = rpcError.message || "";
-      if (msg.includes("invalid_transition"))
-        return NextResponse.json(
-          { ok: false, error: "invalid_transition" },
-          { status: 409 }
-        );
-      if (msg.includes("child_not_found"))
-        return NextResponse.json(
-          { ok: false, error: "child_not_found" },
-          { status: 404 }
-        );
-      if (msg.includes("invalid_action"))
-        return NextResponse.json(
-          { ok: false, error: "invalid_action", field: "action" },
-          { status: 400 }
-        );
+      const mapped = mapRpcError(
+        rpcError.message,
+        (rpcError as any).code,
+        PATCH_RPC_ERRORS,
+      );
+      if (mapped) return mapped;
       return NextResponse.json(
         { ok: false, error: rpcError.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -104,7 +87,7 @@ export async function PATCH(
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message || "Unexpected error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

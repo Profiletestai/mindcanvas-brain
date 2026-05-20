@@ -48,8 +48,8 @@ DECLARE
   v_billing_id         uuid;
   v_billing_type       text;
   v_entitlement_status text;
-  v_period_start       timestamptz := date_trunc('month', now());
-  v_period_end         timestamptz := date_trunc('month', now()) + interval '1 month';
+  v_period_start       timestamptz := date_trunc('month', now() AT TIME ZONE 'UTC');
+  v_period_end         timestamptz := date_trunc('month', now() AT TIME ZONE 'UTC') + interval '1 month';
 BEGIN
   -- Validate parent
   SELECT status INTO v_parent_status FROM portal.orgs WHERE id = p_parent_org_id;
@@ -58,6 +58,24 @@ BEGIN
   END IF;
   IF v_parent_status = 'archived' THEN
     RAISE EXCEPTION 'parent_archived';
+  END IF;
+
+  -- AuthZ: caller must be an org_owner of the parent org, OR a
+  -- superadmin. Defense in depth — the API route already enforces
+  -- this, but the RPC must not rely on the caller for authorization
+  -- given it runs as SECURITY DEFINER and bypasses RLS.
+  IF NOT EXISTS (
+    SELECT 1
+      FROM portal.user_orgs
+     WHERE user_id = p_caller_user_id
+       AND org_id  = p_parent_org_id
+       AND role    = 'org_owner'
+  ) AND NOT EXISTS (
+    SELECT 1
+      FROM portal.superadmin
+     WHERE user_id = p_caller_user_id
+  ) THEN
+    RAISE EXCEPTION 'forbidden';
   END IF;
 
   -- Validate tier (v1: only tier 1)
@@ -91,12 +109,22 @@ BEGIN
     WHEN 'self_paid'   THEN 'suspended'
   END;
 
-  -- Insert child org
-  INSERT INTO portal.orgs (
-    name, slug, country, website_url, industry, status, last_completed_step
-  ) VALUES (
-    p_child_name, p_child_slug, p_country_code, p_website, p_industry, v_child_status, 3
-  ) RETURNING id INTO v_child_id;
+  -- Insert child org. Map slug uniqueness collision to a typed
+  -- `slug_taken` exception so the API layer does not have to rely on
+  -- the raw SQLSTATE 23505 fallback.
+  BEGIN
+    INSERT INTO portal.orgs (
+      name, slug, country, website_url, industry, status, last_completed_step
+    ) VALUES (
+      p_child_name, p_child_slug, p_country_code, p_website, p_industry, v_child_status, 3
+    ) RETURNING id INTO v_child_id;
+  EXCEPTION
+    WHEN unique_violation THEN
+      IF SQLERRM ILIKE '%slug%' THEN
+        RAISE EXCEPTION 'slug_taken';
+      END IF;
+      RAISE;
+  END;
 
   -- Grant caller manage access on the child
   INSERT INTO portal.user_orgs (user_id, org_id, role)
@@ -154,6 +182,7 @@ CREATE OR REPLACE FUNCTION portal.fn_update_sub_org_status(
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = portal
 AS $$
 DECLARE
+  v_parent_org_id    uuid;
   v_rel_status       text;
   v_org_status       text;
   v_new_status       text;
@@ -164,13 +193,31 @@ BEGIN
     RAISE EXCEPTION 'invalid_action';
   END IF;
 
-  SELECT r.status INTO v_rel_status
+  SELECT r.parent_org_id, r.status
+    INTO v_parent_org_id, v_rel_status
     FROM portal.org_relationships r
    WHERE r.child_org_id = p_child_org_id
      AND r.relationship_type = 'licensee'
    FOR UPDATE;
   IF v_rel_status IS NULL THEN
     RAISE EXCEPTION 'child_not_found';
+  END IF;
+
+  -- AuthZ: caller must be an org_owner of the parent org, OR a
+  -- superadmin. Defense in depth — RPC runs SECURITY DEFINER and
+  -- bypasses RLS, so it must not rely on the API layer alone.
+  IF NOT EXISTS (
+    SELECT 1
+      FROM portal.user_orgs
+     WHERE user_id = p_caller_user_id
+       AND org_id  = v_parent_org_id
+       AND role    = 'org_owner'
+  ) AND NOT EXISTS (
+    SELECT 1
+      FROM portal.superadmin
+     WHERE user_id = p_caller_user_id
+  ) THEN
+    RAISE EXCEPTION 'forbidden';
   END IF;
 
   SELECT status INTO v_org_status FROM portal.orgs WHERE id = p_child_org_id;

@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { assertOrgOwner } from "@/app/_lib/portal";
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
+import { listQuerySchema } from "./_lib/schema";
+import { parseOr400 } from "./_lib/errors";
 
 export const dynamic = "force-dynamic";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ALLOWED_STATUS = new Set([
   "active",
@@ -40,18 +39,17 @@ export async function GET(req: Request) {
     if (authError) return authError;
 
     const url = new URL(req.url);
-    const parentOrgId = url.searchParams.get("parentOrgId")?.trim() ?? "";
-    if (!UUID_RE.test(parentOrgId))
-      return NextResponse.json(
-        { ok: false, error: "parentOrgId must be a UUID" },
-        { status: 400 }
-      );
+    const parsed = parseOr400(listQuerySchema, {
+      parentOrgId: url.searchParams.get("parentOrgId")?.trim() ?? "",
+    });
+    if (!parsed.ok) return parsed.response;
+    const { parentOrgId } = parsed.data;
 
     const access = await assertOrgOwner(user.id, parentOrgId);
     if (!access.ok)
       return NextResponse.json(
         { ok: false, error: access.error },
-        { status: access.status }
+        { status: access.status },
       );
 
     const statusParam = url.searchParams.get("status")?.trim() || "";
@@ -68,7 +66,7 @@ export async function GET(req: Request) {
       .select(
         `status, payer_mode, owner_first_name, owner_last_name, owner_email,
          owner_phone, created_by_user_id, created_at,
-         child:orgs!child_org_id(id, name, slug, status)`
+         child:orgs!child_org_id(id, name, slug, status)`,
       )
       .eq("parent_org_id", parentOrgId)
       .eq("relationship_type", "licensee")
@@ -82,7 +80,7 @@ export async function GET(req: Request) {
     if (error)
       return NextResponse.json(
         { ok: false, error: error.message },
-        { status: 500 }
+        { status: 500 },
       );
 
     const rows = ((data ?? []) as unknown as RelationshipRow[])
@@ -106,7 +104,7 @@ export async function GET(req: Request) {
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message || "Unexpected error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
