@@ -169,9 +169,12 @@ BEGIN
 END;
 $$;
 
+-- Only service_role may invoke. RPC trusts p_caller_user_id, so granting
+-- to `authenticated` would let any logged-in user spoof another user's
+-- identity by passing their uuid. API path uses service_role.
 GRANT EXECUTE ON FUNCTION portal.fn_create_sub_org(
   uuid, uuid, text, text, text, text, text, text, int, text, text, text, text
-) TO authenticated, service_role;
+) TO service_role;
 
 -- 4. RPC: portal.fn_update_sub_org_status
 CREATE OR REPLACE FUNCTION portal.fn_update_sub_org_status(
@@ -286,5 +289,6 @@ BEGIN
 END;
 $$;
 
+-- service_role only — see note on fn_create_sub_org.
 GRANT EXECUTE ON FUNCTION portal.fn_update_sub_org_status(uuid, uuid, text)
-  TO authenticated, service_role;
+  TO service_role;
