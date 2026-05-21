@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type TimelinePoint = { date: string; submissions: number };
 
@@ -257,6 +257,25 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
   const [drawerErr, setDrawerErr] = useState<string>("");
   const [drawerData, setDrawerData] = useState<any>(null);
 
+  const supportRef = useRef<HTMLDivElement>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
+
+  useEffect(() => {
+    if (!supportOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!supportRef.current?.contains(e.target as Node)) setSupportOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSupportOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [supportOpen]);
+
   const appliedFromIso = useMemo(() => dateInputToIsoStart(fromDate), [fromDate]);
   const appliedToIso = useMemo(() => dateInputToIsoEnd(toDate), [toDate]);
 
@@ -493,17 +512,77 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
       <MindCanvasGrid />
 
       {/* Header */}
-      <div className={wowCard}>
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(900px_260px_at_20%_0%,rgba(100,186,226,0.35),transparent_65%)]" />
-        <div className="absolute inset-0 opacity-15 bg-[radial-gradient(700px_220px_at_90%_30%,rgba(124,92,255,0.30),transparent_60%)]" />
+      <div className="relative z-30 rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(900px_260px_at_20%_0%,rgba(100,186,226,0.35),transparent_65%)]" />
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(700px_220px_at_90%_30%,rgba(124,92,255,0.30),transparent_60%)]" />
+        </div>
         <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
+          <div className="lg:order-1">
             <h1 className="text-3xl font-semibold">Dashboard</h1>
             <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
           </div>
 
+          {/* Help links */}
+          <div className="flex items-center gap-2 lg:order-2">
+            <a
+              href="https://community.profiletest.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+            >
+              Community ↗
+            </a>
+
+            <div className="relative" ref={supportRef}>
+              <button
+                type="button"
+                onClick={() => setSupportOpen((v) => !v)}
+                aria-expanded={supportOpen}
+                aria-haspopup="dialog"
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+              >
+                Support
+              </button>
+
+              {supportOpen && (
+                <div
+                  role="dialog"
+                  className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-white/10 bg-[#0a1422]/95 p-4 text-sm text-white shadow-xl backdrop-blur"
+                >
+                  <div className="font-semibold">How do you get help?</div>
+                  <p className="mt-2 text-white/75">
+                    You can always email{" "}
+                    <a className="underline" href="mailto:support@profiletest.ai">
+                      support@profiletest.ai
+                    </a>{" "}
+                    for support. In emergencies or technical support use{" "}
+                    <a className="underline" href="mailto:sos@profiletest.ai">
+                      sos@profiletest.ai
+                    </a>
+                    .
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      href="mailto:support@profiletest.ai"
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs hover:bg-white/10"
+                    >
+                      support@profiletest.ai
+                    </a>
+                    <a
+                      href="mailto:sos@profiletest.ai"
+                      className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs text-amber-100 hover:bg-amber-400/20"
+                    >
+                      sos@profiletest.ai (emergency)
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end lg:order-3">
             <div className="min-w-[240px]">
               <label className="block text-xs text-white/60 mb-1">Test</label>
               <select
