@@ -1,37 +1,32 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/app/_lib/portal";
 import { resolvePostLoginNext } from "@/app/_lib/portal-postauth";
+import { verifyOtpSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 
 export const dynamic = "force-dynamic";
 
-type LoginResponse =
-  | {
-      ok: true;
-      next: string;
-      is_superadmin: boolean;
-      org_slug: string | null;
-    }
-  | { ok: false; error: string };
-
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const email = (body?.email || "").trim();
-    const password = String(body?.password || "");
-
-    if (!email || !password) {
+    const raw = await req.json().catch(() => ({}));
+    const parsed = verifyOtpSchema.safeParse(raw);
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "Email and password required" },
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
         { status: 400 }
       );
     }
+    const { email, token } = parsed.data;
 
     const sb = await getServerSupabase();
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    const { data, error } = await sb.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
 
     if (error || !data?.user) {
       return NextResponse.json(
-        { ok: false, error: error?.message || "Invalid credentials" },
+        { ok: false, error: error?.message || "Invalid or expired code" },
         { status: 401 }
       );
     }
