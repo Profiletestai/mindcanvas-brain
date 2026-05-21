@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,7 +42,7 @@ const EMPTY: SubOrgInput = {
   industry: "",
 };
 
-export default function SubOrganisationPage() {
+function SubOrganisationForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const [ready, setReady] = useState(false);
@@ -238,5 +238,15 @@ export default function SubOrganisationPage() {
         </button>
       </form>
     </StepCard>
+  );
+}
+
+export default function SubOrganisationPage() {
+  return (
+    <Suspense
+      fallback={<div className="py-8 text-center text-white/70">Loading…</div>}
+    >
+      <SubOrganisationForm />
+    </Suspense>
   );
 }
