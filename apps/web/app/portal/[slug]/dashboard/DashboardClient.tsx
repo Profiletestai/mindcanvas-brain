@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type TimelinePoint = { date: string; submissions: number };
 
@@ -231,6 +232,23 @@ function SparklineGlow({ data, height = 130 }: { data: TimelinePoint[]; height?:
 
 export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
   const org = orgSlug;
+  const sp = useSearchParams();
+  const router = useRouter();
+  const createdSlugInitial = sp?.get("created") ?? null;
+  const [createdSlug, setCreatedSlug] = useState<string | null>(createdSlugInitial);
+
+  useEffect(() => {
+    if (!createdSlugInitial) return;
+    const params = new URLSearchParams(sp?.toString() ?? "");
+    params.delete("created");
+    const qs = params.toString();
+    router.replace(
+      qs
+        ? `/portal/${orgSlug}/dashboard?${qs}`
+        : `/portal/${orgSlug}/dashboard`,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const now = new Date();
   const defaultTo = isoToDateInput(now.toISOString());
@@ -492,6 +510,29 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
     <div className="relative min-h-screen p-6 space-y-6 text-white">
       <MindCanvasGrid />
 
+      {createdSlug && (
+        <div
+          role="status"
+          className="rounded-2xl border px-4 py-3 flex items-center justify-between gap-4"
+          style={{
+            background: "rgba(34,197,94,0.10)",
+            borderColor: "rgba(34,197,94,0.35)",
+            color: "rgb(187,247,208)",
+          }}
+        >
+          <span className="text-sm">
+            Sub-account <span className="font-semibold">{createdSlug}</span> created.
+          </span>
+          <button
+            type="button"
+            onClick={() => setCreatedSlug(null)}
+            className="text-xs uppercase tracking-widest text-white/70 hover:text-white"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className={wowCard}>
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(900px_260px_at_20%_0%,rgba(100,186,226,0.35),transparent_65%)]" />
@@ -500,6 +541,27 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
           <div>
             <h1 className="text-3xl font-semibold">Dashboard</h1>
             <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
+            {data?.filters?.orgId && (
+              <div className="mt-3 flex gap-2 flex-wrap">
+                <Link
+                  href={`/portal/sub-accounts/new/organisation?parentOrgId=${encodeURIComponent(data.filters.orgId)}&parentOrgSlug=${encodeURIComponent(org)}`}
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-xl font-semibold text-white"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+                    boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
+                  }}
+                >
+                  + Create sub-account
+                </Link>
+                <Link
+                  href={`/portal/${encodeURIComponent(org)}/sub-accounts`}
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-xl font-semibold text-white border border-white/15 bg-white/[0.06] hover:bg-white/[0.1]"
+                >
+                  Manage sub-accounts
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Filters */}

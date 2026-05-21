@@ -16,6 +16,7 @@ const ENABLE_COMMUNICATIONS_TAB = false;
 
 const tabs = [
   { label: "Dashboard", path: "dashboard" },
+  { label: "Sub-accounts", path: "sub-accounts" },
   { label: "Database", path: "database" },
   { label: "Tests", path: "tests" },
   { label: "Communications", path: "communications" }, // disabled via flag
