@@ -2277,9 +2277,10 @@ function RhythmPuzzlePieceImage(props: {
   );
 }
 
-function Card(props: { children: ReactNode; className?: string }) {
+function Card(props: { children: ReactNode; className?: string; id?: string }) {
   return (
     <section
+      id={props.id}
       className={cls(
         "rounded-3xl border border-white/10 bg-[#0C203A]/80 p-5 shadow-2xl shadow-black/20",
         props.className,
@@ -3982,6 +3983,17 @@ export default function LegacyOrgReportClient(props: {
   } = derived;
   const topFreqCopy = FREQUENCY_COPY[topFreq];
 
+  function handleNextStepsClick() {
+    if (nextStepsUrl) {
+      window.open(nextStepsUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    document
+      .getElementById("report-next-steps")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div
       ref={reportRef}
@@ -4008,18 +4020,14 @@ export default function LegacyOrgReportClient(props: {
             >
               {pdfBusy ? "Preparing..." : "Download PDF"}
             </button>
-            {nextStepsUrl ? (
-              <button
-                type="button"
-                onClick={() =>
-                  window.open(nextStepsUrl, "_blank", "noopener,noreferrer")
-                }
-                data-html2canvas-ignore="true"
-                className="h-[37px] rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[13px] font-semibold leading-[20px] text-[#071C36]"
-              >
-                Next steps
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={handleNextStepsClick}
+              data-html2canvas-ignore="true"
+              className="h-[37px] rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[13px] font-semibold leading-[20px] text-[#071C36]"
+            >
+              Next steps
+            </button>
           </div>
 
           <div className="flex items-start gap-[13px] pr-[240px]">
@@ -4039,9 +4047,6 @@ export default function LegacyOrgReportClient(props: {
               </div>
               <div className="mt-[10px] text-[13px] font-bold uppercase leading-[19.5px] tracking-[3.64px] text-white/75">
                 Life Puzzle
-              </div>
-              <div className="mt-[13px] inline-flex rounded-full border border-white/15 bg-white/5 px-[12px] py-[3px] text-[10px] font-bold uppercase tracking-[0.25em] text-white/75">
-                powered by profiletest.ai
               </div>
             </div>
           </div>
@@ -4232,23 +4237,14 @@ export default function LegacyOrgReportClient(props: {
               >
                 {pdfBusy ? "Preparing..." : "Download PDF"}
               </button>
-              {nextStepsUrl ? (
-                <a
-                  href={nextStepsUrl}
-                  data-html2canvas-ignore="true"
-                  className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
-                >
-                  Next step
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  data-html2canvas-ignore="true"
-                  className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
-                >
-                  Next step
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleNextStepsClick}
+                data-html2canvas-ignore="true"
+                className="inline-flex h-[31px] items-center justify-center rounded-[8px] bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-[14px] text-[11px] font-semibold leading-[16px] text-[#071C36] shadow-sm"
+              >
+                Next step
+              </button>
             </div>
           </aside>
 
@@ -5180,7 +5176,7 @@ export default function LegacyOrgReportClient(props: {
               <HoldingBackSection profileContent={profileContent} />
             </Card>
 
-            <Card>
+            <Card className="scroll-mt-8" id="report-next-steps">
               <SectionHeader
                 title="Your Next Steps"
                 icon={REPORT_ASSETS.icons.nextSteps}
@@ -5208,7 +5204,7 @@ export default function LegacyOrgReportClient(props: {
                     title={GENERIC_CONTENT.nextSteps.cards[2].title}
                     body={GENERIC_CONTENT.nextSteps.cards[2].body}
                     button={GENERIC_CONTENT.nextSteps.cards[2].button}
-                    href={data.org?.website_url || nextStepsUrl}
+                    href="https://lifepuzzle.com.au/"
                   />
                 </div>
                 <div className="mt-6 text-sm text-slate-500">
@@ -5218,6 +5214,12 @@ export default function LegacyOrgReportClient(props: {
             </Card>
           </div>
         </div>
+
+        <footer className="mt-8 pb-2 text-center">
+          <div className="inline-flex rounded-full border border-white/15 bg-white/5 px-[12px] py-[4px] text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">
+            powered by profiletest.ai®
+          </div>
+        </footer>
       </main>
     </div>
   );
