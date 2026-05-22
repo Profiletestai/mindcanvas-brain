@@ -5542,7 +5542,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
                     title={GENERIC_CONTENT.nextSteps.cards[2].title}
                     body={GENERIC_CONTENT.nextSteps.cards[2].body}
                     button={GENERIC_CONTENT.nextSteps.cards[2].button}
-                    href={data.org?.website_url || nextStepsUrl}
+                    href="https://lifepuzzle.com.au/"
                   />
                 </div>
                 <div className="mt-6 text-sm text-slate-500">
