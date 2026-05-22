@@ -3883,9 +3883,6 @@ export default function TeamPuzzleRhythmReportClient(props: {
               <div className="mt-[10px] text-[13px] font-bold uppercase leading-[19.5px] tracking-[3.64px] text-white/75">
                 Life Puzzle
               </div>
-              <div className="mt-[13px] inline-flex rounded-full border border-white/15 bg-white/5 px-[12px] py-[3px] text-[10px] font-bold uppercase tracking-[0.25em] text-white/75">
-                powered by profiletest.ai
-              </div>
             </div>
           </div>
 
@@ -5537,6 +5534,10 @@ export default function TeamPuzzleRhythmReportClient(props: {
             </Card>
           </div>
         </div>
+
+        <footer className="mt-8 pb-2 text-center text-[10px] font-bold uppercase tracking-[0.25em] text-white/45">
+          powered by profiletest.ai®
+        </footer>
       </main>
     </div>
   );
