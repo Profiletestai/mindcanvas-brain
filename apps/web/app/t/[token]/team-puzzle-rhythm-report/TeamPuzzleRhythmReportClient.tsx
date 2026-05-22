@@ -2066,6 +2066,22 @@ function formatDate(value?: string | null) {
   });
 }
 
+function compactFrameworkName(value?: string | null) {
+  const name = String(value || "").trim();
+
+  if (!name) return "Team Puzzle RHYTHM Edition";
+
+  return name
+    .replace(
+      /Team Puzzle Assessment\s*[—–-]\s*RHYTHM Edition/i,
+      "Team Puzzle RHYTHM Edition",
+    )
+    .replace(
+      /Team Puzzle Discovery Assessment\s*[—–-]\s*RHYTHM Edition/i,
+      "Team Puzzle RHYTHM Edition",
+    );
+}
+
 function profileCodeToShort(code: string) {
   const m = String(code || "").match(/(\d+)/);
   return m ? `P${m[1]}` : code;
@@ -3735,6 +3751,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
     return {
       participantName,
       orgName,
+      frameworkName: compactFrameworkName(data.test.name),
       profileName,
       profileCode,
       profileContent,
@@ -3806,6 +3823,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
   const {
     participantName,
     orgName,
+    frameworkName,
     profileName,
     profileCode,
     profileContent,
@@ -3886,7 +3904,7 @@ export default function TeamPuzzleRhythmReportClient(props: {
             </div>
           </div>
 
-          <div className="mt-[14px] grid gap-[10px] md:ml-auto md:mr-0 md:w-[697px] md:grid-cols-[168px_168px_1fr]">
+          <div className="mt-[14px] grid gap-[10px] md:ml-auto md:mr-0 md:w-[760px] md:grid-cols-[168px_168px_minmax(0,1fr)] lg:w-[820px]">
             <div className="h-[70px] rounded-[18px] border border-white/10 bg-gradient-to-b from-[rgba(35,62,97,0.72)] to-[rgba(18,38,64,0.78)] px-[15px] py-[12px]">
               <div className="text-[10px] leading-[15px] text-white/55">
                 Prepared for
@@ -3907,8 +3925,8 @@ export default function TeamPuzzleRhythmReportClient(props: {
               <div className="text-[10px] leading-[15px] text-white/55">
                 Framework
               </div>
-              <div className="mt-[6px] text-[16px] font-semibold leading-[20px] text-white">
-                {data.test.name || "Team Puzzle Discovery Assessment"}
+              <div className="mt-[6px] text-[15px] font-semibold leading-[18px] text-white">
+                {frameworkName}
               </div>
             </div>
           </div>
