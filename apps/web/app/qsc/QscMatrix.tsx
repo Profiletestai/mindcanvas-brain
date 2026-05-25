@@ -32,9 +32,17 @@ export type QscMatrixProps = {
   // Optional – will be used later for more nuanced shading
   personalityPercentages?: Partial<Record<PersonalityKey, number>>;
   mindsetPercentages?: Partial<Record<MindsetKey, number>>;
+
+  // Optional copy overrides (default to the Buyer Persona Matrix literals so
+  // existing leader/entrepreneur callers are unaffected).
+  title?: string;
+  eyebrow?: string;
+  description?: string;
 };
 
-const PERSONALITY_COLUMNS: { key: PersonalityKey; label: string; code: string }[] =
+type PersonalityColumn = { key: PersonalityKey; label: string; code: string };
+
+const PERSONALITY_COLUMNS: PersonalityColumn[] =
   [
     { key: "FIRE", label: "Fire", code: "A" },
     { key: "FLOW", label: "Flow", code: "B" },
@@ -42,7 +50,9 @@ const PERSONALITY_COLUMNS: { key: PersonalityKey; label: string; code: string }[
     { key: "FIELD", label: "Field", code: "D" },
   ];
 
-const MINDSET_ROWS: { key: MindsetKey; label: string; level: number }[] = [
+type MindsetRow = { key: MindsetKey; label: string; level: number };
+
+const MINDSET_ROWS: MindsetRow[] = [
   { key: "ORIGIN", level: 1, label: "Origin" },
   { key: "MOMENTUM", level: 2, label: "Momentum" },
   { key: "VECTOR", level: 3, label: "Vector" },
@@ -106,6 +116,12 @@ function getCellState(
 }
 
 export function QscMatrix(props: QscMatrixProps) {
+  const eyebrow = props.eyebrow ?? "Quantum Source Code";
+  const title = props.title ?? "Buyer Persona Matrix";
+  const description =
+    props.description ??
+    "This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection.";
+
   return (
     <section
       aria-labelledby="qsc-matrix-heading"
@@ -113,18 +129,16 @@ export function QscMatrix(props: QscMatrixProps) {
     >
       <header className="flex flex-col gap-2 mb-5 md:mb-6">
         <p className="text-xs font-semibold tracking-[0.22em] uppercase text-sky-300/80">
-          Quantum Source Code
+          {eyebrow}
         </p>
         <h2
           id="qsc-matrix-heading"
           className="text-xl md:text-2xl font-semibold text-slate-50"
         >
-          Buyer Persona Matrix
+          {title}
         </h2>
         <p className="text-xs md:text-sm text-slate-300 max-w-2xl">
-          This grid maps your Buyer Frequency Type (left to right) against your
-          Buyer Mindset Level (bottom to top). Your combined profile sits at the
-          intersection.
+          {description}
         </p>
       </header>
 

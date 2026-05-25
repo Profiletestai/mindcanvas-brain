@@ -5,6 +5,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
+import { StandardResultGraphs, QscResultGraphs } from "./ResultGraphs";
 
 export const dynamic = "force-dynamic";
 
@@ -47,32 +48,6 @@ function codeToPShort(code?: string | null) {
   if (m) return `P${m[1]}`;
   const m2 = code.match(/P(\d+)/i);
   return m2 ? `P${m2[1]}` : code;
-}
-
-function BarRow({
-  label,
-  pct,
-  note,
-}: {
-  label: string;
-  pct: number;
-  note?: string;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-48 text-sm">
-        <span className="font-medium">{label}</span>
-        {note ? <span className="text-gray-500"> {note}</span> : null}
-      </div>
-      <div className="flex-1 h-2 rounded bg-gray-200">
-        <div
-          className="h-2 rounded bg-blue-600"
-          style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-        />
-      </div>
-      <div className="w-10 text-right text-sm tabular-nums">{pct}%</div>
-    </div>
-  );
 }
 
 type QscAudience = "entrepreneur" | "leader";
@@ -261,14 +236,27 @@ export default async function TakerDetail({
   const fullName =
     [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
 
-  const sortedProfilePct = sortDesc(profilePct);
-  const topThreeProfiles = sortedProfilePct.slice(0, 3).map(([name, pct]) => {
-    const pMeta = profiles.find((p) => p.name === name);
-    const code = pMeta?.code || "";
-    return { name, pct, code };
-  });
+  // Standard-test chart data (mirrors the Frequencies bars + Personality Map
+  // radar the respondent's own report renders).
+  const freqChart = (["A", "B", "C", "D"] as const).map((code) => ({
+    code,
+    name:
+      (freqSource.find(
+        (x: any) => String(x?.code).toUpperCase() === code,
+      )?.label as string) ||
+      freqLabels[code] ||
+      code,
+    pct: freqPct[code] ?? 0,
+  }));
 
-  const labels = ["Primary profile", "Secondary", "Tertiary"];
+  const profileRadarLabels = profiles.map((p) => ({
+    code: codeToPShort(p.code) || p.name,
+    name: p.name,
+  }));
+
+  const profileRadarPct: Record<string, number> = Object.fromEntries(
+    profiles.map((p) => [codeToPShort(p.code) || p.name, profilePct[p.name] ?? 0]),
+  );
 
   const slugLower = String(test?.slug || "").toLowerCase();
   const testNameLower = String(test?.name || "").toLowerCase();
@@ -294,17 +282,25 @@ export default async function TakerDetail({
   let qscStrategicUrl: string | null = null;
 
   let qscAudience: QscAudience | null = null;
+  // QSC and GED both read from qsc_results (same table/API). Fetch once.
+  let qscRow: any = null;
 
-  if (isQsc && taker.link_token) {
-    const { data: qscRow } = await sb
+  if ((isQsc || isGed) && taker.link_token) {
+    const { data } = await sb
       .from("qsc_results")
-      .select("audience, created_at")
+      .select(
+        "audience, created_at, personality_percentages, mindset_percentages, primary_personality, secondary_personality, primary_mindset, secondary_mindset, combined_profile_code",
+      )
       .eq("token", taker.link_token)
       .eq("taker_id", taker.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    qscRow = data;
+  }
+
+  if (isQsc && taker.link_token) {
     const aud = (qscRow?.audience as QscAudience | null) ?? null;
 
     if (aud === "leader" || aud === "entrepreneur") {
@@ -422,7 +418,7 @@ export default async function TakerDetail({
                   : "—"}
               </dd>
 
-              {!isVisibility && (
+              {!isVisibility && !isQsc && !isGed && (
                 <>
                   <dt className="text-gray-500">Top profile</dt>
                   <dd className="col-span-2">
@@ -536,75 +532,30 @@ export default async function TakerDetail({
           </div>
         )}
 
-        {!isVisibility && (
-          <>
-            <div className="space-y-2 pt-4">
-              <h3 className="font-medium">Frequency mix</h3>
-              {["A", "B", "C", "D"].map((f) => (
-                <BarRow
-                  key={f}
-                  label={
-                    (freqSource.find(
-                      (x: any) => String(x?.code).toUpperCase() === f
-                    )?.label as string) ||
-                    freqLabels[f] ||
-                    f
-                  }
-                  note={`(${f})`}
-                  pct={freqPct[f] ?? 0}
-                />
-              ))}
-            </div>
+        {!isVisibility && !isQsc && !isGed && (
+          <StandardResultGraphs
+            freq={freqChart}
+            profileLabels={profileRadarLabels}
+            profilePct={profileRadarPct}
+          />
+        )}
 
-            <div className="space-y-2">
-              <h3 className="font-medium">Profile mix</h3>
-              {Object.keys(profilePct).length ? (
-                sortDesc(profilePct).map(([name, pct]) => {
-                  const p = profiles.find((x) => x.name === name);
-                  const short = codeToPShort(p?.code || "");
-                  return (
-                    <BarRow
-                      key={name}
-                      label={name}
-                      note={short ? `(${short})` : undefined}
-                      pct={pct}
-                    />
-                  );
-                })
-              ) : (
-                <p className="text-sm text-gray-500">
-                  Profile-level scores aren’t available for this result (only
-                  frequencies were stored).
-                </p>
-              )}
-            </div>
-
-            {topThreeProfiles.length > 0 && (
-              <div className="grid gap-4 md:grid-cols-3 pt-4">
-                {topThreeProfiles.map((p, idx) => (
-                  <div
-                    key={p.name}
-                    className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      {labels[idx] || "Profile"}
-                    </p>
-                    <h3 className="mt-1 text-base font-semibold text-slate-900">
-                      {p.name}
-                    </h3>
-                    {p.code && (
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                        {p.code}
-                      </p>
-                    )}
-                    <p className="mt-2 text-sm font-medium text-slate-800">
-                      {p.pct}% match
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+        {(isQsc || isGed) && qscRow && (
+          <QscResultGraphs
+            variant={
+              isGed
+                ? "ged"
+                : qscAudience === "leader"
+                  ? "qsc-leader"
+                  : "qsc-entrepreneur"
+            }
+            personality={qscRow.personality_percentages ?? {}}
+            mindset={qscRow.mindset_percentages ?? {}}
+            primaryPersonality={qscRow.primary_personality}
+            secondaryPersonality={qscRow.secondary_personality}
+            primaryMindset={qscRow.primary_mindset}
+            secondaryMindset={qscRow.secondary_mindset}
+          />
         )}
       </section>
 
