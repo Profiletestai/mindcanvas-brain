@@ -29,24 +29,65 @@ type Row = {
   status: string;
 };
 
-function pct(part: number, total: number) {
+function percent(part: number, total: number) {
   if (!total) return "0%";
   return `${Math.round((part / total) * 100)}%`;
 }
 
-function badge(value: boolean | null) {
-  if (value === true) return "✅ Match";
-  if (value === false) return "⚠️ Review";
-  return "—";
+function clean(value: string | null | undefined) {
+  return value || "Unknown";
 }
 
-function countBy(rows: Row[], key: keyof Row) {
+function countBy(rows: Row[], getKey: (row: Row) => string) {
   const out: Record<string, number> = {};
   for (const row of rows) {
-    const value = String(row[key] || "Unknown");
-    out[value] = (out[value] || 0) + 1;
+    const key = getKey(row);
+    out[key] = (out[key] || 0) + 1;
   }
-  return out;
+  return Object.entries(out)
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function clusterRows(rows: Row[], type: "os" | "cv") {
+  const map: Record<string, { expected: string; calculated: string; count: number }> = {};
+
+  for (const row of rows) {
+    const match = type === "os" ? row.os_match : row.cv_match;
+    if (match === true) continue;
+
+    const expected =
+      type === "os" ? clean(row.expected_primary_os) : clean(row.expected_primary_cv);
+    const calculated =
+      type === "os" ? clean(row.calculated_primary_os) : clean(row.calculated_primary_cv);
+
+    const key = `${expected} → ${calculated}`;
+
+    map[key] = map[key] || { expected, calculated, count: 0 };
+    map[key].count += 1;
+  }
+
+  return Object.values(map).sort((a, b) => b.count - a.count);
+}
+
+function badge(value: boolean | null) {
+  if (value === true) {
+    return (
+      <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-xs text-emerald-200">
+        Match
+      </span>
+    );
+  }
+
+  if (value === false) {
+    return (
+      <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs text-amber-200">
+        Review
+      </span>
+    );
+  }
+
+  return <span className="text-slate-500">—</span>;
 }
 
 export default async function Page({
@@ -67,9 +108,7 @@ export default async function Page({
       : "";
 
   const q =
-    typeof params.q === "string" && params.q.trim()
-      ? params.q.trim()
-      : "";
+    typeof params.q === "string" && params.q.trim() ? params.q.trim() : "";
 
   const sb = mcasSupa();
 
@@ -86,34 +125,41 @@ export default async function Page({
   if (q) query = query.ilike("job_title", `%${q}%`);
 
   const { data, error } = await query;
-
   const rows = (data || []) as Row[];
 
   const total = rows.length;
   const osMatches = rows.filter((r) => r.os_match === true).length;
   const cvMatches = rows.filter((r) => r.cv_match === true).length;
+  const bothMatch = rows.filter((r) => r.os_match === true && r.cv_match === true).length;
   const needsReview = rows.filter((r) => r.status === "needs_review").length;
-  const scored = rows.filter((r) => r.status === "scored").length;
 
-  const expectedOs = countBy(rows, "expected_primary_os");
-  const calculatedOs = countBy(rows, "calculated_primary_os");
-  const expectedCv = countBy(rows, "expected_primary_cv");
-  const calculatedCv = countBy(rows, "calculated_primary_cv");
+  const expectedOs = countBy(rows, (r) => clean(r.expected_primary_os));
+  const calculatedOs = countBy(rows, (r) => clean(r.calculated_primary_os));
+  const expectedCv = countBy(rows, (r) => clean(r.expected_primary_cv));
+  const calculatedCv = countBy(rows, (r) => clean(r.calculated_primary_cv));
+
+  const osClusters = clusterRows(rows, "os").slice(0, 12);
+  const cvClusters = clusterRows(rows, "cv").slice(0, 12);
+
+  const reviewRows = rows
+    .filter((r) => r.os_match === false || r.cv_match === false)
+    .slice(0, 80);
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-8">
-          <p className="text-sm text-slate-400">MCAS</p>
+          <p className="text-sm text-slate-400">MCAS Calibration</p>
           <h1 className="text-3xl font-semibold">Behavioural Dataset</h1>
-          <p className="mt-2 max-w-3xl text-slate-300">
-            Validation centre for MCAS behavioural dataset rows, expected profiles,
-            calculated results, and scoring calibration.
+          <p className="mt-2 max-w-4xl text-slate-300">
+            This dashboard compares Daniel’s canonical behavioural dataset against
+            the current MCAS scorer. It is used to identify scorer drift, OS/CV
+            mismatch patterns, and calibration priorities.
           </p>
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
+          <div className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-200">
             {error.message}
           </div>
         ) : null}
@@ -161,45 +207,57 @@ export default async function Page({
         </form>
 
         <section className="mb-8 grid gap-4 md:grid-cols-5">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-400">Rows</p>
-            <p className="mt-1 text-2xl font-semibold">{total}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-400">Scored</p>
-            <p className="mt-1 text-2xl font-semibold">{scored}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-400">Needs review</p>
-            <p className="mt-1 text-2xl font-semibold">{needsReview}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-400">OS match rate</p>
-            <p className="mt-1 text-2xl font-semibold">{pct(osMatches, total)}</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-400">CV match rate</p>
-            <p className="mt-1 text-2xl font-semibold">{pct(cvMatches, total)}</p>
-          </div>
+          <MetricCard label="Dataset rows" value={String(total)} />
+          <MetricCard label="OS match rate" value={percent(osMatches, total)} sub={`${osMatches}/${total}`} />
+          <MetricCard label="CV match rate" value={percent(cvMatches, total)} sub={`${cvMatches}/${total}`} />
+          <MetricCard label="Both OS + CV match" value={percent(bothMatch, total)} sub={`${bothMatch}/${total}`} />
+          <MetricCard label="Needs review" value={String(needsReview)} />
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5">
+          <h2 className="text-lg font-semibold text-amber-100">What this means</h2>
+          <p className="mt-2 text-sm leading-6 text-amber-100/85">
+            The dataset is the canonical behavioural benchmark. Low match rates do
+            not mean the dataset is wrong. They show where the current scorer is
+            drifting from Daniel’s intended psychometric interpretation. Use the
+            mismatch clusters below to decide what Daniel should review first.
+          </p>
+        </section>
+
+        <section className="mb-8 grid gap-4 lg:grid-cols-2">
+          <ClusterCard
+            title="Top OS mismatch clusters"
+            description="Where the scorer most often disagrees with the expected Operating Style."
+            clusters={osClusters}
+            type="os"
+          />
+
+          <ClusterCard
+            title="Top CV mismatch clusters"
+            description="Where the scorer most often disagrees with the expected Career Vertical."
+            clusters={cvClusters}
+            type="cv"
+          />
         </section>
 
         <section className="mb-8 grid gap-4 md:grid-cols-4">
-          <DistributionCard title="Expected OS" data={expectedOs} />
-          <DistributionCard title="Calculated OS" data={calculatedOs} />
-          <DistributionCard title="Expected CV" data={expectedCv} />
-          <DistributionCard title="Calculated CV" data={calculatedCv} />
+          <DistributionCard title="Expected OS" data={expectedOs} total={total} />
+          <DistributionCard title="Calculated OS" data={calculatedOs} total={total} />
+          <DistributionCard title="Expected CV" data={expectedCv} total={total} />
+          <DistributionCard title="Calculated CV" data={calculatedCv} total={total} />
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
           <div className="border-b border-white/10 p-4">
-            <h2 className="text-lg font-semibold">Dataset rows</h2>
+            <h2 className="text-lg font-semibold">Review queue</h2>
             <p className="text-sm text-slate-400">
-              Click a row to inspect expected vs calculated results.
+              These are rows where the scorer disagrees with the benchmark. Start
+              with repeated mismatch clusters, not isolated rows.
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
+            <table className="w-full min-w-[1050px] text-left text-sm">
               <thead className="bg-white/5 text-xs uppercase text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Row</th>
@@ -214,8 +272,9 @@ export default async function Page({
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
+
               <tbody>
-                {rows.map((row) => (
+                {reviewRows.map((row) => (
                   <tr key={row.id} className="border-t border-white/10 hover:bg-white/5">
                     <td className="px-4 py-3 text-slate-400">{row.row_number}</td>
                     <td className="px-4 py-3 font-medium">{row.job_title}</td>
@@ -241,10 +300,10 @@ export default async function Page({
                   </tr>
                 ))}
 
-                {!rows.length ? (
+                {!reviewRows.length ? (
                   <tr>
                     <td colSpan={10} className="px-4 py-8 text-center text-slate-400">
-                      No rows found.
+                      No review rows found.
                     </td>
                   </tr>
                 ) : null}
@@ -257,40 +316,111 @@ export default async function Page({
   );
 }
 
+function MetricCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {sub ? <p className="mt-1 text-xs text-slate-500">{sub}</p> : null}
+    </div>
+  );
+}
+
+function ClusterCard({
+  title,
+  description,
+  clusters,
+  type,
+}: {
+  title: string;
+  description: string;
+  clusters: Array<{ expected: string; calculated: string; count: number }>;
+  type: "os" | "cv";
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="mt-1 text-sm text-slate-400">{description}</p>
+      </div>
+
+      <div className="space-y-2">
+        {clusters.map((cluster) => {
+          const href =
+            type === "os"
+              ? `/admin/mcas/behavioural-dataset?status=needs_review&q=&version=v1`
+              : `/admin/mcas/behavioural-dataset?status=needs_review&q=&version=v1`;
+
+          return (
+            <div
+              key={`${cluster.expected}-${cluster.calculated}`}
+              className="flex items-center justify-between rounded-xl bg-white/5 p-3"
+            >
+              <div>
+                <p className="font-medium">
+                  {cluster.expected}{" "}
+                  <span className="text-slate-500">→</span>{" "}
+                  {cluster.calculated}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Expected vs calculated drift
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-semibold">{cluster.count}</p>
+                <p className="text-xs text-slate-500">rows</p>
+              </div>
+            </div>
+          );
+        })}
+
+        {!clusters.length ? (
+          <p className="text-sm text-slate-400">No mismatch clusters found.</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function DistributionCard({
   title,
   data,
+  total,
 }: {
   title: string;
-  data: Record<string, number>;
+  data: Array<{ label: string; count: number }>;
+  total: number;
 }) {
-  const entries = Object.entries(data).sort((a, b) => a[0].localeCompare(b[0]));
-  const total = entries.reduce((sum, [, value]) => sum + value, 0);
-
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <h3 className="mb-3 font-semibold">{title}</h3>
       <div className="space-y-2">
-        {entries.map(([label, value]) => (
-          <div key={label}>
+        {data.map((item) => (
+          <div key={item.label}>
             <div className="mb-1 flex justify-between text-xs">
-              <span className="text-slate-300">{label}</span>
+              <span className="text-slate-300">{item.label}</span>
               <span className="text-slate-400">
-                {value} · {pct(value, total)}
+                {item.count} · {percent(item.count, total)}
               </span>
             </div>
             <div className="h-2 rounded-full bg-white/10">
               <div
                 className="h-2 rounded-full bg-white/60"
-                style={{ width: pct(value, total) }}
+                style={{ width: percent(item.count, total) }}
               />
             </div>
           </div>
         ))}
 
-        {!entries.length ? (
-          <p className="text-sm text-slate-400">No data</p>
-        ) : null}
+        {!data.length ? <p className="text-sm text-slate-400">No data</p> : null}
       </div>
     </div>
   );
