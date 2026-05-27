@@ -24,6 +24,7 @@ type Row = {
   expected_primary_cv: string | null;
   calculated_primary_os: string | null;
   calculated_primary_cv: string | null;
+  calculated_result: any | null;
   os_match: boolean | null;
   cv_match: boolean | null;
   status: string;
@@ -34,8 +35,38 @@ function percent(part: number, total: number) {
   return `${Math.round((part / total) * 100)}%`;
 }
 
+function percentDecimal(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 1) return `${Math.round(n * 100)}%`;
+  return `${Math.round(n)}%`;
+}
+
 function clean(value: string | null | undefined) {
   return value || "Unknown";
+}
+
+function displayCv(value: string | null | undefined) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "—";
+  const match = raw.match(/(?:CV|V)\s*([1-6])/);
+  return match ? `CV${match[1]}` : raw;
+}
+
+function displayOs(value: string | null | undefined) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "—";
+  const match = raw.match(/OS\s*([1-8])/);
+  return match ? `OS${match[1]}` : raw;
+}
+
+function getPrimaryOsPct(row: Row) {
+  const ranking = row.calculated_result?.scoring?.operating_style_ranking;
+  if (!Array.isArray(ranking)) return null;
+
+  const calculated = displayOs(row.calculated_primary_os);
+  const primary = ranking.find((item: any) => displayOs(item?.code) === calculated) || ranking[0];
+  return percentDecimal(primary?.pct);
 }
 
 function countBy(rows: Row[], getKey: (row: Row) => string) {
@@ -63,13 +94,13 @@ function clusterRows(rows: Row[], type: "os" | "cv") {
 
     const expected =
       type === "os"
-        ? clean(row.expected_primary_os)
-        : clean(row.expected_primary_cv);
+        ? displayOs(row.expected_primary_os)
+        : displayCv(row.expected_primary_cv);
 
     const calculated =
       type === "os"
-        ? clean(row.calculated_primary_os)
-        : clean(row.calculated_primary_cv);
+        ? displayOs(row.calculated_primary_os)
+        : displayCv(row.calculated_primary_cv);
 
     const key = `${expected} → ${calculated}`;
 
@@ -125,7 +156,7 @@ export default async function Page({
   let query = sb
     .from("behavioural_dataset")
     .select(
-      "id,row_number,dataset_version,job_title,expected_primary_os,expected_primary_cv,calculated_primary_os,calculated_primary_cv,os_match,cv_match,status"
+      "id,row_number,dataset_version,job_title,expected_primary_os,expected_primary_cv,calculated_primary_os,calculated_primary_cv,calculated_result,os_match,cv_match,status"
     )
     .eq("dataset_version", version)
     .order("row_number", { ascending: true })
@@ -158,10 +189,10 @@ export default async function Page({
         ? needsReviewRows
         : allRows;
 
-  const expectedOs = countBy(allRows, (r) => clean(r.expected_primary_os));
-  const calculatedOs = countBy(allRows, (r) => clean(r.calculated_primary_os));
-  const expectedCv = countBy(allRows, (r) => clean(r.expected_primary_cv));
-  const calculatedCv = countBy(allRows, (r) => clean(r.calculated_primary_cv));
+  const expectedOs = countBy(allRows, (r) => displayOs(r.expected_primary_os));
+  const calculatedOs = countBy(allRows, (r) => displayOs(r.calculated_primary_os));
+  const expectedCv = countBy(allRows, (r) => displayCv(r.expected_primary_cv));
+  const calculatedCv = countBy(allRows, (r) => displayCv(r.calculated_primary_cv));
 
   const osClusters = clusterRows(allRows, "os").slice(0, 12);
   const cvClusters = clusterRows(allRows, "cv").slice(0, 12);
@@ -269,30 +300,15 @@ export default async function Page({
         </section>
 
         <section className="mb-8 grid gap-4 lg:grid-cols-2">
-          <ClusterCard
-            title="Top OS mismatch clusters"
-            clusters={osClusters}
-          />
-
-          <ClusterCard
-            title="Top CV mismatch clusters"
-            clusters={cvClusters}
-          />
+          <ClusterCard title="Top OS mismatch clusters" clusters={osClusters} />
+          <ClusterCard title="Top CV mismatch clusters" clusters={cvClusters} />
         </section>
 
         <section className="mb-8 grid gap-4 md:grid-cols-4">
           <DistributionCard title="Expected OS" data={expectedOs} total={total} />
-          <DistributionCard
-            title="Calculated OS"
-            data={calculatedOs}
-            total={total}
-          />
+          <DistributionCard title="Calculated OS" data={calculatedOs} total={total} />
           <DistributionCard title="Expected CV" data={expectedCv} total={total} />
-          <DistributionCard
-            title="Calculated CV"
-            data={calculatedCv}
-            total={total}
-          />
+          <DistributionCard title="Calculated CV" data={calculatedCv} total={total} />
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
@@ -353,13 +369,14 @@ export default async function Page({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-left text-sm">
+            <table className="w-full min-w-[1120px] text-left text-sm">
               <thead className="bg-white/5 text-xs uppercase text-slate-400">
                 <tr>
                   <th className="px-4 py-3">Row</th>
                   <th className="px-4 py-3">Job title</th>
                   <th className="px-4 py-3">Expected OS</th>
                   <th className="px-4 py-3">Calculated OS</th>
+                  <th className="px-4 py-3">OS %</th>
                   <th className="px-4 py-3">OS</th>
                   <th className="px-4 py-3">Expected CV</th>
                   <th className="px-4 py-3">Calculated CV</th>
@@ -375,23 +392,14 @@ export default async function Page({
                     key={row.id}
                     className="border-t border-white/10 hover:bg-white/5"
                   >
-                    <td className="px-4 py-3 text-slate-400">
-                      {row.row_number}
-                    </td>
+                    <td className="px-4 py-3 text-slate-400">{row.row_number}</td>
                     <td className="px-4 py-3 font-medium">{row.job_title}</td>
-                    <td className="px-4 py-3">
-                      {row.expected_primary_os || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.calculated_primary_os || "—"}
-                    </td>
+                    <td className="px-4 py-3">{displayOs(row.expected_primary_os)}</td>
+                    <td className="px-4 py-3">{displayOs(row.calculated_primary_os)}</td>
+                    <td className="px-4 py-3">{getPrimaryOsPct(row) || "—"}</td>
                     <td className="px-4 py-3">{badge(row.os_match)}</td>
-                    <td className="px-4 py-3">
-                      {row.expected_primary_cv || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.calculated_primary_cv || "—"}
-                    </td>
+                    <td className="px-4 py-3">{displayCv(row.expected_primary_cv)}</td>
+                    <td className="px-4 py-3">{displayCv(row.calculated_primary_cv)}</td>
                     <td className="px-4 py-3">{badge(row.cv_match)}</td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-white/10 px-2 py-1 text-xs">
@@ -411,10 +419,7 @@ export default async function Page({
 
                 {!displayRows.length ? (
                   <tr>
-                    <td
-                      colSpan={10}
-                      className="px-4 py-8 text-center text-slate-400"
-                    >
+                    <td colSpan={11} className="px-4 py-8 text-center text-slate-400">
                       No rows found.
                     </td>
                   </tr>
@@ -512,9 +517,7 @@ function DistributionCard({
           </div>
         ))}
 
-        {!data.length ? (
-          <p className="text-sm text-slate-400">No data</p>
-        ) : null}
+        {!data.length ? <p className="text-sm text-slate-400">No data</p> : null}
       </div>
     </div>
   );

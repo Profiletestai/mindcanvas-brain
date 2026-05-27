@@ -14,25 +14,30 @@ function supa() {
   );
 }
 
-function getBearerToken(req: Request): string | null {
-  const auth = req.headers.get("authorization") || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  return auth.slice("Bearer ".length).trim() || null;
-}
-
-function isAuthorized(req: Request): boolean {
-  const expected = process.env.MCAS_API_BEARER_TOKEN || "";
-  if (!expected) return false;
-  return getBearerToken(req) === expected;
-}
-
 function csvCell(value: unknown) {
   if (value === null || value === undefined) return "";
-
-  const text =
-    typeof value === "object" ? JSON.stringify(value) : String(value);
-
+  const text = typeof value === "object" ? JSON.stringify(value) : String(value);
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function displayCv(value: unknown) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "";
+  const match = raw.match(/(?:CV|V)\s*([1-6])/);
+  return match ? `CV${match[1]}` : raw;
+}
+
+function displayOs(value: unknown) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "";
+  const match = raw.match(/OS\s*([1-8])/);
+  return match ? `OS${match[1]}` : raw;
+}
+
+function pct(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return n <= 1 ? Math.round(n * 100) : Math.round(n);
 }
 
 function getCore(result: any, key: "C" | "O" | "R" | "E") {
@@ -43,23 +48,23 @@ function getOsRanking(result: any) {
   return result?.scoring?.operating_style_ranking || [];
 }
 
-function getOsRankValue(result: any, index: number, field: "code" | "label" | "pct") {
+function getOsRankValue(
+  result: any,
+  index: number,
+  field: "code" | "label" | "pct"
+) {
   const item = getOsRanking(result)?.[index];
+  if (!item) return "";
+  if (field === "code") return displayOs(item.code);
+  if (field === "pct") return pct(item.pct);
   return item?.[field] ?? "";
 }
 
 export async function GET(req: Request) {
   try {
-    if (!isAuthorized(req)) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     const url = new URL(req.url);
     const datasetVersion = url.searchParams.get("version") || "v1";
-    const status = url.searchParams.get("status") || "";
+    const group = url.searchParams.get("group") || "all";
     const q = url.searchParams.get("q") || "";
 
     const sb = supa();
@@ -71,7 +76,6 @@ export async function GET(req: Request) {
       .order("row_number", { ascending: true })
       .limit(5000);
 
-    if (status) query = query.eq("status", status);
     if (q) query = query.ilike("job_title", `%${q}%`);
 
     const { data, error } = await query;
@@ -83,7 +87,15 @@ export async function GET(req: Request) {
       );
     }
 
-    const rows = data || [];
+    let rows = data || [];
+
+    if (group === "matched") {
+      rows = rows.filter((row: any) => row.os_match === true && row.cv_match === true);
+    }
+
+    if (group === "needs_review") {
+      rows = rows.filter((row: any) => row.os_match !== true || row.cv_match !== true);
+    }
 
     const headers = [
       "dataset_version",
@@ -94,6 +106,7 @@ export async function GET(req: Request) {
       "expected_secondary_os",
       "expected_tertiary_os",
       "calculated_primary_os",
+      "calculated_primary_os_pct",
       "os_match",
       "expected_primary_cv",
       "expected_secondary_cv",
@@ -123,20 +136,22 @@ export async function GET(req: Request) {
 
     const csvRows = rows.map((row: any) => {
       const result = row.calculated_result || {};
+      const primaryPct = getOsRankValue(result, 0, "pct");
 
       const values = [
         row.dataset_version,
         row.row_number,
         row.job_title,
         row.job_description,
-        row.expected_primary_os,
-        row.expected_secondary_os,
-        row.expected_tertiary_os,
-        row.calculated_primary_os,
+        displayOs(row.expected_primary_os),
+        displayOs(row.expected_secondary_os),
+        displayOs(row.expected_tertiary_os),
+        displayOs(row.calculated_primary_os),
+        primaryPct,
         row.os_match,
-        row.expected_primary_cv,
-        row.expected_secondary_cv,
-        row.calculated_primary_cv,
+        displayCv(row.expected_primary_cv),
+        displayCv(row.expected_secondary_cv),
+        displayCv(row.calculated_primary_cv),
         row.cv_match,
         row.status,
         getCore(result, "C"),
@@ -152,7 +167,7 @@ export async function GET(req: Request) {
         getOsRankValue(result, 2, "code"),
         getOsRankValue(result, 2, "label"),
         getOsRankValue(result, 2, "pct"),
-        result?.scoring?.career_vertical?.code ?? "",
+        displayCv(result?.scoring?.career_vertical?.code),
         result?.scoring?.career_vertical?.label ?? "",
         result?.scoring?.career_vertical?.avg_score ?? "",
         row.validation_justification,
@@ -164,8 +179,7 @@ export async function GET(req: Request) {
     });
 
     const csv = [headers.map(csvCell).join(","), ...csvRows].join("\n");
-
-    const filename = `mcas-behavioural-dataset-${datasetVersion}.csv`;
+    const filename = `mcas-behavioural-dataset-${datasetVersion}-${group}.csv`;
 
     return new NextResponse(csv, {
       status: 200,

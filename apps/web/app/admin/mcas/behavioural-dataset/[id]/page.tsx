@@ -16,6 +16,27 @@ function mcasSupa() {
   );
 }
 
+function displayCv(value: string | null | undefined) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "—";
+  const match = raw.match(/(?:CV|V)\s*([1-6])/);
+  return match ? `CV${match[1]}` : raw;
+}
+
+function displayOs(value: string | null | undefined) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "—";
+  const match = raw.match(/OS\s*([1-8])/);
+  return match ? `OS${match[1]}` : raw;
+}
+
+function percentDecimal(value: unknown) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  if (n <= 1) return `${Math.round(n * 100)}%`;
+  return `${Math.round(n)}%`;
+}
+
 export default async function Page({
   params,
 }: {
@@ -35,6 +56,9 @@ export default async function Page({
   const scoring = row.calculated_result?.scoring || null;
   const audit = row.calculated_result?.audit?.answers || [];
   const answers = row.answers || {};
+  const osRanking = Array.isArray(scoring?.operating_style_ranking)
+    ? scoring.operating_style_ranking
+    : [];
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -55,10 +79,10 @@ export default async function Page({
         </div>
 
         <section className="mb-8 grid gap-4 md:grid-cols-4">
-          <SummaryCard label="Expected OS" value={row.expected_primary_os} />
-          <SummaryCard label="Calculated OS" value={row.calculated_primary_os} />
-          <SummaryCard label="Expected CV" value={row.expected_primary_cv} />
-          <SummaryCard label="Calculated CV" value={row.calculated_primary_cv} />
+          <SummaryCard label="Expected OS" value={displayOs(row.expected_primary_os)} />
+          <SummaryCard label="Calculated OS" value={displayOs(row.calculated_primary_os)} />
+          <SummaryCard label="Expected CV" value={displayCv(row.expected_primary_cv)} />
+          <SummaryCard label="Calculated CV" value={displayCv(row.calculated_primary_cv)} />
         </section>
 
         <section className="mb-8 grid gap-4 md:grid-cols-2">
@@ -76,23 +100,52 @@ export default async function Page({
         {scoring ? (
           <section className="mb-8 grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h2 className="mb-4 text-xl font-semibold">Operating Style Percentages</h2>
+              <div className="space-y-3">
+                {osRanking.map((item: any) => (
+                  <div key={item.code}>
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span>
+                        {displayOs(item.code)} {item.label ? `· ${item.label}` : ""}
+                      </span>
+                      <span className="text-slate-400">{percentDecimal(item.pct)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10">
+                      <div
+                        className="h-2 rounded-full bg-white/60"
+                        style={{ width: percentDecimal(item.pct) }}
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {!osRanking.length ? (
+                  <p className="text-sm text-slate-400">No operating style ranking found.</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <h2 className="mb-4 text-xl font-semibold">Career Vertical</h2>
+              <div className="rounded-xl bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Calculated vertical</p>
+                <p className="mt-1 text-3xl font-semibold">
+                  {displayCv(scoring?.career_vertical?.code)}
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Average score: {scoring?.career_vertical?.avg_score ?? "—"}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <h2 className="mb-4 text-xl font-semibold">CORE Distribution</h2>
               <JsonPretty data={scoring.core_distribution} />
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h2 className="mb-4 text-xl font-semibold">Operating Style Ranking</h2>
-              <JsonPretty data={scoring.operating_style_ranking} />
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h2 className="mb-4 text-xl font-semibold">Primary Operating Style</h2>
-              <JsonPretty data={scoring.primary_operating_style} />
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-              <h2 className="mb-4 text-xl font-semibold">Career Vertical</h2>
-              <JsonPretty data={scoring.career_vertical} />
+              <h2 className="mb-4 text-xl font-semibold">Full Scoring Payload</h2>
+              <JsonPretty data={scoring} />
             </div>
           </section>
         ) : (
@@ -137,28 +190,16 @@ export default async function Page({
   );
 }
 
-function SummaryCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null;
-}) {
+function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value || "—"}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
     </div>
   );
 }
 
-function MatchCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: boolean | null;
-}) {
+function MatchCard({ title, value }: { title: string; value: boolean | null }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
       <p className="text-sm text-slate-400">{title}</p>
