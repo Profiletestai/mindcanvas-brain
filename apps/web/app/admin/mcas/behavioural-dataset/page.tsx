@@ -40,26 +40,36 @@ function clean(value: string | null | undefined) {
 
 function countBy(rows: Row[], getKey: (row: Row) => string) {
   const out: Record<string, number> = {};
+
   for (const row of rows) {
     const key = getKey(row);
     out[key] = (out[key] || 0) + 1;
   }
+
   return Object.entries(out)
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => b.count - a.count);
 }
 
 function clusterRows(rows: Row[], type: "os" | "cv") {
-  const map: Record<string, { expected: string; calculated: string; count: number }> = {};
+  const map: Record<
+    string,
+    { expected: string; calculated: string; count: number }
+  > = {};
 
   for (const row of rows) {
     const match = type === "os" ? row.os_match : row.cv_match;
     if (match === true) continue;
 
     const expected =
-      type === "os" ? clean(row.expected_primary_os) : clean(row.expected_primary_cv);
+      type === "os"
+        ? clean(row.expected_primary_os)
+        : clean(row.expected_primary_cv);
+
     const calculated =
-      type === "os" ? clean(row.calculated_primary_os) : clean(row.calculated_primary_cv);
+      type === "os"
+        ? clean(row.calculated_primary_os)
+        : clean(row.calculated_primary_cv);
 
     const key = `${expected} → ${calculated}`;
 
@@ -102,10 +112,10 @@ export default async function Page({
       ? params.version.trim()
       : "v1";
 
-  const status =
-    typeof params.status === "string" && params.status.trim()
-      ? params.status.trim()
-      : "";
+  const group =
+    typeof params.group === "string" && params.group.trim()
+      ? params.group.trim()
+      : "all";
 
   const q =
     typeof params.q === "string" && params.q.trim() ? params.q.trim() : "";
@@ -121,41 +131,60 @@ export default async function Page({
     .order("row_number", { ascending: true })
     .limit(1000);
 
-  if (status) query = query.eq("status", status);
   if (q) query = query.ilike("job_title", `%${q}%`);
 
   const { data, error } = await query;
-  const rows = (data || []) as Row[];
+  const allRows = (data || []) as Row[];
 
-  const total = rows.length;
-  const osMatches = rows.filter((r) => r.os_match === true).length;
-  const cvMatches = rows.filter((r) => r.cv_match === true).length;
-  const bothMatch = rows.filter((r) => r.os_match === true && r.cv_match === true).length;
-  const needsReview = rows.filter((r) => r.status === "needs_review").length;
+  const total = allRows.length;
+  const osMatches = allRows.filter((r) => r.os_match === true).length;
+  const cvMatches = allRows.filter((r) => r.cv_match === true).length;
+  const bothMatch = allRows.filter(
+    (r) => r.os_match === true && r.cv_match === true
+  ).length;
 
-  const expectedOs = countBy(rows, (r) => clean(r.expected_primary_os));
-  const calculatedOs = countBy(rows, (r) => clean(r.calculated_primary_os));
-  const expectedCv = countBy(rows, (r) => clean(r.expected_primary_cv));
-  const calculatedCv = countBy(rows, (r) => clean(r.calculated_primary_cv));
+  const needsReviewRows = allRows.filter(
+    (r) => r.os_match !== true || r.cv_match !== true
+  );
 
-  const osClusters = clusterRows(rows, "os").slice(0, 12);
-  const cvClusters = clusterRows(rows, "cv").slice(0, 12);
+  const matchedRows = allRows.filter(
+    (r) => r.os_match === true && r.cv_match === true
+  );
 
-  const reviewRows = rows
-    .filter((r) => r.os_match === false || r.cv_match === false)
-    .slice(0, 80);
+  const displayRows =
+    group === "matched"
+      ? matchedRows
+      : group === "needs_review"
+        ? needsReviewRows
+        : allRows;
+
+  const expectedOs = countBy(allRows, (r) => clean(r.expected_primary_os));
+  const calculatedOs = countBy(allRows, (r) => clean(r.calculated_primary_os));
+  const expectedCv = countBy(allRows, (r) => clean(r.expected_primary_cv));
+  const calculatedCv = countBy(allRows, (r) => clean(r.calculated_primary_cv));
+
+  const osClusters = clusterRows(allRows, "os").slice(0, 12);
+  const cvClusters = clusterRows(allRows, "cv").slice(0, 12);
+
+  const exportHref = `/api/admin/mcas/behavioural-dataset/export?version=${encodeURIComponent(
+    version
+  )}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-8">
-          <p className="text-sm text-slate-400">MCAS Calibration</p>
-          <h1 className="text-3xl font-semibold">Behavioural Dataset</h1>
-          <p className="mt-2 max-w-4xl text-slate-300">
-            This dashboard compares Daniel’s canonical behavioural dataset against
-            the current MCAS scorer. It is used to identify scorer drift, OS/CV
-            mismatch patterns, and calibration priorities.
-          </p>
+        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <p className="text-sm text-slate-400">MCAS Calibration</p>
+            <h1 className="text-3xl font-semibold">Behavioural Dataset</h1>
+          </div>
+
+          <a
+            href={exportHref}
+            className="inline-flex rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-slate-200"
+          >
+            Export CSV
+          </a>
         </div>
 
         {error ? (
@@ -166,7 +195,9 @@ export default async function Page({
 
         <form className="mb-6 grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Dataset version</label>
+            <label className="mb-1 block text-xs text-slate-400">
+              Dataset version
+            </label>
             <input
               name="version"
               defaultValue={version}
@@ -175,22 +206,24 @@ export default async function Page({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Status</label>
+            <label className="mb-1 block text-xs text-slate-400">
+              Group rows
+            </label>
             <select
-              name="status"
-              defaultValue={status}
+              name="group"
+              defaultValue={group}
               className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm"
             >
-              <option value="">All</option>
-              <option value="imported">Imported</option>
-              <option value="scored">Scored</option>
-              <option value="needs_review">Needs review</option>
-              <option value="archived">Archived</option>
+              <option value="all">All rows</option>
+              <option value="matched">Matched only</option>
+              <option value="needs_review">Needs review only</option>
             </select>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Search job title</label>
+            <label className="mb-1 block text-xs text-slate-400">
+              Search job title
+            </label>
             <input
               name="q"
               defaultValue={q}
@@ -206,54 +239,117 @@ export default async function Page({
           </div>
         </form>
 
-        <section className="mb-8 grid gap-4 md:grid-cols-5">
-          <MetricCard label="Dataset rows" value={String(total)} />
-          <MetricCard label="OS match rate" value={percent(osMatches, total)} sub={`${osMatches}/${total}`} />
-          <MetricCard label="CV match rate" value={percent(cvMatches, total)} sub={`${cvMatches}/${total}`} />
-          <MetricCard label="Both OS + CV match" value={percent(bothMatch, total)} sub={`${bothMatch}/${total}`} />
-          <MetricCard label="Needs review" value={String(needsReview)} />
-        </section>
-
-        <section className="mb-8 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5">
-          <h2 className="text-lg font-semibold text-amber-100">What this means</h2>
-          <p className="mt-2 text-sm leading-6 text-amber-100/85">
-            The dataset is the canonical behavioural benchmark. Low match rates do
-            not mean the dataset is wrong. They show where the current scorer is
-            drifting from Daniel’s intended psychometric interpretation. Use the
-            mismatch clusters below to decide what Daniel should review first.
-          </p>
+        <section className="mb-8 grid gap-4 md:grid-cols-6">
+          <MetricCard label="Total rows" value={String(total)} />
+          <MetricCard
+            label="Matched rows"
+            value={String(matchedRows.length)}
+            sub={percent(matchedRows.length, total)}
+          />
+          <MetricCard
+            label="Needs review"
+            value={String(needsReviewRows.length)}
+            sub={percent(needsReviewRows.length, total)}
+          />
+          <MetricCard
+            label="OS match"
+            value={percent(osMatches, total)}
+            sub={`${osMatches}/${total}`}
+          />
+          <MetricCard
+            label="CV match"
+            value={percent(cvMatches, total)}
+            sub={`${cvMatches}/${total}`}
+          />
+          <MetricCard
+            label="OS + CV match"
+            value={percent(bothMatch, total)}
+            sub={`${bothMatch}/${total}`}
+          />
         </section>
 
         <section className="mb-8 grid gap-4 lg:grid-cols-2">
           <ClusterCard
             title="Top OS mismatch clusters"
-            description="Where the scorer most often disagrees with the expected Operating Style."
             clusters={osClusters}
-            type="os"
           />
 
           <ClusterCard
             title="Top CV mismatch clusters"
-            description="Where the scorer most often disagrees with the expected Career Vertical."
             clusters={cvClusters}
-            type="cv"
           />
         </section>
 
         <section className="mb-8 grid gap-4 md:grid-cols-4">
           <DistributionCard title="Expected OS" data={expectedOs} total={total} />
-          <DistributionCard title="Calculated OS" data={calculatedOs} total={total} />
+          <DistributionCard
+            title="Calculated OS"
+            data={calculatedOs}
+            total={total}
+          />
           <DistributionCard title="Expected CV" data={expectedCv} total={total} />
-          <DistributionCard title="Calculated CV" data={calculatedCv} total={total} />
+          <DistributionCard
+            title="Calculated CV"
+            data={calculatedCv}
+            total={total}
+          />
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-          <div className="border-b border-white/10 p-4">
-            <h2 className="text-lg font-semibold">Review queue</h2>
-            <p className="text-sm text-slate-400">
-              These are rows where the scorer disagrees with the benchmark. Start
-              with repeated mismatch clusters, not isolated rows.
-            </p>
+          <div className="flex flex-col justify-between gap-3 border-b border-white/10 p-4 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {group === "matched"
+                  ? "Matched rows"
+                  : group === "needs_review"
+                    ? "Needs review rows"
+                    : "All dataset rows"}
+              </h2>
+              <p className="text-sm text-slate-400">
+                Showing {displayRows.length} of {total} rows.
+              </p>
+            </div>
+
+            <div className="flex gap-2 text-sm">
+              <Link
+                href={`/admin/mcas/behavioural-dataset?version=${version}&group=all${
+                  q ? `&q=${encodeURIComponent(q)}` : ""
+                }`}
+                className={`rounded-lg px-3 py-2 ${
+                  group === "all"
+                    ? "bg-white text-slate-950"
+                    : "bg-white/10 text-white"
+                }`}
+              >
+                All
+              </Link>
+
+              <Link
+                href={`/admin/mcas/behavioural-dataset?version=${version}&group=matched${
+                  q ? `&q=${encodeURIComponent(q)}` : ""
+                }`}
+                className={`rounded-lg px-3 py-2 ${
+                  group === "matched"
+                    ? "bg-white text-slate-950"
+                    : "bg-white/10 text-white"
+                }`}
+              >
+                Matched
+              </Link>
+
+              <Link
+                href={`/admin/mcas/behavioural-dataset?version=${version}&group=needs_review${
+                  q ? `&q=${encodeURIComponent(q)}` : ""
+                }`}
+                className={`rounded-lg px-3 py-2 ${
+                  group === "needs_review"
+                    ? "bg-white text-slate-950"
+                    : "bg-white/10 text-white"
+                }`}
+              >
+                Needs Review
+              </Link>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -274,15 +370,28 @@ export default async function Page({
               </thead>
 
               <tbody>
-                {reviewRows.map((row) => (
-                  <tr key={row.id} className="border-t border-white/10 hover:bg-white/5">
-                    <td className="px-4 py-3 text-slate-400">{row.row_number}</td>
+                {displayRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-white/10 hover:bg-white/5"
+                  >
+                    <td className="px-4 py-3 text-slate-400">
+                      {row.row_number}
+                    </td>
                     <td className="px-4 py-3 font-medium">{row.job_title}</td>
-                    <td className="px-4 py-3">{row.expected_primary_os || "—"}</td>
-                    <td className="px-4 py-3">{row.calculated_primary_os || "—"}</td>
+                    <td className="px-4 py-3">
+                      {row.expected_primary_os || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.calculated_primary_os || "—"}
+                    </td>
                     <td className="px-4 py-3">{badge(row.os_match)}</td>
-                    <td className="px-4 py-3">{row.expected_primary_cv || "—"}</td>
-                    <td className="px-4 py-3">{row.calculated_primary_cv || "—"}</td>
+                    <td className="px-4 py-3">
+                      {row.expected_primary_cv || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.calculated_primary_cv || "—"}
+                    </td>
                     <td className="px-4 py-3">{badge(row.cv_match)}</td>
                     <td className="px-4 py-3">
                       <span className="rounded-full bg-white/10 px-2 py-1 text-xs">
@@ -300,10 +409,13 @@ export default async function Page({
                   </tr>
                 ))}
 
-                {!reviewRows.length ? (
+                {!displayRows.length ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-slate-400">
-                      No review rows found.
+                    <td
+                      colSpan={10}
+                      className="px-4 py-8 text-center text-slate-400"
+                    >
+                      No rows found.
                     </td>
                   </tr>
                 ) : null}
@@ -336,51 +448,31 @@ function MetricCard({
 
 function ClusterCard({
   title,
-  description,
   clusters,
-  type,
 }: {
   title: string;
-  description: string;
   clusters: Array<{ expected: string; calculated: string; count: number }>;
-  type: "os" | "cv";
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="mt-1 text-sm text-slate-400">{description}</p>
-      </div>
+      <h2 className="mb-4 text-lg font-semibold">{title}</h2>
 
       <div className="space-y-2">
-        {clusters.map((cluster) => {
-          const href =
-            type === "os"
-              ? `/admin/mcas/behavioural-dataset?status=needs_review&q=&version=v1`
-              : `/admin/mcas/behavioural-dataset?status=needs_review&q=&version=v1`;
-
-          return (
-            <div
-              key={`${cluster.expected}-${cluster.calculated}`}
-              className="flex items-center justify-between rounded-xl bg-white/5 p-3"
-            >
-              <div>
-                <p className="font-medium">
-                  {cluster.expected}{" "}
-                  <span className="text-slate-500">→</span>{" "}
-                  {cluster.calculated}
-                </p>
-                <p className="text-xs text-slate-400">
-                  Expected vs calculated drift
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-semibold">{cluster.count}</p>
-                <p className="text-xs text-slate-500">rows</p>
-              </div>
+        {clusters.map((cluster) => (
+          <div
+            key={`${cluster.expected}-${cluster.calculated}`}
+            className="flex items-center justify-between rounded-xl bg-white/5 p-3"
+          >
+            <p className="font-medium">
+              {cluster.expected} <span className="text-slate-500">→</span>{" "}
+              {cluster.calculated}
+            </p>
+            <div className="text-right">
+              <p className="text-lg font-semibold">{cluster.count}</p>
+              <p className="text-xs text-slate-500">rows</p>
             </div>
-          );
-        })}
+          </div>
+        ))}
 
         {!clusters.length ? (
           <p className="text-sm text-slate-400">No mismatch clusters found.</p>
@@ -420,7 +512,9 @@ function DistributionCard({
           </div>
         ))}
 
-        {!data.length ? <p className="text-sm text-slate-400">No data</p> : null}
+        {!data.length ? (
+          <p className="text-sm text-slate-400">No data</p>
+        ) : null}
       </div>
     </div>
   );
