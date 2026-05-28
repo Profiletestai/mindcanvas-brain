@@ -65,6 +65,43 @@ function verticalBandMidpoint(band: string): number | null {
   }
 }
 
+function verticalBandToCode(band: string): string | null {
+  switch (band) {
+    case "1-2":
+      return "V2";
+    case "3":
+      return "V3";
+    case "4":
+      return "V4";
+    case "5-6":
+      return "V5";
+    default:
+      return null;
+  }
+}
+
+function displayCvCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  if (code === "V2") return "CV1-2";
+  if (code === "V5") return "CV5-6";
+  return code.replace(/^V/, "CV");
+}
+
+function cvSortOrder(code: string): number {
+  switch (code) {
+    case "V2":
+      return 2;
+    case "V3":
+      return 3;
+    case "V4":
+      return 4;
+    case "V5":
+      return 5;
+    default:
+      return 99;
+  }
+}
+
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -238,6 +275,13 @@ async function fetchReportSections(input: {
   };
 }
 
+
+function extractOptionCode(value: unknown): string {
+  const raw = String(value || "").trim().toUpperCase();
+  const match = raw.match(/^[A-D]/);
+  return match ? match[0] : raw;
+}
+
 export async function POST(req: Request) {
   try {
     if (!isAuthorized(req)) {
@@ -402,6 +446,7 @@ export async function POST(req: Request) {
     const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
     const osTotals: Record<string, number> = {};
     const verticalValues: number[] = [];
+    const verticalTotals: Record<string, number> = {};
 
     let verticalConfidence: "low" | "matched" | null = null;
     let verticalReadinessSignal = false;
@@ -416,7 +461,7 @@ export async function POST(req: Request) {
 
     for (let i = 1; i <= 25; i++) {
       const qCode = `Q${i}`;
-      const optionCode = String(answers[qCode]).trim();
+      const optionCode = extractOptionCode(answers[qCode]);
       const q = qMap.get(qCode);
 
       if (!q) {
@@ -442,7 +487,7 @@ export async function POST(req: Request) {
       });
 
       if (q.section === "operating_style") {
-        if (typeof opt.points !== "number" || !opt.os || !opt.core) {
+        if (!opt.os || !opt.core) {
           return NextResponse.json(
             {
               ok: false,
@@ -452,8 +497,8 @@ export async function POST(req: Request) {
           );
         }
 
-        coreTotals[opt.core] += opt.points;
-        osTotals[opt.os] = (osTotals[opt.os] || 0) + opt.points;
+        coreTotals[opt.core] += 1;
+        osTotals[opt.os] = (osTotals[opt.os] || 0) + 1;
       }
 
       if (q.section === "career_vertical") {
@@ -470,8 +515,11 @@ export async function POST(req: Request) {
           const mid = opt.vertical_band
             ? verticalBandMidpoint(opt.vertical_band)
             : null;
+          const verticalCode = opt.vertical_band
+            ? verticalBandToCode(opt.vertical_band)
+            : null;
 
-          if (mid == null) {
+          if (mid == null || !verticalCode) {
             return NextResponse.json(
               {
                 ok: false,
@@ -482,6 +530,7 @@ export async function POST(req: Request) {
           }
 
           verticalValues.push(mid);
+          verticalTotals[verticalCode] = (verticalTotals[verticalCode] || 0) + 1;
         }
       }
     }
@@ -508,12 +557,27 @@ export async function POST(req: Request) {
       verticalValues.reduce((acc, v) => acc + v, 0) /
       (verticalValues.length || 1);
 
-    const verticalLevel = clamp(Math.round(vAvg), 1, 6);
-    const verticalCode = `V${verticalLevel}`;
+    const verticalRaw = Object.entries(verticalTotals)
+      .map(([code, raw]) => ({ code, raw }))
+      .sort((a, b) => b.raw - a.raw || cvSortOrder(a.code) - cvSortOrder(b.code));
+    const verticalSum = verticalRaw.reduce((acc, x) => acc + x.raw, 0) || 1;
+    const careerVerticalRanking = verticalRaw.map((item, idx) => ({
+      code: item.code,
+      display_code: displayCvCode(item.code),
+      label: cvLabels[item.code] || displayCvCode(item.code) || item.code,
+      pct: Number((item.raw / verticalSum).toFixed(4)),
+      count: item.raw,
+      rank: idx + 1,
+    }));
+    const primaryCareerVertical = careerVerticalRanking[0] || null;
+    const verticalCode =
+      primaryCareerVertical?.code || `V${clamp(Math.round(vAvg), 1, 6)}`;
+    const verticalLevel = Number(String(verticalCode).replace("V", ""));
 
     const careerVertical = {
       code: verticalCode,
-      label: cvLabels[verticalCode] || verticalCode,
+      display_code: displayCvCode(verticalCode),
+      label: cvLabels[verticalCode] || displayCvCode(verticalCode) || verticalCode,
       avg_score: Number(vAvg.toFixed(2)),
     };
 
@@ -595,11 +659,12 @@ export async function POST(req: Request) {
 
     const resultPayload = {
       scoring: {
-        model_version: "mcas-score-v1",
+        model_version: "mcas-score-v2-distribution",
         core_distribution: coreDistribution,
         primary_operating_style: topOperatingStyle,
         operating_style_ranking: operatingStyleEnriched,
         career_vertical: careerVertical,
+        career_vertical_ranking: careerVerticalRanking,
         flags,
         confidence: {
           rating: "moderate",
@@ -648,7 +713,7 @@ export async function POST(req: Request) {
         slug: framework_slug,
         version: framework_version,
       },
-      scoring_model_version: "mcas-score-v1",
+      scoring_model_version: "mcas-score-v2-distribution",
       result: resultPayload,
     };
 
@@ -660,7 +725,7 @@ export async function POST(req: Request) {
         score_payload: resultPayload,
         word_mapping_payload: wording,
         export_payload: exportPayload,
-        scoring_model_version: "mcas-score-v1",
+        scoring_model_version: "mcas-score-v2-distribution",
         status: "scored",
         scored_at: now,
       })

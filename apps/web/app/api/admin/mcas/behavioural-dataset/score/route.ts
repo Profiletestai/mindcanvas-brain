@@ -63,6 +63,43 @@ function verticalBandMidpoint(band: string): number | null {
   }
 }
 
+function verticalBandToCode(band: string): string | null {
+  switch (band) {
+    case "1-2":
+      return "V2";
+    case "3":
+      return "V3";
+    case "4":
+      return "V4";
+    case "5-6":
+      return "V5";
+    default:
+      return null;
+  }
+}
+
+function displayCvCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  if (code === "V2") return "CV1-2";
+  if (code === "V5") return "CV5-6";
+  return code.replace(/^V/, "CV");
+}
+
+function cvSortOrder(code: string): number {
+  switch (code) {
+    case "V2":
+      return 2;
+    case "V3":
+      return 3;
+    case "V4":
+      return 4;
+    case "V5":
+      return 5;
+    default:
+      return 99;
+  }
+}
+
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -102,6 +139,7 @@ function scoreAnswers(params: {
   const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
   const osTotals: Record<string, number> = {};
   const verticalValues: number[] = [];
+  const verticalTotals: Record<string, number> = {};
 
   let verticalConfidence: "low" | "matched" | null = null;
   let verticalReadinessSignal = false;
@@ -140,12 +178,12 @@ function scoreAnswers(params: {
     });
 
     if (q.section === "operating_style") {
-      if (typeof opt.points !== "number" || !opt.os || !opt.core) {
+      if (!opt.os || !opt.core) {
         throw new Error(`Missing scoring metadata on ${qCode}:${optionCode}`);
       }
 
-      coreTotals[opt.core] += opt.points;
-      osTotals[opt.os] = (osTotals[opt.os] || 0) + opt.points;
+      coreTotals[opt.core] += 1;
+      osTotals[opt.os] = (osTotals[opt.os] || 0) + 1;
     }
 
     if (q.section === "career_vertical") {
@@ -162,12 +200,16 @@ function scoreAnswers(params: {
         const mid = opt.vertical_band
           ? verticalBandMidpoint(opt.vertical_band)
           : null;
+        const verticalCode = opt.vertical_band
+          ? verticalBandToCode(opt.vertical_band)
+          : null;
 
-        if (mid == null) {
+        if (mid == null || !verticalCode) {
           throw new Error(`Missing vertical_band on ${qCode}:${optionCode}`);
         }
 
         verticalValues.push(mid);
+        verticalTotals[verticalCode] = (verticalTotals[verticalCode] || 0) + 1;
       }
     }
   }
@@ -193,8 +235,23 @@ function scoreAnswers(params: {
     verticalValues.reduce((acc, v) => acc + v, 0) /
     (verticalValues.length || 1);
 
-  const verticalLevel = clamp(Math.round(vAvg), 1, 6);
-  const careerVerticalCode = `V${verticalLevel}`;
+  const verticalRaw = Object.entries(verticalTotals)
+    .map(([code, raw]) => ({ code, raw }))
+    .sort((a, b) => b.raw - a.raw || cvSortOrder(a.code) - cvSortOrder(b.code));
+  const verticalSum = verticalRaw.reduce((acc, x) => acc + x.raw, 0) || 1;
+  const careerVerticalRanking = verticalRaw.map((item, idx) => ({
+    code: item.code,
+    display_code: displayCvCode(item.code),
+    label: cvLabels[item.code] || displayCvCode(item.code) || item.code,
+    pct: Number((item.raw / verticalSum).toFixed(4)),
+    count: item.raw,
+    rank: idx + 1,
+  }));
+
+  const primaryCareerVertical = careerVerticalRanking[0] || null;
+  const careerVerticalCode =
+    primaryCareerVertical?.code || `V${clamp(Math.round(vAvg), 1, 6)}`;
+  const verticalLevel = Number(String(careerVerticalCode).replace("V", ""));
 
   const flags: Array<{ code: string; severity: string }> = [];
   if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
@@ -210,15 +267,17 @@ function scoreAnswers(params: {
 
   return {
     scoring: {
-      model_version: "mcas-dataset-validation-v1",
+      model_version: "mcas-dataset-validation-v2-distribution",
       core_distribution: coreDistribution,
       primary_operating_style: primaryOperatingStyle,
       operating_style_ranking: operatingStyleRanking,
       career_vertical: {
         code: careerVerticalCode,
-        label: cvLabels[careerVerticalCode] || careerVerticalCode,
+        display_code: displayCvCode(careerVerticalCode),
+        label: cvLabels[careerVerticalCode] || displayCvCode(careerVerticalCode) || careerVerticalCode,
         avg_score: Number(vAvg.toFixed(2)),
       },
+      career_vertical_ranking: careerVerticalRanking,
       flags,
       confidence: {
         rating: "moderate",

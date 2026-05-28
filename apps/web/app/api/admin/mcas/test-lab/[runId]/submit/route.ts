@@ -25,6 +25,43 @@ function extractOptionCode(value: unknown): string {
 function verticalBandMidpoint(band: string): number | null {
   switch (band) { case "1-2": return 1.5; case "3": return 3; case "4": return 4; case "5-6": return 5.5; default: return null; }
 }
+function verticalBandToCode(band: string): string | null {
+  switch (band) {
+    case "1-2":
+      return "V2";
+    case "3":
+      return "V3";
+    case "4":
+      return "V4";
+    case "5-6":
+      return "V5";
+    default:
+      return null;
+  }
+}
+
+function displayCvCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  if (code === "V2") return "CV1-2";
+  if (code === "V5") return "CV5-6";
+  return code.replace(/^V/, "CV");
+}
+
+function cvSortOrder(code: string): number {
+  switch (code) {
+    case "V2":
+      return 2;
+    case "V3":
+      return 3;
+    case "V4":
+      return 4;
+    case "V5":
+      return 5;
+    default:
+      return 99;
+  }
+}
+
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
 function normalize(obj: Record<string, number>) {
   const sum = Object.values(obj).reduce((acc, v) => acc + v, 0) || 1;
@@ -41,6 +78,7 @@ function scoreAnswers(params: { answers: Record<string, string>; questions: Fram
   const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
   const osTotals: Record<string, number> = {};
   const verticalValues: number[] = [];
+  const verticalTotals: Record<string, number> = {};
   let verticalConfidence: "low" | "matched" | null = null;
   let verticalReadinessSignal = false;
   let overreachRisk = false;
@@ -60,9 +98,9 @@ function scoreAnswers(params: { answers: Record<string, string>; questions: Fram
     audit.push({ question_code: qCode, option_code: optionCode, prompt: question.prompt, option_label: option.label });
 
     if (question.section === "operating_style") {
-      if (typeof option.points !== "number" || !option.os || !option.core) throw new Error(`Missing scoring metadata on ${qCode}:${optionCode}`);
-      coreTotals[option.core] += option.points;
-      osTotals[option.os] = (osTotals[option.os] || 0) + option.points;
+      if (!option.os || !option.core) throw new Error(`Missing scoring metadata on ${qCode}:${optionCode}`);
+      coreTotals[option.core] += 1;
+      osTotals[option.os] = (osTotals[option.os] || 0) + 1;
     }
 
     if (question.section === "career_vertical") {
@@ -73,8 +111,10 @@ function scoreAnswers(params: { answers: Record<string, string>; questions: Fram
         if (option.flag === "vertical_readiness_signal") verticalReadinessSignal = true;
       } else {
         const mid = option.vertical_band ? verticalBandMidpoint(option.vertical_band) : null;
-        if (mid == null) throw new Error(`Missing vertical_band on ${qCode}:${optionCode}`);
+        const verticalCode = option.vertical_band ? verticalBandToCode(option.vertical_band) : null;
+        if (mid == null || !verticalCode) throw new Error(`Missing vertical_band on ${qCode}:${optionCode}`);
         verticalValues.push(mid);
+        verticalTotals[verticalCode] = (verticalTotals[verticalCode] || 0) + 1;
       }
     }
   }
@@ -85,8 +125,21 @@ function scoreAnswers(params: { answers: Record<string, string>; questions: Fram
   const operatingStyleRanking = operatingStyleRaw.map((item, index) => ({ code: item.code, label: osLabels[item.code] || item.code, pct: Number((item.raw / osSum).toFixed(4)), rank: index + 1 }));
   const primaryOperatingStyle = operatingStyleRanking[0] || null;
   const verticalAverage = verticalValues.reduce((acc, value) => acc + value, 0) / (verticalValues.length || 1);
-  const verticalLevel = clamp(Math.round(verticalAverage), 1, 6);
-  const verticalCode = `V${verticalLevel}`;
+  const verticalRaw = Object.entries(verticalTotals)
+    .map(([code, raw]) => ({ code, raw }))
+    .sort((a, b) => b.raw - a.raw || cvSortOrder(a.code) - cvSortOrder(b.code));
+  const verticalSum = verticalRaw.reduce((acc, x) => acc + x.raw, 0) || 1;
+  const careerVerticalRanking = verticalRaw.map((item, index) => ({
+    code: item.code,
+    display_code: displayCvCode(item.code),
+    label: cvLabels[item.code] || displayCvCode(item.code) || item.code,
+    pct: Number((item.raw / verticalSum).toFixed(4)),
+    count: item.raw,
+    rank: index + 1,
+  }));
+  const primaryCareerVertical = careerVerticalRanking[0] || null;
+  const verticalCode = primaryCareerVertical?.code || `V${clamp(Math.round(verticalAverage), 1, 6)}`;
+  const verticalLevel = Number(String(verticalCode).replace("V", ""));
   const flags: Array<{ code: string; severity: string }> = [];
   if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
   if (verticalConfidence === "low") flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
@@ -95,11 +148,17 @@ function scoreAnswers(params: { answers: Record<string, string>; questions: Fram
 
   return {
     scoring: {
-      model_version: "mcas-test-lab-v1",
+      model_version: "mcas-test-lab-v2-distribution",
       core_distribution: coreDistribution,
       primary_operating_style: primaryOperatingStyle,
       operating_style_ranking: operatingStyleRanking,
-      career_vertical: { code: verticalCode, label: cvLabels[verticalCode] || verticalCode, display_code: String(verticalCode).replace(/^V/, "CV"), avg_score: Number(verticalAverage.toFixed(2)) },
+      career_vertical: {
+        code: verticalCode,
+        display_code: displayCvCode(verticalCode),
+        label: cvLabels[verticalCode] || displayCvCode(verticalCode) || verticalCode,
+        avg_score: Number(verticalAverage.toFixed(2)),
+      },
+      career_vertical_ranking: careerVerticalRanking,
       flags,
       confidence: { rating: "moderate", signals: { answered_count: 25, vertical_avg: Number(verticalAverage.toFixed(2)), vertical_level: verticalLevel, vertical_confidence: verticalConfidence, vertical_readiness_signal: verticalReadinessSignal, overreach_risk: overreachRisk } },
     },
