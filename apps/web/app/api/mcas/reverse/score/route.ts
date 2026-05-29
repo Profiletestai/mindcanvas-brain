@@ -1,9 +1,15 @@
 // apps/web/app/api/mcas/reverse/score/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  scoreMcasV2,
+  type McasAnswers,
+  type McasQuestion,
+} from "@/lib/mcas/scoreMcasV2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function supa() {
   return createClient(
@@ -26,101 +32,10 @@ function isAuthorized(req: Request): boolean {
   return !!received && received === expected;
 }
 
-type AnswersMap = Record<string, string>;
-
-type FrameworkOption = {
-  code: string;
-  label: string;
-  points?: number;
-  os?: string;
-  core?: "C" | "O" | "R" | "E";
-  vertical_band?: "1-2" | "3" | "4" | "5-6";
-  flag?: string;
-};
-
-type FrameworkQuestion = {
-  code: string;
-  section: "operating_style" | "career_vertical";
-  prompt: string;
-  options: FrameworkOption[];
-};
-
 type ReportContentBlock = {
   section_key: "oss" | "rfs" | "cvs";
   content: any;
 };
-
-function verticalBandMidpoint(band: string): number | null {
-  switch (band) {
-    case "1-2":
-      return 1.5;
-    case "3":
-      return 3;
-    case "4":
-      return 4;
-    case "5-6":
-      return 5.5;
-    default:
-      return null;
-  }
-}
-
-function verticalBandToCode(band: string): string | null {
-  switch (band) {
-    case "1-2":
-      return "V2";
-    case "3":
-      return "V3";
-    case "4":
-      return "V4";
-    case "5-6":
-      return "V5";
-    default:
-      return null;
-  }
-}
-
-function displayCvCode(code: string | null | undefined): string | null {
-  if (!code) return null;
-  if (code === "V2") return "CV1-2";
-  if (code === "V5") return "CV5-6";
-  return code.replace(/^V/, "CV");
-}
-
-function cvSortOrder(code: string): number {
-  switch (code) {
-    case "V2":
-      return 2;
-    case "V3":
-      return 3;
-    case "V4":
-      return 4;
-    case "V5":
-      return 5;
-    default:
-      return 99;
-  }
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function normalize(obj: Record<string, number>) {
-  const sum = Object.values(obj).reduce((acc, v) => acc + v, 0) || 1;
-  const out: Record<string, number> = {};
-  for (const k of Object.keys(obj)) {
-    out[k] = Number((obj[k] / sum).toFixed(4));
-  }
-  return out;
-}
-
-function getTopTwoCore(coreDistribution: Record<string, number>) {
-  return Object.entries(coreDistribution)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([code, pct]) => ({ code, pct }));
-}
 
 async function getWordMappings(
   sb: ReturnType<typeof supa>,
@@ -153,6 +68,14 @@ async function nextRunNumber(sb: ReturnType<typeof supa>): Promise<string> {
   }
 
   return String(data);
+}
+
+function legacyVerticalMappingCode(code: string | null | undefined) {
+  if (!code) return "V3";
+  if (code === "CV1_2") return "V2";
+  if (code === "CV5_6") return "V5";
+  const match = String(code).match(/CV([1-6])/);
+  return match ? `V${match[1]}` : String(code).replace(/^CV/, "V");
 }
 
 function buildIdealCandidateProfile(input: {
@@ -221,7 +144,7 @@ async function fetchReportSections(input: {
           current_vertical: {
             code: input.careerVertical.code,
             label: input.careerVertical.label,
-            avg_score: input.careerVertical.avg_score,
+            pct: input.careerVertical.pct,
             summary: null,
           },
         }
@@ -252,6 +175,7 @@ async function fetchReportSections(input: {
   }
 
   const cvsContent = bySection.cvs || {};
+  const currentCode = input.careerVertical?.code || null;
 
   return {
     operating_style_summary: bySection.oss,
@@ -262,24 +186,15 @@ async function fetchReportSections(input: {
         ? {
             code: input.careerVertical.code,
             label: input.careerVertical.label,
-            avg_score: input.careerVertical.avg_score,
+            pct: input.careerVertical.pct,
             summary:
-              cvsContent?.levels?.[input.careerVertical.code] ||
-              cvsContent?.levels?.[
-                `CV${String(input.careerVertical.code).replace("V", "")}`
-              ] ||
+              cvsContent?.levels?.[currentCode] ||
+              cvsContent?.levels?.[legacyVerticalMappingCode(currentCode)] ||
               null,
           }
         : null,
     },
   };
-}
-
-
-function extractOptionCode(value: unknown): string {
-  const raw = String(value || "").trim().toUpperCase();
-  const match = raw.match(/^[A-D]/);
-  return match ? match[0] : raw;
 }
 
 export async function POST(req: Request) {
@@ -305,7 +220,7 @@ export async function POST(req: Request) {
       String(body?.framework_version || "").trim() || "v1";
     const source = String(body?.source || "").trim() || "ai";
     const notes = body?.notes ? String(body.notes).trim() : null;
-    const answers = (body?.answers || {}) as AnswersMap;
+    const answers = (body?.answers || {}) as McasAnswers;
 
     if (!partner_key) {
       return NextResponse.json(
@@ -326,6 +241,16 @@ export async function POST(req: Request) {
         { ok: false, error: "title is required" },
         { status: 400 }
       );
+    }
+
+    for (let i = 1; i <= 25; i++) {
+      const qCode = `Q${i}`;
+      if (!answers[qCode]) {
+        return NextResponse.json(
+          { ok: false, error: `Missing answer for ${qCode}` },
+          { status: 400 }
+        );
+      }
     }
 
     const sb = supa();
@@ -372,7 +297,7 @@ export async function POST(req: Request) {
     }
 
     const definition = (fw.definition || {}) as any;
-    const questions: FrameworkQuestion[] = Array.isArray(definition.questions)
+    const questions: McasQuestion[] = Array.isArray(definition.questions)
       ? definition.questions
       : [];
 
@@ -386,15 +311,15 @@ export async function POST(req: Request) {
       );
     }
 
-    for (let i = 1; i <= 25; i++) {
-      const qCode = `Q${i}`;
-      if (!answers[qCode]) {
-        return NextResponse.json(
-          { ok: false, error: `Missing answer for ${qCode}` },
-          { status: 400 }
-        );
-      }
-    }
+    const labels = definition.labels || {};
+    const coreLabels: Record<string, string> = labels.core || {
+      C: "Create",
+      O: "Organise",
+      R: "Resolve",
+      E: "Examine",
+    };
+    const osLabels: Record<string, string> = labels.operating_styles || {};
+    const cvLabels: Record<string, string> = labels.career_verticals || {};
 
     const run_number = await nextRunNumber(sb);
 
@@ -430,170 +355,24 @@ export async function POST(req: Request) {
       );
     }
 
-    const labels = definition.labels || {};
-    const coreLabels: Record<string, string> = labels.core || {
-      C: "Create",
-      O: "Organise",
-      R: "Resolve",
-      E: "Examine",
-    };
-    const osLabels: Record<string, string> = labels.operating_styles || {};
-    const cvLabels: Record<string, string> = labels.career_verticals || {};
+    const scoring = scoreMcasV2({
+      answers,
+      questions,
+      osLabels,
+      coreLabels,
+      cvLabels,
+    });
 
-    const qMap = new Map<string, FrameworkQuestion>();
-    for (const q of questions) qMap.set(q.code, q);
+    const topOperatingStyle = scoring.primary_operating_style || null;
+    const primaryCareerVertical = scoring.primary_career_vertical || null;
 
-    const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
-    const osTotals: Record<string, number> = {};
-    const verticalValues: number[] = [];
-    const verticalTotals: Record<string, number> = {};
-
-    let verticalConfidence: "low" | "matched" | null = null;
-    let verticalReadinessSignal = false;
-    let overreachRisk = false;
-
-    const answerAudit: Array<{
-      question_code: string;
-      option_code: string;
-      prompt: string;
-      option_label: string;
-    }> = [];
-
-    for (let i = 1; i <= 25; i++) {
-      const qCode = `Q${i}`;
-      const optionCode = extractOptionCode(answers[qCode]);
-      const q = qMap.get(qCode);
-
-      if (!q) {
-        return NextResponse.json(
-          { ok: false, error: `Question ${qCode} missing in framework` },
-          { status: 500 }
-        );
-      }
-
-      const opt = q.options?.find((o) => o.code === optionCode);
-      if (!opt) {
-        return NextResponse.json(
-          { ok: false, error: `Invalid option ${optionCode} for ${qCode}` },
-          { status: 400 }
-        );
-      }
-
-      answerAudit.push({
-        question_code: qCode,
-        option_code: optionCode,
-        prompt: q.prompt,
-        option_label: opt.label,
-      });
-
-      if (q.section === "operating_style") {
-        if (!opt.os || !opt.core) {
-          return NextResponse.json(
-            {
-              ok: false,
-              error: `Missing scoring metadata on ${qCode}:${optionCode}`,
-            },
-            { status: 500 }
-          );
+    const careerVertical = primaryCareerVertical
+      ? {
+          code: primaryCareerVertical.code,
+          label: primaryCareerVertical.label,
+          pct: primaryCareerVertical.pct,
         }
-
-        coreTotals[opt.core] += 1;
-        osTotals[opt.os] = (osTotals[opt.os] || 0) + 1;
-      }
-
-      if (q.section === "career_vertical") {
-        if (qCode === "Q25") {
-          if (opt.flag === "overreach_risk") overreachRisk = true;
-          if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
-          if (opt.flag === "vertical_confidence_matched") {
-            verticalConfidence = "matched";
-          }
-          if (opt.flag === "vertical_readiness_signal") {
-            verticalReadinessSignal = true;
-          }
-        } else {
-          const mid = opt.vertical_band
-            ? verticalBandMidpoint(opt.vertical_band)
-            : null;
-          const verticalCode = opt.vertical_band
-            ? verticalBandToCode(opt.vertical_band)
-            : null;
-
-          if (mid == null || !verticalCode) {
-            return NextResponse.json(
-              {
-                ok: false,
-                error: `Missing vertical_band on ${qCode}:${optionCode}`,
-              },
-              { status: 500 }
-            );
-          }
-
-          verticalValues.push(mid);
-          verticalTotals[verticalCode] = (verticalTotals[verticalCode] || 0) + 1;
-        }
-      }
-    }
-
-    const coreDistribution = normalize(coreTotals);
-
-    const operatingStyleRanking = Object.entries(osTotals)
-      .map(([code, raw]) => ({ code, raw }))
-      .sort((a, b) => b.raw - a.raw);
-
-    const osSum =
-      operatingStyleRanking.reduce((acc, x) => acc + x.raw, 0) || 1;
-
-    const operatingStyleEnriched = operatingStyleRanking.map((x, idx) => ({
-      code: x.code,
-      label: osLabels[x.code] || x.code,
-      pct: Number((x.raw / osSum).toFixed(4)),
-      rank: idx + 1,
-    }));
-
-    const topOperatingStyle = operatingStyleEnriched[0] || null;
-
-    const vAvg =
-      verticalValues.reduce((acc, v) => acc + v, 0) /
-      (verticalValues.length || 1);
-
-    const verticalRaw = Object.entries(verticalTotals)
-      .map(([code, raw]) => ({ code, raw }))
-      .sort((a, b) => b.raw - a.raw || cvSortOrder(a.code) - cvSortOrder(b.code));
-    const verticalSum = verticalRaw.reduce((acc, x) => acc + x.raw, 0) || 1;
-    const careerVerticalRanking = verticalRaw.map((item, idx) => ({
-      code: item.code,
-      display_code: displayCvCode(item.code),
-      label: cvLabels[item.code] || displayCvCode(item.code) || item.code,
-      pct: Number((item.raw / verticalSum).toFixed(4)),
-      count: item.raw,
-      rank: idx + 1,
-    }));
-    const primaryCareerVertical = careerVerticalRanking[0] || null;
-    const verticalCode =
-      primaryCareerVertical?.code || `V${clamp(Math.round(vAvg), 1, 6)}`;
-    const verticalLevel = Number(String(verticalCode).replace("V", ""));
-
-    const careerVertical = {
-      code: verticalCode,
-      display_code: displayCvCode(verticalCode),
-      label: cvLabels[verticalCode] || displayCvCode(verticalCode) || verticalCode,
-      avg_score: Number(vAvg.toFixed(2)),
-    };
-
-    const flags: Array<{ code: string; severity: string }> = [];
-    if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
-    if (verticalConfidence === "low") {
-      flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
-    }
-    if (verticalConfidence === "matched") {
-      flags.push({ code: "VERTICAL_CONFIDENCE_MATCHED", severity: "low" });
-    }
-    if (verticalReadinessSignal) {
-      flags.push({ code: "VERTICAL_READINESS_SIGNAL", severity: "low" });
-    }
-
-    const [primaryCore, secondaryCore] = getTopTwoCore(coreDistribution);
+      : null;
 
     const topOsWords = topOperatingStyle
       ? await getWordMappings(
@@ -605,27 +384,33 @@ export async function POST(req: Request) {
         )
       : [];
 
-    const cvWords = await getWordMappings(
-      sb,
-      framework_slug,
-      framework_version,
-      "career_vertical",
-      careerVertical.code
-    );
+    const cvWords = careerVertical
+      ? await getWordMappings(
+          sb,
+          framework_slug,
+          framework_version,
+          "career_vertical",
+          legacyVerticalMappingCode(careerVertical.code)
+        )
+      : [];
 
     const wording = {
-      primary_core: primaryCore
+      primary_core: scoring.behavioural_approach_ranking?.[0]
         ? {
-            code: primaryCore.code,
-            label: coreLabels[primaryCore.code] || primaryCore.code,
-            pct: primaryCore.pct,
+            code: scoring.behavioural_approach_ranking[0].code,
+            label:
+              coreLabels[scoring.behavioural_approach_ranking[0].code] ||
+              scoring.behavioural_approach_ranking[0].code,
+            pct: scoring.behavioural_approach_ranking[0].pct,
           }
         : null,
-      secondary_core: secondaryCore
+      secondary_core: scoring.behavioural_approach_ranking?.[1]
         ? {
-            code: secondaryCore.code,
-            label: coreLabels[secondaryCore.code] || secondaryCore.code,
-            pct: secondaryCore.pct,
+            code: scoring.behavioural_approach_ranking[1].code,
+            label:
+              coreLabels[scoring.behavioural_approach_ranking[1].code] ||
+              scoring.behavioural_approach_ranking[1].code,
+            pct: scoring.behavioural_approach_ranking[1].pct,
           }
         : null,
       operating_style: topOperatingStyle
@@ -635,11 +420,13 @@ export async function POST(req: Request) {
             words: topOsWords,
           }
         : null,
-      career_vertical: {
-        code: careerVertical.code,
-        label: careerVertical.label,
-        words: cvWords,
-      },
+      career_vertical: careerVertical
+        ? {
+            code: careerVertical.code,
+            label: careerVertical.label,
+            words: cvWords,
+          }
+        : null,
     };
 
     const idealCandidateProfile = buildIdealCandidateProfile({
@@ -658,26 +445,7 @@ export async function POST(req: Request) {
     });
 
     const resultPayload = {
-      scoring: {
-        model_version: "mcas-score-v2-distribution",
-        core_distribution: coreDistribution,
-        primary_operating_style: topOperatingStyle,
-        operating_style_ranking: operatingStyleEnriched,
-        career_vertical: careerVertical,
-        career_vertical_ranking: careerVerticalRanking,
-        flags,
-        confidence: {
-          rating: "moderate",
-          signals: {
-            answered_count: 25,
-            vertical_avg: Number(vAvg.toFixed(2)),
-            vertical_level: verticalLevel,
-            vertical_confidence: verticalConfidence,
-            vertical_readiness_signal: verticalReadinessSignal,
-            overreach_risk: overreachRisk,
-          },
-        },
-      },
+      scoring,
       wording,
       ideal_candidate_profile: idealCandidateProfile,
       report: {
@@ -686,9 +454,7 @@ export async function POST(req: Request) {
         role_fit_summary: reportSections.role_fit_summary,
         career_vertical_summary: reportSections.career_vertical_summary,
       },
-      audit: {
-        answers: answerAudit,
-      },
+      audit: scoring.audit,
     };
 
     const exportPayload = {
@@ -713,7 +479,7 @@ export async function POST(req: Request) {
         slug: framework_slug,
         version: framework_version,
       },
-      scoring_model_version: "mcas-score-v2-distribution",
+      scoring_model_version: scoring.model_version,
       result: resultPayload,
     };
 
@@ -725,7 +491,7 @@ export async function POST(req: Request) {
         score_payload: resultPayload,
         word_mapping_payload: wording,
         export_payload: exportPayload,
-        scoring_model_version: "mcas-score-v2-distribution",
+        scoring_model_version: scoring.model_version,
         status: "scored",
         scored_at: now,
       })
