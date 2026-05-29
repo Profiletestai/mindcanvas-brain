@@ -1,4 +1,4 @@
-//apps/web/app/api/admin/mcas/test-lab/create/route.ts
+// apps/web/app/api/admin/mcas/test-lab/create/route.ts
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -16,17 +16,26 @@ function base64UrlEncode(value: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const title = String(body?.title || "").trim();
-    const description = String(body?.description || "").trim();
+
+    const title = String(body?.title || body?.job_title || "").trim();
+
+    const description = String(
+      body?.description || body?.job_description || ""
+    ).trim();
 
     if (!title) {
-      return NextResponse.json({ ok: false, error: "title is required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Job title is required" },
+        { status: 400 }
+      );
     }
 
     const token = base64UrlEncode(
       JSON.stringify({
         title,
+        job_title: title,
         description,
+        job_description: description,
         created_at: new Date().toISOString(),
         source: "mcas_internal_test_lab",
       })
