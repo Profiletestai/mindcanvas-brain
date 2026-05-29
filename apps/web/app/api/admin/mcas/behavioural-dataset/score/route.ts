@@ -1,9 +1,15 @@
-//apps/web/app/api/admin/mcas/behavioural-dataset/score/route.ts
+// apps/web/app/api/admin/mcas/behavioural-dataset/score/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  scoreMcasV2,
+  type McasAnswers,
+  type McasQuestion,
+} from "@/lib/mcas/scoreMcasV2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function supa() {
   return createClient(
@@ -25,57 +31,6 @@ function isAuthorized(req: Request): boolean {
   return getBearerToken(req) === expected;
 }
 
-type FrameworkOption = {
-  code: string;
-  label: string;
-  points?: number;
-  os?: string;
-  core?: "C" | "O" | "R" | "E";
-  vertical_band?: "1-2" | "3" | "4" | "5-6";
-  flag?: string;
-};
-
-type FrameworkQuestion = {
-  code: string;
-  section: "operating_style" | "career_vertical";
-  prompt: string;
-  options: FrameworkOption[];
-};
-
-function extractOptionCode(value: unknown): string {
-  const raw = String(value || "").trim().toUpperCase();
-  const match = raw.match(/^[A-D]/);
-  return match ? match[0] : raw;
-}
-
-function verticalBandMidpoint(band: string): number | null {
-  switch (band) {
-    case "1-2":
-      return 1.5;
-    case "3":
-      return 3;
-    case "4":
-      return 4;
-    case "5-6":
-      return 5.5;
-    default:
-      return null;
-  }
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function normalize(obj: Record<string, number>) {
-  const sum = Object.values(obj).reduce((acc, v) => acc + v, 0) || 1;
-  const out: Record<string, number> = {};
-  for (const k of Object.keys(obj)) {
-    out[k] = Number((obj[k] / sum).toFixed(4));
-  }
-  return out;
-}
-
 function normalizeOs(value: unknown): string | null {
   const raw = String(value || "").toUpperCase().trim();
   const match = raw.match(/OS\s*([1-8])/);
@@ -84,158 +39,23 @@ function normalizeOs(value: unknown): string | null {
 
 function normalizeCv(value: unknown): string | null {
   const raw = String(value || "").toUpperCase().trim();
+
+  if (!raw) return null;
+
+  if (raw.includes("1") && raw.includes("2")) return "CV1_2";
+  if (raw.includes("5") && raw.includes("6")) return "CV5_6";
+
   const match = raw.match(/(?:CV|V)\s*([1-6])/);
-  return match ? `V${match[1]}` : raw || null;
+  return match ? `CV${match[1]}` : raw;
 }
 
-function scoreAnswers(params: {
-  answers: Record<string, string>;
-  questions: FrameworkQuestion[];
-  osLabels: Record<string, string>;
-  cvLabels: Record<string, string>;
-}) {
-  const { answers, questions, osLabels, cvLabels } = params;
+function extractRankingCodes(ranking: any[]): string[] {
+  if (!Array.isArray(ranking)) return [];
 
-  const qMap = new Map<string, FrameworkQuestion>();
-  for (const q of questions) qMap.set(q.code, q);
-
-  const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
-  const osTotals: Record<string, number> = {};
-  const verticalValues: number[] = [];
-
-  let verticalConfidence: "low" | "matched" | null = null;
-  let verticalReadinessSignal = false;
-  let overreachRisk = false;
-
-  const audit: Array<{
-    question_code: string;
-    option_code: string;
-    prompt: string;
-    option_label: string;
-  }> = [];
-
-  for (let i = 1; i <= 25; i++) {
-    const qCode = `Q${i}`;
-    const optionCode = extractOptionCode(answers?.[qCode]);
-
-    if (!optionCode) {
-      throw new Error(`Missing answer for ${qCode}`);
-    }
-
-    const q = qMap.get(qCode);
-    if (!q) {
-      throw new Error(`Question ${qCode} missing in framework`);
-    }
-
-    const opt = q.options?.find((o) => o.code === optionCode);
-    if (!opt) {
-      throw new Error(`Invalid option ${optionCode} for ${qCode}`);
-    }
-
-    audit.push({
-      question_code: qCode,
-      option_code: optionCode,
-      prompt: q.prompt,
-      option_label: opt.label,
-    });
-
-    if (q.section === "operating_style") {
-      if (typeof opt.points !== "number" || !opt.os || !opt.core) {
-        throw new Error(`Missing scoring metadata on ${qCode}:${optionCode}`);
-      }
-
-      coreTotals[opt.core] += opt.points;
-      osTotals[opt.os] = (osTotals[opt.os] || 0) + opt.points;
-    }
-
-    if (q.section === "career_vertical") {
-      if (qCode === "Q25") {
-        if (opt.flag === "overreach_risk") overreachRisk = true;
-        if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
-        if (opt.flag === "vertical_confidence_matched") {
-          verticalConfidence = "matched";
-        }
-        if (opt.flag === "vertical_readiness_signal") {
-          verticalReadinessSignal = true;
-        }
-      } else {
-        const mid = opt.vertical_band
-          ? verticalBandMidpoint(opt.vertical_band)
-          : null;
-
-        if (mid == null) {
-          throw new Error(`Missing vertical_band on ${qCode}:${optionCode}`);
-        }
-
-        verticalValues.push(mid);
-      }
-    }
-  }
-
-  const coreDistribution = normalize(coreTotals);
-
-  const osRaw = Object.entries(osTotals)
-    .map(([code, raw]) => ({ code, raw }))
-    .sort((a, b) => b.raw - a.raw);
-
-  const osSum = osRaw.reduce((acc, x) => acc + x.raw, 0) || 1;
-
-  const operatingStyleRanking = osRaw.map((x, idx) => ({
-    code: x.code,
-    label: osLabels[x.code] || x.code,
-    pct: Number((x.raw / osSum).toFixed(4)),
-    rank: idx + 1,
-  }));
-
-  const primaryOperatingStyle = operatingStyleRanking[0] || null;
-
-  const vAvg =
-    verticalValues.reduce((acc, v) => acc + v, 0) /
-    (verticalValues.length || 1);
-
-  const verticalLevel = clamp(Math.round(vAvg), 1, 6);
-  const careerVerticalCode = `V${verticalLevel}`;
-
-  const flags: Array<{ code: string; severity: string }> = [];
-  if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
-  if (verticalConfidence === "low") {
-    flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
-  }
-  if (verticalConfidence === "matched") {
-    flags.push({ code: "VERTICAL_CONFIDENCE_MATCHED", severity: "low" });
-  }
-  if (verticalReadinessSignal) {
-    flags.push({ code: "VERTICAL_READINESS_SIGNAL", severity: "low" });
-  }
-
-  return {
-    scoring: {
-      model_version: "mcas-dataset-validation-v1",
-      core_distribution: coreDistribution,
-      primary_operating_style: primaryOperatingStyle,
-      operating_style_ranking: operatingStyleRanking,
-      career_vertical: {
-        code: careerVerticalCode,
-        label: cvLabels[careerVerticalCode] || careerVerticalCode,
-        avg_score: Number(vAvg.toFixed(2)),
-      },
-      flags,
-      confidence: {
-        rating: "moderate",
-        signals: {
-          answered_count: 25,
-          vertical_avg: Number(vAvg.toFixed(2)),
-          vertical_level: verticalLevel,
-          vertical_confidence: verticalConfidence,
-          vertical_readiness_signal: verticalReadinessSignal,
-          overreach_risk: overreachRisk,
-        },
-      },
-    },
-    audit: {
-      answers: audit,
-    },
-  };
+  return ranking
+    .filter((item) => Number(item?.pct || 0) > 0)
+    .map((item) => String(item?.code || "").trim())
+    .filter(Boolean);
 }
 
 export async function POST(req: Request) {
@@ -255,6 +75,7 @@ export async function POST(req: Request) {
 
     const frameworkSlug =
       String(body?.framework_slug || "").trim() || "mcas-core-alignment";
+
     const frameworkVersion =
       String(body?.framework_version || "").trim() || "v1";
 
@@ -282,12 +103,30 @@ export async function POST(req: Request) {
     }
 
     const definition = (fw.definition || {}) as any;
-    const questions: FrameworkQuestion[] = Array.isArray(definition.questions)
+
+    const questions: McasQuestion[] = Array.isArray(definition.questions)
       ? definition.questions
       : [];
 
+    if (questions.length !== 25) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Framework must contain 25 questions. Found ${questions.length}.`,
+        },
+        { status: 500 }
+      );
+    }
+
     const labels = definition.labels || {};
+
     const osLabels: Record<string, string> = labels.operating_styles || {};
+    const coreLabels: Record<string, string> = labels.core || {
+      C: "Create",
+      O: "Organise",
+      R: "Resolve",
+      E: "Examine",
+    };
     const cvLabels: Record<string, string> = labels.career_verticals || {};
 
     let query = sb
@@ -316,42 +155,80 @@ export async function POST(req: Request) {
     let matchedOs = 0;
     let matchedCv = 0;
     let needsReview = 0;
-    const errors: Array<{ id: string; row_number: number | null; error: string }> = [];
+
+    const errors: Array<{
+      id: string;
+      row_number: number | null;
+      error: string;
+    }> = [];
 
     for (const row of datasetRows as any[]) {
       try {
-        const result = scoreAnswers({
-          answers: row.answers || {},
+        const scoring = scoreMcasV2({
+          answers: (row.answers || {}) as McasAnswers,
           questions,
           osLabels,
+          coreLabels,
           cvLabels,
         });
 
-        const calculatedPrimaryOs =
-          result.scoring.primary_operating_style?.code || null;
-        const calculatedPrimaryCv = result.scoring.career_vertical?.code || null;
+        const expectedOs = [
+          normalizeOs(row.expected_primary_os),
+          normalizeOs(row.expected_secondary_os),
+          normalizeOs(row.expected_tertiary_os),
+        ].filter(Boolean) as string[];
 
-        const expectedOs = normalizeOs(row.expected_primary_os);
-        const expectedCv = normalizeCv(row.expected_primary_cv);
+        const calculatedOs = extractRankingCodes(
+          scoring.operating_style_ranking || []
+        )
+          .map(normalizeOs)
+          .filter(Boolean)
+          .slice(0, expectedOs.length) as string[];
+
+        const expectedCv = [
+          normalizeCv(row.expected_primary_cv),
+          normalizeCv(row.expected_secondary_cv),
+        ].filter(Boolean) as string[];
+
+        const calculatedCv = extractRankingCodes(
+          scoring.career_vertical_ranking || []
+        )
+          .map(normalizeCv)
+          .filter(Boolean)
+          .slice(0, expectedCv.length) as string[];
+
+        const primaryOs = calculatedOs[0] || null;
+        const primaryCv = calculatedCv[0] || null;
 
         const osMatch =
-          !!expectedOs &&
-          !!calculatedPrimaryOs &&
-          normalizeOs(calculatedPrimaryOs) === expectedOs;
+          expectedOs.length > 0 &&
+          expectedOs.every((code, index) => calculatedOs[index] === code);
 
         const cvMatch =
-          !!expectedCv &&
-          !!calculatedPrimaryCv &&
-          normalizeCv(calculatedPrimaryCv) === expectedCv;
+          expectedCv.length > 0 &&
+          expectedCv.every((code, index) => calculatedCv[index] === code);
 
         const status = osMatch && cvMatch ? "scored" : "needs_review";
+
+        const calculatedResult = {
+          scoring,
+          audit: scoring.audit,
+          expected_vs_actual: {
+            expected_os: expectedOs,
+            calculated_os: calculatedOs,
+            expected_cv: expectedCv,
+            calculated_cv: calculatedCv,
+            os_match: osMatch,
+            cv_match: cvMatch,
+          },
+        };
 
         const { error: updateErr } = await sb
           .from("behavioural_dataset")
           .update({
-            calculated_result: result,
-            calculated_primary_os: calculatedPrimaryOs,
-            calculated_primary_cv: calculatedPrimaryCv,
+            calculated_result: calculatedResult,
+            calculated_primary_os: primaryOs,
+            calculated_primary_cv: primaryCv,
             os_match: osMatch,
             cv_match: cvMatch,
             status,
@@ -386,6 +263,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       dataset_version: datasetVersion,
+      scoring_model_version: "mcas-v2-distribution",
       processed_rows: datasetRows.length,
       scored_rows: scored,
       os_matches: matchedOs,
