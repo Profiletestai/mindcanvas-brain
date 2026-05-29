@@ -1,6 +1,11 @@
 // apps/web/app/api/mcas/candidate/score/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  scoreMcasV2,
+  type McasAnswers,
+  type McasQuestion,
+} from "@/lib/mcas/scoreMcasV2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,31 +31,12 @@ function isAuthorized(req: Request): boolean {
   return !!received && received === expected;
 }
 
-type AnswersMap = Record<string, string>;
-
 type CandidatePayload = {
   first_name?: string;
   last_name?: string;
   email?: string;
   phone?: string;
   consent?: boolean;
-};
-
-type FrameworkOption = {
-  code: string;
-  label: string;
-  points?: number;
-  os?: string;
-  core?: "C" | "O" | "R" | "E";
-  vertical_band?: "1-2" | "3" | "4" | "5-6";
-  flag?: string;
-};
-
-type FrameworkQuestion = {
-  code: string;
-  section: "operating_style" | "career_vertical";
-  prompt: string;
-  options: FrameworkOption[];
 };
 
 type ReportContentBlock = {
@@ -62,76 +48,20 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function verticalBandMidpoint(band: string): number | null {
-  switch (band) {
-    case "1-2":
-      return 1.5;
-    case "3":
-      return 3;
-    case "4":
-      return 4;
-    case "5-6":
-      return 5.5;
-    default:
-      return null;
-  }
-}
-
-function verticalBandToCode(band: string): string | null {
-  switch (band) {
-    case "1-2":
-      return "V2";
-    case "3":
-      return "V3";
-    case "4":
-      return "V4";
-    case "5-6":
-      return "V5";
-    default:
-      return null;
-  }
-}
-
 function displayCvCode(code: string | null | undefined): string | null {
   if (!code) return null;
-  if (code === "V2") return "CV1-2";
-  if (code === "V5") return "CV5-6";
-  return code.replace(/^V/, "CV");
+  if (code === "CV1_2") return "CV1-2";
+  if (code === "CV5_6") return "CV5-6";
+  return code;
 }
 
-function cvSortOrder(code: string): number {
-  switch (code) {
-    case "V2":
-      return 2;
-    case "V3":
-      return 3;
-    case "V4":
-      return 4;
-    case "V5":
-      return 5;
-    default:
-      return 99;
-  }
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function normalize(obj: Record<string, number>) {
-  const sum = Object.values(obj).reduce((acc, v) => acc + v, 0) || 1;
-  const out: Record<string, number> = {};
-  for (const k of Object.keys(obj)) {
-    out[k] = Number((obj[k] / sum).toFixed(4));
-  }
-  return out;
-}
-
-
-function extractOptionCode(value: unknown): string {
-  const raw = String(value || "").trim().toUpperCase();
-  const match = raw.match(/^[A-D]/);
-  return match ? match[0] : raw;
+function legacyVerticalCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  if (code === "CV1_2") return "V2";
+  if (code === "CV3") return "V3";
+  if (code === "CV4") return "V4";
+  if (code === "CV5_6") return "V5";
+  return code.replace(/^CV/, "V");
 }
 
 export async function POST(req: Request) {
@@ -170,7 +100,7 @@ export async function POST(req: Request) {
     const phone = String(candidate.phone || "").trim();
     const consent = Boolean(candidate.consent);
 
-    const answers = (body?.answers || {}) as AnswersMap;
+    const answers = (body?.answers || {}) as McasAnswers;
 
     if (!partner_key) {
       return NextResponse.json(
@@ -266,7 +196,8 @@ export async function POST(req: Request) {
     }
 
     const definition = (fw.definition || {}) as any;
-    const questions: FrameworkQuestion[] = Array.isArray(definition.questions)
+
+    const questions: McasQuestion[] = Array.isArray(definition.questions)
       ? definition.questions
       : [];
 
@@ -282,10 +213,13 @@ export async function POST(req: Request) {
 
     const labels = definition.labels || {};
     const osLabels: Record<string, string> = labels.operating_styles || {};
+    const coreLabels: Record<string, string> = labels.core || {
+      C: "Create",
+      O: "Organise",
+      R: "Resolve",
+      E: "Examine",
+    };
     const cvLabels: Record<string, string> = labels.career_verticals || {};
-
-    const qLookup = new Map<string, FrameworkQuestion>();
-    for (const q of questions) qLookup.set(q.code, q);
 
     const { data: existingApp, error: findAppErr } = await sb
       .from("partner_applications")
@@ -472,166 +406,55 @@ export async function POST(req: Request) {
       );
     }
 
-    const coreTotals: Record<string, number> = { C: 0, O: 0, R: 0, E: 0 };
-    const osTotals: Record<string, number> = {};
-    const verticalValues: number[] = [];
-    const verticalTotals: Record<string, number> = {};
+    const scoring = scoreMcasV2({
+      answers,
+      questions,
+      osLabels,
+      coreLabels,
+      cvLabels,
+    });
 
-    let verticalConfidence: "low" | "matched" | null = null;
-    let verticalReadinessSignal = false;
-    let overreachRisk = false;
+    const scoring_model_version = "mcas-v2-distribution";
 
-    const answerAudit: Array<{
-      question_code: string;
-      option_code: string;
-      prompt: string;
-      option_label: string;
-    }> = [];
+    const primaryOperatingStyle = scoring.primary_operating_style;
+    const primaryCareerVertical = scoring.primary_career_vertical;
 
-    for (let i = 1; i <= 25; i++) {
-      const qc = `Q${i}`;
-      const oc = extractOptionCode(answers[qc]);
-      const q = qLookup.get(qc);
-
-      if (!q) {
-        return NextResponse.json(
-          { ok: false, error: `Framework missing ${qc}` },
-          { status: 500 }
-        );
-      }
-
-      const opt = q.options?.find((x) => x.code === oc);
-      if (!opt) {
-        return NextResponse.json(
-          { ok: false, error: `Invalid option ${qc}:${oc}` },
-          { status: 400 }
-        );
-      }
-
-      answerAudit.push({
-        question_code: qc,
-        option_code: oc,
-        prompt: q.prompt,
-        option_label: opt.label,
-      });
-
-      if (q.section === "operating_style") {
-        if (!opt.os || !opt.core) {
-          return NextResponse.json(
-            { ok: false, error: `Missing scoring meta on ${qc}:${oc}` },
-            { status: 500 }
-          );
-        }
-
-        coreTotals[opt.core] += 1;
-        osTotals[opt.os] = (osTotals[opt.os] || 0) + 1;
-      }
-
-      if (q.section === "career_vertical") {
-        if (qc === "Q25") {
-          if (opt.flag === "overreach_risk") overreachRisk = true;
-          if (opt.flag === "vertical_confidence_low") verticalConfidence = "low";
-          if (opt.flag === "vertical_confidence_matched") {
-            verticalConfidence = "matched";
-          }
-          if (opt.flag === "vertical_readiness_signal") {
-            verticalReadinessSignal = true;
-          }
-        } else {
-          const mid = opt.vertical_band
-            ? verticalBandMidpoint(opt.vertical_band)
-            : null;
-          const verticalCode = opt.vertical_band
-            ? verticalBandToCode(opt.vertical_band)
-            : null;
-
-          if (mid == null || !verticalCode) {
-            return NextResponse.json(
-              { ok: false, error: `Missing vertical_band on ${qc}:${oc}` },
-              { status: 500 }
-            );
-          }
-
-          verticalValues.push(mid);
-          verticalTotals[verticalCode] = (verticalTotals[verticalCode] || 0) + 1;
-        }
-      }
-    }
+    const careerVerticalCode = primaryCareerVertical?.code || null;
+    const careerVerticalDisplayCode = displayCvCode(careerVerticalCode);
+    const careerVerticalLabel =
+      primaryCareerVertical?.label ||
+      careerVerticalDisplayCode ||
+      careerVerticalCode ||
+      null;
 
     const flags: Array<{ code: string; severity: string }> = [];
 
-    if (overreachRisk) flags.push({ code: "OVERREACH_RISK", severity: "high" });
-    if (verticalConfidence === "low") {
-      flags.push({ code: "VERTICAL_CONFIDENCE_LOW", severity: "medium" });
+    if (scoring.readiness_signal?.code) {
+      const readinessCode = String(scoring.readiness_signal.code).toUpperCase();
+
+      let severity = "low";
+      if (readinessCode === "OVERREACH_RISK") severity = "high";
+      if (readinessCode === "VERTICAL_CONFIDENCE_LOW") severity = "medium";
+
+      flags.push({
+        code: readinessCode,
+        severity,
+      });
     }
-    if (verticalConfidence === "matched") {
-      flags.push({ code: "VERTICAL_CONFIDENCE_MATCHED", severity: "low" });
-    }
-    if (verticalReadinessSignal) {
-      flags.push({ code: "VERTICAL_READINESS_SIGNAL", severity: "low" });
-    }
-
-    const coreDist = normalize(coreTotals);
-
-    const osDistArr = Object.entries(osTotals)
-      .map(([code, raw]) => ({ code, raw }))
-      .sort((a, b) => b.raw - a.raw);
-
-    const osSum = osDistArr.reduce((acc, x) => acc + x.raw, 0) || 1;
-
-    const osDist = osDistArr.map((x, idx) => ({
-      code: x.code,
-      label: osLabels[x.code] || x.code,
-      pct: Number((x.raw / osSum).toFixed(4)),
-      rank: idx + 1,
-    }));
-
-    const primaryOperatingStyle = osDist[0] || null;
-
-    const vAvg =
-      verticalValues.reduce((acc, v) => acc + v, 0) /
-      (verticalValues.length || 1);
-
-    const verticalRaw = Object.entries(verticalTotals)
-      .map(([code, raw]) => ({ code, raw }))
-      .sort((a, b) => b.raw - a.raw || cvSortOrder(a.code) - cvSortOrder(b.code));
-    const verticalSum = verticalRaw.reduce((acc, x) => acc + x.raw, 0) || 1;
-    const careerVerticalRanking = verticalRaw.map((item, idx) => ({
-      code: item.code,
-      display_code: displayCvCode(item.code),
-      label: cvLabels[item.code] || displayCvCode(item.code) || item.code,
-      pct: Number((item.raw / verticalSum).toFixed(4)),
-      count: item.raw,
-      rank: idx + 1,
-    }));
-    const primaryCareerVertical = careerVerticalRanking[0] || null;
-    const careerVerticalCode =
-      primaryCareerVertical?.code || `V${clamp(Math.round(vAvg), 1, 6)}`;
-    const verticalLevel = Number(String(careerVerticalCode).replace("V", ""));
-
-    const confidence = {
-      rating: "moderate",
-      signals: {
-        answered_count: 25,
-        vertical_avg: Number(vAvg.toFixed(2)),
-        vertical_level: verticalLevel,
-        vertical_confidence: verticalConfidence,
-        vertical_readiness_signal: verticalReadinessSignal,
-        overreach_risk: overreachRisk,
-      },
-    };
-
-    const scoring_model_version = `mcas_${framework_version}_candidate_v2_distribution`;
 
     await sb.from("results").delete().eq("assessment_id", assessmentId);
 
     const resultRow = {
       assessment_id: assessmentId,
       scoring_model: scoring_model_version,
-      core_distribution: coreDist,
-      os_distribution: osDist.map((x) => ({ code: x.code, pct: x.pct })),
-      vertical_readiness: careerVerticalCode,
-      confidence,
+      core_distribution: scoring.behavioural_approach_distribution,
+      os_distribution: scoring.operating_style_ranking.map((x) => ({
+        code: x.code,
+        pct: x.pct,
+      })),
+      vertical_readiness:
+        legacyVerticalCode(careerVerticalCode) || careerVerticalDisplayCode,
+      confidence: scoring.confidence,
       flags,
     };
 
@@ -655,9 +478,6 @@ export async function POST(req: Request) {
       .from("partner_applications")
       .update({ status: "completed", completed_at: completedAt })
       .eq("id", applicationRow.id);
-
-    const careerVerticalLabel =
-      cvLabels[careerVerticalCode] || displayCvCode(careerVerticalCode) || careerVerticalCode;
 
     let reportContentBySection: Record<"oss" | "rfs" | "cvs", any> = {
       oss: null,
@@ -749,18 +569,39 @@ export async function POST(req: Request) {
       result: {
         scoring: {
           model_version: scoring_model_version,
-          core_distribution: coreDist,
-          primary_operating_style: primaryOperatingStyle,
-          operating_style_ranking: osDist,
+
+          operating_style_counts: scoring.operating_style_counts,
+          operating_style_distribution: scoring.operating_style_distribution,
+          operating_style_ranking: scoring.operating_style_ranking,
+
+          primary_operating_style: scoring.primary_operating_style,
+          secondary_operating_style: scoring.secondary_operating_style,
+          tertiary_operating_style: scoring.tertiary_operating_style,
+
+          behavioural_approach_counts: scoring.behavioural_approach_counts,
+          behavioural_approach_distribution:
+            scoring.behavioural_approach_distribution,
+          behavioural_approach_ranking: scoring.behavioural_approach_ranking,
+
+          core_distribution: scoring.core_distribution,
+
+          career_vertical_counts: scoring.career_vertical_counts,
+          career_vertical_distribution: scoring.career_vertical_distribution,
+          career_vertical_ranking: scoring.career_vertical_ranking,
+
+          primary_career_vertical: scoring.primary_career_vertical,
+          secondary_career_vertical: scoring.secondary_career_vertical,
+
           career_vertical: {
             code: careerVerticalCode,
-            display_code: displayCvCode(careerVerticalCode),
+            display_code: careerVerticalDisplayCode,
             label: careerVerticalLabel,
-            avg_score: Number(vAvg.toFixed(2)),
+            pct: primaryCareerVertical?.pct ?? null,
           },
-          career_vertical_ranking: careerVerticalRanking,
+
+          readiness_signal: scoring.readiness_signal,
           flags,
-          confidence,
+          confidence: scoring.confidence,
         },
         report: {
           operating_style_summary:
@@ -773,18 +614,20 @@ export async function POST(req: Request) {
             ...careerVerticalSummaryContent,
             current_vertical: {
               code: careerVerticalCode,
+              display_code: careerVerticalDisplayCode,
               label: careerVerticalLabel,
-              avg_score: Number(vAvg.toFixed(2)),
+              pct: primaryCareerVertical?.pct ?? null,
               summary:
-                careerVerticalSummaryContent?.levels?.[careerVerticalCode] ||
-                careerVerticalSummaryContent?.levels?.[`CV${verticalLevel}`] ||
+                careerVerticalSummaryContent?.levels?.[careerVerticalCode || ""] ||
+                careerVerticalSummaryContent?.levels?.[
+                  displayCvCode(careerVerticalCode) || ""
+                ] ||
                 null,
             },
+            readiness_signal: scoring.readiness_signal,
           },
         },
-        audit: {
-          answers: answerAudit,
-        },
+        audit: scoring.audit,
       },
     };
 
