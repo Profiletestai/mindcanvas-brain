@@ -34,6 +34,80 @@ export type McasOrgDashboardStats = {
   latestActivityAt: string | null;
 };
 
+export type McasApplicationStatus = "created" | "started" | "completed";
+
+type McasCandidateDatabaseViewRow = {
+  partner_application_id: string;
+  org_id: string;
+  partner_key: string;
+  application_id: string;
+  public_token: string;
+  application_status: string;
+  candidate_first_name: string | null;
+  candidate_last_name: string | null;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+  consent: boolean | null;
+  application_created_at: string;
+  application_started_at: string | null;
+  application_completed_at: string | null;
+
+  assessment_id: string | null;
+  assessment_status: string | null;
+  assessment_started_at: string | null;
+  assessment_completed_at: string | null;
+  framework_slug: string | null;
+  framework_version: string | null;
+  assessment_meta: Record<string, unknown> | null;
+
+  result_id: string | null;
+  scoring_model: string | null;
+  core_distribution: unknown | null;
+  os_distribution: unknown | null;
+  vertical_readiness: string | null;
+  confidence: unknown | null;
+  flags: unknown | null;
+  result_computed_at: string | null;
+};
+
+export type McasCandidateDatabaseRow = {
+  partnerApplicationId: string;
+  orgId: string;
+  partnerKey: string;
+  applicationId: string;
+  publicToken: string;
+  status: string;
+
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  consent: boolean | null;
+
+  applicationCreatedAt: string;
+  applicationStartedAt: string | null;
+  applicationCompletedAt: string | null;
+  assessmentDate: string | null;
+
+  assessmentId: string | null;
+  assessmentStatus: string | null;
+  frameworkSlug: string | null;
+  frameworkVersion: string | null;
+
+  resultId: string | null;
+  scoringModel: string | null;
+  primaryOS: string | null;
+  secondaryOS: string | null;
+  primaryCV: string | null;
+  verticalReadiness: string | null;
+
+  rawCoreDistribution: unknown | null;
+  rawOsDistribution: unknown | null;
+  rawConfidence: unknown | null;
+  rawFlags: unknown | null;
+};
+
 function getMcasAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -225,6 +299,282 @@ export async function getMcasOrgDashboardStats(
     latestActivityAt:
       latest?.completed_at ?? latest?.started_at ?? latest?.created_at ?? null,
   };
+}
+
+export async function getMcasCandidateDatabaseRows({
+  orgId,
+  query,
+  status,
+}: {
+  orgId: string;
+  query?: string;
+  status?: string;
+}): Promise<McasCandidateDatabaseRow[]> {
+  const supabase = getMcasAdminClient();
+
+  let request = supabase
+    .from("v_admin_candidate_database")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("application_created_at", { ascending: false })
+    .limit(500);
+
+  if (status && status !== "all") {
+    request = request.eq("application_status", status);
+  }
+
+  const { data, error } = await request;
+
+  if (error) {
+    throw new Error(`Failed to load MCAS candidate database: ${error.message}`);
+  }
+
+  let rows = ((data ?? []) as McasCandidateDatabaseViewRow[]).map(
+    normaliseCandidateDatabaseRow,
+  );
+
+  const trimmedQuery = query?.trim().toLowerCase();
+
+  if (trimmedQuery) {
+    rows = rows.filter((row) => {
+      const haystack = [
+        row.fullName,
+        row.email,
+        row.applicationId,
+        row.partnerKey,
+        row.primaryOS,
+        row.secondaryOS,
+        row.primaryCV,
+        row.verticalReadiness,
+        row.status,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(trimmedQuery);
+    });
+  }
+
+  return rows;
+}
+
+export async function getMcasCandidateDetailById({
+  orgId,
+  candidateId,
+}: {
+  orgId: string;
+  candidateId: string;
+}): Promise<McasCandidateDatabaseRow | null> {
+  const supabase = getMcasAdminClient();
+
+  const { data, error } = await supabase
+    .from("v_admin_candidate_database")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("partner_application_id", candidateId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load MCAS candidate detail: ${error.message}`);
+  }
+
+  if (!data) return null;
+
+  return normaliseCandidateDatabaseRow(data as McasCandidateDatabaseViewRow);
+}
+
+function normaliseCandidateDatabaseRow(
+  row: McasCandidateDatabaseViewRow,
+): McasCandidateDatabaseRow {
+  const firstName = cleanText(row.candidate_first_name);
+  const lastName = cleanText(row.candidate_last_name);
+
+  const fullName =
+    [firstName, lastName].filter(Boolean).join(" ").trim() || "Unnamed candidate";
+
+  const osRank = readDistribution(row.os_distribution);
+
+  const confidenceObject =
+    row.confidence && typeof row.confidence === "object" && !Array.isArray(row.confidence)
+      ? (row.confidence as Record<string, unknown>)
+      : null;
+
+  const possibleCvDistribution =
+    confidenceObject?.cv_distribution ??
+    confidenceObject?.career_vertical_distribution ??
+    confidenceObject?.careerVerticalDistribution ??
+    confidenceObject?.vertical_distribution ??
+    null;
+
+  const cvRank = readDistribution(possibleCvDistribution);
+
+  return {
+    partnerApplicationId: row.partner_application_id,
+    orgId: row.org_id,
+    partnerKey: row.partner_key,
+    applicationId: row.application_id,
+    publicToken: row.public_token,
+    status: row.application_status,
+
+    firstName,
+    lastName,
+    fullName,
+    email: cleanText(row.candidate_email),
+    phone: cleanText(row.candidate_phone),
+    consent: row.consent,
+
+    applicationCreatedAt: row.application_created_at,
+    applicationStartedAt: row.application_started_at,
+    applicationCompletedAt: row.application_completed_at,
+    assessmentDate:
+      row.application_completed_at ??
+      row.assessment_completed_at ??
+      row.application_started_at ??
+      row.assessment_started_at ??
+      row.application_created_at,
+
+    assessmentId: row.assessment_id,
+    assessmentStatus: row.assessment_status,
+    frameworkSlug: row.framework_slug,
+    frameworkVersion: row.framework_version,
+
+    resultId: row.result_id,
+    scoringModel: row.scoring_model,
+    primaryOS: osRank[0]?.code ?? null,
+    secondaryOS: osRank[1]?.code ?? null,
+    primaryCV: cvRank[0]?.code ?? null,
+    verticalReadiness: cleanText(row.vertical_readiness),
+
+    rawCoreDistribution: row.core_distribution,
+    rawOsDistribution: row.os_distribution,
+    rawConfidence: row.confidence,
+    rawFlags: row.flags,
+  };
+}
+
+function cleanText(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readDistribution(value: unknown): Array<{ code: string; value: number }> {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+
+        const object = item as Record<string, unknown>;
+
+        const code =
+          asString(object.code) ??
+          asString(object.key) ??
+          asString(object.label) ??
+          asString(object.name);
+
+        const distributionValue =
+          asNumber(object.pct) ??
+          asNumber(object.percentage) ??
+          asNumber(object.percent) ??
+          asNumber(object.score) ??
+          asNumber(object.value) ??
+          asNumber(object.count);
+
+        if (!code || distributionValue === null) return null;
+
+        return {
+          code,
+          value: distributionValue,
+        };
+      })
+      .filter((item): item is { code: string; value: number } => Boolean(item))
+      .sort((a, b) => b.value - a.value);
+  }
+
+  if (typeof value === "object") {
+    const object = value as Record<string, unknown>;
+
+    return Object.entries(object)
+      .map(([key, rawValue]) => {
+        if (typeof rawValue === "number") {
+          return {
+            code: key,
+            value: rawValue,
+          };
+        }
+
+        if (typeof rawValue === "string") {
+          const parsed = Number(rawValue);
+
+          if (!Number.isNaN(parsed)) {
+            return {
+              code: key,
+              value: parsed,
+            };
+          }
+        }
+
+        if (rawValue && typeof rawValue === "object") {
+          const nested = rawValue as Record<string, unknown>;
+
+          const code =
+            asString(nested.code) ??
+            asString(nested.key) ??
+            asString(nested.label) ??
+            key;
+
+          const distributionValue =
+            asNumber(nested.pct) ??
+            asNumber(nested.percentage) ??
+            asNumber(nested.percent) ??
+            asNumber(nested.score) ??
+            asNumber(nested.value) ??
+            asNumber(nested.count);
+
+          if (distributionValue === null) return null;
+
+          return {
+            code,
+            value: distributionValue,
+          };
+        }
+
+        return null;
+      })
+      .filter((item): item is { code: string; value: number } => Boolean(item))
+      .sort((a, b) => b.value - a.value);
+  }
+
+  return [];
+}
+
+function asString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
 }
 
 export function formatMcasDate(value: string | null | undefined): string {
