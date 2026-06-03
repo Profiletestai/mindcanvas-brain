@@ -204,7 +204,10 @@ export async function getMcasOrganisationSummaries(): Promise<
         ...org,
         total_applications: totalApplications,
         completed_applications: completedApplications,
-        open_applications: Math.max(totalApplications - completedApplications, 0),
+        open_applications: Math.max(
+          totalApplications - completedApplications,
+          0,
+        ),
       };
     }),
   );
@@ -391,23 +394,21 @@ function normaliseCandidateDatabaseRow(
   const lastName = cleanText(row.candidate_last_name);
 
   const fullName =
-    [firstName, lastName].filter(Boolean).join(" ").trim() || "Unnamed candidate";
+    [firstName, lastName].filter(Boolean).join(" ").trim() ||
+    "Unnamed candidate";
 
   const osRank = readDistribution(row.os_distribution);
 
-  const confidenceObject =
-    row.confidence && typeof row.confidence === "object" && !Array.isArray(row.confidence)
-      ? (row.confidence as Record<string, unknown>)
-      : null;
-
-  const possibleCvDistribution =
-    confidenceObject?.cv_distribution ??
-    confidenceObject?.career_vertical_distribution ??
-    confidenceObject?.careerVerticalDistribution ??
-    confidenceObject?.vertical_distribution ??
-    null;
-
-  const cvRank = readDistribution(possibleCvDistribution);
+  /**
+   * Important MCAS mapping:
+   *
+   * In the current v2 result shape, results.vertical_readiness stores the
+   * Career Vertical output. It is displayed in the admin UI as Primary CV.
+   *
+   * Do not treat this as Q25 validation/readiness yet.
+   * Q25 readiness/validation should be separated later if needed.
+   */
+  const primaryCV = cleanText(row.vertical_readiness);
 
   return {
     partnerApplicationId: row.partner_application_id,
@@ -443,8 +444,8 @@ function normaliseCandidateDatabaseRow(
     scoringModel: row.scoring_model,
     primaryOS: osRank[0]?.code ?? null,
     secondaryOS: osRank[1]?.code ?? null,
-    primaryCV: cvRank[0]?.code ?? null,
-    verticalReadiness: cleanText(row.vertical_readiness),
+    primaryCV,
+    verticalReadiness: primaryCV,
 
     rawCoreDistribution: row.core_distribution,
     rawOsDistribution: row.os_distribution,
