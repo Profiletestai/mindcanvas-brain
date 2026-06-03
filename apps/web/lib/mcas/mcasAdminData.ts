@@ -108,6 +108,62 @@ export type McasCandidateDatabaseRow = {
   rawFlags: unknown | null;
 };
 
+type McasPartnerApplicationRow = {
+  id: string;
+  partner_key: string;
+  application_id: string;
+  org_id: string;
+  framework_slug: string;
+  framework_version: string;
+  public_token: string;
+  status: string;
+  candidate_email: string | null;
+  candidate_first_name: string | null;
+  candidate_last_name: string | null;
+  candidate_phone: string | null;
+  consent: boolean | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export type McasTestLinkRow = {
+  id: string;
+  orgId: string;
+  partnerKey: string;
+  applicationId: string;
+  publicToken: string;
+  status: string;
+  candidateFirstName: string | null;
+  candidateLastName: string | null;
+  candidateFullName: string;
+  candidateEmail: string | null;
+  candidatePhone: string | null;
+  consent: boolean | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  frameworkSlug: string;
+  frameworkVersion: string;
+  testUrl: string;
+};
+
+export type CreateMcasCandidateLinkInput = {
+  orgId: string;
+  orgSlug: string;
+  applicationId?: string | null;
+  candidateFirstName?: string | null;
+  candidateLastName?: string | null;
+  candidateEmail?: string | null;
+  candidatePhone?: string | null;
+};
+
+export type CreateMcasCandidateLinkResult = {
+  id: string;
+  publicToken: string;
+  testUrl: string;
+};
+
 function getMcasAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -129,6 +185,27 @@ function getMcasAdminClient() {
       autoRefreshToken: false,
     },
   });
+}
+
+export function getMcasPublicBaseUrl(): string {
+  const explicitUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.APP_URL;
+
+  if (explicitUrl) {
+    return explicitUrl.replace(/\/$/, "");
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
+  }
+
+  return "http://localhost:3000";
+}
+
+export function buildMcasCandidateTestUrl(publicToken: string): string {
+  return `${getMcasPublicBaseUrl()}/mcas/t/${publicToken}`;
 }
 
 export async function getMcasOrganisations(): Promise<McasOrganisation[]> {
@@ -387,6 +464,74 @@ export async function getMcasCandidateDetailById({
   return normaliseCandidateDatabaseRow(data as McasCandidateDatabaseViewRow);
 }
 
+export async function createMcasCandidateAssessmentLink(
+  input: CreateMcasCandidateLinkInput,
+): Promise<CreateMcasCandidateLinkResult> {
+  const supabase = getMcasAdminClient();
+
+  const partnerKey = input.orgSlug;
+  const applicationId =
+    cleanText(input.applicationId) ?? generateMcasApplicationId(input.orgSlug);
+
+  const payload = {
+    org_id: input.orgId,
+    partner_key: partnerKey,
+    application_id: applicationId,
+    framework_slug: "mcas-core-alignment",
+    framework_version: "v1",
+    status: "created",
+    candidate_first_name: cleanText(input.candidateFirstName),
+    candidate_last_name: cleanText(input.candidateLastName),
+    candidate_email: cleanText(input.candidateEmail),
+    candidate_phone: cleanText(input.candidatePhone),
+  };
+
+  const { data, error } = await supabase
+    .from("partner_applications")
+    .insert(payload)
+    .select("id, public_token")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error(
+        "A link with this Application ID already exists for this organisation. Use a different Application ID or leave it blank to auto-generate one.",
+      );
+    }
+
+    throw new Error(`Failed to create MCAS test link: ${error.message}`);
+  }
+
+  return {
+    id: data.id as string,
+    publicToken: data.public_token as string,
+    testUrl: buildMcasCandidateTestUrl(data.public_token as string),
+  };
+}
+
+export async function getMcasTestLinks({
+  orgId,
+  limit = 100,
+}: {
+  orgId: string;
+  limit?: number;
+}): Promise<McasTestLinkRow[]> {
+  const supabase = getMcasAdminClient();
+
+  const { data, error } = await supabase
+    .from("partner_applications")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to load MCAS test links: ${error.message}`);
+  }
+
+  return ((data ?? []) as McasPartnerApplicationRow[]).map(normaliseTestLinkRow);
+}
+
 function normaliseCandidateDatabaseRow(
   row: McasCandidateDatabaseViewRow,
 ): McasCandidateDatabaseRow {
@@ -399,15 +544,6 @@ function normaliseCandidateDatabaseRow(
 
   const osRank = readDistribution(row.os_distribution);
 
-  /**
-   * Important MCAS mapping:
-   *
-   * In the current v2 result shape, results.vertical_readiness stores the
-   * Career Vertical output. It is displayed in the admin UI as Primary CV.
-   *
-   * Do not treat this as Q25 validation/readiness yet.
-   * Q25 readiness/validation should be separated later if needed.
-   */
   const primaryCV = cleanText(row.vertical_readiness);
 
   return {
@@ -452,6 +588,50 @@ function normaliseCandidateDatabaseRow(
     rawConfidence: row.confidence,
     rawFlags: row.flags,
   };
+}
+
+function normaliseTestLinkRow(row: McasPartnerApplicationRow): McasTestLinkRow {
+  const firstName = cleanText(row.candidate_first_name);
+  const lastName = cleanText(row.candidate_last_name);
+
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    partnerKey: row.partner_key,
+    applicationId: row.application_id,
+    publicToken: row.public_token,
+    status: row.status,
+    candidateFirstName: firstName,
+    candidateLastName: lastName,
+    candidateFullName:
+      [firstName, lastName].filter(Boolean).join(" ").trim() ||
+      "Open candidate link",
+    candidateEmail: cleanText(row.candidate_email),
+    candidatePhone: cleanText(row.candidate_phone),
+    consent: row.consent,
+    createdAt: row.created_at,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    frameworkSlug: row.framework_slug,
+    frameworkVersion: row.framework_version,
+    testUrl: buildMcasCandidateTestUrl(row.public_token),
+  };
+}
+
+function generateMcasApplicationId(orgSlug: string): string {
+  const cleanSlug = orgSlug
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:.TZ]/g, "")
+    .slice(0, 14);
+
+  const random = Math.random().toString(36).slice(2, 8);
+
+  return `${cleanSlug}-${timestamp}-${random}`;
 }
 
 function cleanText(value: string | null | undefined): string | null {
