@@ -23,6 +23,7 @@ function getBearerToken(req: Request): string | null {
 function isAuthorized(req: Request): boolean {
   const expected = process.env.MCAS_API_BEARER_TOKEN || "";
   if (!expected) return false;
+
   const received = getBearerToken(req);
   return !!received && received === expected;
 }
@@ -91,9 +92,24 @@ function buildIdealCandidateProfile(payload: any) {
   };
 }
 
+function cleanExistingReport(report: any) {
+  if (!report || typeof report !== "object" || Array.isArray(report)) {
+    return {};
+  }
+
+  const cleanReport = { ...report };
+
+  // Prevent duplicated payload output:
+  // Keep this only at result.ideal_candidate_profile, not inside result.report.
+  delete cleanReport.ideal_candidate_profile;
+
+  return cleanReport;
+}
+
 async function fetchReportSections(sb: ReturnType<typeof supa>, payload: any) {
   const frameworkSlug = payload?.framework?.slug || "mcas-core-alignment";
   const frameworkVersion = payload?.framework?.version || "v1";
+
   const operatingStyleCode =
     payload?.result?.scoring?.primary_operating_style?.code ||
     payload?.result?.wording?.operating_style?.code ||
@@ -153,7 +169,9 @@ async function fetchReportSections(sb: ReturnType<typeof supa>, payload: any) {
             avg_score: careerVertical.avg_score,
             summary:
               cvsContent?.levels?.[careerVertical.code] ||
-              cvsContent?.levels?.[`CV${String(careerVertical.code).replace("V", "")}`] ||
+              cvsContent?.levels?.[
+                `CV${String(careerVertical.code).replace("V", "")}`
+              ] ||
               null,
           }
         : null,
@@ -165,18 +183,24 @@ async function enrichExportPayload(sb: ReturnType<typeof supa>, payload: any) {
   if (!payload || typeof payload !== "object") return payload;
 
   const idealCandidateProfile =
-    payload?.result?.ideal_candidate_profile || buildIdealCandidateProfile(payload);
+    payload?.result?.ideal_candidate_profile ||
+    payload?.result?.report?.ideal_candidate_profile ||
+    buildIdealCandidateProfile(payload);
 
   const reportSections = await fetchReportSections(sb, payload);
+  const cleanReport = cleanExistingReport(payload?.result?.report);
 
   return {
     ...payload,
     result: {
       ...(payload.result || {}),
+
+      // Canonical location for this content.
+      // Do not also include this under result.report.
       ideal_candidate_profile: idealCandidateProfile,
+
       report: {
-        ...(payload?.result?.report || {}),
-        ideal_candidate_profile: idealCandidateProfile,
+        ...cleanReport,
         operating_style_summary: reportSections.operating_style_summary,
         role_fit_summary: reportSections.role_fit_summary,
         career_vertical_summary: reportSections.career_vertical_summary,
