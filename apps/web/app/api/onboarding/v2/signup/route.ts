@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/app/_lib/supabaseAdmin";
+import { supabaseAdmin, portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { signupSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 import { findUserByEmail } from "@/app/_lib/findUserByEmail";
 
@@ -20,29 +20,43 @@ export async function POST(req: Request) {
     const admin = supabaseAdmin();
 
     const existing = await findUserByEmail(email);
+
     if (existing?.email_confirmed_at) {
-      return NextResponse.json(
-        { ok: false, error: "An account with this email already exists." },
-        { status: 409 }
-      );
-    }
+      // Block only when the user already has a fully activated org;
+      // otherwise treat as resume and re-send the OTP.
+      const { data: membership } = await portalAdmin()
+        .from("user_orgs")
+        .select("orgs(status)")
+        .eq("user_id", existing.id)
+        .maybeSingle<{ orgs: { status: string } | null }>();
 
-    const { error: createError } = await admin.auth.admin.createUser({
-      email,
-      email_confirm: false,
-      user_metadata: { first_name, last_name },
-    });
+      if (membership?.orgs?.status === "active") {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "An account with this email already exists. Please log in.",
+          },
+          { status: 409 }
+        );
+      }
+    } else {
+      const { error: createError } = await admin.auth.admin.createUser({
+        email,
+        email_confirm: false,
+        user_metadata: { first_name, last_name },
+      });
 
-    // 422 = user already exists (unverified) — idempotent, continue to OTP send.
-    const alreadyExists =
-      createError?.status === 422 ||
-      (createError as { code?: string } | null)?.code === "email_exists";
+      // 422 = user already exists (unverified) — idempotent, continue to OTP send.
+      const alreadyExists =
+        createError?.status === 422 ||
+        (createError as { code?: string } | null)?.code === "email_exists";
 
-    if (createError && !alreadyExists) {
-      return NextResponse.json(
-        { ok: false, error: createError.message },
-        { status: 400 }
-      );
+      if (createError && !alreadyExists) {
+        return NextResponse.json(
+          { ok: false, error: createError.message },
+          { status: 400 }
+        );
+      }
     }
 
     const { error: otpError } = await admin.auth.signInWithOtp({ email });

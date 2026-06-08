@@ -34,6 +34,37 @@ export async function PATCH(req: Request) {
 
     const org_id = membership.org_id;
 
+    const { data: tierDef } = await admin
+      .from("tier_definitions")
+      .select("id")
+      .eq("tier", tier)
+      .is("valid_until", null)
+      .maybeSingle();
+
+    if (!tierDef?.id) {
+      return NextResponse.json(
+        { ok: false, error: "Selected plan is no longer available. Please choose another." },
+        { status: 400 }
+      );
+    }
+
+    const { data: priceRow } = await admin
+      .from("tier_prices")
+      .select("id, amount_cents, stripe_price_id")
+      .eq("tier_definition_id", tierDef.id)
+      .eq("billing_type", "owner")
+      .eq("interval", "month")
+      .eq("active", true)
+      .gt("amount_cents", 0)
+      .maybeSingle();
+
+    if (!priceRow) {
+      return NextResponse.json(
+        { ok: false, error: "Selected plan is no longer available. Please choose another." },
+        { status: 400 }
+      );
+    }
+
     // Idempotency: unique constraint only applies when stripe_status = 'active', so query manually
     const { data: existing } = await admin
       .from("billing_accounts")

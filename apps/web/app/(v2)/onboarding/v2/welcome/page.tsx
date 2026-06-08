@@ -7,11 +7,12 @@ import { getPlan, type PlanTier } from "../_lib/plans";
 import { StepCard } from "../_components/StepCard";
 import type { PortalOrg } from "@/types/database.types";
 
-type OrgStatus = "pending_activation" | "active" | "suspended" | "archived";
+type OrgStatus = "pending_activation" | "active" | "past_due" | "suspended" | "archived";
 
 const STATUS_LABEL: Record<OrgStatus, string> = {
   pending_activation: "PENDING_ACTIVATION",
   active: "ACTIVE",
+  past_due: "PAST_DUE",
   suspended: "SUSPENDED",
   archived: "ARCHIVED",
 };
@@ -30,6 +31,11 @@ const STATUS_STYLE: Record<
     text: "rgb(28,128,72)",
     dot: "rgb(46,168,96)",
   },
+  past_due: {
+    bg: "rgb(255,236,214)",
+    text: "rgb(168,82,12)",
+    dot: "rgb(214,118,46)",
+  },
   suspended: {
     bg: "rgb(255,224,228)",
     text: "rgb(176,40,68)",
@@ -46,19 +52,50 @@ export default function WelcomePage() {
   const router = useRouter();
   const [org, setOrg] = useState<PortalOrg | null>(null);
   const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const orgRes = await api.getOrg();
       if (cancelled) return;
-      if (!isErr(orgRes)) setOrg(orgRes.org);
+      if (!isErr(orgRes) && orgRes.org) {
+        if (orgRes.org.status !== "pending_activation") {
+          router.replace("/portal/billing");
+          return;
+        }
+        setOrg(orgRes.org);
+      }
       setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
+
+  async function activate() {
+    setBusy(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const j = await res.json();
+      if (!res.ok || !j?.url) {
+        setErr(j?.error || "Could not start checkout");
+        setBusy(false);
+        return;
+      }
+      window.location.href = j.url as string;
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+      setBusy(false);
+    }
+  }
 
   if (!ready) {
     return <div className="py-8 text-center text-white/70">Loading…</div>;
@@ -155,16 +192,30 @@ export default function WelcomePage() {
             label="Billing"
             value={
               <span style={{ color: "rgb(120,144,176)", fontWeight: 500 }}>
-                Visible · disabled until activation
+                Subscription billed at activation
               </span>
             }
           />
         </div>
 
+        {err ? (
+          <div
+            className="mt-4 rounded-[12px] px-4 py-3 text-sm"
+            style={{
+              background: "rgb(255,236,238)",
+              color: "rgb(176,40,68)",
+              border: "1px solid rgb(214,62,90)",
+            }}
+          >
+            {err}
+          </div>
+        ) : null}
+
         <button
           type="button"
-          onClick={() => router.push("/portal/login")}
-          className="mt-6 w-full h-[60px] rounded-[14px] text-white font-bold tracking-wide cursor-pointer"
+          onClick={activate}
+          disabled={busy}
+          className="mt-6 w-full h-[60px] rounded-[14px] text-white font-bold tracking-wide cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
           style={{
             background:
               "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
@@ -173,7 +224,7 @@ export default function WelcomePage() {
             boxShadow: "0px 6px 20px 0px rgba(37,99,200,0.30)",
           }}
         >
-          Continue to setup
+          {busy ? "Starting checkout…" : "Continue to setup"}
         </button>
       </div>
     </StepCard>
