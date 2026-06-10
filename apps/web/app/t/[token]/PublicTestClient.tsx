@@ -25,6 +25,7 @@ type CountryCode = {
 };
 
 const PRIVACY_POLICY_URL = "https://profiletest.ai/privacy-policy";
+const LINKEDIN_URL = "https://www.linkedin.com/feed/";
 
 const COUNTRY_CODES: CountryCode[] = [
   { iso: "ZA", label: "South Africa", dial: "+27" },
@@ -717,14 +718,30 @@ export default function PublicTestClient({
                 </label>
 
                 <label className="block">
-                  <span className="text-sm text-white/80">LinkedIn Profile (optional)</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-white/80">LinkedIn Profile (optional)</span>
+
+                    <a
+                      href={LINKEDIN_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg border border-white/20 px-3 py-1 text-xs font-medium text-white/90 hover:bg-white/10"
+                    >
+                      Open LinkedIn
+                    </a>
+                  </div>
+
                   <input
                     type="url"
-                    placeholder="https://www.linkedin.com/in/..."
+                    placeholder="Paste your LinkedIn profile URL here"
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={linkedinProfile}
                     onChange={(e) => setLinkedinProfile(e.target.value)}
                   />
+
+                  <p className="mt-1 text-xs text-white/55">
+                    Open LinkedIn, copy your profile URL, then paste it here.
+                  </p>
                 </label>
 
                 <label className="block md:col-span-2">
