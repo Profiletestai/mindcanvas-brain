@@ -84,13 +84,11 @@ type SubmitResponse = {
   next_steps_url?: string | null;
   hidden_results_message?: string | null;
 
-  // legacy / alternate variants
   redirect_url?: string | null;
   redirectUrl?: string | null;
   showResults?: boolean;
   nextStepsUrl?: string | null;
 
-  // qsc-specific variants
   qsc_public_path?: string | null;
   qsc_public_url?: string | null;
 
@@ -114,7 +112,9 @@ function isAbsoluteUrl(url: string) {
 
 function buildInternationalPhone(countryCode: string, localNumber: string) {
   const cleanedCountryCode = safeString(countryCode).trim() || "+27";
-  const cleanedLocal = safeString(localNumber).replace(/[^\d]/g, "").replace(/^0+/, "");
+  const cleanedLocal = safeString(localNumber)
+    .replace(/[^\d]/g, "")
+    .replace(/^0+/, "");
 
   return cleanedLocal ? `${cleanedCountryCode}${cleanedLocal}` : "";
 }
@@ -171,7 +171,6 @@ export default function PublicTestClient({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [limitReached, setLimitReached] = useState(false);
 
   const [testName, setTestName] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
@@ -185,10 +184,8 @@ export default function PublicTestClient({
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [textAnswers, setTextAnswers] = useState<TextAnswersMap>({});
 
-  // visibility engine detection
   const [isVisibilityEngine, setIsVisibilityEngine] = useState(false);
 
-  // details
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -196,6 +193,8 @@ export default function PublicTestClient({
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
+  const [linkedinProfile, setLinkedinProfile] = useState("");
+  const [referredBy, setReferredBy] = useState("");
   const [dataConsent, setDataConsent] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
@@ -219,12 +218,6 @@ export default function PublicTestClient({
         if (!alive) return;
 
         const metaData = metaRes?.data ?? {};
-
-        if (metaData?.limit_reached) {
-          setLimitReached(true);
-          setLoading(false);
-          return;
-        }
         const nameFromMeta: string | null = metaData?.name ?? null;
 
         const orgNameFromMeta: string | null =
@@ -285,6 +278,8 @@ export default function PublicTestClient({
               setPhone(parsedPhone.localPhone);
               setCompany(o.company || "");
               setRoleTitle(o.roleTitle || "");
+              setLinkedinProfile(o.linkedinProfile || "");
+              setReferredBy(o.referredBy || "");
               setDataConsent(Boolean(o.dataConsent));
             } catch {}
           }
@@ -330,11 +325,25 @@ export default function PublicTestClient({
           phone,
           company,
           roleTitle,
+          linkedinProfile,
+          referredBy,
           dataConsent,
         })
       );
     }
-  }, [firstName, lastName, email, phoneCountryCode, phone, company, roleTitle, dataConsent, token]);
+  }, [
+    firstName,
+    lastName,
+    email,
+    phoneCountryCode,
+    phone,
+    company,
+    roleTitle,
+    linkedinProfile,
+    referredBy,
+    dataConsent,
+    token,
+  ]);
 
   const q = questions[i];
 
@@ -403,6 +412,8 @@ export default function PublicTestClient({
           phone: internationalPhone || null,
           company: company.trim() || null,
           role_title: roleTitle.trim() || null,
+          linkedin_profile: linkedinProfile.trim() || null,
+          referred_by: referredBy.trim() || null,
           data_consent: true,
         }),
       });
@@ -486,7 +497,6 @@ export default function PublicTestClient({
         window.localStorage.removeItem(key("details"));
       }
 
-      // Visibility always goes to bespoke route
       if (isVisibilityEngine) {
         router.replace(`/t/${token}/visibility/report?tid=${encodeURIComponent(takerId)}`);
         return;
@@ -494,8 +504,6 @@ export default function PublicTestClient({
 
       const { redirect, nextSteps, showResults } = resolveRedirectAndNextSteps(j);
 
-      // CRITICAL FIX:
-      // Trust explicit backend redirect FIRST (QSC and other bespoke engines)
       if (redirect) {
         if (isAbsoluteUrl(redirect)) {
           window.location.href = redirect;
@@ -516,7 +524,6 @@ export default function PublicTestClient({
         return;
       }
 
-      // Only fall back to generic /result when no explicit redirect was provided
       if (showResults !== false) {
         router.replace(`/t/${token}/result?tid=${encodeURIComponent(takerId)}`);
         return;
@@ -533,8 +540,6 @@ export default function PublicTestClient({
       setSubmitting(false);
     }
   };
-
-  /* ---------------- UI ---------------- */
 
   const finalOrg = orgName || "Profiletest.ai";
   const finalTest = testName || "Profile Test";
@@ -555,22 +560,6 @@ export default function PublicTestClient({
         <pre className="mt-3 p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">
           {error}
         </pre>
-      </div>
-    );
-  }
-
-  if (limitReached) {
-    return (
-      <div className={embed ? "p-0" : "p-6"} style={embed ? { minHeight: 420 } : undefined}>
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-5 max-w-2xl space-y-3">
-          <h1 className="text-xl font-semibold text-white">
-            This link is no longer accepting submissions
-          </h1>
-          <p className="text-sm text-white/80">
-            The usage limit for this test link has been reached. Please contact
-            the person who shared this link if you need access.
-          </p>
-        </div>
       </div>
     );
   }
@@ -611,7 +600,9 @@ export default function PublicTestClient({
               <div className="text-2xl font-semibold text-white">{finalTest}</div>
 
               <div>
-                <div className="text-sm font-semibold text-white/90">Introduction To {finalTest}</div>
+                <div className="text-sm font-semibold text-white/90">
+                  Introduction To {finalTest}
+                </div>
                 <p className="mt-2 text-sm leading-6 text-white/75">
                   {introText?.trim()
                     ? introText
@@ -622,8 +613,8 @@ export default function PublicTestClient({
               <div className="rounded-xl bg-black/20 border border-white/10 p-4">
                 <div className="text-sm font-semibold text-white/90">Instructions</div>
                 <p className="mt-2 text-sm leading-6 text-white/75">
-                  Please answer each question honestly and instinctively. There are no right or wrong answers.
-                  Your results are based on patterns across your responses.
+                  Please answer each question honestly and instinctively. There are no right or wrong
+                  answers. Your results are based on patterns across your responses.
                 </p>
                 <p className="mt-3 text-sm text-white/75">Enjoy this experience with {finalOrg}.</p>
               </div>
@@ -632,7 +623,9 @@ export default function PublicTestClient({
 
           <div className="lg:col-span-3">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-5 space-y-4">
-              <div className="text-lg font-semibold text-white">Before we start, tell us about you</div>
+              <div className="text-lg font-semibold text-white">
+                Before we start, tell us about you
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="block">
@@ -714,12 +707,33 @@ export default function PublicTestClient({
                   />
                 </label>
 
-                <label className="block md:col-span-2">
+                <label className="block">
                   <span className="text-sm text-white/80">Role / Department (optional)</span>
                   <input
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={roleTitle}
                     onChange={(e) => setRoleTitle(e.target.value)}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm text-white/80">LinkedIn Profile (optional)</span>
+                  <input
+                    type="url"
+                    placeholder="https://www.linkedin.com/in/..."
+                    className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                    value={linkedinProfile}
+                    onChange={(e) => setLinkedinProfile(e.target.value)}
+                  />
+                </label>
+
+                <label className="block md:col-span-2">
+                  <span className="text-sm text-white/80">Who referred you? (optional)</span>
+                  <input
+                    placeholder="Name, company, campaign, or source"
+                    className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                    value={referredBy}
+                    onChange={(e) => setReferredBy(e.target.value)}
                   />
                 </label>
               </div>
@@ -784,8 +798,9 @@ export default function PublicTestClient({
             This test isn&apos;t configured with any questions yet
           </div>
           <p className="text-sm text-white/70">
-            The link is valid, but no question set was found for this test. If you believe this is an error,
-            please contact the organiser or MindCanvas support so they can add questions to this assessment.
+            The link is valid, but no question set was found for this test. If you believe this is an
+            error, please contact the organiser or MindCanvas support so they can add questions to
+            this assessment.
           </p>
         </div>
       ) : (
@@ -800,7 +815,9 @@ export default function PublicTestClient({
               )}
             </div>
 
-            <div className="text-lg font-medium mb-4 text-white">{q.text || `Question ${i + 1}`}</div>
+            <div className="text-lg font-medium mb-4 text-white">
+              {q.text || `Question ${i + 1}`}
+            </div>
 
             {isTextQuestion(q) ? (
               <div className="space-y-2">
