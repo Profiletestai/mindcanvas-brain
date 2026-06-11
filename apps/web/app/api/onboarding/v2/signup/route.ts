@@ -16,6 +16,7 @@ export async function POST(req: Request) {
       );
     }
     const { first_name, last_name, email } = parsed.data;
+    const acceptedAt = new Date().toISOString();
 
     const admin = supabaseAdmin();
 
@@ -43,7 +44,12 @@ export async function POST(req: Request) {
       const { error: createError } = await admin.auth.admin.createUser({
         email,
         email_confirm: false,
-        user_metadata: { first_name, last_name },
+        user_metadata: {
+          first_name,
+          last_name,
+          terms_accepted_at: acceptedAt,
+          privacy_accepted_at: acceptedAt,
+        },
       });
 
       // 422 = user already exists (unverified) — idempotent, continue to OTP send.

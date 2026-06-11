@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, isErr } from "../_lib/api";
-import { getPlan, type PlanTier } from "../_lib/plans";
 import { StepCard } from "../_components/StepCard";
 import type { PortalOrg } from "@/types/database.types";
 
@@ -52,8 +51,6 @@ export default function WelcomePage() {
   const router = useRouter();
   const [org, setOrg] = useState<PortalOrg | null>(null);
   const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -74,37 +71,10 @@ export default function WelcomePage() {
     };
   }, [router]);
 
-  async function activate() {
-    setBusy(true);
-    setErr("");
-    try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const j = await res.json();
-      if (!res.ok || !j?.url) {
-        setErr(j?.error || "Could not start checkout");
-        setBusy(false);
-        return;
-      }
-      window.location.href = j.url as string;
-    } catch (e: any) {
-      setErr(String(e?.message || e));
-      setBusy(false);
-    }
-  }
-
   if (!ready) {
     return <div className="py-8 text-center text-white/70">Loading…</div>;
   }
 
-  const tierStr =
-    typeof window !== "undefined" ? sessionStorage.getItem("onb_tier") : null;
-  const tier = tierStr ? (Number(tierStr) as PlanTier) : null;
-  const plan = getPlan(tier);
   const status = (org?.status as OrgStatus) ?? "pending_activation";
   const statusStyle = STATUS_STYLE[status] ?? STATUS_STYLE.pending_activation;
   const statusLabel = STATUS_LABEL[status] ?? status;
@@ -186,8 +156,6 @@ export default function WelcomePage() {
             }
           />
           <Divider />
-          <Row label="Selected plan" value={plan ? plan.name : "—"} />
-          <Divider />
           <Row
             label="Billing"
             value={
@@ -198,24 +166,10 @@ export default function WelcomePage() {
           />
         </div>
 
-        {err ? (
-          <div
-            className="mt-4 rounded-[12px] px-4 py-3 text-sm"
-            style={{
-              background: "rgb(255,236,238)",
-              color: "rgb(176,40,68)",
-              border: "1px solid rgb(214,62,90)",
-            }}
-          >
-            {err}
-          </div>
-        ) : null}
-
         <button
           type="button"
-          onClick={activate}
-          disabled={busy}
-          className="mt-6 w-full h-[60px] rounded-[14px] text-white font-bold tracking-wide cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+          onClick={() => router.push("/choose-plan")}
+          className="mt-6 w-full h-[60px] rounded-[14px] text-white font-bold tracking-wide cursor-pointer"
           style={{
             background:
               "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
@@ -224,7 +178,7 @@ export default function WelcomePage() {
             boxShadow: "0px 6px 20px 0px rgba(37,99,200,0.30)",
           }}
         >
-          {busy ? "Starting checkout…" : "Continue to setup"}
+          Choose your plan
         </button>
       </div>
     </StepCard>

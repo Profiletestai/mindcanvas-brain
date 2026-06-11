@@ -14,6 +14,7 @@ import {
   getOwnerPricesForTier,
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
+import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { getBaseUrl } from "@/lib/baseUrl";
 
 export const runtime = "nodejs";
@@ -28,11 +29,15 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error;
   const user = auth.user;
 
-  let body: { orgId?: string } = {};
+  let body: { orgId?: string; tier?: number } = {};
   try {
     body = await req.json();
   } catch {
     // empty body is fine
+  }
+
+  if (body.tier !== undefined && (!Number.isInteger(body.tier) || body.tier < 1 || body.tier > 4)) {
+    return jerr("tier must be an integer between 1 and 4", "invalid_tier", 400);
   }
 
   const resolved = await resolveOwnerOrgId(user.id, body.orgId ?? null);
@@ -44,6 +49,26 @@ export async function POST(req: Request) {
   if (org.status === "archived") return jerr("Org archived", "org_archived", 409);
   if (org.status === "active") return jerr("Org already active", "org_already_active", 409);
   if (org.status === "suspended") return jerr("Org suspended", "org_suspended", 409);
+
+  if (body.tier !== undefined) {
+    const admin = portalAdmin();
+    const existing = await getOwnerBillingAccount(orgId);
+    if (existing) {
+      const { error } = await admin
+        .from("billing_accounts")
+        .update({ tier: body.tier })
+        .eq("id", existing.id);
+      if (error) return jerr(error.message, "tier_update_failed", 500);
+    } else {
+      const { error } = await admin.from("billing_accounts").insert({
+        org_id: orgId,
+        billing_type: "owner",
+        tier: body.tier,
+        stripe_status: null,
+      });
+      if (error) return jerr(error.message, "billing_account_create_failed", 500);
+    }
+  }
 
   const ba = await getOwnerBillingAccount(orgId);
   if (!ba) return jerr("Billing account missing", "billing_account_missing", 500);
