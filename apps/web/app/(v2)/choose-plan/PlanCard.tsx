@@ -1,5 +1,5 @@
 import type { PlanCardData } from "./ChoosePlanClient";
-import { CheckIcon, CrossIcon } from "./icons";
+import { CheckSvgIcon, CrossSvgIcon } from "./icons";
 
 export type Interval = "month" | "year";
 
@@ -32,7 +32,7 @@ export function PlanCard({
 
   return (
     <div
-      className={`relative flex flex-col rounded-[16px] bg-white pt-[22px] px-4 pb-[18px] [animation:cp-rise_480ms_ease_both] ${
+      className={`relative flex flex-col rounded-[16px] bg-white px-5 pb-4 pt-5 [animation:cp-rise_480ms_ease_both] ${
         card.highlight
           ? "border-2 border-[rgba(45,157,224,1)]"
           : "border border-white/[0.08]"
@@ -59,23 +59,37 @@ export function PlanCard({
         <span className="text-[28px] font-bold leading-[28px] text-[rgba(19,38,64,1)]">
           {formatUsd(monthlyCents)}
         </span>
-        <span className="-ml-[2px] text-[13px] leading-[13px] text-[rgba(19,38,64,1)]">/month</span>
+        <span className="-ml-[2px] text-[13px] leading-[13px] text-[rgba(19,38,64,1)]">
+          /month
+        </span>
       </div>
-      <p className="mt-1 text-[12px] text-[rgb(71,99,128)]">{card.tagline}</p>
+      <p className="mt-1 text-[11px] leading-[16.5px] text-[rgba(19,38,64,1)]">
+        {card.tagline}
+      </p>
 
-      <div className="mt-3 mb-4 h-px bg-[rgb(24,44,62)]" />
+      <div className="mt-3 mb-4 h-px bg-[rgba(28,48,80,1)]" />
 
       <ul className="flex-1 space-y-1.5">
         {card.features.map((f) => (
-          <li key={f.label} className="flex items-start gap-[6px]">
+          <li key={f.label} className="flex items-start gap-[18px]">
             {f.included ? (
-              <CheckIcon color="rgb(38,180,120)" size={11} className="mt-[3px] shrink-0" />
+              <CheckSvgIcon
+                color="rgba(45,212,191,1)"
+                size={12}
+                className="mt-[3px] shrink-0"
+              />
             ) : (
-              <CrossIcon color="rgb(148,163,184)" size={9} className="mt-[4px] shrink-0" />
+              <CrossSvgIcon
+                color="#132640"
+                size={12}
+                className="mt-[3px] shrink-0 opacity-50"
+              />
             )}
             <span
-              className={`text-[11px] leading-[17px] tracking-[-0.1px] ${
-                f.included ? "text-[rgb(40,62,84)]" : "text-[rgb(148,163,184)]"
+              className={`text-[11px] leading-[15.4px] font-light tracking-[0px] ${
+                f.included
+                  ? "text-[rgba(19,38,64,1)]"
+                  : "text-[rgba(19,38,64,0.5)]"
               }`}
             >
               {f.label}

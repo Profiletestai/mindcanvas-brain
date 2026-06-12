@@ -6,7 +6,7 @@ import { api, isErr } from "@/app/(v2)/onboarding/v2/_lib/api";
 import { pathForStep } from "@/app/(v2)/onboarding/v2/_lib/progress";
 import type { PlanCardContent } from "./planContent";
 import { PlanCard, type Interval } from "./PlanCard";
-import { CheckIcon } from "./icons";
+import { CheckSvgIcon } from "./icons";
 
 export type PlanCardData = PlanCardContent & {
   amountCents: number;
@@ -33,7 +33,11 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
         router.replace(pathForStep(prog.step));
         return;
       }
-      if (!isErr(orgRes) && orgRes.org && orgRes.org.status !== "pending_activation") {
+      if (
+        !isErr(orgRes) &&
+        orgRes.org &&
+        orgRes.org.status !== "pending_activation"
+      ) {
         router.replace("/portal/billing");
         return;
       }
@@ -84,18 +88,18 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <div className="mx-auto max-w-[1720px] px-6 py-10 lg:py-11">
+      <div className="mx-auto max-w-[1720px] px-6 py-10 pt-[38px]">
         <header className="text-center [animation:cp-rise_480ms_ease_both]">
           <h1 className="text-[20px] font-extrabold leading-[32px] tracking-[-0.4px] text-white">
             Choose Plan
           </h1>
-          <p className="mx-auto mt-3 max-w-[500px] text-[13px] leading-[21px] text-[rgb(148,170,196)]">
-            All plans include a one-to-one onboarding call, monthly group coaching,
-            your training library, and 10 kickstart free tests. Upgrade or change
-            anytime.
+          <p className="mx-auto mt-[17px] max-w-[500px] text-[13px] leading-[21px] text-[rgb(148,170,196)]">
+            All plans include a one-to-one onboarding call, monthly group
+            coaching, your training library, and 10 kickstart free tests.
+            Upgrade or change anytime.
           </p>
 
-          <div className="mt-7 flex items-center justify-center gap-3">
+          <div className="mt-[34px] flex items-center justify-center gap-3">
             <span
               className={`text-[12px] leading-[19.2px] font-medium ${
                 interval === "month" ? "text-[#EEF2F8]" : "text-[#3D5870]"
@@ -108,12 +112,14 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
               role="switch"
               aria-checked={interval === "year"}
               aria-label="Toggle annual billing"
-              onClick={() => setInterval(interval === "month" ? "year" : "month")}
-              className="relative h-6 w-11 cursor-pointer rounded-full border border-white/[0.12] bg-[rgb(30,58,85)] transition-colors"
+              onClick={() =>
+                setInterval(interval === "month" ? "year" : "month")
+              }
+              className="relative h-6 w-[42px] cursor-pointer rounded-full bg-[rgb(30,58,85)] transition-colors"
             >
               <span
-                className={`absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.35)] transition-[left] duration-200 ${
-                  interval === "year" ? "left-[22px]" : "left-[3px]"
+                className={`absolute top-[2px] h-5 w-5 rounded-full bg-white transition-[left] duration-200 ${
+                  interval === "year" ? "left-[20px]" : "left-[2px]"
                 }`}
               />
             </button>
@@ -136,7 +142,7 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
           </div>
         )}
 
-        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[repeat(4,282px)] xl:justify-center xl:gap-3.5 items-stretch">
+        <div className="mt-[50px] grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[repeat(4,282px)] xl:justify-center xl:gap-3.5 items-stretch">
           {cards.map((card, i) => (
             <PlanCard
               key={card.tier}
@@ -150,13 +156,21 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
           ))}
         </div>
 
-        <div className="mx-auto mt-16 max-w-[648px] rounded-[12px] border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.05)] px-6 py-2.5 [animation:cp-rise_480ms_ease_520ms_both]">
+        <div className="mx-auto mt-[34px] max-w-[648px] rounded-[12px] border border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.05)] px-6 py-2.5 [animation:cp-rise_480ms_ease_520ms_both]">
           <div className="flex items-start gap-3">
-            <CheckIcon color="rgb(74,210,134)" size={13} className="mt-[4px] shrink-0" />
+            <CheckSvgIcon
+              color="#22C55E"
+              size={16}
+              className="mt-[2px] shrink-0"
+            />
             <p className="text-[12px] leading-[20.4px] text-[rgba(122,155,191,1)]">
-              Your first <strong className="text-[rgba(238,242,248,1)]">10 tests are free</strong> — no
-              payment required to get started. Billing only begins when you&apos;re ready
-              to share test links with clients. You can change your plan at any time.
+              Your first{" "}
+              <strong className="text-[rgba(238,242,248,1)]">
+                10 tests are free
+              </strong>{" "}
+              — no payment required to get started. Billing only begins when
+              you&apos;re ready to share test links with clients. You can change
+              your plan at any time.
             </p>
           </div>
         </div>
