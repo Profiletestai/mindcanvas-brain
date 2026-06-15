@@ -8,6 +8,7 @@ import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
 import {
   getOrgRow,
   getOwnerBillingAccount,
+  getSubmissionUsage,
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
 
@@ -40,10 +41,12 @@ export async function GET(req: Request) {
   if (!org) return jerr("Org not found", "org_not_found", 404);
 
   const ba = await getOwnerBillingAccount(orgId);
+  const usage = await getSubmissionUsage(orgId);
 
   return NextResponse.json({
     ok: true,
     org: { id: org.id, name: org.name, status: org.status },
+    usage,
     billing: ba
       ? {
           tier: ba.tier,

@@ -145,6 +145,50 @@ export async function resolveOwnerOrgId(userId: string, orgIdHint?: string | nul
   return { ok: true, orgId: orgs[0].org_id };
 }
 
+export type ReserveSubmissionResult = {
+  ok: boolean;
+  reason?: "no_subscription" | "limit_reached";
+  allowance?: number;
+  used?: number;
+  remaining?: number;
+};
+
+export function isSubmissionQuotaEnforced(): boolean {
+  return process.env.SUBMISSION_QUOTA_ENFORCED !== "false";
+}
+
+export async function reserveSubmission(
+  orgId: string,
+  referenceId: string
+): Promise<ReserveSubmissionResult> {
+  if (!isSubmissionQuotaEnforced()) return { ok: true };
+
+  const { data, error } = await portalAdmin().rpc("fn_reserve_submission", {
+    p_org_id: orgId,
+    p_reference_id: referenceId,
+  });
+  if (error) throw error;
+  return data as ReserveSubmissionResult;
+}
+
+export type SubmissionUsage = {
+  ok: boolean;
+  reason?: "no_subscription";
+  allowance: number;
+  used: number;
+  remaining: number;
+  period_start: string | null;
+  period_end: string | null;
+};
+
+export async function getSubmissionUsage(orgId: string): Promise<SubmissionUsage> {
+  const { data, error } = await portalAdmin().rpc("fn_submission_usage", {
+    p_org_id: orgId,
+  });
+  if (error) throw error;
+  return data as SubmissionUsage;
+}
+
 export async function getOrgRow(orgId: string) {
   const { data, error } = await portalAdmin()
     .from("orgs")
