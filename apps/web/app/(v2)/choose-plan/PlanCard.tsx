@@ -3,8 +3,6 @@ import { CheckSvgIcon, CrossSvgIcon } from "./icons";
 
 export type Interval = "month" | "year";
 
-const ANNUAL_DISCOUNT = 0.85;
-
 function formatUsd(cents: number): string {
   const major = cents / 100;
   return `$${Number.isInteger(major) ? major : major.toFixed(2)}`;
@@ -25,10 +23,7 @@ export function PlanCard({
   onSelect: () => void;
   animationDelay: number;
 }) {
-  const monthlyCents =
-    interval === "year"
-      ? Math.round(card.amountCents * ANNUAL_DISCOUNT)
-      : card.amountCents;
+  const monthlyCents = card.amountCents;
 
   return (
     <div
@@ -98,18 +93,29 @@ export function PlanCard({
         ))}
       </ul>
 
-      <button
-        type="button"
-        onClick={onSelect}
-        disabled={disabled}
-        className={`mt-6 h-[38px] w-full rounded-[8px] bg-[rgba(23,46,74,1)] text-[12px] leading-[100%] font-medium text-white transition ${
-          disabled
-            ? "cursor-not-allowed opacity-60"
-            : "cursor-pointer hover:brightness-125"
-        }`}
-      >
-        {busy ? "Starting checkout…" : card.cta}
-      </button>
+      {card.externalUrl ? (
+        <a
+          href={card.externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 flex h-[38px] w-full items-center justify-center rounded-[8px] bg-[rgba(23,46,74,1)] text-[12px] leading-[100%] font-medium text-white transition cursor-pointer hover:brightness-125"
+        >
+          {card.cta}
+        </a>
+      ) : (
+        <button
+          type="button"
+          onClick={onSelect}
+          disabled={disabled}
+          className={`mt-6 h-[38px] w-full rounded-[8px] bg-[rgba(23,46,74,1)] text-[12px] leading-[100%] font-medium text-white transition ${
+            disabled
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer hover:brightness-125"
+          }`}
+        >
+          {busy ? "Starting checkout…" : card.cta}
+        </button>
+      )}
     </div>
   );
 }

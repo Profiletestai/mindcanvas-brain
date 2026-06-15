@@ -112,10 +112,8 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
               role="switch"
               aria-checked={interval === "year"}
               aria-label="Toggle annual billing"
-              onClick={() =>
-                setInterval(interval === "month" ? "year" : "month")
-              }
-              className="relative h-6 w-[42px] cursor-pointer rounded-full bg-[rgb(30,58,85)] transition-colors"
+              disabled
+              className="relative h-6 w-[42px] cursor-not-allowed rounded-full bg-[rgb(30,58,85)] opacity-50 transition-colors"
             >
               <span
                 className={`absolute top-[2px] h-5 w-5 rounded-full bg-white transition-[left] duration-200 ${

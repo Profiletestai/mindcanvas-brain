@@ -7,6 +7,7 @@ export type PlanCardContent = {
   badge?: { label: string; color: "blue" | "teal" };
   highlight?: boolean;
   cta: string;
+  externalUrl?: string;
   fallbackAmountCents: number;
   features: PlanFeature[];
 };
@@ -94,6 +95,7 @@ export const PLAN_CARDS: PlanCardContent[] = [
     name: "Enterprise",
     tagline: "Organisations & large-scale operators",
     cta: "Get in touch",
+    externalUrl: "https://profiletest.ai/contact-us",
     fallbackAmountCents: 99700,
     features: [
       inc("Full Engine Library"),
