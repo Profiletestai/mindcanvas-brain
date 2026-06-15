@@ -117,6 +117,8 @@ type GhlSyncResult = {
   response?: any;
 };
 
+type CompetencyCoachSyncMode = "qsc_entrepreneur" | "cc_dna_blueprint";
+
 const TIERS: Tier[] = ["Invisible", "Emerging", "Established", "Magnetic"];
 const PRIME_PILLARS: PrimePillar[] = [
   "visibility",
@@ -358,8 +360,6 @@ function scoreRhythmLayer(args: {
   const rankedDrivers = [...RHYTHM_DRIVERS].sort((a, b) => {
     const scoreDiff = rawScores[b] - rawScores[a];
     if (scoreDiff !== 0) return scoreDiff;
-
-    // Stable tie-breaker so reports do not randomly change on equal scores.
     return RHYTHM_DRIVERS.indexOf(a) - RHYTHM_DRIVERS.indexOf(b);
   });
 
@@ -777,6 +777,181 @@ async function syncGedToGhl(args: {
     return {
       ok: false,
       message: `GHL sync request failed: ${String(e?.message || e)}`,
+    };
+  }
+}
+
+async function syncCompetencyCoachToGhl(args: {
+  mode: CompetencyCoachSyncMode;
+  taker: any;
+  reportUrl: string;
+  qscSummary: QscResultSummary | null;
+  ccProfile: string | null;
+  ccCoachingFlow: string | null;
+}): Promise<GhlSyncResult> {
+  const endpoint =
+    normalizeText(process.env.COMPETENCY_COACH_GHL_CONTACT_UPSERT_URL) ||
+    normalizeText(process.env.GHL_CONTACT_UPSERT_URL) ||
+    "https://services.leadconnectorhq.com/contacts/upsert";
+
+  const apiKey = normalizeText(process.env.COMPETENCY_COACH_GHL_API_KEY);
+  const locationId = normalizeText(process.env.COMPETENCY_COACH_GHL_LOCATION_ID);
+  const apiVersion =
+    normalizeText(process.env.COMPETENCY_COACH_GHL_API_VERSION) ||
+    normalizeText(process.env.GHL_API_VERSION) ||
+    "2021-07-28";
+
+  if (!apiKey || !locationId || !endpoint) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped Competency Coach GHL sync because location, API key, or endpoint is missing.",
+    };
+  }
+
+  const email = normalizeEmail(args.taker?.email);
+  const phone = normalizeText(args.taker?.phone);
+
+  if (!email && !phone) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped Competency Coach GHL sync because taker has neither email nor phone.",
+    };
+  }
+
+  const customFields: any[] = [];
+  let completionTag = "";
+
+  if (args.mode === "qsc_entrepreneur") {
+    if (!args.qscSummary) {
+      return {
+        ok: false,
+        skipped: true,
+        message:
+          "Skipped Competency Coach QSC sync because QSC summary was not available.",
+      };
+    }
+
+    pushCustomField(
+      customFields,
+      process.env.COMPETENCY_COACH_GHL_CF_QSC_PROFILE ||
+        "key:contact.qsc_profile",
+      args.qscSummary.quantum_profile
+    );
+
+    pushCustomField(
+      customFields,
+      process.env.COMPETENCY_COACH_GHL_CF_QSC_MINDSET_LEVEL ||
+        "key:contact.qsc_mindset_level",
+      args.qscSummary.mindset_layer
+    );
+
+    pushCustomField(
+      customFields,
+      process.env.COMPETENCY_COACH_GHL_CF_QSC_REPORT_URL ||
+        "key:contact.qsc_prospect_report_link",
+      args.reportUrl
+    );
+
+    completionTag =
+      normalizeText(process.env.COMPETENCY_COACH_GHL_TAG_QSC_COMPLETED) ||
+      "QSC Completed";
+  }
+
+  if (args.mode === "cc_dna_blueprint") {
+    pushCustomField(
+      customFields,
+      process.env.COMPETENCY_COACH_GHL_CF_CC_PROFILE ||
+        "key:contact.cc_profile",
+      args.ccProfile
+    );
+
+    pushCustomField(
+      customFields,
+      process.env.COMPETENCY_COACH_GHL_CF_CC_COACHING_FLOW ||
+        "key:contact.cc_coaching_flow",
+      args.ccCoachingFlow
+    );
+
+    pushCustomField(
+      customFields,
+      process.env.COMPETENCY_COACH_GHL_CF_CC_REPORT_URL ||
+        "key:contact.cc_prospect_report_link",
+      args.reportUrl
+    );
+
+    completionTag =
+      normalizeText(process.env.COMPETENCY_COACH_GHL_TAG_CC_COMPLETED) ||
+      "CC DNA Blueprint Completed";
+  }
+
+  const tags = completionTag ? [completionTag] : [];
+
+  const fullName = [args.taker?.first_name, args.taker?.last_name]
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const payload: any = {
+    locationId,
+    firstName: normalizeText(args.taker?.first_name) || undefined,
+    lastName: normalizeText(args.taker?.last_name) || undefined,
+    name: fullName || undefined,
+    email: email || undefined,
+    phone: phone || undefined,
+    tags,
+    customFields: customFields.length ? customFields : undefined,
+  };
+
+  if (normalizeText(args.taker?.company)) {
+    payload.companyName = normalizeText(args.taker?.company);
+  }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Version: apiVersion,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+
+    const raw = await res.text();
+    let parsed: any = raw;
+
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      // keep raw text
+    }
+
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        message: `Competency Coach GHL sync failed with status ${res.status}`,
+        response: parsed,
+      };
+    }
+
+    return {
+      ok: true,
+      status: res.status,
+      response: parsed,
+    };
+  } catch (e: any) {
+    return {
+      ok: false,
+      message: `Competency Coach GHL sync request failed: ${String(
+        e?.message || e
+      )}`,
     };
   }
 }
@@ -1936,7 +2111,6 @@ export async function POST(
       });
     }
 
-    // ---------- Existing behaviour for all other tests ----------
     const effectiveTestId = await resolveEffectiveTestId(sb, test);
 
     const slug: string = (test.slug as string) || "";
@@ -2020,8 +2194,48 @@ export async function POST(
       );
     }
 
+    const { data: frequencyLabelRows, error: frequencyLabelErr } = await sb
+      .from("test_frequency_labels")
+      .select("*")
+      .eq("test_id", effectiveTestId);
+
+    if (frequencyLabelErr) {
+      console.warn(
+        "[submit] frequency labels load failed",
+        frequencyLabelErr.message
+      );
+    }
+
     const nameToCode = new Map<string, string>();
+    const profileCodeToName = new Map<string, string>();
     const codeToFreq = new Map<string, AB>();
+    const frequencyNameByCode = new Map<string, string>();
+
+    const competencyCoachFrequencyFallback: Record<AB, string> = {
+      A: "Catalyst",
+      B: "Communicator",
+      C: "Rhythmic",
+      D: "Observer",
+    };
+
+    for (const row of frequencyLabelRows || []) {
+      const code = String(
+        (row as any)?.frequency_code || (row as any)?.code || ""
+      )
+        .trim()
+        .toUpperCase();
+
+      const label = normalizeText(
+        (row as any)?.frequency_name ||
+          (row as any)?.label ||
+          (row as any)?.name ||
+          (row as any)?.title
+      );
+
+      if (code && label) {
+        frequencyNameByCode.set(code, label);
+      }
+    }
 
     for (const r of labels || []) {
       const code = String((r as any).profile_code || "").trim();
@@ -2029,6 +2243,8 @@ export async function POST(
       const f = String((r as any).frequency_code || "").trim().toUpperCase();
 
       if (name && code) nameToCode.set(name, code);
+      if (code && name) profileCodeToName.set(code, name);
+
       if (code) {
         if (f === "A" || f === "B" || f === "C" || f === "D") {
           codeToFreq.set(code, f as AB);
@@ -2103,6 +2319,21 @@ export async function POST(
       const f = codeToFreq.get(pcode) || profileCodeToFreq(pcode);
       if (f) freqTotals[f] += points;
     }
+
+    const sortedProfiles = Object.entries(profileTotals).sort((a, b) => b[1] - a[1]);
+    const topProfileCode = sortedProfiles[0]?.[0] || null;
+    const topProfileLabel = topProfileCode
+      ? profileCodeToName.get(topProfileCode) || topProfileCode
+      : null;
+
+    const sortedFrequencies = Object.entries(freqTotals).sort((a, b) => b[1] - a[1]);
+    const topFrequencyCode = (sortedFrequencies[0]?.[0] || null) as AB | null;
+    const topFrequencyLabel = topFrequencyCode
+      ? frequencyNameByCode.get(topFrequencyCode) ||
+        (slugLower === "competency-coach"
+          ? competencyCoachFrequencyFallback[topFrequencyCode]
+          : topFrequencyCode)
+      : null;
 
     const totals = {
       frequencies: {
@@ -2476,6 +2707,64 @@ export async function POST(
       normalizeEmail((orgRow as any)?.support_email) ||
       getDefaultSupportEmail();
 
+    const orgSlug = String((orgRow as any)?.slug || "")
+      .trim()
+      .toLowerCase();
+
+    let competencyCoachGhlSyncResult: GhlSyncResult | null = null;
+
+    const isCompetencyCoachDnaTest = slugLower === "competency-coach";
+
+    const isCompetencyCoachQscEntrepreneur =
+      orgSlug === "competency-coach" &&
+      isQscTest &&
+      !isGedTest &&
+      qscAudience === "entrepreneur";
+
+    if (isCompetencyCoachQscEntrepreneur) {
+      competencyCoachGhlSyncResult = await syncCompetencyCoachToGhl({
+        mode: "qsc_entrepreneur",
+        taker,
+        reportUrl: publicReportUrl,
+        qscSummary,
+        ccProfile: null,
+        ccCoachingFlow: null,
+      });
+
+      if (!competencyCoachGhlSyncResult.ok && !competencyCoachGhlSyncResult.skipped) {
+        console.error(
+          "[submit] Competency Coach QSC GHL sync failed",
+          competencyCoachGhlSyncResult
+        );
+      } else if (competencyCoachGhlSyncResult.skipped) {
+        console.warn(
+          "[submit] Competency Coach QSC GHL sync skipped",
+          competencyCoachGhlSyncResult
+        );
+      }
+    } else if (isCompetencyCoachDnaTest) {
+      competencyCoachGhlSyncResult = await syncCompetencyCoachToGhl({
+        mode: "cc_dna_blueprint",
+        taker,
+        reportUrl: publicReportUrl,
+        qscSummary: null,
+        ccProfile: topProfileLabel,
+        ccCoachingFlow: topFrequencyLabel,
+      });
+
+      if (!competencyCoachGhlSyncResult.ok && !competencyCoachGhlSyncResult.skipped) {
+        console.error(
+          "[submit] Competency Coach DNA GHL sync failed",
+          competencyCoachGhlSyncResult
+        );
+      } else if (competencyCoachGhlSyncResult.skipped) {
+        console.warn(
+          "[submit] Competency Coach DNA GHL sync skipped",
+          competencyCoachGhlSyncResult
+        );
+      }
+    }
+
     let ghlSyncResult: GhlSyncResult | null = null;
     if (isGedTest) {
       ghlSyncResult = await syncGedToGhl({
@@ -2580,6 +2869,13 @@ export async function POST(
         ? {
             diagnostics: gedDiagnostics,
             ghl_sync: ghlSyncResult,
+          }
+        : null,
+      competency_coach: competencyCoachGhlSyncResult
+        ? {
+            ghl_sync: competencyCoachGhlSyncResult,
+            cc_profile: topProfileLabel,
+            cc_coaching_flow: topFrequencyLabel,
           }
         : null,
       link: {
