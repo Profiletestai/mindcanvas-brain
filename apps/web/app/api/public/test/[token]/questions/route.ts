@@ -1,5 +1,4 @@
 // apps/web/app/api/public/test/[token]/questions/route.ts
-// apps/web/app/api/public/test/[token]/questions/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
