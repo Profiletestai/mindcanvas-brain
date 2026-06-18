@@ -15,14 +15,54 @@ import type {
 } from "@/lib/mcas/reportTypes";
 
 type PageProps = {
-  params: Promise<{
-    token: string;
-  }>;
+  params: Promise<{ token: string }>;
+};
+
+const OS_IMAGES: Record<McasOperatingStyleCode, string> = {
+  OS1: "/mcas/profile-cards/trailblazer.png",
+  OS2: "/mcas/profile-cards/spark.png",
+  OS3: "/mcas/profile-cards/uplifter.png",
+  OS4: "/mcas/profile-cards/bridgebuilder.png",
+  OS5: "/mcas/profile-cards/steadyhead.png",
+  OS6: "/mcas/profile-cards/organiser.png",
+  OS7: "/mcas/profile-cards/analyst.png",
+  OS8: "/mcas/profile-cards/refiner.png",
+};
+
+const OS_COLOURS: Record<McasOperatingStyleCode, string> = {
+  OS1: "#300993",
+  OS2: "#9554F8",
+  OS3: "#FD464A",
+  OS4: "#F86B04",
+  OS5: "#047D7B",
+  OS6: "#4F46E5",
+  OS7: "#F7B955",
+  OS8: "#DB2777",
+};
+
+const CORE_SHORT: Record<McasCoreCode, string> = {
+  CREATE: "C",
+  ORGANISE: "O",
+  RESOLVE: "R",
+  EXAMINE: "E",
+};
+
+const CORE_IMAGES: Record<McasCoreCode, string> = {
+  CREATE: "/mcas/icons/create.png",
+  ORGANISE: "/mcas/icons/organise.png",
+  RESOLVE: "/mcas/icons/resolve.png",
+  EXAMINE: "/mcas/icons/examine.png",
+};
+
+const CORE_COLOURS: Record<McasCoreCode, string> = {
+  CREATE: "#1725DB",
+  ORGANISE: "#0A65EE",
+  RESOLVE: "#028F8B",
+  EXAMINE: "#2C06C1",
 };
 
 function formatDate(value: string | null) {
   if (!value) return "Not completed";
-
   try {
     return new Intl.DateTimeFormat("en-ZA", {
       year: "numeric",
@@ -35,8 +75,6 @@ function formatDate(value: string | null) {
 }
 
 function bandLabel(band?: string) {
-  if (!band) return "Result";
-
   const labels: Record<string, string> = {
     dominant: "Dominant",
     secondary: "Secondary",
@@ -44,8 +82,7 @@ function bandLabel(band?: string) {
     minimal: "Minimal",
     low: "Low",
   };
-
-  return labels[band] ?? band;
+  return band ? labels[band] ?? band : "Result";
 }
 
 function periodLabel(period: McasSuccessGuideItem["period"]) {
@@ -54,100 +91,81 @@ function periodLabel(period: McasSuccessGuideItem["period"]) {
     days_31_60: "Days 31–60",
     days_61_90: "Days 61–90",
   };
-
   return labels[period];
 }
 
-function safePercent(value: number | undefined) {
+function pct(value: number | undefined) {
   if (typeof value !== "number" || Number.isNaN(value)) return 0;
-  if (value < 0) return 0;
-  if (value > 100) return 100;
-  return Math.round(value);
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function dominantCorePair(payload: McasReportPayload) {
-  return payload.result.core.distribution
-    .slice(0, 2)
-    .map((item) => item.label)
-    .join(" + ");
+function corePair(payload: McasReportPayload) {
+  return payload.result.core.distribution.slice(0, 2);
 }
 
-function SectionShell({
-  id,
-  title,
-  eyebrow,
-  children,
-}: {
-  id: string;
-  title: string;
-  eyebrow?: string;
-  children: ReactNode;
-}) {
+function coreInitials(payload: McasReportPayload) {
+  return corePair(payload).map((item) => CORE_SHORT[item.code]).join(" + ");
+}
+
+function coreLabels(payload: McasReportPayload) {
+  return corePair(payload).map((item) => item.label).join(" & ");
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function strengthIcon(strength: McasStrength) {
+  const slug = slugify(strength.title);
+  const known: Record<string, string> = {
+    "cross-team-alignment": "/mcas/report-icons/cross-team-alignment.png",
+    "timing-and-presence": "/mcas/report-icons/timing-presence.png",
+    "communication-clarity": "/mcas/report-icons/communication-clarity.png",
+    "relational-execution": "/mcas/report-icons/relational-execution.png",
+    "calm-under-pressure": "/mcas/report-icons/calm-under-pressure.png",
+    "gap-identification": "/mcas/report-icons/gap-identification.png",
+  };
+  return known[slug] ?? "/mcas/report-icons/natural-strengths.png";
+}
+
+function MetaCard({ label, value }: { label: string; value: string }) {
   return (
-    <section id={id} className="rounded-[28px] bg-[#6d4cff] p-3 shadow-xl">
-      <div className="rounded-[22px] bg-white p-6 md:p-8">
-        <div className="mb-6 flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#eee9ff] text-lg">
-            ✉
-          </div>
-          <div>
-            {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#6d4cff]">
-                {eyebrow}
-              </p>
-            ) : null}
-            <h2 className="text-xl font-black text-slate-950 md:text-2xl">
-              {title}
-            </h2>
-          </div>
-        </div>
-
-        {children}
-      </div>
-    </section>
+    <div className="rounded-[18px] border border-[#16152E]/40 px-4 py-3">
+      <p className="text-[10px] uppercase tracking-[0.22em] text-[#181631]/50">{label}</p>
+      <p className="mt-2 text-sm font-bold text-[#17152F] md:text-base">{value}</p>
+    </div>
   );
 }
 
-function TopHeader({ payload }: { payload: McasReportPayload }) {
+function ReportHeader({ payload }: { payload: McasReportPayload }) {
   return (
-    <header className="rounded-t-[28px] bg-[#f1eaff] px-5 py-4 md:px-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-xl bg-[#d8ccff]" />
+    <header className="rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex items-start gap-5">
+          <div className="mt-2 h-10 w-12 rounded-2xl border border-white/20 bg-[#6F5CFF]/30" />
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.28em] text-[#5b45d6]">
+            <p className="max-w-xl text-2xl font-semibold uppercase leading-tight tracking-[0.14em] text-[#6F5CFF] md:text-[32px] md:leading-[35px]">
               Candidate Extensive Career Report
             </p>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
+            <p className="mt-3 text-[13px] font-bold uppercase tracking-[0.28em] text-[#201E41]">
               MindCanvas CORE Alignment System
             </p>
           </div>
         </div>
 
-        <div className="grid gap-2 text-xs md:grid-cols-3">
-          <div className="rounded-2xl border border-[#d8ccff] bg-white px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-              Prepared for
-            </p>
-            <p className="font-semibold text-slate-950">
-              {payload.candidate.fullName}
-            </p>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-3 xl:justify-end">
+            <a href="#download" className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
+              Download PDF
+            </a>
+            <a href="#pathway" className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white">
+              Next steps
+            </a>
           </div>
-
-          <div className="rounded-2xl border border-[#d8ccff] bg-white px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-              Date
-            </p>
-            <p className="font-semibold text-slate-950">
-              {formatDate(payload.assessment.completedAt)}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[#d8ccff] bg-white px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-              Framework
-            </p>
-            <p className="font-semibold text-slate-950">Full Career Report</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <MetaCard label="Prepared for" value={payload.candidate.fullName} />
+            <MetaCard label="Date" value={formatDate(payload.assessment.completedAt)} />
+            <MetaCard label="Framework" value="Candidate Extensive Career Report" />
           </div>
         </div>
       </div>
@@ -155,22 +173,71 @@ function TopHeader({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  caption,
-}: {
-  label: string;
-  value: string;
-  caption: string;
-}) {
+function HeroMetric({ label, value, caption }: { label: string; value: string; caption: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/8 p-5">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-violet-200">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      <p className="mt-1 text-sm leading-5 text-violet-100">{caption}</p>
+    <div className="rounded-[13px] border border-white/10 bg-white/[0.06] p-5">
+      <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-white/35">{label}</p>
+      <p className="mt-2 text-2xl font-extrabold text-white">{value}</p>
+      <p className="mt-2 text-sm font-semibold text-[#8E7BFF]">{caption}</p>
+    </div>
+  );
+}
+
+function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasDistributionItem<McasOperatingStyleCode>[]; title?: string }) {
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-6 text-[#0D1B2A]">
+      <div className="mb-5 flex items-center justify-between">
+        <h3 className="text-[12px] font-bold uppercase tracking-[0.25em] text-[#4A5568]">{title}</h3>
+        <span className="rounded-full bg-[#6F5CFF]/10 px-3 py-1 text-xs font-bold text-[#6F5CFF]">Distribution</span>
+      </div>
+      <div className="space-y-4">
+        {items.map((item) => {
+          const colour = OS_COLOURS[item.code] ?? "#6F5CFF";
+          return (
+            <div key={item.code} className="grid grid-cols-[28px_1fr_40px_72px] items-center gap-3">
+              <img src={OS_IMAGES[item.code]} alt="" className="h-7 w-7 rounded-lg object-cover shadow-sm" />
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-bold">{item.label}</p>
+                <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#EFF1F5]">
+                  <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: colour }} />
+                </div>
+              </div>
+              <p className="text-right text-xs font-semibold text-[#4A5568]">{item.percentage}%</p>
+              <span className="rounded px-2 py-1 text-center text-[10px] font-semibold" style={{ backgroundColor: `${colour}14`, color: item.band === "low" ? "#718096" : colour }}>
+                {bandLabel(item.band)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WorkCycleCoverage({ items, title = "Work Cycle Coverage" }: { items: McasDistributionItem<McasCoreCode>[]; title?: string }) {
+  const byCode = new Map(items.map((item) => [item.code, item]));
+  const create = byCode.get("CREATE")?.percentage ?? 0;
+  const organise = byCode.get("ORGANISE")?.percentage ?? 0;
+  const resolve = byCode.get("RESOLVE")?.percentage ?? 0;
+  const examine = byCode.get("EXAMINE")?.percentage ?? 0;
+
+  return (
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
+      <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8892A4]">{title}</p>
+      <div className="mx-auto grid h-[176px] w-[176px] grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-[7px] border-[#EEEAFE] text-center text-[10px] font-bold">
+        <div className="flex flex-col items-center justify-center bg-[#2C06C1]/20"><span>Create</span><span className="text-[#1725DB]">{create}%</span></div>
+        <div className="flex flex-col items-center justify-center bg-[#1725DB]/10"><span>Organise</span><span className="text-[#0A65EE]">{organise}%</span></div>
+        <div className="flex flex-col items-center justify-center bg-[#028F8B]/20"><span>Resolve</span><span className="text-[#028F8B]">{resolve}%</span></div>
+        <div className="flex flex-col items-center justify-center bg-[#0A65EE]/20"><span>Examine</span><span className="text-[#2C06C1]">{examine}%</span></div>
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] text-[#6B7280]">
+        {items.map((item) => (
+          <div key={item.code} className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CORE_COLOURS[item.code] }} />
+            <span>{CORE_SHORT[item.code]} {item.percentage}%</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -179,82 +246,38 @@ function Hero({ payload }: { payload: McasReportPayload }) {
   const primaryOs = payload.result.operatingStyle.primary;
   const primaryVertical = payload.result.careerVertical.primary;
   const readiness = payload.result.careerVertical.readinessPercentage;
-  const corePair = dominantCorePair(payload);
 
   return (
-    <section className="bg-[#100d25] px-5 py-8 text-white md:px-8 md:py-10">
-      <div className="grid gap-8 lg:grid-cols-[1.05fr_1fr_280px]">
+    <section className="overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-8 text-white md:px-8">
+      <div className="grid gap-7 xl:grid-cols-[520px_1fr_254px]">
         <div>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-violet-200">
-            Candidate Extensive Career Report
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#8E7BFF]">Candidate Extensive Career Report</p>
+          <h1 className="mt-4 text-[38px] font-black leading-none tracking-[-0.04em] md:text-5xl">{payload.candidate.fullName}</h1>
+          <p className="mt-6 max-w-lg text-sm leading-7 text-white/55 md:text-[15px]">
+            A practical career guide — grounded, honest, and actionable. This report explains how you naturally execute work and where you are most likely to thrive.
           </p>
-
-          <h1 className="text-3xl font-black tracking-tight md:text-5xl">
-            {payload.candidate.fullName}
-          </h1>
-
-          <p className="mt-4 max-w-2xl text-base leading-7 text-violet-100">
-            A practical career guide — grounded, honest, and actionable. This
-            report explains how you naturally execute work and where you are
-            most likely to thrive.
-          </p>
-
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <MetricCard
-              label="Operating Style"
-              value={primaryOs.label}
-              caption="Dominant pattern"
-            />
-            <MetricCard
-              label="Vertical Fit"
-              value={primaryVertical.code}
-              caption={primaryVertical.label}
-            />
-            <MetricCard
-              label="CORE Balance"
-              value={corePair}
-              caption="Dominant behavioural coverage"
-            />
-            <MetricCard
-              label="Next Readiness"
-              value={readiness === undefined ? "In development" : `${readiness}%`}
-              caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"}
-            />
+          <div className="mt-9 grid gap-4 sm:grid-cols-2">
+            <HeroMetric label="Operating Style" value={primaryOs.label} caption="Dominant pattern" />
+            <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
+            <HeroMetric label="Vertical Fit" value={primaryVertical.code} caption={primaryVertical.label} />
+            <HeroMetric label="Next Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
           </div>
         </div>
 
-        <OperatingStylePanel
-          items={payload.result.operatingStyle.distribution}
-          compact
-        />
+        <OperatingStyleCard items={payload.result.operatingStyle.distribution} />
 
         <div className="space-y-4">
-          <CoreBalanceMini items={payload.result.core.distribution} />
-
-          <SummaryPill
-            label="Core Balance"
-            value={corePair}
-            caption="Dominant"
-          />
-
-          <SummaryPill
+          <WorkCycleCoverage items={payload.result.core.distribution} />
+          <HeroSummaryCard label="Core balance" value={coreInitials(payload)} caption="Dominant" />
+          <HeroSummaryCard
             label="Vertical Fit"
             value={`${primaryVertical.code} Now`}
-            caption={
-              payload.result.careerVertical.next
-                ? `${payload.result.careerVertical.next.code} in development`
-                : payload.result.careerVertical.readinessLabel ?? "Current fit"
-            }
+            caption={payload.result.careerVertical.next ? `${payload.result.careerVertical.next.code} in development` : payload.result.careerVertical.readinessLabel ?? "Current fit"}
           />
-
-          <SummaryPill
+          <HeroSummaryCard
             label="Development"
-            value={
-              payload.candidateFacing.nextStepPathway?.developmentFocus
-                ?.slice(0, 4)
-                .join(" · ") ?? "Growth areas"
-            }
-            caption="Focus areas"
+            value={`${payload.candidateFacing.nextStepPathway?.developmentFocus?.length ?? 0} areas`}
+            caption={payload.candidateFacing.nextStepPathway?.developmentFocus?.slice(0, 4).join(" · ") ?? "Growth areas"}
           />
         </div>
       </div>
@@ -262,154 +285,32 @@ function Hero({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-function SummaryPill({
-  label,
-  value,
-  caption,
-}: {
-  label: string;
-  value: string;
-  caption: string;
-}) {
+function HeroSummaryCard({ label, value, caption }: { label: string; value: string; caption: string }) {
   return (
-    <div className="rounded-3xl bg-[#6d4cff] p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-100">
-        {label}
-      </p>
-      <p className="mt-2 text-xl font-black text-white">{value}</p>
-      <p className="mt-1 text-sm text-violet-100">{caption}</p>
+    <div className="rounded-xl border border-[#E2E8F0] bg-[#6F5CFF] p-5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">{label}</p>
+      <p className="mt-2 text-xl font-extrabold text-white">{value}</p>
+      <p className="mt-1 text-sm font-semibold leading-5 text-white">{caption}</p>
     </div>
   );
 }
 
-function OperatingStylePanel({
-  items,
-  compact = false,
-}: {
-  items: McasDistributionItem<McasOperatingStyleCode>[];
-  compact?: boolean;
-}) {
+function TopStyleStrip({ items }: { items: McasDistributionItem<McasOperatingStyleCode>[] }) {
   return (
-    <div
-      className={
-        compact
-          ? "rounded-3xl bg-white p-5 text-slate-950"
-          : "rounded-3xl border border-slate-200 bg-white p-5"
-      }
-    >
-      <div className="mb-5 flex items-center justify-between">
-        <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">
-          Operating Style
-        </h3>
-        <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">
-          Distribution
-        </span>
-      </div>
-
-      <div className="space-y-3">
-        {items.map((item) => (
-          <div key={item.code}>
-            <div className="mb-1 flex items-center justify-between gap-4 text-sm">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-xs font-black text-violet-700">
-                  {item.code.replace("OS", "")}
-                </span>
-                <span className="truncate font-semibold text-slate-900">
-                  {item.label}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="font-bold text-slate-900">
-                  {item.percentage}%
-                </span>
-                <span className="hidden rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 sm:inline-flex">
-                  {bandLabel(item.band)}
-                </span>
-              </div>
-            </div>
-
-            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-[#6d4cff]"
-                style={{ width: `${safePercent(item.percentage)}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CoreBalanceMini({
-  items,
-}: {
-  items: McasDistributionItem<McasCoreCode>[];
-}) {
-  const byCode = new Map(items.map((item) => [item.code, item]));
-
-  const create = byCode.get("CREATE")?.percentage ?? 0;
-  const organise = byCode.get("ORGANISE")?.percentage ?? 0;
-  const resolve = byCode.get("RESOLVE")?.percentage ?? 0;
-  const examine = byCode.get("EXAMINE")?.percentage ?? 0;
-
-  return (
-    <div className="rounded-3xl bg-white p-5 text-slate-950">
-      <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-        CORE Balance
-      </p>
-
-      <div className="mx-auto grid h-44 w-44 grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-8 border-violet-100 text-center text-xs font-bold">
-        <div className="flex flex-col items-center justify-center bg-violet-50">
-          <span>Create</span>
-          <span className="text-violet-700">{create}%</span>
-        </div>
-        <div className="flex flex-col items-center justify-center bg-indigo-50">
-          <span>Organise</span>
-          <span className="text-indigo-700">{organise}%</span>
-        </div>
-        <div className="flex flex-col items-center justify-center bg-cyan-50">
-          <span>Resolve</span>
-          <span className="text-cyan-700">{resolve}%</span>
-        </div>
-        <div className="flex flex-col items-center justify-center bg-slate-50">
-          <span>Examine</span>
-          <span className="text-slate-700">{examine}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TopStyleStrip({
-  items,
-}: {
-  items: McasDistributionItem<McasOperatingStyleCode>[];
-}) {
-  return (
-    <div className="grid gap-3 bg-white px-5 py-4 md:grid-cols-4 md:px-8">
+    <div className="grid gap-4 bg-white px-6 py-5 md:grid-cols-4 md:px-8">
       {items.slice(0, 4).map((item) => (
-        <div
-          key={item.code}
-          className="rounded-2xl border border-slate-200 bg-white p-4"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <p className="font-bold text-slate-950">{item.label}</p>
-            <p className="text-sm font-bold text-slate-500">
-              {item.percentage}%
-            </p>
+        <div key={item.code} className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <img src={OS_IMAGES[item.code]} alt="" className="h-8 w-8 rounded-lg object-cover" />
+              <p className="truncate font-extrabold text-[#0D1B2A]">{item.label}</p>
+            </div>
+            <p className="text-sm font-bold text-[#718096]">{item.percentage}%</p>
           </div>
-
-          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-[#6d4cff]"
-              style={{ width: `${safePercent(item.percentage)}%` }}
-            />
+          <div className="h-2 overflow-hidden rounded-full bg-[#EFF1F5]">
+            <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: OS_COLOURS[item.code] }} />
           </div>
-
-          <p className="mt-2 text-xs font-semibold text-slate-500">
-            {bandLabel(item.band)}
-          </p>
+          <p className="mt-3 text-xs font-bold text-[#718096]">{bandLabel(item.band)}</p>
         </div>
       ))}
     </div>
@@ -421,7 +322,6 @@ function SidebarIndex({ token }: { token: string }) {
     ["orientation", "Welcome and Orientation"],
     ["plain-language", "Your Work Pattern in Plain Language"],
     ["style-deep-dive", "Your Operating Style Deep Dive"],
-    ["core-balance", "Your CORE Behavioural Balance"],
     ["pressure-strengths", "Your Strength Advantages Under Pressure"],
     ["blind-spots", "Your Blind Spots and How to Manage Them"],
     ["roles", "Your Best Fit Work and Roles"],
@@ -431,102 +331,71 @@ function SidebarIndex({ token }: { token: string }) {
   ];
 
   return (
-    <aside className="rounded-3xl bg-[#211941] p-5 text-white lg:sticky lg:top-6">
-      <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-violet-200">
-        Report Index
-      </p>
-
+    <aside className="rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
       <nav className="space-y-2">
         {links.map(([href, label], index) => (
-          <a
-            key={href}
-            href={`#${href}`}
-            className="block rounded-xl border border-white/10 px-3 py-2 text-sm text-violet-50 hover:bg-white/10"
-          >
+          <a key={href} href={`#${href}`} className="block rounded-xl border border-white/35 px-3 py-2 text-sm leading-5 transition hover:bg-white/10">
             {index + 1}. {label}
           </a>
         ))}
       </nav>
-
       <div className="mt-6 space-y-2">
-        <button className="w-full rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">
-          Download PDF
-        </button>
-
-        <a
-          href={`/mcas/r/${token}/snapshot`}
-          className="block w-full rounded-xl bg-[#6d4cff] px-4 py-2 text-center text-sm font-bold text-white"
-        >
-          View Snapshot
-        </a>
+        <a id="download" href="#" className="block rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">Download PDF</a>
+        <a href={`/mcas/r/${token}/snapshot`} className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white">View Snapshot</a>
       </div>
     </aside>
   );
 }
 
+function SectionShell({ id, title, icon, children }: { id: string; title: string; icon: string; children: ReactNode }) {
+  return (
+    <section id={id} className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
+      <div className="rounded-[18px] bg-white p-6 md:p-8">
+        <div className="mb-7 flex items-center gap-4">
+          <img src={icon} alt="" className="h-11 w-11 rounded-xl object-cover ring-1 ring-[#3B82F6]/20" />
+          <h2 className="text-2xl font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">{title}</h2>
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function InfoCard({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-2xl border border-[#E2E8F0] bg-[#EEEAFE] p-5">
+      <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-[#4A5568]">{title}</p>
+      <p className="text-sm leading-7 text-[#4A5568]">{description}</p>
+    </div>
+  );
+}
+
 function OrientationSection() {
   return (
-    <SectionShell id="orientation" title="Welcome and Orientation">
+    <SectionShell id="orientation" title="Welcome and Orientation" icon="/mcas/report-icons/welcome-icon.png">
       <div className="space-y-6">
-        <p className="text-base leading-7 text-slate-700">
-          This report explains how you naturally execute work and where you are
-          most likely to thrive. It is designed to feel encouraging, grounded,
-          honest, and practical.
+        <p className="text-base leading-8 text-[#4A5568]">
+          This report explains how you naturally execute work and where you are most likely to thrive. It is designed to feel encouraging, grounded, honest, and practical.
         </p>
-
-        <p className="text-base leading-7 text-slate-700">
-          MCAS does not measure intelligence, mental health, morality, or
-          values. It measures observable work patterns: how you create movement,
-          organise priorities, resolve work, examine quality, and scale
-          responsibility over time.
+        <p className="text-base leading-8 text-[#4A5568]">
+          MCAS does not measure intelligence, mental health, morality, or values. It measures observable work patterns.
         </p>
-
         <div className="grid gap-4 md:grid-cols-3">
-          <InfoCard
-            title="What it measures"
-            description="Observable work patterns — execution, organisation, resolve, and examine."
-          />
-          <InfoCard
-            title="What it does not measure"
-            description="Intelligence, mental health, morality, values, or fixed personality traits."
-          />
-          <InfoCard
-            title="How to use it"
-            description="Return to it. Share sections. Use the 30/60/90 guide. Treat it as a strategic tool."
-          />
+          <InfoCard title="What it measures" description="Observable work patterns — execution, organisation, resolve, and examine." />
+          <InfoCard title="What it doesn’t measure" description="Intelligence, mental health, morality, values, or personality traits." />
+          <InfoCard title="How to use it" description="Return to it. Share sections. Use the 30/60/90 guide. Treat it as a strategic tool." />
         </div>
       </div>
     </SectionShell>
   );
 }
 
-function InfoCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-violet-100 bg-[#f5f1ff] p-5">
-      <p className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-slate-700">
-        {title}
-      </p>
-      <p className="text-sm leading-6 text-slate-700">{description}</p>
-    </div>
-  );
-}
-
 function PlainLanguageSection({ payload }: { payload: McasReportPayload }) {
   return (
-    <SectionShell
-      id="plain-language"
-      title="Your Work Pattern in Plain Language"
-    >
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-        <p className="text-lg leading-8 text-slate-800">
-          {payload.candidateFacing.workPatternSummary}
-        </p>
+    <SectionShell id="plain-language" title="Your Work Pattern in Plain Language" icon="/mcas/report-icons/work-style.png">
+      <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
+        <p className="text-lg leading-9 text-[#0D1B2A]">{payload.candidateFacing.workPatternSummary}</p>
       </div>
     </SectionShell>
   );
@@ -534,70 +403,32 @@ function PlainLanguageSection({ payload }: { payload: McasReportPayload }) {
 
 function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
   const primary = payload.result.operatingStyle.primary;
-  const secondary = payload.result.operatingStyle.secondary;
 
   return (
-    <SectionShell id="style-deep-dive" title="Your Operating Style Deep Dive">
-      <div className="space-y-8">
-        <p className="text-base leading-7 text-slate-700">
-          The Operating Style reveals your natural execution pattern. The
-          distribution below reflects scored pattern strength, not a ranking
-          against other people.
+    <SectionShell id="style-deep-dive" title="Your Operating Style Deep Dive" icon="/mcas/report-icons/operating-style-identity-system.png">
+      <div className="space-y-7">
+        <p className="text-base leading-8 text-[#4A5568]">
+          The Operating Style reveals your natural execution pattern. The distribution below reflects scored pattern strength, not a ranking against other people.
         </p>
-
-        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <div className="mx-auto grid max-w-sm grid-cols-3 gap-3 text-center text-xs font-bold text-slate-700">
-              {payload.result.operatingStyle.distribution.map((item) => (
-                <div
-                  key={item.code}
-                  className={
-                    item.code === primary.code
-                      ? "rounded-2xl bg-[#6d4cff] p-3 text-white shadow-lg"
-                      : "rounded-2xl bg-white p-3"
-                  }
-                >
-                  <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-                    {item.code.replace("OS", "")}
-                  </div>
-                  <p>{item.label}</p>
-                </div>
-              ))}
+        <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
+            <img src="/mcas/report-icons/operating-style-identity-system.png" alt="" className="mx-auto max-h-[335px] w-full object-contain" />
+            <p className="mx-auto mt-4 max-w-[180px] text-center text-sm font-bold capitalize text-[#0D1B2A]">Operating style identity system</p>
+          </div>
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6">
+            <div className="flex flex-col gap-5 md:flex-row">
+              <img src={OS_IMAGES[primary.code]} alt="" className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#718096]">
+                  Operating Style · Profile {primary.code.replace("OS", "").padStart(2, "0")}
+                </p>
+                <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">The {primary.label}</h3>
+                <p className="mt-4 text-base leading-8 text-[#5A5F7E]">{payload.candidateFacing.operatingStyleNarrative}</p>
+              </div>
             </div>
           </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#6d4cff]">
-              Operating Style Profile · {primary.code}
-            </p>
-            <h3 className="mt-3 text-3xl font-black text-slate-950">
-              The {primary.label}
-            </h3>
-            <p className="mt-4 text-base leading-7 text-slate-700">
-              {payload.candidateFacing.operatingStyleNarrative}
-            </p>
-
-            {secondary ? (
-              <div className="mt-5 rounded-2xl border border-violet-100 bg-[#f5f1ff] p-5">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-                  Secondary Influence
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
-                  Your secondary pattern is{" "}
-                  <strong>
-                    {secondary.label} at {secondary.percentage}%
-                  </strong>
-                  . This can shape how your dominant pattern shows up in more
-                  complex or pressured environments.
-                </p>
-              </div>
-            ) : null}
-          </div>
         </div>
-
-        <OperatingStylePanel
-          items={payload.result.operatingStyle.distribution}
-        />
+        <OperatingStyleCard items={payload.result.operatingStyle.distribution} title="Operating Style Distribution" />
       </div>
     </SectionShell>
   );
@@ -605,15 +436,13 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
 
 function CoreBalanceSection({ payload }: { payload: McasReportPayload }) {
   return (
-    <SectionShell id="core-balance" title="Your CORE Behavioural Balance">
-      <div className="space-y-6">
-        <p className="text-base leading-7 text-slate-700">
-          The CORE system maps which parts of the work cycle you naturally
-          drive, support, or under-cover.
+    <SectionShell id="core-balance" title="Your CORE Behavioural Balance" icon="/mcas/report-icons/core-behavioural-balance.png">
+      <div className="space-y-7">
+        <p className="text-base leading-8 text-[#4A5568]">
+          The CORE system maps which parts of the work cycle you naturally drive, support, or under-cover.
         </p>
-
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <CoreBalanceMini items={payload.result.core.distribution} />
+          <WorkCycleCoverage items={payload.result.core.distribution} title="CORE Balance" />
           <CoreCoverage items={payload.result.core.distribution} />
         </div>
       </div>
@@ -621,40 +450,25 @@ function CoreBalanceSection({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-function CoreCoverage({
-  items,
-}: {
-  items: McasDistributionItem<McasCoreCode>[];
-}) {
+function CoreCoverage({ items }: { items: McasDistributionItem<McasCoreCode>[] }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {items.map((item) => (
-        <div
-          key={item.code}
-          className="rounded-2xl border border-slate-200 bg-white p-5"
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="font-black text-slate-950">{item.label}</p>
-              <p className="text-xs font-semibold text-slate-500">
-                {item.percentage}% · {bandLabel(item.band)}
-              </p>
+        <div key={item.code} className="rounded-2xl border border-[#E2E8F0] bg-white p-5">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <img src={CORE_IMAGES[item.code]} alt="" className="h-10 w-10 rounded-xl object-cover" />
+              <div>
+                <p className="text-lg font-black text-[#0D0F1C]">{item.label}</p>
+                <p className="mt-1 text-sm font-bold text-[#718096]">{item.percentage}% · {bandLabel(item.band)}</p>
+              </div>
             </div>
-            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">
-              {item.code}
-            </span>
+            <span className="rounded-full bg-[#6F5CFF]/10 px-3 py-1 text-xs font-bold uppercase text-[#6F5CFF]">{CORE_SHORT[item.code]}</span>
           </div>
-
-          <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-[#6d4cff]"
-              style={{ width: `${safePercent(item.percentage)}%` }}
-            />
+          <div className="mb-4 h-2 overflow-hidden rounded-full bg-[#EFF1F5]">
+            <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: CORE_COLOURS[item.code] }} />
           </div>
-
-          <p className="text-sm leading-6 text-slate-600">
-            {item.description}
-          </p>
+          <p className="text-sm leading-7 text-[#4A5568]">{item.description}</p>
         </div>
       ))}
     </div>
@@ -663,70 +477,36 @@ function CoreCoverage({
 
 function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) {
   return (
-    <SectionShell
-      id="pressure-strengths"
-      title="Your Strength Advantages Under Pressure"
-    >
+    <SectionShell id="pressure-strengths" title="Your Strength Advantages Under Pressure" icon="/mcas/report-icons/natural-strengths.png">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {strengths.map((strength) => (
-          <StrengthCard key={strength.title} strength={strength} />
+          <div key={strength.title} className="rounded-2xl border border-[#45E0D1] bg-white p-5">
+            <img src={strengthIcon(strength)} alt="" className="mb-5 h-12 w-12 rounded-xl object-cover" />
+            <h3 className="font-black text-[#0D0F1C]">{strength.title}</h3>
+            <p className="mt-3 text-sm leading-7 text-[#4A5568]">{strength.description}</p>
+          </div>
         ))}
       </div>
     </SectionShell>
   );
 }
 
-function StrengthCard({ strength }: { strength: McasStrength }) {
+function BlindSpotsSection({ blindSpots }: { blindSpots: McasBlindSpot[] }) {
   return (
-    <div className="rounded-2xl border border-teal-200 bg-white p-5">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-lg">
-        {strength.icon ?? "✦"}
-      </div>
-      <h3 className="font-black text-slate-950">{strength.title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">
-        {strength.description}
-      </p>
-    </div>
-  );
-}
-
-function BlindSpotsSection({
-  blindSpots,
-}: {
-  blindSpots: McasBlindSpot[];
-}) {
-  return (
-    <SectionShell id="blind-spots" title="Your Blind Spots and How to Manage Them">
+    <SectionShell id="blind-spots" title="Your Blind Spots and How to Manage Them" icon="/mcas/report-icons/blind-spots.png">
       <div className="space-y-6">
-        <p className="text-base leading-7 text-slate-700">
-          Blind spots are not weaknesses. They are the natural shadow of your
-          strengths — the places where your dominant pattern, applied without
-          awareness, can create friction or limit impact.
+        <p className="text-base leading-8 text-[#4A5568]">
+          Blind spots are not weaknesses. They are the natural shadow of your strengths — the places where your dominant pattern, applied without awareness, can create friction or limit impact.
         </p>
-
         <div className="space-y-4">
           {blindSpots.map((blindSpot, index) => (
-            <div
-              key={blindSpot.title}
-              className="rounded-2xl border border-slate-200 bg-white p-5"
-            >
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-                Blind Spot {String(index + 1).padStart(2, "0")}
-              </p>
-              <h3 className="mt-2 text-lg font-black text-slate-950">
-                {blindSpot.title}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {blindSpot.description}
-              </p>
-
-              <div className="mt-4 rounded-2xl bg-[#f5f1ff] p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-700">
-                  Management strategy
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
-                  {blindSpot.managementStrategy}
-                </p>
+            <div key={blindSpot.title} className="rounded-2xl border border-[#E2E8F0] bg-white p-5">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">Blind Spot {String(index + 1).padStart(2, "0")}</p>
+              <h3 className="mt-3 text-xl font-black text-[#0D0F1C]">{blindSpot.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-[#4A5568]">{blindSpot.description}</p>
+              <div className="mt-5 rounded-2xl bg-[#EEEAFE] p-4">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#4A5568]">Management strategy</p>
+                <p className="mt-2 text-sm leading-7 text-[#4A5568]">{blindSpot.managementStrategy}</p>
               </div>
             </div>
           ))}
@@ -738,25 +518,13 @@ function BlindSpotsSection({
 
 function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
   return (
-    <SectionShell id="roles" title="Your Best Fit Work and Roles">
-      <div className="grid gap-5 lg:grid-cols-[1fr_180px_1fr]">
-        <div className="space-y-4">
-          {roles.slice(0, 3).map((role) => (
-            <RoleCard key={`${role.category}-${role.title}`} role={role} />
-          ))}
-        </div>
-
+    <SectionShell id="roles" title="Your Best Fit Work and Roles" icon="/mcas/report-icons/recommended-roles-pathways.png">
+      <div className="grid gap-6 lg:grid-cols-[1fr_220px_1fr]">
+        <div className="space-y-4">{roles.slice(0, 3).map((role) => <RoleCard key={`${role.category}-${role.title}`} role={role} />)}</div>
         <div className="hidden items-center justify-center lg:flex">
-          <div className="flex h-40 w-40 items-center justify-center rounded-full border-8 border-violet-100 bg-[#f5f1ff] text-center text-5xl">
-            👥
-          </div>
+          <img src="/mcas/report-icons/recommended-roles-pathways.png" alt="" className="max-h-56 w-full object-contain" />
         </div>
-
-        <div className="space-y-4">
-          {roles.slice(3, 6).map((role) => (
-            <RoleCard key={`${role.category}-${role.title}`} role={role} />
-          ))}
-        </div>
+        <div className="space-y-4">{roles.slice(3, 6).map((role) => <RoleCard key={`${role.category}-${role.title}`} role={role} />)}</div>
       </div>
     </SectionShell>
   );
@@ -764,72 +532,61 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
 
 function RoleCard({ role }: { role: McasRoleRecommendation }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-        {role.category}
-      </p>
-      <h3 className="mt-2 font-black text-slate-950">{role.title}</h3>
-      <p className="mt-1 text-sm leading-6 text-slate-600">
-        {role.description}
-      </p>
+    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">{role.category}</p>
+      <h3 className="mt-3 text-lg font-black leading-6 text-[#0D0F1C]">{role.title}</h3>
+      <p className="mt-2 text-sm leading-7 text-[#4A5568]">{role.description}</p>
     </div>
   );
 }
 
 function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   const primary = payload.result.careerVertical.primary;
+  const order = ["V1", "V2", "V3", "V4", "V5", "V6"] as const;
+  const primaryLevel = Number(primary.code.replace("V", ""));
+
+  const verticals = order.map((code) => {
+    return payload.result.careerVertical.distribution.find((item) => item.code === code) ?? {
+      code,
+      label: code,
+      percentage: 0,
+      rank: 99,
+      band: "low" as const,
+      description: "",
+    };
+  });
 
   return (
-    <SectionShell id="vertical" title="Your Career Vertical Fit Today">
-      <div className="space-y-6">
-        <p className="text-base leading-7 text-slate-700">
-          Progression changes work itself. Higher verticals increase ambiguity,
-          scope, and accountability. Your current indication is{" "}
-          <strong>
-            {primary.code} — {primary.label}
-          </strong>
-          .
+    <SectionShell id="vertical" title="Your Career Vertical Fit Today" icon="/mcas/report-icons/career-vertical-fit.png">
+      <div className="space-y-7">
+        <p className="text-base leading-8 text-[#4A5568]">
+          Progression changes work itself. Higher verticals increase ambiguity, scope, and accountability. Your current indication is{" "}
+          <strong className="text-[#0D0F1C]">{primary.code} — {primary.label}</strong>.
         </p>
-
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-          <div className="grid gap-4 md:grid-cols-6">
-            {payload.result.careerVertical.distribution.map((item) => {
+        <div className="relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
+          <div className="absolute inset-x-8 bottom-8 h-24 rounded-full bg-gradient-to-r from-[#45E0D1]/20 via-[#6F5CFF]/25 to-[#8B5CF6]/40 blur-2xl" />
+          <div className="relative grid gap-4 md:grid-cols-6">
+            {verticals.map((item) => {
               const isPrimary = item.code === primary.code;
-
+              const level = Number(item.code.replace("V", ""));
+              const isPast = level < primaryLevel;
               return (
-                <div
-                  key={item.code}
-                  className={
-                    isPrimary
-                      ? "rounded-2xl bg-[#6d4cff] p-4 text-white shadow-lg"
-                      : "rounded-2xl bg-white p-4 text-slate-800"
-                  }
-                >
-                  <p className="text-sm font-black">{item.code}</p>
-                  <p className="mt-1 text-xs font-semibold">{item.label}</p>
-                  <p
-                    className={
-                      isPrimary
-                        ? "mt-3 text-xs text-violet-100"
-                        : "mt-3 text-xs text-slate-500"
-                    }
-                  >
-                    {item.description}
+                <div key={item.code} className={["min-h-[150px] rounded-2xl p-4", isPrimary ? "bg-[#6F5CFF] text-white shadow-lg" : "bg-white text-[#0D1B2A]"].join(" ")}>
+                  <p className="text-lg font-black">{item.code}</p>
+                  <p className="mt-1 text-sm font-bold leading-5">{item.label}</p>
+                  <p className={["mt-3 text-xs leading-5", isPrimary ? "text-white/80" : "text-[#718096]"].join(" ")}>{item.description}</p>
+                  <p className={["mt-4 text-[11px] font-bold uppercase tracking-[0.16em]", isPrimary ? "text-white" : isPast ? "text-[#028F8B]" : "text-[#718096]"].join(" ")}>
+                    {isPrimary ? "Current Fit" : isPast ? "Completed" : "Stretch"}
                   </p>
                 </div>
               );
             })}
           </div>
         </div>
-
         {payload.result.careerVertical.readinessLabel ? (
-          <div className="rounded-2xl border border-violet-100 bg-[#f5f1ff] p-5">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-              Readiness note
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              {payload.result.careerVertical.readinessLabel}
-            </p>
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EEEAFE] p-5">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6F5CFF]">Readiness note</p>
+            <p className="mt-2 text-sm leading-7 text-[#4A5568]">{payload.result.careerVertical.readinessLabel}</p>
           </div>
         ) : null}
       </div>
@@ -837,28 +594,15 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-function SuccessGuideSection({
-  successGuide,
-}: {
-  successGuide: McasSuccessGuideItem[];
-}) {
+function SuccessGuideSection({ successGuide }: { successGuide: McasSuccessGuideItem[] }) {
   return (
-    <SectionShell id="success-guide" title="Your 30 / 60 / 90 Day Success Guide">
-      <div className="grid gap-4 lg:grid-cols-3">
+    <SectionShell id="success-guide" title="Your 30 / 60 / 90 Day Success Guide" icon="/mcas/report-icons/success-guide.png">
+      <div className="grid gap-5 lg:grid-cols-3">
         {successGuide.map((item) => (
-          <div
-            key={item.period}
-            className="rounded-2xl border border-slate-200 bg-white p-5"
-          >
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-              {periodLabel(item.period)}
-            </p>
-            <h3 className="mt-3 text-lg font-black text-slate-950">
-              {item.title}
-            </h3>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {item.description}
-            </p>
+          <div key={item.period} className="rounded-2xl border border-[#E2E8F0] bg-white p-5">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">{periodLabel(item.period)}</p>
+            <h3 className="mt-4 text-xl font-black leading-7 text-[#0D0F1C]">{item.title}</h3>
+            <p className="mt-4 text-sm leading-7 text-[#4A5568]">{item.description}</p>
           </div>
         ))}
       </div>
@@ -870,41 +614,30 @@ function NextStepPathwaySection({ payload }: { payload: McasReportPayload }) {
   const pathway = payload.candidateFacing.nextStepPathway;
   const primary = payload.result.careerVertical.primary;
   const next = payload.result.careerVertical.next;
-
   const currentLabel = pathway?.current ?? `${primary.code} — ${primary.label}`;
-  const nextLabel = pathway?.next ?? next
-    ? `${next?.code} — ${next?.label}`
-    : "Next stage";
+  const nextLabel = pathway?.next ?? (next ? `${next.code} — ${next.label}` : "Next stage");
   const futureLabel = pathway?.future ?? "Future growth";
   const developmentFocus = pathway?.developmentFocus ?? [];
 
   return (
-    <SectionShell id="pathway" title="Your Next Step Pathway">
-      <div className="space-y-6">
-        <p className="text-base leading-7 text-slate-700">
-          Growth is not about becoming a different type of person. It is about
-          expanding the range and sustainability of your natural pattern.
+    <SectionShell id="pathway" title="Your Next Step Pathway" icon="/mcas/report-icons/your-next-steps.png">
+      <div className="space-y-7">
+        <p className="text-base leading-8 text-[#4A5568]">
+          Growth is not about becoming a different type of person — it is about expanding the range and sustainability of your natural pattern.
         </p>
-
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-[1fr_40px_1fr_40px_1fr] md:items-center">
           <PathwayCard label="Now" value={currentLabel} />
+          <PathwayArrow />
           <PathwayCard label="Next Stage" value={nextLabel} />
+          <PathwayArrow />
           <PathwayCard label="Future" value={futureLabel} />
         </div>
-
         {developmentFocus.length > 0 ? (
-          <div className="rounded-2xl border border-violet-100 bg-[#f5f1ff] p-5">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-              Development preparation
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EEEAFE] p-5">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">Development Preparation</p>
+            <div className="mt-4 flex flex-wrap gap-2">
               {developmentFocus.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-700"
-                >
-                  {item}
-                </span>
+                <span key={item} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#0D0F1C]">{item}</span>
               ))}
             </div>
           </div>
@@ -916,102 +649,34 @@ function NextStepPathwaySection({ payload }: { payload: McasReportPayload }) {
 
 function PathwayCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6d4cff]">
-        {label}
-      </p>
-      <p className="mt-2 text-lg font-black text-slate-950">{value}</p>
+    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 text-center">
+      <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">{label}</p>
+      <p className="mt-3 text-lg font-black leading-6 text-[#0D0F1C]">{value}</p>
     </div>
   );
 }
 
-function LockedFullReport({
-  payload,
-  token,
-}: {
-  payload: McasReportPayload;
-  token: string;
-}) {
+function PathwayArrow() {
+  return <div className="hidden text-center text-2xl font-black text-[#6F5CFF] md:block">→</div>;
+}
+
+function LockedFullReport({ payload, token }: { payload: McasReportPayload; token: string }) {
   return (
-    <main className="min-h-screen bg-[#080e1b] px-5 py-6 text-slate-950">
+    <main className="min-h-screen bg-[#0D0F1C] px-5 py-6 text-[#0D0F1C]">
       <div className="mx-auto max-w-5xl overflow-hidden rounded-[30px] bg-white shadow-2xl">
-        <TopHeader payload={payload} />
-
-        <section className="bg-[#100d25] px-6 py-12 text-center text-white md:px-10">
+        <ReportHeader payload={payload} />
+        <section className="bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-12 text-center text-white md:px-10">
           <div className="mx-auto max-w-3xl">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/10 text-3xl">
-              🔒
-            </div>
-
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-violet-200">
-              Full report locked
+            <img src="/mcas/report-icons/unlock-full-report.png" alt="" className="mx-auto mb-5 h-16 w-16 rounded-2xl object-cover" />
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-[#8E7BFF]">Full report locked</p>
+            <h1 className="text-3xl font-black tracking-tight md:text-5xl">Unlock Your Full Strategic Career Growth Report</h1>
+            <p className="mt-5 text-base leading-7 text-white/60">
+              Your MCAS assessment has already been completed. You do not need to take the test again. The full report uses the same result and unlocks deeper guidance.
             </p>
-
-            <h1 className="text-3xl font-black tracking-tight md:text-5xl">
-              Unlock Your Full Strategic Career Growth Report
-            </h1>
-
-            <p className="mt-5 text-base leading-7 text-violet-100">
-              Your MCAS assessment has already been completed. You do not need
-              to take the test again. The full report uses the same result and
-              unlocks deeper guidance, blind spots, pressure patterns, and your
-              30/60/90-day success guide.
-            </p>
-
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <a
-                href={`/mcas/r/${token}/snapshot`}
-                className="rounded-2xl bg-white px-6 py-3 text-sm font-black text-slate-950"
-              >
-                Return to Snapshot
-              </a>
-
-              <a
-                href="#full-preview"
-                className="rounded-2xl bg-[#6d4cff] px-6 py-3 text-sm font-black text-white shadow-lg"
-              >
-                See What Unlocks
-              </a>
+              <a href={`/mcas/r/${token}/snapshot`} className="rounded-lg bg-white px-6 py-3 text-sm font-black text-[#111827]">Return to Snapshot</a>
+              <a href="#full-preview" className="rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-6 py-3 text-sm font-black text-white">See What Unlocks</a>
             </div>
-          </div>
-        </section>
-
-        <section id="full-preview" className="space-y-4 bg-[#f5f1ff] p-6 md:p-10">
-          <h2 className="text-2xl font-black text-slate-950">
-            What is included in the full report
-          </h2>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {[
-              "Your Work Pattern in Plain Language",
-              "Your Operating Style Deep Dive",
-              "Your CORE Behavioural Balance",
-              "Your Strength Advantages Under Pressure",
-              "Your Blind Spots and How to Manage Them",
-              "Your Best Fit Work and Roles",
-              "Your Career Vertical Fit Today",
-              "Your 30 / 60 / 90 Day Success Guide",
-              "Your Next Step Pathway",
-            ].map((item) => (
-              <div
-                key={item}
-                className="flex items-center gap-3 rounded-2xl bg-white p-5"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eee9ff]">
-                  🔒
-                </span>
-                <p className="font-bold text-slate-900">{item}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-2xl bg-white p-5 text-sm leading-6 text-slate-600">
-            The checkout/unlock flow will connect here once billing is ready. For
-            now, full report access is controlled by{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5">
-              mcas.report_access.full_unlocked
-            </code>
-            .
           </div>
         </section>
       </div>
@@ -1023,9 +688,7 @@ export default async function McasFullReportPage({ params }: PageProps) {
   const resolvedParams = await params;
   const token = resolvedParams.token;
 
-  if (!token) {
-    notFound();
-  }
+  if (!token) notFound();
 
   let payload: McasReportPayload;
 
@@ -1041,31 +704,24 @@ export default async function McasFullReportPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#080e1b] py-6 text-slate-950">
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[30px] bg-[#080e1b] shadow-2xl">
-        <TopHeader payload={payload} />
+    <main className="min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
+      <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
+        <ReportHeader payload={payload} />
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
 
-        <div className="grid gap-6 px-5 py-8 md:px-8 lg:grid-cols-[260px_1fr]">
+        <div className="grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
           <SidebarIndex token={token} />
-
           <div className="space-y-8">
             <OrientationSection />
             <PlainLanguageSection payload={payload} />
             <OperatingStyleDeepDive payload={payload} />
             <CoreBalanceSection payload={payload} />
-            <PressureStrengthsSection
-              strengths={payload.candidateFacing.strengths}
-            />
-            <BlindSpotsSection
-              blindSpots={payload.candidateFacing.blindSpots ?? []}
-            />
+            <PressureStrengthsSection strengths={payload.candidateFacing.strengths} />
+            <BlindSpotsSection blindSpots={payload.candidateFacing.blindSpots ?? []} />
             <RolesSection roles={payload.candidateFacing.roleRecommendations} />
             <CareerVerticalSection payload={payload} />
-            <SuccessGuideSection
-              successGuide={payload.candidateFacing.successGuide ?? []}
-            />
+            <SuccessGuideSection successGuide={payload.candidateFacing.successGuide ?? []} />
             <NextStepPathwaySection payload={payload} />
           </div>
         </div>
