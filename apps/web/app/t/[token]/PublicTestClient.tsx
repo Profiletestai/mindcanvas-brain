@@ -25,7 +25,7 @@ type CountryCode = {
 };
 
 const PRIVACY_POLICY_URL = "https://profiletest.ai/privacy-policy";
-const LINKEDIN_URL = "https://www.linkedin.com/feed/";
+const LINKEDIN_URL = "https://linkedin.com/in/me";
 
 const COUNTRY_CODES: CountryCode[] = [
   { iso: "ZA", label: "South Africa", dial: "+27" },
