@@ -175,9 +175,9 @@ function ReportHeader({ payload }: { payload: McasReportPayload }) {
 
 function HeroMetric({ label, value, caption }: { label: string; value: string; caption: string }) {
   return (
-    <div className="rounded-[13px] border border-white/10 bg-white/[0.06] p-5">
+    <div className="rounded-[13px] border border-white/10 bg-white/[0.06] p-4">
       <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-white/35">{label}</p>
-      <p className="mt-2 text-2xl font-extrabold text-white">{value}</p>
+      <p className="mt-2 text-[22px] font-extrabold leading-tight text-white">{value}</p>
       <p className="mt-2 text-sm font-semibold text-[#8E7BFF]">{caption}</p>
     </div>
   );
@@ -185,24 +185,24 @@ function HeroMetric({ label, value, caption }: { label: string; value: string; c
 
 function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasDistributionItem<McasOperatingStyleCode>[]; title?: string }) {
   return (
-    <div className="rounded-xl border border-[#E2E8F0] bg-white p-6 text-[#0D1B2A]">
-      <div className="mb-5 flex items-center justify-between">
+    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
+      <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[12px] font-bold uppercase tracking-[0.25em] text-[#4A5568]">{title}</h3>
         <span className="rounded-full bg-[#6F5CFF]/10 px-3 py-1 text-xs font-bold text-[#6F5CFF]">Distribution</span>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items.map((item) => {
           const colour = OS_COLOURS[item.code] ?? "#6F5CFF";
           return (
-            <div key={item.code} className="grid grid-cols-[28px_1fr_40px_72px] items-center gap-3">
+            <div key={item.code} className="grid grid-cols-[28px_minmax(0,1fr)_36px_70px] items-center gap-3">
               <img src={OS_IMAGES[item.code]} alt="" className="h-7 w-7 rounded-lg object-cover shadow-sm" />
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-bold">{item.label}</p>
+                <p className="truncate text-[12px] font-bold leading-4">{item.label}</p>
                 <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#EFF1F5]">
                   <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: colour }} />
                 </div>
               </div>
-              <p className="text-right text-xs font-semibold text-[#4A5568]">{item.percentage}%</p>
+              <p className="text-right text-[11px] font-semibold text-[#4A5568]">{item.percentage}%</p>
               <span className="rounded px-2 py-1 text-center text-[10px] font-semibold" style={{ backgroundColor: `${colour}14`, color: item.band === "low" ? "#718096" : colour }}>
                 {bandLabel(item.band)}
               </span>
@@ -222,9 +222,9 @@ function WorkCycleCoverage({ items, title = "Work Cycle Coverage" }: { items: Mc
   const examine = byCode.get("EXAMINE")?.percentage ?? 0;
 
   return (
-    <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
+    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white p-4 text-[#0D1B2A]">
       <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8892A4]">{title}</p>
-      <div className="mx-auto grid h-[176px] w-[176px] grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-[7px] border-[#EEEAFE] text-center text-[10px] font-bold">
+      <div className="mx-auto grid h-[164px] w-[164px] grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-[7px] border-[#EEEAFE] text-center text-[10px] font-bold">
         <div className="flex flex-col items-center justify-center bg-[#2C06C1]/20"><span>Create</span><span className="text-[#1725DB]">{create}%</span></div>
         <div className="flex flex-col items-center justify-center bg-[#1725DB]/10"><span>Organise</span><span className="text-[#0A65EE]">{organise}%</span></div>
         <div className="flex flex-col items-center justify-center bg-[#028F8B]/20"><span>Resolve</span><span className="text-[#028F8B]">{resolve}%</span></div>
@@ -248,15 +248,15 @@ function Hero({ payload }: { payload: McasReportPayload }) {
   const readiness = payload.result.careerVertical.readinessPercentage;
 
   return (
-    <section className="overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-8 text-white md:px-8">
-      <div className="grid gap-7 xl:grid-cols-[520px_1fr_254px]">
+    <section className="overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-6 text-white md:px-8">
+      <div className="grid items-start gap-6 xl:grid-cols-[500px_minmax(500px,1fr)_254px]">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#8E7BFF]">Candidate Extensive Career Report</p>
-          <h1 className="mt-4 text-[38px] font-black leading-none tracking-[-0.04em] md:text-5xl">{payload.candidate.fullName}</h1>
-          <p className="mt-6 max-w-lg text-sm leading-7 text-white/55 md:text-[15px]">
+          <h1 className="mt-3 text-[36px] font-black leading-none tracking-[-0.04em] md:text-[42px]">{payload.candidate.fullName}</h1>
+          <p className="mt-5 max-w-lg text-sm leading-7 text-white/55 md:text-[14px]">
             A practical career guide — grounded, honest, and actionable. This report explains how you naturally execute work and where you are most likely to thrive.
           </p>
-          <div className="mt-9 grid gap-4 sm:grid-cols-2">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
             <HeroMetric label="Operating Style" value={primaryOs.label} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
             <HeroMetric label="Vertical Fit" value={primaryVertical.code} caption={primaryVertical.label} />
@@ -269,16 +269,6 @@ function Hero({ payload }: { payload: McasReportPayload }) {
         <div className="space-y-4">
           <WorkCycleCoverage items={payload.result.core.distribution} />
           <HeroSummaryCard label="Core balance" value={coreInitials(payload)} caption="Dominant" />
-          <HeroSummaryCard
-            label="Vertical Fit"
-            value={`${primaryVertical.code} Now`}
-            caption={payload.result.careerVertical.next ? `${payload.result.careerVertical.next.code} in development` : payload.result.careerVertical.readinessLabel ?? "Current fit"}
-          />
-          <HeroSummaryCard
-            label="Development"
-            value={`${payload.candidateFacing.nextStepPathway?.developmentFocus?.length ?? 0} areas`}
-            caption={payload.candidateFacing.nextStepPathway?.developmentFocus?.slice(0, 4).join(" · ") ?? "Growth areas"}
-          />
         </div>
       </div>
     </section>
@@ -287,9 +277,9 @@ function Hero({ payload }: { payload: McasReportPayload }) {
 
 function HeroSummaryCard({ label, value, caption }: { label: string; value: string; caption: string }) {
   return (
-    <div className="rounded-xl border border-[#E2E8F0] bg-[#6F5CFF] p-5">
+    <div className="rounded-xl border border-[#E2E8F0] bg-[#6F5CFF] p-4">
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">{label}</p>
-      <p className="mt-2 text-xl font-extrabold text-white">{value}</p>
+      <p className="mt-2 text-lg font-extrabold text-white">{value}</p>
       <p className="mt-1 text-sm font-semibold leading-5 text-white">{caption}</p>
     </div>
   );
