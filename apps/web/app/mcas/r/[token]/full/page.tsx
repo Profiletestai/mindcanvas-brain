@@ -395,32 +395,64 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
   const primary = payload.result.operatingStyle.primary;
 
   return (
-    <SectionShell id="style-deep-dive" title="Your Operating Style Deep Dive" icon="/mcas/report-icons/operating-style-identity-system.png">
-      <div className="space-y-7">
-        <p className="text-base leading-8 text-[#4A5568]">
-          The Operating Style reveals your natural execution pattern. The distribution below reflects scored pattern strength, not a ranking against other people.
+    <section
+      id="style-deep-dive"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/operating-style-identity-system.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your Operating Style Deep Dive
+        </h2>
+      </div>
+
+      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <p className="mb-6 text-[13px] leading-7 text-[#4A5568]">
+          The Operating Style reveals the candidate&apos;s natural execution
+          pattern. The distribution below reflects scored pattern strength, not
+          a ranking against others.
         </p>
-        <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-          <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
-            <img src="/mcas/report-icons/operating-style-identity-system.png" alt="" className="mx-auto max-h-[335px] w-full object-contain" />
-            <p className="mx-auto mt-4 max-w-[180px] text-center text-sm font-bold capitalize text-[#0D1B2A]">Operating style identity system</p>
+
+        <div className="grid items-center gap-8 lg:grid-cols-[410px_1fr]">
+          <div className="flex justify-center">
+            <img
+              src="/mcas/graphics/operating-style-system.png"
+              alt="Operating style identity system"
+              className="h-auto max-h-[335px] w-full max-w-[390px] object-contain"
+            />
           </div>
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6">
-            <div className="flex flex-col gap-5 md:flex-row">
-              <img src={OS_IMAGES[primary.code]} alt="" className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow" />
+
+          <div className="rounded-[13px] border border-[#E2E8F0] bg-white p-6">
+            <div className="grid items-start gap-5 md:grid-cols-[64px_1fr]">
+              <img
+                src={OS_IMAGES[primary.code]}
+                alt=""
+                className="h-16 w-16 rounded-[13px] object-cover shadow-sm"
+              />
+
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#718096]">
-                  Operating Style · Profile {primary.code.replace("OS", "").padStart(2, "0")}
+                <p className="text-[10px] font-bold uppercase leading-4 tracking-[0.22em] text-[#718096]">
+                  Operating Style · Profile{" "}
+                  {primary.code.replace("OS", "").padStart(2, "0")}
                 </p>
-                <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">The {primary.label}</h3>
-                <p className="mt-4 text-base leading-8 text-[#5A5F7E]">{payload.candidateFacing.operatingStyleNarrative}</p>
+
+                <h3 className="mt-2 text-[28px] font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">
+                  The {primary.label}
+                </h3>
+
+                <p className="mt-4 max-w-[470px] text-[13px] leading-7 text-[#5A5F7E]">
+                  {payload.candidateFacing.operatingStyleNarrative}
+                </p>
               </div>
             </div>
           </div>
         </div>
-        <OperatingStyleCard items={payload.result.operatingStyle.distribution} title="Operating Style Distribution" />
       </div>
-    </SectionShell>
+    </section>
   );
 }
 
