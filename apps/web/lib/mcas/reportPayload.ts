@@ -27,71 +27,59 @@ import type {
 
 type JsonRecord = Record<string, unknown>;
 
-type PartnerApplicationRow = {
-  id: string;
-  org_id: string | null;
-  partner_key: string | null;
-  application_id: string | null;
-  public_token: string | null;
-  status: string | null;
-  candidate_first_name: string | null;
-  candidate_last_name: string | null;
-  candidate_email: string | null;
-  candidate_phone: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
 type AssessmentRow = {
   id: string;
   partner_application_id: string | null;
-  individual_id?: string | null;
-  status: string | null;
+  test_link_id: string | null;
+  individual_id: string | null;
+  framework_slug: string;
+  framework_version: string;
+  status: string;
   started_at: string | null;
   completed_at: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  meta: unknown;
+  report_token: string;
+};
+
+type TestLinkRow = {
+  id: string;
+  org_id: string;
+  public_token: string;
+  link_type: string;
+  framework_slug: string;
+  framework_version: string;
+  name: string;
+  report_version: "lite" | "full";
+  show_results: boolean;
+  email_report: boolean;
+  next_steps_url: string | null;
+  settings: unknown;
+};
+
+type IndividualRow = {
+  id: string;
+  org_id: string;
+  external_ref: string | null;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
 };
 
 type ResultRow = {
   id: string;
-  assessment_id: string | null;
+  assessment_id: string;
+  scoring_model: string;
   core_distribution: unknown;
   os_distribution: unknown;
   vertical_readiness: unknown;
-  flags: unknown;
   confidence: unknown;
-  scoring_model: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type OrgSettingsRow = {
-  id: string;
-  org_id: string | null;
-  slug: string | null;
-  display_name: string | null;
-  branding: unknown;
-};
-
-type ReportAccessRow = {
-  snapshot_unlocked: boolean | null;
-  full_unlocked: boolean | null;
-  internal_unlocked: boolean | null;
-  full_purchase_enabled?: boolean | null;
+  flags: unknown;
+  computed_at: string | null;
 };
 
 type BuildPayloadArgs =
-  | {
-      token: string;
-      applicationId?: never;
-      reportType?: McasReportType;
-    }
-  | {
-      applicationId: string;
-      token?: never;
-      reportType?: McasReportType;
-    };
+  | { token: string; assessmentId?: never; reportType?: McasReportType }
+  | { assessmentId: string; token?: never; reportType?: McasReportType };
 
 const DEFAULT_REPORT_VERSION = "mcas_report_v1";
 
@@ -99,13 +87,8 @@ function mcasSupa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!serviceRoleKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
+  if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+  if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
   return createClient(url, serviceRoleKey, {
     db: { schema: "mcas" },
@@ -120,45 +103,31 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function asNumber(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  if (typeof value === "string") {
-    const cleaned = value.replace("%", "").trim();
-    const parsed = Number(cleaned);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-
-  return fallback;
-}
-
-function clampPercentage(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  if (value < 0) return 0;
-  if (value > 100) return 100;
-  return Math.round(value);
-}
-
-function normalisePercentage(value: unknown): number {
-  const numberValue = asNumber(value, 0);
-
-  // If saved as 0.82 instead of 82, convert to 82.
-  if (numberValue > 0 && numberValue <= 1) {
-    return clampPercentage(numberValue * 100);
-  }
-
-  return clampPercentage(numberValue);
-}
-
 function cleanString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function toNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value.replace("%", "").trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return fallback;
+}
+
+function toPercentage(value: unknown) {
+  const numberValue = toNumber(value, 0);
+  const percentage = numberValue > 0 && numberValue <= 1 ? numberValue * 100 : numberValue;
+  return Math.max(0, Math.min(100, Math.round(percentage)));
+}
+
 function toCandidateFullName(firstName: string | null, lastName: string | null) {
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  return fullName || "Candidate";
+  return [firstName, lastName].filter(Boolean).join(" ").trim() || "Candidate";
 }
 
 function rankBand(
@@ -176,10 +145,6 @@ function sortAndRank<TCode extends string>(
   items: Array<Omit<McasDistributionItem<TCode>, "rank" | "band">>
 ): McasDistributionItem<TCode>[] {
   return items
-    .map((item) => ({
-      ...item,
-      percentage: clampPercentage(item.percentage),
-    }))
     .sort((a, b) => b.percentage - a.percentage)
     .map((item, index) => {
       const rank = index + 1;
@@ -215,27 +180,19 @@ function maybeOperatingStyleCode(value: unknown): McasOperatingStyleCode | null 
   const labelMap: Record<string, McasOperatingStyleCode> = {
     VISIONARY: "OS1",
     TRAILBLAZER: "OS1",
-
     CATALYST: "OS2",
     SPARK: "OS2",
-
     MOTIVATOR: "OS3",
     UPLIFTER: "OS3",
-
     CONNECTOR: "OS4",
     BRIDGEBUILDER: "OS4",
-    BRIDGEBUILDERP04: "OS4",
-
     FACILITATOR: "OS5",
     STEADYHAND: "OS5",
-
     COORDINATOR: "OS6",
     ORGANISER: "OS6",
     ORGANIZER: "OS6",
-
     CONTROLLER: "OS7",
     ANALYST: "OS7",
-
     OPTIMISER: "OS8",
     OPTIMIZER: "OS8",
     REFINER: "OS8",
@@ -289,36 +246,23 @@ function maybeVerticalCode(value: unknown): McasCareerVerticalCode | null {
   }
 
   const numeric = upper.match(/[1-6]/)?.[0];
-  if (numeric) return `V${numeric}` as McasCareerVerticalCode;
-
-  return null;
+  return numeric ? (`V${numeric}` as McasCareerVerticalCode) : null;
 }
 
 function normaliseOperatingStyleDistribution(
   value: unknown
 ): McasDistributionItem<McasOperatingStyleCode>[] {
-  const items: Array<
+  const map = new Map<
+    McasOperatingStyleCode,
     Omit<McasDistributionItem<McasOperatingStyleCode>, "rank" | "band">
-  > = [];
+  >();
 
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      if (!isRecord(entry)) continue;
+  function add(code: McasOperatingStyleCode, valueToAdd: unknown) {
+    const percentage = toPercentage(valueToAdd);
+    const existing = map.get(code);
 
-      const code =
-        maybeOperatingStyleCode(entry.code) ??
-        maybeOperatingStyleCode(entry.os_code) ??
-        maybeOperatingStyleCode(entry.operating_style) ??
-        maybeOperatingStyleCode(entry.label) ??
-        maybeOperatingStyleCode(entry.name);
-
-      if (!code) continue;
-
-      const percentage = normalisePercentage(
-        entry.percentage ?? entry.pct ?? entry.value ?? entry.score
-      );
-
-      items.push({
+    if (!existing || percentage > existing.percentage) {
+      map.set(code, {
         code,
         label: getOperatingStyleDisplayLabel(code),
         shortLabel: MCAS_OPERATING_STYLE_LABELS[code].label,
@@ -328,62 +272,49 @@ function normaliseOperatingStyleDistribution(
     }
   }
 
-  if (isRecord(value)) {
-    for (const [key, percentageValue] of Object.entries(value)) {
-      if (
-        key === "primary" ||
-        key === "secondary" ||
-        key === "dominant" ||
-        key === "distribution"
-      ) {
-        continue;
-      }
-
-      const code = maybeOperatingStyleCode(key);
-      if (!code) continue;
-
-      items.push({
-        code,
-        label: getOperatingStyleDisplayLabel(code),
-        shortLabel: MCAS_OPERATING_STYLE_LABELS[code].label,
-        percentage: normalisePercentage(percentageValue),
-        description: MCAS_OPERATING_STYLE_LABELS[code].shortDescription,
-      });
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!isRecord(item)) continue;
+      const code =
+        maybeOperatingStyleCode(item.code) ??
+        maybeOperatingStyleCode(item.label) ??
+        maybeOperatingStyleCode(item.name);
+      if (code) add(code, item.percentage ?? item.pct ?? item.value ?? item.score);
     }
+  }
 
+  if (isRecord(value)) {
     if (Array.isArray(value.distribution)) {
       return normaliseOperatingStyleDistribution(value.distribution);
     }
+
+    for (const [key, score] of Object.entries(value)) {
+      const code = maybeOperatingStyleCode(key);
+      if (code) add(code, score);
+    }
   }
 
-  const merged = mergeDistributionItems(items);
+  for (const code of Object.keys(
+    MCAS_OPERATING_STYLE_LABELS
+  ) as McasOperatingStyleCode[]) {
+    if (!map.has(code)) add(code, 0);
+  }
 
-  return ensureAllOperatingStyles(merged);
+  return sortAndRank(Array.from(map.values()));
 }
 
-function normaliseCoreDistribution(
-  value: unknown
-): McasDistributionItem<McasCoreCode>[] {
-  const items: Array<Omit<McasDistributionItem<McasCoreCode>, "rank" | "band">> =
-    [];
+function normaliseCoreDistribution(value: unknown): McasDistributionItem<McasCoreCode>[] {
+  const map = new Map<
+    McasCoreCode,
+    Omit<McasDistributionItem<McasCoreCode>, "rank" | "band">
+  >();
 
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      if (!isRecord(entry)) continue;
+  function add(code: McasCoreCode, valueToAdd: unknown) {
+    const percentage = toPercentage(valueToAdd);
+    const existing = map.get(code);
 
-      const code =
-        maybeCoreCode(entry.code) ??
-        maybeCoreCode(entry.core_code) ??
-        maybeCoreCode(entry.label) ??
-        maybeCoreCode(entry.name);
-
-      if (!code) continue;
-
-      const percentage = normalisePercentage(
-        entry.percentage ?? entry.pct ?? entry.value ?? entry.score
-      );
-
-      items.push({
+    if (!existing || percentage > existing.percentage) {
+      map.set(code, {
         code,
         label: getCoreLabel(code),
         percentage,
@@ -392,80 +323,70 @@ function normaliseCoreDistribution(
     }
   }
 
-  if (isRecord(value)) {
-    for (const [key, percentageValue] of Object.entries(value)) {
-      if (
-        key === "primary" ||
-        key === "strongest" ||
-        key === "weakest" ||
-        key === "distribution"
-      ) {
-        continue;
-      }
-
-      const code = maybeCoreCode(key);
-      if (!code) continue;
-
-      items.push({
-        code,
-        label: getCoreLabel(code),
-        percentage: normalisePercentage(percentageValue),
-        description: MCAS_CORE_LABELS[code].shortDescription,
-      });
-    }
-
-    if (Array.isArray(value.distribution)) {
-      return normaliseCoreDistribution(value.distribution);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!isRecord(item)) continue;
+      const code =
+        maybeCoreCode(item.code) ??
+        maybeCoreCode(item.label) ??
+        maybeCoreCode(item.name);
+      if (code) add(code, item.percentage ?? item.pct ?? item.value ?? item.score);
     }
   }
 
-  const merged = mergeDistributionItems(items);
+  if (isRecord(value)) {
+    if (Array.isArray(value.distribution)) {
+      return normaliseCoreDistribution(value.distribution);
+    }
 
-  return ensureAllCoreCodes(merged);
+    for (const [key, score] of Object.entries(value)) {
+      const code = maybeCoreCode(key);
+      if (code) add(code, score);
+    }
+  }
+
+  for (const code of Object.keys(MCAS_CORE_LABELS) as McasCoreCode[]) {
+    if (!map.has(code)) add(code, 0);
+  }
+
+  return sortAndRank(Array.from(map.values()));
 }
 
 function normaliseCareerVerticalDistribution(
   value: unknown
 ): McasDistributionItem<McasCareerVerticalCode>[] {
-  const items: Array<
+  const map = new Map<
+    McasCareerVerticalCode,
     Omit<McasDistributionItem<McasCareerVerticalCode>, "rank" | "band">
-  > = [];
+  >();
 
-  if (typeof value === "string") {
-    const code = maybeVerticalCode(value);
-    if (code) {
-      items.push({
-        code,
-        label: getVerticalLabel(code),
-        percentage: 100,
-        description: MCAS_VERTICAL_LABELS[code].shortDescription,
-      });
-    }
-  }
+  function add(code: McasCareerVerticalCode, valueToAdd: unknown) {
+    const percentage = toPercentage(valueToAdd);
+    const existing = map.get(code);
 
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      if (!isRecord(entry)) continue;
-
-      const code =
-        maybeVerticalCode(entry.code) ??
-        maybeVerticalCode(entry.cv_code) ??
-        maybeVerticalCode(entry.vertical) ??
-        maybeVerticalCode(entry.label) ??
-        maybeVerticalCode(entry.name);
-
-      if (!code) continue;
-
-      const percentage = normalisePercentage(
-        entry.percentage ?? entry.pct ?? entry.value ?? entry.score
-      );
-
-      items.push({
+    if (!existing || percentage > existing.percentage) {
+      map.set(code, {
         code,
         label: getVerticalLabel(code),
         percentage,
         description: MCAS_VERTICAL_LABELS[code].shortDescription,
       });
+    }
+  }
+
+  if (typeof value === "string") {
+    const code = maybeVerticalCode(value);
+    if (code) add(code, 100);
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (!isRecord(item)) continue;
+      const code =
+        maybeVerticalCode(item.code) ??
+        maybeVerticalCode(item.label) ??
+        maybeVerticalCode(item.name);
+      if (code) add(code, item.percentage ?? item.pct ?? item.value ?? item.score);
     }
   }
 
@@ -474,132 +395,17 @@ function normaliseCareerVerticalDistribution(
       return normaliseCareerVerticalDistribution(value.distribution);
     }
 
-    for (const [key, percentageValue] of Object.entries(value)) {
-      if (
-        key === "primary" ||
-        key === "current" ||
-        key === "current_vertical" ||
-        key === "next" ||
-        key === "readinessLabel" ||
-        key === "readinessPercentage" ||
-        key === "readiness_percentage" ||
-        key === "distribution"
-      ) {
-        continue;
-      }
-
+    for (const [key, score] of Object.entries(value)) {
       const code = maybeVerticalCode(key);
-      if (!code) continue;
-
-      items.push({
-        code,
-        label: getVerticalLabel(code),
-        percentage: normalisePercentage(percentageValue),
-        description: MCAS_VERTICAL_LABELS[code].shortDescription,
-      });
-    }
-
-    const primaryCode =
-      maybeVerticalCode(value.primary) ??
-      maybeVerticalCode(value.current) ??
-      maybeVerticalCode(value.current_vertical);
-
-    if (primaryCode && !items.some((item) => item.code === primaryCode)) {
-      items.push({
-        code: primaryCode,
-        label: getVerticalLabel(primaryCode),
-        percentage: 100,
-        description: MCAS_VERTICAL_LABELS[primaryCode].shortDescription,
-      });
+      if (code) add(code, score);
     }
   }
 
-  const merged = mergeDistributionItems(items);
-
-  return ensureAllVerticalCodes(merged);
-}
-
-function mergeDistributionItems<TCode extends string>(
-  items: Array<Omit<McasDistributionItem<TCode>, "rank" | "band">>
-): Array<Omit<McasDistributionItem<TCode>, "rank" | "band">> {
-  const map = new Map<TCode, Omit<McasDistributionItem<TCode>, "rank" | "band">>();
-
-  for (const item of items) {
-    const existing = map.get(item.code);
-
-    if (!existing || item.percentage > existing.percentage) {
-      map.set(item.code, item);
-    }
+  for (const code of Object.keys(MCAS_VERTICAL_LABELS) as McasCareerVerticalCode[]) {
+    if (!map.has(code)) add(code, 0);
   }
 
-  return Array.from(map.values());
-}
-
-function ensureAllOperatingStyles(
-  items: Array<Omit<McasDistributionItem<McasOperatingStyleCode>, "rank" | "band">>
-): McasDistributionItem<McasOperatingStyleCode>[] {
-  const existing = new Set(items.map((item) => item.code));
-  const completed = [...items];
-
-  for (const code of Object.keys(
-    MCAS_OPERATING_STYLE_LABELS
-  ) as McasOperatingStyleCode[]) {
-    if (existing.has(code)) continue;
-
-    completed.push({
-      code,
-      label: getOperatingStyleDisplayLabel(code),
-      shortLabel: MCAS_OPERATING_STYLE_LABELS[code].label,
-      percentage: 0,
-      description: MCAS_OPERATING_STYLE_LABELS[code].shortDescription,
-    });
-  }
-
-  return sortAndRank(completed);
-}
-
-function ensureAllCoreCodes(
-  items: Array<Omit<McasDistributionItem<McasCoreCode>, "rank" | "band">>
-): McasDistributionItem<McasCoreCode>[] {
-  const existing = new Set(items.map((item) => item.code));
-  const completed = [...items];
-
-  for (const code of Object.keys(MCAS_CORE_LABELS) as McasCoreCode[]) {
-    if (existing.has(code)) continue;
-
-    completed.push({
-      code,
-      label: getCoreLabel(code),
-      percentage: 0,
-      description: MCAS_CORE_LABELS[code].shortDescription,
-    });
-  }
-
-  return sortAndRank(completed);
-}
-
-function ensureAllVerticalCodes(
-  items: Array<
-    Omit<McasDistributionItem<McasCareerVerticalCode>, "rank" | "band">
-  >
-): McasDistributionItem<McasCareerVerticalCode>[] {
-  const existing = new Set(items.map((item) => item.code));
-  const completed = [...items];
-
-  for (const code of Object.keys(
-    MCAS_VERTICAL_LABELS
-  ) as McasCareerVerticalCode[]) {
-    if (existing.has(code)) continue;
-
-    completed.push({
-      code,
-      label: getVerticalLabel(code),
-      percentage: 0,
-      description: MCAS_VERTICAL_LABELS[code].shortDescription,
-    });
-  }
-
-  return sortAndRank(completed);
+  return sortAndRank(Array.from(map.values()));
 }
 
 function normaliseFlags(value: unknown): string[] {
@@ -610,23 +416,11 @@ function normaliseFlags(value: unknown): string[] {
       .map((item) => {
         if (typeof item === "string") return item.trim();
         if (isRecord(item)) {
-          return (
-            cleanString(item.label) ??
-            cleanString(item.title) ??
-            cleanString(item.code) ??
-            null
-          );
+          return cleanString(item.label) ?? cleanString(item.title) ?? cleanString(item.code);
         }
         return null;
       })
       .filter((item): item is string => Boolean(item));
-  }
-
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
   }
 
   if (isRecord(value)) {
@@ -639,341 +433,261 @@ function normaliseFlags(value: unknown): string[] {
 }
 
 function normaliseConfidence(value: unknown) {
-  if (!value) {
-    return {
-      level: "moderate" as const,
-      score: undefined,
-      notes: ["Confidence could not be determined from the saved result."],
-    };
-  }
-
-  if (typeof value === "number" || typeof value === "string") {
-    const score = normalisePercentage(value);
-
-    return {
-      level: confidenceLevelFromScore(score),
-      score,
-      notes: [],
-    };
-  }
-
   if (isRecord(value)) {
     const scoreValue =
-      value.score ??
-      value.percentage ??
-      value.confidence ??
-      value.confidence_score ??
-      value.overall;
-
-    const score =
-      scoreValue === undefined ? undefined : normalisePercentage(scoreValue);
-
-    const level =
-      cleanString(value.level) ??
-      cleanString(value.band) ??
-      cleanString(value.confidence_level);
-
-    const notesValue = value.notes ?? value.reasons ?? value.messages;
-
-    const notes = Array.isArray(notesValue)
-      ? notesValue
-          .map((note) => (typeof note === "string" ? note.trim() : null))
-          .filter((note): note is string => Boolean(note))
-      : [];
+      value.score ?? value.percentage ?? value.confidence ?? value.confidence_score;
+    const score = scoreValue === undefined ? undefined : toPercentage(scoreValue);
+    const level = cleanString(value.level) ?? cleanString(value.rating) ?? cleanString(value.band);
+    const normalisedLevel = level?.toLowerCase();
 
     return {
-      level: normaliseConfidenceLevel(level, score),
+      level:
+        normalisedLevel === "high"
+          ? ("high" as const)
+          : normalisedLevel === "low"
+            ? ("low" as const)
+            : ("moderate" as const),
       score,
-      notes,
+      notes: [] as string[],
     };
   }
 
   return {
     level: "moderate" as const,
     score: undefined,
-    notes: [],
+    notes: [] as string[],
   };
 }
 
-function confidenceLevelFromScore(score: number) {
-  if (score >= 75) return "high" as const;
-  if (score >= 45) return "moderate" as const;
-  return "low" as const;
+function getMetaCandidatePhone(meta: unknown): string | null {
+  if (!isRecord(meta) || !isRecord(meta.candidate)) return null;
+  return cleanString(meta.candidate.phone);
 }
 
-function normaliseConfidenceLevel(level: string | null, score?: number) {
-  const normalised = level?.toLowerCase();
-
-  if (normalised === "high") return "high" as const;
-  if (normalised === "moderate" || normalised === "medium") {
-    return "moderate" as const;
-  }
-  if (normalised === "low") return "low" as const;
-
-  if (typeof score === "number") return confidenceLevelFromScore(score);
-
-  return "moderate" as const;
+function getVerticalReadinessLabel(code: McasCareerVerticalCode) {
+  return `${code} fit indicated`;
 }
 
-function getVerticalReadinessLabel(
-  verticalReadiness: unknown,
-  primaryCode: McasCareerVerticalCode
-): string {
-  if (isRecord(verticalReadiness)) {
-    return (
-      cleanString(verticalReadiness.readinessLabel) ??
-      cleanString(verticalReadiness.readiness_label) ??
-      cleanString(verticalReadiness.label) ??
-      `${primaryCode} fit indicated`
-    );
-  }
-
-  return `${primaryCode} fit indicated`;
-}
-
-function getVerticalReadinessPercentage(
-  verticalReadiness: unknown
-): number | undefined {
-  if (!isRecord(verticalReadiness)) return undefined;
-
-  const value =
-    verticalReadiness.readinessPercentage ??
-    verticalReadiness.readiness_percentage ??
-    verticalReadiness.next_readiness ??
-    verticalReadiness.nextReadiness;
-
-  if (value === undefined) return undefined;
-
-  return normalisePercentage(value);
-}
-
-function getBranding(value: unknown) {
-  if (!isRecord(value)) return undefined;
-
-  return {
-    logoUrl: cleanString(value.logoUrl) ?? cleanString(value.logo_url),
-    primaryColor:
-      cleanString(value.primaryColor) ?? cleanString(value.primary_color),
-    secondaryColor:
-      cleanString(value.secondaryColor) ?? cleanString(value.secondary_color),
-    accentColor:
-      cleanString(value.accentColor) ?? cleanString(value.accent_color),
-  };
-}
-
-async function fetchOrgSettings(
-  orgId: string | null,
-  partnerKey: string | null
-): Promise<OrgSettingsRow | null> {
-  if (!orgId && !partnerKey) return null;
-
-  const supa = mcasSupa();
-
-  try {
-    let query = supa
-      .from("org_settings")
-      .select("id, org_id, slug, display_name, branding")
-      .limit(1);
-
-    if (orgId) {
-      query = query.eq("org_id", orgId);
-    } else if (partnerKey) {
-      query = query.eq("partner_key", partnerKey);
-    }
-
-    const { data, error } = await query.maybeSingle();
-
-    if (error) {
-      console.warn("[MCAS] org_settings lookup skipped:", error.message);
-      return null;
-    }
-
-    return data as OrgSettingsRow | null;
-  } catch (error) {
-    console.warn("[MCAS] org_settings lookup failed:", error);
-    return null;
-  }
-}
-
-async function fetchReportAccess(
-  applicationId: string
-): Promise<ReportAccessRow | null> {
-  const supa = mcasSupa();
-
-  try {
-    const { data, error } = await supa
-      .from("report_access")
-      .select(
-        "snapshot_unlocked, full_unlocked, internal_unlocked, full_purchase_enabled"
-      )
-      .eq("application_id", applicationId)
-      .maybeSingle();
-
-    if (error) {
-      console.warn("[MCAS] report_access lookup skipped:", error.message);
-      return null;
-    }
-
-    return data as ReportAccessRow | null;
-  } catch (error) {
-    console.warn("[MCAS] report_access lookup failed:", error);
-    return null;
-  }
-}
-
-async function fetchApplicationByToken(
-  token: string
-): Promise<PartnerApplicationRow | null> {
-  const supa = mcasSupa();
-
-  const { data, error } = await supa
-    .from("partner_applications")
-    .select(
-      [
-        "id",
-        "org_id",
-        "partner_key",
-        "application_id",
-        "public_token",
-        "status",
-        "candidate_first_name",
-        "candidate_last_name",
-        "candidate_email",
-        "candidate_phone",
-        "created_at",
-        "updated_at",
-      ].join(", ")
-    )
-    .eq("public_token", token)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Unable to load MCAS application by token: ${error.message}`);
-  }
-
-  return data as PartnerApplicationRow | null;
-}
-
-async function fetchApplicationById(
-  applicationId: string
-): Promise<PartnerApplicationRow | null> {
-  const supa = mcasSupa();
-
-  const { data, error } = await supa
-    .from("partner_applications")
-    .select(
-      [
-        "id",
-        "org_id",
-        "partner_key",
-        "application_id",
-        "public_token",
-        "status",
-        "candidate_first_name",
-        "candidate_last_name",
-        "candidate_email",
-        "candidate_phone",
-        "created_at",
-        "updated_at",
-      ].join(", ")
-    )
-    .eq("id", applicationId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Unable to load MCAS application by id: ${error.message}`);
-  }
-
-  return data as PartnerApplicationRow | null;
-}
-
-async function fetchAssessmentForApplication(
-  applicationId: string
-): Promise<AssessmentRow | null> {
-  const supa = mcasSupa();
-
-  const { data, error } = await supa
+async function fetchAssessmentByReportToken(reportToken: string): Promise<AssessmentRow | null> {
+  const { data, error } = await mcasSupa()
     .from("assessments")
     .select(
       [
         "id",
         "partner_application_id",
+        "test_link_id",
         "individual_id",
+        "framework_slug",
+        "framework_version",
         "status",
         "started_at",
         "completed_at",
-        "created_at",
-        "updated_at",
+        "meta",
+        "report_token",
       ].join(", ")
     )
-    .eq("partner_application_id", applicationId)
-    .order("completed_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .eq("report_token", reportToken)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(`Unable to load MCAS assessment: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Unable to load MCAS assessment by report token: ${error.message}`);
   return data as AssessmentRow | null;
 }
 
-async function fetchResultForAssessment(
-  assessmentId: string
-): Promise<ResultRow | null> {
-  const supa = mcasSupa();
+async function fetchAssessmentById(assessmentId: string): Promise<AssessmentRow | null> {
+  const { data, error } = await mcasSupa()
+    .from("assessments")
+    .select(
+      [
+        "id",
+        "partner_application_id",
+        "test_link_id",
+        "individual_id",
+        "framework_slug",
+        "framework_version",
+        "status",
+        "started_at",
+        "completed_at",
+        "meta",
+        "report_token",
+      ].join(", ")
+    )
+    .eq("id", assessmentId)
+    .maybeSingle();
 
-  const { data, error } = await supa
+  if (error) throw new Error(`Unable to load MCAS assessment by id: ${error.message}`);
+  return data as AssessmentRow | null;
+}
+
+async function fetchTestLink(testLinkId: string): Promise<TestLinkRow | null> {
+  const { data, error } = await mcasSupa()
+    .from("test_links")
+    .select(
+      [
+        "id",
+        "org_id",
+        "public_token",
+        "link_type",
+        "framework_slug",
+        "framework_version",
+        "name",
+        "report_version",
+        "show_results",
+        "email_report",
+        "next_steps_url",
+        "settings",
+      ].join(", ")
+    )
+    .eq("id", testLinkId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Unable to load MCAS test link: ${error.message}`);
+  return data as TestLinkRow | null;
+}
+
+async function fetchIndividual(individualId: string | null): Promise<IndividualRow | null> {
+  if (!individualId) return null;
+
+  const { data, error } = await mcasSupa()
+    .from("individuals")
+    .select("id, org_id, external_ref, email, first_name, last_name")
+    .eq("id", individualId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Unable to load MCAS individual: ${error.message}`);
+  return data as IndividualRow | null;
+}
+
+async function fetchResultForAssessment(assessmentId: string): Promise<ResultRow | null> {
+  const { data, error } = await mcasSupa()
     .from("results")
     .select(
       [
         "id",
         "assessment_id",
+        "scoring_model",
         "core_distribution",
         "os_distribution",
         "vertical_readiness",
-        "flags",
         "confidence",
-        "scoring_model",
-        "created_at",
-        "updated_at",
+        "flags",
+        "computed_at",
       ].join(", ")
     )
     .eq("assessment_id", assessmentId)
-    .order("created_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
 
-  if (error) {
-    throw new Error(`Unable to load MCAS result: ${error.message}`);
-  }
-
+  if (error) throw new Error(`Unable to load MCAS result: ${error.message}`);
   return data as ResultRow | null;
 }
 
-function getCandidateFacingContent(primaryCode: McasOperatingStyleCode): {
-  workPatternSummary: string;
-  operatingStyleNarrative: string;
-  strengths: McasStrength[];
-  environmentFit: McasEnvironmentFit;
-  roleRecommendations: McasRoleRecommendation[];
-  blindSpots: McasBlindSpot[];
-  successGuide: McasSuccessGuideItem[];
-  nextStepPathway: {
-    current: string;
-    next: string;
-    future: string;
-    developmentFocus: string[];
-  };
-} {
-  const displayLabel = getOperatingStyleDisplayLabel(primaryCode);
+function getStrengths(code: McasOperatingStyleCode): McasStrength[] {
+  const label = getOperatingStyleDisplayLabel(code);
+  return [
+    {
+      title: `${label} contribution`,
+      description:
+        "You have a clear natural pattern for moving work forward and creating value in the right environment.",
+      icon: "✦",
+    },
+    {
+      title: "Natural execution rhythm",
+      description:
+        "Your results show how you tend to create momentum, organise work, resolve priorities, and examine quality.",
+      icon: "↗",
+    },
+    {
+      title: "Best-fit awareness",
+      description:
+        "This profile helps you understand the conditions where your strongest work patterns are most sustainable.",
+      icon: "◎",
+    },
+  ];
+}
 
-  const generic = {
-    workPatternSummary: `Your strongest pattern is ${displayLabel}. This means your work energy is most naturally expressed through ${MCAS_OPERATING_STYLE_LABELS[
-      primaryCode
-    ].workCycleStage.toLowerCase()}.`,
-    operatingStyleNarrative: `The ${displayLabel} pattern describes how you most naturally move work forward. It is not a personality label. It is a practical view of the work conditions, contribution patterns, and responsibility levels where your strengths are most likely to create sustainable value.`,
+function getEnvironmentFit(code: McasOperatingStyleCode): McasEnvironmentFit {
+  const label = getOperatingStyleDisplayLabel(code);
+  return {
+    pace: "Moderate to fast — enough movement to create momentum without losing clarity.",
+    autonomy: "Moderate to high — you perform best when trusted to use your natural work pattern responsibly.",
+    structure: "Semi-structured — clear goals with enough flexibility to apply your strengths.",
+    workStyle: `${label}-aligned work — environments that value your natural contribution pattern.`,
+  };
+}
+
+function getRoleRecommendations(code: McasOperatingStyleCode): McasRoleRecommendation[] {
+  const label = getOperatingStyleDisplayLabel(code);
+  return [
+    {
+      category: "Primary Fit",
+      title: `${label}-aligned role`,
+      description:
+        "A role where your natural operating style is central to how value is created.",
+    },
+    {
+      category: "Growth Pathway",
+      title: "Cross-functional contributor",
+      description:
+        "A pathway where your work pattern can support collaboration, execution, and sustainable delivery.",
+    },
+    {
+      category: "Development Fit",
+      title: "Responsibility expansion role",
+      description:
+        "A role that lets you grow scope while strengthening your lower-scoring CORE areas.",
+    },
+  ];
+}
+
+function getBlindSpots(_code: McasOperatingStyleCode): McasBlindSpot[] {
+  return [
+    {
+      title: "Overusing your strongest pattern",
+      description:
+        "Your strongest work pattern can become a limitation if it is applied automatically in every situation.",
+      managementStrategy:
+        "Pause before reacting and ask what this situation needs from the full work cycle, not only from your strongest pattern.",
+    },
+    {
+      title: "Under-supporting lower CORE areas",
+      description:
+        "Lower scoring work-cycle areas may need conscious structure, partnership, or review.",
+      managementStrategy:
+        "Build simple checkpoints or partner with people whose natural strengths cover the areas you underuse.",
+    },
+  ];
+}
+
+function getSuccessGuide(code: McasOperatingStyleCode): McasSuccessGuideItem[] {
+  const label = getOperatingStyleDisplayLabel(code);
+  return [
+    {
+      period: "days_1_30",
+      title: "Understand your operating context",
+      description: `Notice where your ${label} pattern is useful and where the role may need support from other work-cycle strengths.`,
+    },
+    {
+      period: "days_31_60",
+      title: "Build your support structure",
+      description:
+        "Create simple habits, checkpoints, and partnerships that protect your strengths and reduce predictable friction.",
+    },
+    {
+      period: "days_61_90",
+      title: "Scale deliberately",
+      description:
+        "Use your strongest work pattern more intentionally. Expand responsibility without losing sustainability.",
+    },
+  ];
+}
+
+function getCandidateFacingContent(primaryCode: McasOperatingStyleCode) {
+  const displayLabel = getOperatingStyleDisplayLabel(primaryCode);
+  const knowledgeLabel = MCAS_OPERATING_STYLE_LABELS[primaryCode].label;
+  const stage = MCAS_OPERATING_STYLE_LABELS[primaryCode].workCycleStage;
+
+  return {
+    workPatternSummary: `Your strongest pattern is ${displayLabel}. This means your work energy is most naturally expressed through ${stage.toLowerCase()}.`,
+    operatingStyleNarrative: `The ${displayLabel} pattern, known in the MCAS knowledge base as ${knowledgeLabel}, describes how you most naturally move work forward. It is not a personality label. It is a practical view of the work conditions, contribution patterns, and responsibility levels where your strengths are most likely to create sustainable value.`,
     strengths: getStrengths(primaryCode),
     environmentFit: getEnvironmentFit(primaryCode),
     roleRecommendations: getRoleRecommendations(primaryCode),
@@ -990,502 +704,6 @@ function getCandidateFacingContent(primaryCode: McasOperatingStyleCode): {
       ],
     },
   };
-
-  if (primaryCode !== "OS4") return generic;
-
-  return {
-    workPatternSummary:
-      "You succeed through people and process — not one or the other, but both working together. You are most effective when you understand the human side of a problem and then build the right structure around it.",
-    operatingStyleNarrative:
-      "You are a natural connector of people, priorities, and communication. You create alignment without forcing it — moving work forward through relationships, trust, and well-timed action. You are often the person others turn to when teams are stuck or communication has broken down.",
-    strengths: getStrengths(primaryCode),
-    environmentFit: getEnvironmentFit(primaryCode),
-    roleRecommendations: getRoleRecommendations(primaryCode),
-    blindSpots: getBlindSpots(primaryCode),
-    successGuide: getSuccessGuide(primaryCode),
-    nextStepPathway: {
-      current: "V3 — Established execution",
-      next: "V4 — Senior cross-functional scope",
-      future: "V5 — Strategic leadership",
-      developmentFocus: [
-        "Authority clarity",
-        "Analytical coverage",
-        "Scope boundary management",
-        "Strategic narrative",
-      ],
-    },
-  };
-}
-
-function getStrengths(code: McasOperatingStyleCode): McasStrength[] {
-  const map: Record<McasOperatingStyleCode, McasStrength[]> = {
-    OS1: [
-      {
-        title: "Direction creation",
-        description:
-          "You naturally spot new opportunities and create forward movement before everything is fully certain.",
-      },
-      {
-        title: "Fast initiation",
-        description:
-          "You are often comfortable starting work, testing ideas, and learning through movement.",
-      },
-      {
-        title: "Opportunity awareness",
-        description:
-          "You notice gaps, possibilities, and future pathways others may not see yet.",
-      },
-    ],
-    OS2: [
-      {
-        title: "Momentum building",
-        description:
-          "You bring energy, attention, and movement to ideas that need activation.",
-      },
-      {
-        title: "Influence through energy",
-        description:
-          "You help people engage with a direction and feel ready to move.",
-      },
-      {
-        title: "Fast mobilisation",
-        description:
-          "You are useful when work needs urgency, visibility, and early traction.",
-      },
-    ],
-    OS3: [
-      {
-        title: "People commitment",
-        description:
-          "You help sustain morale, trust, and emotional investment in the work.",
-      },
-      {
-        title: "Encouraging presence",
-        description:
-          "You often help people stay connected and motivated through pressure.",
-      },
-      {
-        title: "Human-centred delivery",
-        description:
-          "You notice how work is affecting people and help keep energy sustainable.",
-      },
-    ],
-    OS4: [
-      {
-        title: "Cross-team alignment",
-        description:
-          "You naturally bring people together across different priorities, styles, and perspectives.",
-      },
-      {
-        title: "Timing and presence",
-        description:
-          "You sense when to step in, hold back, and how to move things forward with minimal friction.",
-      },
-      {
-        title: "Communication clarity",
-        description:
-          "You translate complexity into clear, actionable direction different stakeholders can understand.",
-      },
-      {
-        title: "Relational execution",
-        description:
-          "You build trust as a working tool — relationships directly accelerate your output.",
-      },
-      {
-        title: "Calm under pressure",
-        description:
-          "You are a stabilising presence when teams face uncertainty, tension, or competing demands.",
-      },
-      {
-        title: "Gap identification",
-        description:
-          "You see where communication or trust is breaking down — often before others notice.",
-      },
-    ],
-    OS5: [
-      {
-        title: "Reliable delivery",
-        description:
-          "You protect consistency, follow-through, and practical completion.",
-      },
-      {
-        title: "Operational steadiness",
-        description:
-          "You help work stay stable when pressure or ambiguity increases.",
-      },
-      {
-        title: "Supportive execution",
-        description:
-          "You create confidence by keeping work grounded, clear, and deliverable.",
-      },
-    ],
-    OS6: [
-      {
-        title: "Structure building",
-        description:
-          "You naturally create process, order, and repeatable ways of working.",
-      },
-      {
-        title: "Priority organisation",
-        description:
-          "You help convert moving parts into clear ownership, sequence, and rhythm.",
-      },
-      {
-        title: "Scalable execution",
-        description:
-          "You make work easier to repeat, manage, and hand over.",
-      },
-    ],
-    OS7: [
-      {
-        title: "Quality judgement",
-        description:
-          "You protect standards, evidence, and responsible decision-making.",
-      },
-      {
-        title: "Risk awareness",
-        description:
-          "You notice weak points, assumptions, and areas that require validation.",
-      },
-      {
-        title: "Analytical discipline",
-        description:
-          "You bring care, review, and rigour to work that must be accurate.",
-      },
-    ],
-    OS8: [
-      {
-        title: "Continuous improvement",
-        description:
-          "You naturally see how work can be refined, sharpened, and improved.",
-      },
-      {
-        title: "Standards elevation",
-        description:
-          "You help teams raise quality and avoid settling for average execution.",
-      },
-      {
-        title: "Optimisation thinking",
-        description:
-          "You identify better ways to make outcomes cleaner, stronger, or more effective.",
-      },
-    ],
-  };
-
-  return map[code];
-}
-
-function getEnvironmentFit(code: McasOperatingStyleCode): McasEnvironmentFit {
-  const map: Record<McasOperatingStyleCode, McasEnvironmentFit> = {
-    OS1: {
-      pace: "Fast — opportunity-led movement with room to test.",
-      autonomy: "High — you perform best when trusted to initiate.",
-      structure: "Flexible — enough direction to focus, not enough to restrict movement.",
-      workStyle: "Entrepreneurial — growth, innovation, and new direction.",
-    },
-    OS2: {
-      pace: "Fast — visible momentum and active engagement.",
-      autonomy: "Moderate to high — room to activate people and ideas.",
-      structure: "Light to semi-structured — clear goals with energetic movement.",
-      workStyle: "Influence-led — communication, activation, and buy-in.",
-    },
-    OS3: {
-      pace: "Moderate — sustainable progress with people connection.",
-      autonomy: "Moderate — trusted ownership with relational awareness.",
-      structure: "Supportive — clear expectations and healthy team rhythms.",
-      workStyle: "Human-centred — engagement, support, and team commitment.",
-    },
-    OS4: {
-      pace: "Moderate to fast — structured momentum with room for relationship-building.",
-      autonomy: "High — you perform best when trusted to own your relationships and process.",
-      structure: "Semi-structured — clear goals with flexibility in how you achieve them.",
-      workStyle: "Collaborative — cross-functional, multi-stakeholder, purpose-aligned teams.",
-    },
-    OS5: {
-      pace: "Steady — consistent delivery with clear priorities.",
-      autonomy: "Moderate — ownership works best when expectations are clear.",
-      structure: "Clear — stable systems, defined outputs, and dependable rhythm.",
-      workStyle: "Delivery-led — practical execution and reliable completion.",
-    },
-    OS6: {
-      pace: "Structured — organised movement with clear sequencing.",
-      autonomy: "Moderate to high — best when trusted to build process.",
-      structure: "High — clear frameworks, repeatability, and operational rhythm.",
-      workStyle: "System-building — process, coordination, and scalable execution.",
-    },
-    OS7: {
-      pace: "Measured — enough time to validate, review, and protect quality.",
-      autonomy: "High — best when trusted for judgement and rigour.",
-      structure: "Clear — evidence, standards, and decision criteria matter.",
-      workStyle: "Analytical — quality, risk, validation, and responsible judgement.",
-    },
-    OS8: {
-      pace: "Focused — improvement cycles with room to refine.",
-      autonomy: "Moderate to high — best when trusted to improve the work.",
-      structure: "Defined but adaptable — standards with room for iteration.",
-      workStyle: "Improvement-led — optimisation, refinement, and quality elevation.",
-    },
-  };
-
-  return map[code];
-}
-
-function getRoleRecommendations(
-  code: McasOperatingStyleCode
-): McasRoleRecommendation[] {
-  const map: Record<McasOperatingStyleCode, McasRoleRecommendation[]> = {
-    OS1: [
-      {
-        category: "Growth & Innovation",
-        title: "Innovation Lead",
-        description: "New direction, opportunity testing, strategic movement.",
-      },
-      {
-        category: "Commercial",
-        title: "Business Development Lead",
-        description: "Market openings, opportunity creation, early momentum.",
-      },
-      {
-        category: "Strategy",
-        title: "Venture Builder",
-        description: "New initiatives, experimentation, future-facing work.",
-      },
-    ],
-    OS2: [
-      {
-        category: "Sales & Growth",
-        title: "Growth Manager",
-        description: "Activation, visibility, and momentum building.",
-      },
-      {
-        category: "Marketing",
-        title: "Campaign Lead",
-        description: "Audience energy, communication, and traction.",
-      },
-      {
-        category: "Change",
-        title: "Change Activation Lead",
-        description: "Mobilising people around a new direction.",
-      },
-    ],
-    OS3: [
-      {
-        category: "People & Culture",
-        title: "Employee Experience Lead",
-        description: "Engagement, morale, belonging, and human sustainability.",
-      },
-      {
-        category: "Leadership",
-        title: "Team Lead",
-        description: "People support, trust, and team commitment.",
-      },
-      {
-        category: "Customer",
-        title: "Community Manager",
-        description: "Relationship energy, care, and sustained engagement.",
-      },
-    ],
-    OS4: [
-      {
-        category: "People & Culture",
-        title: "People Partner",
-        description: "Cross-functional alignment, talent advocacy.",
-      },
-      {
-        category: "Programme Management",
-        title: "Programme Lead",
-        description: "Multi-team delivery, stakeholder management.",
-      },
-      {
-        category: "Strategy & Operations",
-        title: "Chief of Staff",
-        description: "Executive alignment, operational bridging.",
-      },
-      {
-        category: "Customer Success",
-        title: "CS Director",
-        description: "Relationship-led retention and growth.",
-      },
-      {
-        category: "Communications",
-        title: "Comms Lead",
-        description: "Narrative clarity, internal alignment.",
-      },
-      {
-        category: "Consulting",
-        title: "Senior Consultant",
-        description: "Client alignment, delivery ownership.",
-      },
-    ],
-    OS5: [
-      {
-        category: "Operations",
-        title: "Operations Lead",
-        description: "Reliable delivery, consistency, and practical execution.",
-      },
-      {
-        category: "Service Delivery",
-        title: "Delivery Manager",
-        description: "Output ownership, follow-through, and delivery rhythm.",
-      },
-      {
-        category: "Customer Operations",
-        title: "Client Delivery Lead",
-        description: "Dependable execution and service stability.",
-      },
-    ],
-    OS6: [
-      {
-        category: "Operations",
-        title: "Operations Manager",
-        description: "Process, structure, and repeatable delivery.",
-      },
-      {
-        category: "Project Management",
-        title: "PMO Lead",
-        description: "Coordination, governance, and execution systems.",
-      },
-      {
-        category: "Business Systems",
-        title: "Process Improvement Lead",
-        description: "Workflow design, structure, and scalable operations.",
-      },
-    ],
-    OS7: [
-      {
-        category: "Risk & Quality",
-        title: "Quality Assurance Lead",
-        description: "Evidence, standards, validation, and review.",
-      },
-      {
-        category: "Finance / Analysis",
-        title: "Business Analyst",
-        description: "Analytical review, data-led decisions, and judgement.",
-      },
-      {
-        category: "Governance",
-        title: "Risk Manager",
-        description: "Control, risk visibility, and responsible decision support.",
-      },
-    ],
-    OS8: [
-      {
-        category: "Improvement",
-        title: "Continuous Improvement Lead",
-        description: "Refinement, optimisation, and standards elevation.",
-      },
-      {
-        category: "Product",
-        title: "Product Optimisation Lead",
-        description: "Iteration, quality improvement, and user outcome refinement.",
-      },
-      {
-        category: "Operations",
-        title: "Performance Improvement Manager",
-        description: "Efficiency, quality, and better operating outcomes.",
-      },
-    ],
-  };
-
-  return map[code];
-}
-
-function getBlindSpots(code: McasOperatingStyleCode): McasBlindSpot[] {
-  const fallback: McasBlindSpot[] = [
-    {
-      title: "Overusing your strongest pattern",
-      description:
-        "Your strongest work pattern can become a limitation if it is applied automatically in every situation.",
-      managementStrategy:
-        "Pause before reacting and ask: what does this situation need from the full work cycle, not only from my strongest pattern?",
-    },
-    {
-      title: "Under-supporting weaker work areas",
-      description:
-        "Some parts of the work cycle may need conscious structure, partnership, or review.",
-      managementStrategy:
-        "Build simple checkpoints or partner with people whose natural strengths cover the areas you underuse.",
-    },
-  ];
-
-  if (code !== "OS4") return fallback;
-
-  return [
-    {
-      title: "Authority understatement",
-      description:
-        "You may avoid taking a clear directional position when one is needed. Your instinct to maintain harmony can read as indecision in high-stakes moments.",
-      managementStrategy:
-        'Practice stating your position clearly before inviting input: "My recommendation is X — here is why, and I want to hear your concerns."',
-    },
-    {
-      title: "Silent overload absorption",
-      description:
-        "You may absorb more relational and organisational complexity than is sustainable without flagging it.",
-      managementStrategy:
-        'Build a weekly check-in practice: "What am I carrying that is not mine to hold?" Name scope creep early and escalate with evidence.',
-    },
-    {
-      title: "Analytical coverage gap",
-      description:
-        "Deep analytical review and data-led quality assurance may require more conscious effort.",
-      managementStrategy:
-        "Partner intentionally with Analyst or Refiner patterns and build structured review checkpoints into your process.",
-    },
-    {
-      title: "Conflict deferral",
-      description:
-        "Your preference for harmony can lead to delaying necessary direct conversations.",
-      managementStrategy:
-        'Reframe directness as care: "Saying this now protects the relationship and the outcome."',
-    },
-  ];
-}
-
-function getSuccessGuide(code: McasOperatingStyleCode): McasSuccessGuideItem[] {
-  if (code !== "OS4") {
-    return [
-      {
-        period: "days_1_30",
-        title: "Understand your operating context",
-        description:
-          "Map what the role or environment needs from you. Notice where your strongest pattern is useful and where support may be needed.",
-      },
-      {
-        period: "days_31_60",
-        title: "Build your support structure",
-        description:
-          "Create simple habits, checkpoints, and partnerships that protect your strengths and reduce predictable friction.",
-      },
-      {
-        period: "days_61_90",
-        title: "Scale deliberately",
-        description:
-          "Use your strongest work pattern more intentionally. Expand responsibility without losing sustainability.",
-      },
-    ];
-  }
-
-  return [
-    {
-      period: "days_1_30",
-      title: "Map and listen",
-      description:
-        "Identify the key relationships and communication gaps in your environment. Build a simple map of who connects to whom and where misalignment exists. Do not fix yet — understand first.",
-    },
-    {
-      period: "days_31_60",
-      title: "Create your alignment structure",
-      description:
-        "Build the relational and process bridges your role requires. Establish your communication rhythms. Identify your Examine coverage gap and put a structure in place.",
-    },
-    {
-      period: "days_61_90",
-      title: "Lead with presence",
-      description:
-        "Shift attention to your authority pattern. Take at least one clear directional stance per week and begin reviewing your scope load.",
-    },
-  ];
 }
 
 function buildInternalSummary(
@@ -1516,68 +734,43 @@ export async function buildMcasReportPayload(
 ): Promise<McasReportPayload> {
   const reportType = args.reportType ?? "snapshot";
 
-let application: PartnerApplicationRow | null = null;
+  const assessment =
+    typeof args.token === "string"
+      ? await fetchAssessmentByReportToken(args.token)
+      : await fetchAssessmentById(args.assessmentId);
 
-if (typeof args.token === "string") {
-  application = await fetchApplicationByToken(args.token);
-} else if (typeof args.applicationId === "string") {
-  application = await fetchApplicationById(args.applicationId);
-} else {
-  throw new Error("Either token or applicationId is required.");
-}
-
-  if (!application) {
-    throw new Error("MCAS application not found.");
+  if (!assessment) throw new Error("MCAS assessment not found.");
+  if (!assessment.test_link_id) {
+    throw new Error(
+      "This report route expects a candidate assessment created from mcas.test_links."
+    );
   }
 
-  const assessment = await fetchAssessmentForApplication(application.id);
+  const [testLink, individual, result] = await Promise.all([
+    fetchTestLink(assessment.test_link_id),
+    fetchIndividual(assessment.individual_id),
+    fetchResultForAssessment(assessment.id),
+  ]);
 
-  if (!assessment) {
-    throw new Error("MCAS assessment not found for this application.");
-  }
+  if (!testLink) throw new Error("MCAS test link not found for this assessment.");
+  if (!result) throw new Error("MCAS result not found for this assessment.");
 
-  const result = await fetchResultForAssessment(assessment.id);
-
-  if (!result) {
-    throw new Error("MCAS result not found for this assessment.");
-  }
-
-  const orgSettings = await fetchOrgSettings(
-    application.org_id,
-    application.partner_key
-  );
-
-  const reportAccess = await fetchReportAccess(application.id);
-
-  const osDistribution = normaliseOperatingStyleDistribution(
-    result.os_distribution
-  );
+  const osDistribution = normaliseOperatingStyleDistribution(result.os_distribution);
   const coreDistribution = normaliseCoreDistribution(result.core_distribution);
-  const verticalDistribution = normaliseCareerVerticalDistribution(
-    result.vertical_readiness
-  );
+  const verticalDistribution = normaliseCareerVerticalDistribution(result.vertical_readiness);
 
   const primaryOperatingStyle = osDistribution[0];
   const secondaryOperatingStyle = osDistribution[1];
   const strongestCore = coreDistribution[0];
-  const weakestCore = [...coreDistribution].sort(
-    (a, b) => a.percentage - b.percentage
-  )[0];
-
+  const weakestCore = [...coreDistribution].sort((a, b) => a.percentage - b.percentage)[0];
   const primaryVertical = verticalDistribution[0];
   const nextVertical = verticalDistribution[1];
 
   if (!primaryOperatingStyle) {
     throw new Error("MCAS operating style distribution could not be resolved.");
   }
-
-  if (!strongestCore) {
-    throw new Error("MCAS CORE distribution could not be resolved.");
-  }
-
-  if (!primaryVertical) {
-    throw new Error("MCAS career vertical distribution could not be resolved.");
-  }
+  if (!strongestCore) throw new Error("MCAS CORE distribution could not be resolved.");
+  if (!primaryVertical) throw new Error("MCAS career vertical distribution could not be resolved.");
 
   const confidence = normaliseConfidence(result.confidence);
   const flags = normaliseFlags(result.flags);
@@ -1589,41 +782,39 @@ if (typeof args.token === "string") {
     flags
   );
 
-  const firstName = application.candidate_first_name;
-  const lastName = application.candidate_last_name;
+  const firstName = individual?.first_name ?? null;
+  const lastName = individual?.last_name ?? null;
+  const fullReportUnlocked = testLink.report_version === "full";
 
   return {
     reportType,
     reportVersion: DEFAULT_REPORT_VERSION,
 
     organisation: {
-      id: application.org_id ?? "unknown-org",
-      name:
-        orgSettings?.display_name ??
-        application.partner_key ??
-        "MindCanvas MCAS",
-      slug: orgSettings?.slug ?? application.partner_key,
-      branding: getBranding(orgSettings?.branding),
+      id: testLink.org_id,
+      name: "MindCanvas MCAS",
+      slug: undefined,
+      branding: undefined,
     },
 
     candidate: {
-      applicationId: application.id,
+      applicationId: assessment.id,
       firstName,
       lastName,
       fullName: toCandidateFullName(firstName, lastName),
-      email: application.candidate_email,
-      phone: application.candidate_phone,
+      email: individual?.email ?? null,
+      phone: getMetaCandidatePhone(assessment.meta),
     },
 
     assessment: {
       assessmentId: assessment.id,
-      status: assessment.status ?? "unknown",
+      status: assessment.status,
       startedAt: assessment.started_at,
-      completedAt: assessment.completed_at,
+      completedAt: assessment.completed_at ?? result.computed_at,
     },
 
     result: {
-      scoringModel: result.scoring_model ?? "mcas_v2",
+      scoringModel: result.scoring_model,
       operatingStyle: {
         primary: primaryOperatingStyle,
         secondary: secondaryOperatingStyle,
@@ -1638,13 +829,8 @@ if (typeof args.token === "string") {
         primary: primaryVertical,
         next: nextVertical,
         distribution: verticalDistribution,
-        readinessLabel: getVerticalReadinessLabel(
-          result.vertical_readiness,
-          primaryVertical.code
-        ),
-        readinessPercentage: getVerticalReadinessPercentage(
-          result.vertical_readiness
-        ),
+        readinessLabel: getVerticalReadinessLabel(primaryVertical.code),
+        readinessPercentage: undefined,
       },
       confidence,
       flags,
@@ -1668,10 +854,10 @@ if (typeof args.token === "string") {
     },
 
     access: {
-      snapshotUnlocked: reportAccess?.snapshot_unlocked ?? true,
-      fullUnlocked: reportAccess?.full_unlocked ?? false,
-      internalUnlocked: reportAccess?.internal_unlocked ?? true,
-      fullPurchaseEnabled: reportAccess?.full_purchase_enabled ?? true,
+      snapshotUnlocked: testLink.show_results,
+      fullUnlocked: fullReportUnlocked,
+      internalUnlocked: true,
+      fullPurchaseEnabled: true,
     },
   };
 }
@@ -1687,5 +873,5 @@ export async function buildMcasReportPayloadByApplicationId(
   applicationId: string,
   reportType: McasReportType = "internal_decision"
 ): Promise<McasReportPayload> {
-  return buildMcasReportPayload({ applicationId, reportType });
+  return buildMcasReportPayload({ assessmentId: applicationId, reportType });
 }

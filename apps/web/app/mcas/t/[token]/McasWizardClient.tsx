@@ -13,13 +13,15 @@ type Question = {
 
 type Props = {
   token: string;
-  application: {
-    partner_key: string | null;
-    application_id: string | null;
-    status: string | null;
-    candidate_first_name?: string | null;
-    candidate_last_name?: string | null;
-    candidate_email?: string | null;
+  testLink: {
+    id: string;
+    name: string;
+    link_type: string;
+    status: string;
+    recipient_email?: string | null;
+    report_version: "lite" | "full";
+    show_results: boolean;
+    next_steps_url?: string | null;
   };
   questions: Question[];
 };
@@ -27,9 +29,12 @@ type Props = {
 type SubmitResponse = {
   ok?: boolean;
   error?: string;
+  status?: string;
+  reportToken?: string;
   resultUrl?: string;
   snapshotUrl?: string;
   fullReportUrl?: string;
+  nextStepsUrl?: string | null;
   [key: string]: unknown;
 };
 
@@ -39,13 +44,14 @@ function getErrorMessage(error: unknown) {
   return "Something went wrong.";
 }
 
-function buildSnapshotUrl(token: string) {
-  return `/mcas/r/${encodeURIComponent(token)}/snapshot`;
+function fallbackSnapshotUrl(reportToken: string | undefined) {
+  if (!reportToken) return null;
+  return `/mcas/r/${encodeURIComponent(reportToken)}/snapshot`;
 }
 
 export default function McasWizardClient({
   token,
-  application,
+  testLink,
   questions,
 }: Props) {
   const router = useRouter();
@@ -56,18 +62,12 @@ export default function McasWizardClient({
   const [done, setDone] = useState<SubmitResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Intro fields
-  const [firstName, setFirstName] = useState(
-    application.candidate_first_name ?? ""
-  );
-  const [lastName, setLastName] = useState(
-    application.candidate_last_name ?? ""
-  );
-  const [email, setEmail] = useState(application.candidate_email ?? "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState(testLink.recipient_email ?? "");
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
 
-  // Answers keyed by question code
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const isIntro = step === "intro";
@@ -144,26 +144,23 @@ export default function McasWizardClient({
         throw new Error(json?.error || "Submit failed");
       }
 
-      const snapshotUrl =
+      const fallbackUrl = fallbackSnapshotUrl(json.reportToken);
+      const nextUrl =
         typeof json.resultUrl === "string" && json.resultUrl.trim().length > 0
           ? json.resultUrl
           : typeof json.snapshotUrl === "string" &&
               json.snapshotUrl.trim().length > 0
             ? json.snapshotUrl
-            : buildSnapshotUrl(token);
+            : fallbackUrl;
 
       setDone({
         ...json,
-        resultUrl: snapshotUrl,
-        snapshotUrl,
-        fullReportUrl:
-          typeof json.fullReportUrl === "string" &&
-          json.fullReportUrl.trim().length > 0
-            ? json.fullReportUrl
-            : `/mcas/r/${encodeURIComponent(token)}/full`,
+        resultUrl: nextUrl ?? undefined,
       });
 
-      router.push(snapshotUrl);
+      if (nextUrl) {
+        router.push(nextUrl);
+      }
     } catch (e: unknown) {
       setError(getErrorMessage(e));
     } finally {
@@ -175,9 +172,7 @@ export default function McasWizardClient({
     <div className="min-h-screen bg-[#060e16] text-white">
       <div className="mx-auto max-w-3xl px-6 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="text-sm text-white/70">
-            MCAS • {application.application_id ?? "Candidate Assessment"}
-          </div>
+          <div className="text-sm text-white/70">MCAS • {testLink.name}</div>
 
           <h1 className="mt-2 text-2xl font-semibold">
             MindCanvas CORE Alignment System
@@ -202,12 +197,15 @@ export default function McasWizardClient({
                 Thank you. Your responses have been recorded. We are opening
                 your report now.
               </div>
-              <a
-                href={done.snapshotUrl ?? buildSnapshotUrl(token)}
-                className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
-              >
-                Open my report
-              </a>
+
+              {done.resultUrl ? (
+                <a
+                  href={done.resultUrl}
+                  className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
+                >
+                  Open my report
+                </a>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -298,7 +296,7 @@ export default function McasWizardClient({
                 Question {index + 1} of {total} • {currentQuestion.code}
               </div>
               <div>
-                Answered:{" "}
+                Answered: {" "}
                 <span className="text-white">{progress.answeredCount}</span> /{" "}
                 {total}
               </div>
