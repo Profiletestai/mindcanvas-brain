@@ -646,28 +646,149 @@ function StrengthCompactCard({ strength }: { strength: McasStrength }) {
   );
 }
 
-function BlindSpotsSection({ blindSpots }: { blindSpots: McasBlindSpot[] }) {
+function blindSpotCards(blindSpots: McasBlindSpot[]) {
+  const extras: McasBlindSpot[] = [
+    {
+      title: "Over-refinement loop",
+      description:
+        "You may keep improving work beyond the point where the next useful step is release, feedback, or decision.",
+      managementStrategy:
+        "Define the standard needed for this stage before you refine. Ask whether the work needs precision, progress, or feedback.",
+    },
+    {
+      title: "Delayed release",
+      description:
+        "Your quality instinct can make it harder to move work forward while there are still visible gaps or imperfections.",
+      managementStrategy:
+        "Separate essential fixes from later improvements. Move forward when the work is safe, clear, and useful enough.",
+    },
+    {
+      title: "Standards friction",
+      description:
+        "You may experience frustration when others move quickly without checking the quality, logic, or sustainability of the work.",
+      managementStrategy:
+        "Name the standard clearly and explain why it matters. Turn the concern into a practical checkpoint instead of a blocker.",
+    },
+    {
+      title: "Improvement fatigue",
+      description:
+        "Constantly seeing what can be improved may become tiring for you and for the people around you.",
+      managementStrategy:
+        "Choose the few improvements that will create the most value. Let lower-impact refinements wait until the next review cycle.",
+    },
+  ];
+
+  const combined = [...blindSpots];
+
+  for (const extra of extras) {
+    if (combined.length >= 4) break;
+
+    const exists = combined.some(
+      (item) => item.title.toLowerCase() === extra.title.toLowerCase()
+    );
+
+    if (!exists) {
+      combined.push(extra);
+    }
+  }
+
+  return combined.slice(0, 4);
+}
+
+function blindSpotAccent(index: number) {
+  const accents = [
+    {
+      border: "#2563EB",
+      text: "#2563EB",
+    },
+    {
+      border: "#028F8B",
+      text: "#028F8B",
+    },
+    {
+      border: "#F59E0B",
+      text: "#F59E0B",
+    },
+    {
+      border: "#8B5CF6",
+      text: "#6F5CFF",
+    },
+  ];
+
+  return accents[index % accents.length];
+}
+
+function BlindSpotsSection({
+  blindSpots,
+}: {
+  blindSpots: McasBlindSpot[];
+}) {
+  const cards = blindSpotCards(blindSpots);
+
   return (
-    <SectionShell id="blind-spots" title="Your Blind Spots and How to Manage Them" icon="/mcas/report-icons/blind-spots.png">
-      <div className="space-y-6">
-        <p className="text-base leading-8 text-[#4A5568]">
-          Blind spots are not weaknesses. They are the natural shadow of your strengths — the places where your dominant pattern, applied without awareness, can create friction or limit impact.
+    <section
+      id="blind-spots"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/blind-spots.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your Blind Spots and How to Manage Them
+        </h2>
+      </div>
+
+      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <p className="mb-5 max-w-5xl text-[13px] leading-7 text-[#4A5568]">
+          Blind spots are not weaknesses. They are the natural shadow of your
+          strengths — the places where your dominant pattern, applied without
+          awareness, can create friction or limit impact.
         </p>
-        <div className="space-y-4">
-          {blindSpots.map((blindSpot, index) => (
-            <div key={blindSpot.title} className="rounded-2xl border border-[#E2E8F0] bg-white p-5">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">Blind Spot {String(index + 1).padStart(2, "0")}</p>
-              <h3 className="mt-3 text-xl font-black text-[#0D0F1C]">{blindSpot.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-[#4A5568]">{blindSpot.description}</p>
-              <div className="mt-5 rounded-2xl bg-[#EEEAFE] p-4">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#4A5568]">Management strategy</p>
-                <p className="mt-2 text-sm leading-7 text-[#4A5568]">{blindSpot.managementStrategy}</p>
+
+        <div className="space-y-3">
+          {cards.map((blindSpot, index) => {
+            const accent = blindSpotAccent(index);
+
+            return (
+              <div
+                key={`${blindSpot.title}-${index}`}
+                className="rounded-xl border bg-white px-5 py-4"
+                style={{ borderColor: accent.border }}
+              >
+                <p
+                  className="text-[10px] font-black uppercase leading-4 tracking-[0.22em]"
+                  style={{ color: accent.text }}
+                >
+                  Blind Spot {String(index + 1).padStart(2, "0")}
+                </p>
+
+                <h3 className="mt-2 text-[14px] font-black leading-5 text-[#0D0F1C]">
+                  {blindSpot.title}
+                </h3>
+
+                <p className="mt-2 text-[12px] leading-5 text-[#4A5568]">
+                  {blindSpot.description}
+                </p>
+
+                <p
+                  className="mt-3 text-[10px] font-black uppercase leading-4 tracking-[0.18em]"
+                  style={{ color: accent.text }}
+                >
+                  Management strategy
+                </p>
+
+                <p className="mt-1 text-[11px] leading-5 text-[#4A5568]">
+                  {blindSpot.managementStrategy}
+                </p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
-    </SectionShell>
+    </section>
   );
 }
 
@@ -884,3 +1005,4 @@ export default async function McasFullReportPage({ params }: PageProps) {
     </main>
   );
 }
+
