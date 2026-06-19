@@ -792,26 +792,144 @@ function BlindSpotsSection({
   );
 }
 
+function roleCardsForDisplay(
+  roles: McasRoleRecommendation[]
+): McasRoleRecommendation[] {
+  const fallbacks: McasRoleRecommendation[] = [
+    {
+      category: "People & Culture",
+      title: "People Partner",
+      description: "Cross-functional alignment, talent advocacy",
+    },
+    {
+      category: "Programme Management",
+      title: "Programme Lead",
+      description: "Multi-team delivery, stakeholder management",
+    },
+    {
+      category: "Strategy & Operations",
+      title: "Chief of Staff",
+      description: "Executive alignment, operational bridging",
+    },
+    {
+      category: "Customer Success",
+      title: "CS Director",
+      description: "Relationship-led retention and growth",
+    },
+    {
+      category: "Communications",
+      title: "Comms Lead",
+      description: "Narrative clarity, internal alignment",
+    },
+    {
+      category: "Consulting",
+      title: "Senior Consultant",
+      description: "Client alignment, delivery ownership",
+    },
+  ];
+
+  const combined = [...roles];
+
+  for (const fallback of fallbacks) {
+    if (combined.length >= 6) break;
+
+    const exists = combined.some(
+      (item) =>
+        item.title.toLowerCase() === fallback.title.toLowerCase() ||
+        item.category.toLowerCase() === fallback.category.toLowerCase()
+    );
+
+    if (!exists) {
+      combined.push(fallback);
+    }
+  }
+
+  return combined.slice(0, 6);
+}
+
 function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
+  const cards = roleCardsForDisplay(roles);
+  const leftCards = [cards[0], cards[2], cards[4]].filter(
+    (item): item is McasRoleRecommendation => Boolean(item)
+  );
+  const rightCards = [cards[1], cards[3], cards[5]].filter(
+    (item): item is McasRoleRecommendation => Boolean(item)
+  );
+
   return (
-    <SectionShell id="roles" title="Your Best Fit Work and Roles" icon="/mcas/report-icons/recommended-roles-pathways.png">
-      <div className="grid gap-6 lg:grid-cols-[1fr_220px_1fr]">
-        <div className="space-y-4">{roles.slice(0, 3).map((role) => <RoleCard key={`${role.category}-${role.title}`} role={role} />)}</div>
-        <div className="hidden items-center justify-center lg:flex">
-          <img src="/mcas/report-icons/recommended-roles-pathways.png" alt="" className="max-h-56 w-full object-contain" />
-        </div>
-        <div className="space-y-4">{roles.slice(3, 6).map((role) => <RoleCard key={`${role.category}-${role.title}`} role={role} />)}</div>
+    <section
+      id="roles"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/role-fit.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your Best Fit Work and Roles
+        </h2>
       </div>
-    </SectionShell>
+
+      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <div className="grid gap-6 lg:grid-cols-[1fr_230px_1fr] lg:items-center">
+          <div className="space-y-8">
+            {leftCards.map((role) => (
+              <div key={`${role.category}-${role.title}`} className="relative lg:pr-8">
+                <div className="hidden lg:block absolute right-0 top-1/2 h-[2px] w-8 -translate-y-1/2 bg-[#6F5CFF]" />
+                <RoleDiagramCard role={role} align="left" />
+              </div>
+            ))}
+          </div>
+
+          <div className="relative hidden h-full min-h-[330px] items-center justify-center lg:flex">
+            <img
+              src="/mcas/graphics/best-fit-work.png"
+              alt="Best fit work"
+              className="h-auto w-full max-w-[210px] object-contain"
+            />
+          </div>
+
+          <div className="space-y-8">
+            {rightCards.map((role) => (
+              <div key={`${role.category}-${role.title}`} className="relative lg:pl-8">
+                <div className="hidden lg:block absolute left-0 top-1/2 h-[2px] w-8 -translate-y-1/2 bg-[#6F5CFF]" />
+                <RoleDiagramCard role={role} align="right" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
-function RoleCard({ role }: { role: McasRoleRecommendation }) {
+function RoleDiagramCard({
+  role,
+  align,
+}: {
+  role: McasRoleRecommendation;
+  align: "left" | "right";
+}) {
   return (
-    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">{role.category}</p>
-      <h3 className="mt-3 text-lg font-black leading-6 text-[#0D0F1C]">{role.title}</h3>
-      <p className="mt-2 text-sm leading-7 text-[#4A5568]">{role.description}</p>
+    <div
+      className={[
+        "rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]",
+        align === "left" ? "lg:mr-4" : "lg:ml-4",
+      ].join(" ")}
+    >
+      <p className="text-[10px] font-black uppercase leading-4 tracking-[0.22em] text-[#2F6FB8]">
+        {role.category}
+      </p>
+
+      <h3 className="mt-2 text-[14px] font-black leading-5 text-[#0D0F1C]">
+        {role.title}
+      </h3>
+
+      <p className="mt-2 text-[12px] leading-5 text-[#5A5F7E]">
+        {role.description}
+      </p>
     </div>
   );
 }
