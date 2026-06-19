@@ -457,42 +457,105 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
 }
 
 function CoreBalanceSection({ payload }: { payload: McasReportPayload }) {
+  const byCode = new Map(
+    payload.result.core.distribution.map((item) => [item.code, item])
+  );
+
+  const orderedItems = (
+    ["CREATE", "ORGANISE", "RESOLVE", "EXAMINE"] as McasCoreCode[]
+  )
+    .map((code) => byCode.get(code))
+    .filter(
+      (item): item is McasDistributionItem<McasCoreCode> => item !== undefined
+    );
+
   return (
-    <SectionShell id="core-balance" title="Your CORE Behavioural Balance" icon="/mcas/report-icons/core-behavioural-balance.png">
-      <div className="space-y-7">
-        <p className="text-base leading-8 text-[#4A5568]">
-          The CORE system maps which parts of the work cycle you naturally drive, support, or under-cover.
+    <section
+      id="core-balance"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/core-behavioural-balance.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your CORE Behavioural Balance
+        </h2>
+      </div>
+
+      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <p className="mb-6 text-[13px] leading-7 text-[#4A5568]">
+          The CORE system maps which parts of the work cycle the candidate
+          naturally drives, supports, or under-covers.
         </p>
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <WorkCycleCoverage items={payload.result.core.distribution} title="CORE Balance" />
-          <CoreCoverage items={payload.result.core.distribution} />
+
+        <div className="grid items-center gap-8 lg:grid-cols-[360px_1fr]">
+          <div className="flex justify-center">
+            <img
+              src="/mcas/graphics/your-core-behaviour.png"
+              alt="Your CORE behaviour"
+              className="h-auto max-h-[260px] w-full max-w-[330px] object-contain"
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {orderedItems.map((item) => (
+              <CoreCompactCard key={item.code} item={item} />
+            ))}
+          </div>
         </div>
       </div>
-    </SectionShell>
+    </section>
   );
 }
 
-function CoreCoverage({ items }: { items: McasDistributionItem<McasCoreCode>[] }) {
+function CoreCompactCard({
+  item,
+}: {
+  item: McasDistributionItem<McasCoreCode>;
+}) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {items.map((item) => (
-        <div key={item.code} className="rounded-2xl border border-[#E2E8F0] bg-white p-5">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <img src={CORE_IMAGES[item.code]} alt="" className="h-10 w-10 rounded-xl object-cover" />
-              <div>
-                <p className="text-lg font-black text-[#0D0F1C]">{item.label}</p>
-                <p className="mt-1 text-sm font-bold text-[#718096]">{item.percentage}% · {bandLabel(item.band)}</p>
-              </div>
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+      <div className="mb-3 flex items-start gap-3">
+        <img
+          src={CORE_IMAGES[item.code]}
+          alt=""
+          className="h-8 w-8 rounded-lg object-cover"
+        />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-black leading-4 text-[#0D0F1C]">
+                {item.label}
+              </p>
+              <p className="mt-1 text-[11px] font-bold leading-4 text-[#6F5CFF]">
+                {item.percentage}% · {bandLabel(item.band)}
+              </p>
             </div>
-            <span className="rounded-full bg-[#6F5CFF]/10 px-3 py-1 text-xs font-bold uppercase text-[#6F5CFF]">{CORE_SHORT[item.code]}</span>
+
+            <span className="rounded-md bg-[#6F5CFF]/10 px-2 py-1 text-[10px] font-bold uppercase text-[#6F5CFF]">
+              {CORE_SHORT[item.code]}
+            </span>
           </div>
-          <div className="mb-4 h-2 overflow-hidden rounded-full bg-[#EFF1F5]">
-            <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: CORE_COLOURS[item.code] }} />
+
+          <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#EFF1F5]">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${pct(item.percentage)}%`,
+                backgroundColor: CORE_COLOURS[item.code],
+              }}
+            />
           </div>
-          <p className="text-sm leading-7 text-[#4A5568]">{item.description}</p>
         </div>
-      ))}
+      </div>
+
+      <p className="text-[11px] leading-5 text-[#4A5568]">
+        {item.description}
+      </p>
     </div>
   );
 }
