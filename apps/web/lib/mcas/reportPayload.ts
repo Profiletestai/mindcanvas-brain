@@ -1605,8 +1605,9 @@ export async function buildMcasReportPayload(
       fullUnlocked: fullReportUnlocked,
       internalUnlocked: true,
       fullPurchaseEnabled: true,
+      nextStepsUrl: testLink?.next_steps_url ?? null,
     },
-  };
+  } as unknown as McasReportPayload;
 }
 
 export async function buildMcasReportPayloadByToken(

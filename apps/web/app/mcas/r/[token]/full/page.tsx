@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
+import DownloadPdfButton from "./DownloadPdfButton";
 import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
 import type {
   McasBlindSpot,
@@ -154,10 +155,10 @@ function ReportHeader({ payload }: { payload: McasReportPayload }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-3 xl:justify-end">
-            <a href="#download" className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
+          <div className="mcas-no-print flex flex-wrap gap-3 xl:justify-end">
+            <DownloadPdfButton className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
               Download PDF
-            </a>
+            </DownloadPdfButton>
             <a href="#pathway" className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white">
               Next steps
             </a>
@@ -486,7 +487,7 @@ function AfterHeroInfoCard({
   );
 }
 
-function SidebarIndex({ token }: { token: string }) {
+function SidebarIndex({ token, nextStepsUrl }: { token: string; nextStepsUrl?: string | null }) {
   const links = [
     ["orientation", "Welcome and Orientation"],
     ["plain-language", "Your Work Pattern in Plain Language"],
@@ -500,7 +501,7 @@ function SidebarIndex({ token }: { token: string }) {
   ];
 
   return (
-    <aside className="rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
+    <aside className="mcas-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
       <nav className="space-y-2">
         {links.map(([href, label], index) => (
@@ -510,8 +511,15 @@ function SidebarIndex({ token }: { token: string }) {
         ))}
       </nav>
       <div className="mt-6 space-y-2">
-        <a id="download" href="#" className="block rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">Download PDF</a>
-        <a href={`/mcas/r/${token}/snapshot`} className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white">View Snapshot</a>
+        <DownloadPdfButton className="block w-full rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">
+          Download PDF
+        </DownloadPdfButton>
+        <a
+          href={nextStepsUrl || `/mcas/r/${token}/snapshot`}
+          className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white"
+        >
+          Next Steps
+        </a>
       </div>
     </aside>
   );
@@ -1052,28 +1060,28 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
       </div>
 
       <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
-        <div className="grid gap-6 lg:grid-cols-[1fr_230px_1fr] lg:items-center">
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px_1fr] lg:items-center">
           <div className="space-y-8">
             {leftCards.map((role) => (
               <div key={`${role.category}-${role.title}`} className="relative lg:pr-8">
-                <div className="hidden lg:block absolute right-0 top-1/2 h-[2px] w-8 -translate-y-1/2 bg-[#6F5CFF]" />
+                <div className="hidden lg:block absolute right-0 top-1/2 h-[2px] w-10 -translate-y-1/2 bg-[#6F5CFF]" />
                 <RoleDiagramCard role={role} align="left" />
               </div>
             ))}
           </div>
 
-          <div className="relative hidden h-full min-h-[330px] items-center justify-center lg:flex">
+          <div className="relative hidden h-full min-h-[380px] items-center justify-center lg:flex">
             <img
               src="/mcas/graphics/best-fit-work.png"
               alt="Best fit work"
-              className="h-auto w-full max-w-[210px] object-contain"
+              className="h-auto w-full max-w-[330px] object-contain"
             />
           </div>
 
           <div className="space-y-8">
             {rightCards.map((role) => (
               <div key={`${role.category}-${role.title}`} className="relative lg:pl-8">
-                <div className="hidden lg:block absolute left-0 top-1/2 h-[2px] w-8 -translate-y-1/2 bg-[#6F5CFF]" />
+                <div className="hidden lg:block absolute left-0 top-1/2 h-[2px] w-10 -translate-y-1/2 bg-[#6F5CFF]" />
                 <RoleDiagramCard role={role} align="right" />
               </div>
             ))}
@@ -1742,15 +1750,15 @@ export default async function McasFullReportPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
-      <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
+    <main className="mcas-report-page min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
+      <div className="mcas-report-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
         <ReportHeader payload={payload} />
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
         <AfterHeroSummary payload={payload} />
 
-        <div className="grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
-          <SidebarIndex token={token} />
+        <div className="mcas-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
+          <SidebarIndex token={token} nextStepsUrl={(payload.access as { nextStepsUrl?: string | null }).nextStepsUrl} />
           <div className="space-y-8">
             <OrientationSection />
             <PlainLanguageSection payload={payload} />
