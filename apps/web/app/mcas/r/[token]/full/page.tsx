@@ -934,55 +934,215 @@ function RoleDiagramCard({
   );
 }
 
+function verticalLevelNumber(code: string) {
+  const value = Number(String(code || "").replace("V", ""));
+  return Number.isFinite(value) ? value : 0;
+}
+
+function careerVerticalStatusMeta(
+  level: number,
+  primaryLevel: number,
+  readinessPercentage?: number
+) {
+  if (level < primaryLevel) {
+    return {
+      label: "Completed",
+      barWidth: 100,
+      barColor: "#5B5CFF",
+      rowTone: "completed" as const,
+      pillClass: "bg-[#ECEAFE] text-[#5B5CFF]",
+      numberClass: "border-[#A5B4FC] bg-white text-[#5B5CFF]",
+    };
+  }
+
+  if (level === primaryLevel) {
+    return {
+      label: "Current Fit",
+      barWidth: 100,
+      barColor: "#5B5CFF",
+      rowTone: "current" as const,
+      pillClass: "bg-[#111827] text-white",
+      numberClass: "bg-[#0D1B2A] text-white border-[#0D1B2A]",
+    };
+  }
+
+  if (level === primaryLevel + 1) {
+    const width = typeof readinessPercentage === "number" ? Math.max(18, Math.min(100, Math.round(readinessPercentage))) : 38;
+    return {
+      label: "Stretch with support",
+      barWidth: width,
+      barColor: "#F59E0B",
+      rowTone: "stretch" as const,
+      pillClass: "bg-[#FFF3D6] text-[#C56A00]",
+      numberClass: "border-[#F8D58A] bg-[#FFF7E5] text-[#C56A00]",
+    };
+  }
+
+  if (level === primaryLevel + 2) {
+    return {
+      label: "Overreach risk",
+      barWidth: 22,
+      barColor: "#CBD5E1",
+      rowTone: "future" as const,
+      pillClass: "bg-[#F1F5F9] text-[#64748B]",
+      numberClass: "border-[#E2E8F0] bg-[#F8FAFC] text-[#64748B]",
+    };
+  }
+
+  return {
+    label: "Not indicated",
+    barWidth: 8,
+    barColor: "#E2E8F0",
+    rowTone: "future" as const,
+    pillClass: "bg-[#F8FAFC] text-[#94A3B8]",
+    numberClass: "border-[#E2E8F0] bg-[#F8FAFC] text-[#94A3B8]",
+  };
+}
+
+function VerticalInfoChip({
+  icon,
+  title,
+  description,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-[#D9E2F1] bg-white px-4 py-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-lg font-bold text-white">
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4338CA]">
+          {title}
+        </p>
+        <p className="mt-1 text-[11px] leading-4 text-[#4A5568]">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   const primary = payload.result.careerVertical.primary;
+  const readinessPercentage = payload.result.careerVertical.readinessPercentage;
   const order = ["V1", "V2", "V3", "V4", "V5", "V6"] as const;
-  const primaryLevel = Number(primary.code.replace("V", ""));
+  const primaryLevel = verticalLevelNumber(primary.code);
 
   const verticals = order.map((code) => {
-    return payload.result.careerVertical.distribution.find((item) => item.code === code) ?? {
-      code,
-      label: code,
-      percentage: 0,
-      rank: 99,
-      band: "low" as const,
-      description: "",
-    };
+    return (
+      payload.result.careerVertical.distribution.find((item) => item.code === code) ?? {
+        code,
+        label: code,
+        percentage: 0,
+        rank: 99,
+        band: "low" as const,
+        description: "",
+      }
+    );
   });
 
   return (
-    <SectionShell id="vertical" title="Your Career Vertical Fit Today" icon="/mcas/report-icons/career-vertical-fit.png">
-      <div className="space-y-7">
-        <p className="text-base leading-8 text-[#4A5568]">
-          Progression changes work itself. Higher verticals increase ambiguity, scope, and accountability. Your current indication is{" "}
-          <strong className="text-[#0D0F1C]">{primary.code} — {primary.label}</strong>.
+    <SectionShell
+      id="vertical"
+      title="Your Career Vertical Fit Today"
+      icon="/mcas/report-icons/career-vertical-fit.png"
+    >
+      <div className="space-y-6">
+        <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#FCFCFF] p-4 md:p-5">
+          <img
+            src="/mcas/graphics/career-vertical-fit.png"
+            alt="Career vertical fit"
+            className="w-full rounded-xl object-contain"
+          />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <VerticalInfoChip
+            icon="↗"
+            title="Increasing Scope"
+            description="Wider impact and responsibility"
+          />
+          <VerticalInfoChip
+            icon="◎"
+            title="Increasing Complexity"
+            description="More variables and interdependencies."
+          />
+          <VerticalInfoChip
+            icon="★"
+            title="Increasing Accountability"
+            description="Greater ownership and outcomes."
+          />
+        </div>
+
+        <p className="text-[14px] leading-7 text-[#4A5568]">
+          Progression changes work itself. Higher verticals increase ambiguity,
+          scope, and accountability.
         </p>
-        <div className="relative overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
-          <div className="absolute inset-x-8 bottom-8 h-24 rounded-full bg-gradient-to-r from-[#45E0D1]/20 via-[#6F5CFF]/25 to-[#8B5CF6]/40 blur-2xl" />
-          <div className="relative grid gap-4 md:grid-cols-6">
-            {verticals.map((item) => {
-              const isPrimary = item.code === primary.code;
-              const level = Number(item.code.replace("V", ""));
-              const isPast = level < primaryLevel;
-              return (
-                <div key={item.code} className={["min-h-[150px] rounded-2xl p-4", isPrimary ? "bg-[#6F5CFF] text-white shadow-lg" : "bg-white text-[#0D1B2A]"].join(" ")}>
-                  <p className="text-lg font-black">{item.code}</p>
-                  <p className="mt-1 text-sm font-bold leading-5">{item.label}</p>
-                  <p className={["mt-3 text-xs leading-5", isPrimary ? "text-white/80" : "text-[#718096]"].join(" ")}>{item.description}</p>
-                  <p className={["mt-4 text-[11px] font-bold uppercase tracking-[0.16em]", isPrimary ? "text-white" : isPast ? "text-[#028F8B]" : "text-[#718096]"].join(" ")}>
-                    {isPrimary ? "Current Fit" : isPast ? "Completed" : "Stretch"}
+
+        <div className="space-y-3">
+          {verticals.map((item) => {
+            const level = verticalLevelNumber(item.code);
+            const meta = careerVerticalStatusMeta(
+              level,
+              primaryLevel,
+              readinessPercentage
+            );
+
+            return (
+              <div
+                key={item.code}
+                className={[
+                  "grid items-center gap-3 rounded-2xl border px-4 py-3 md:grid-cols-[auto_1.5fr_1fr_auto]",
+                  level === primaryLevel
+                    ? "border-[#5B5CFF] bg-[#F5F3FF]"
+                    : "border-transparent bg-white",
+                ].join(" ")}
+              >
+                <div
+                  className={[
+                    "flex h-8 w-8 items-center justify-center rounded-full border text-sm font-black",
+                    meta.numberClass,
+                  ].join(" ")}
+                >
+                  {level < primaryLevel ? "✓" : level}
+                </div>
+
+                <div>
+                  <p className="text-[14px] font-black text-[#0D0F1C]">
+                    {item.code} · {item.label}
+                  </p>
+                  <p className="mt-1 text-[12px] leading-5 text-[#718096]">
+                    {item.description}
                   </p>
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="w-full">
+                  <div className="h-[3px] w-full overflow-hidden rounded-full bg-[#E2E8F0]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${meta.barWidth}%`,
+                        backgroundColor: meta.barColor,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <span
+                    className={[
+                      "inline-flex rounded-md px-3 py-1 text-[10px] font-bold",
+                      meta.pillClass,
+                    ].join(" ")}
+                  >
+                    {meta.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        {payload.result.careerVertical.readinessLabel ? (
-          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EEEAFE] p-5">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#6F5CFF]">Readiness note</p>
-            <p className="mt-2 text-sm leading-7 text-[#4A5568]">{payload.result.careerVertical.readinessLabel}</p>
-          </div>
-        ) : null}
       </div>
     </SectionShell>
   );
