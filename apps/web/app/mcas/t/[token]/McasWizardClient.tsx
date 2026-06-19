@@ -159,7 +159,7 @@ export default function McasWizardClient({
       });
 
       if (nextUrl) {
-        router.push(nextUrl);
+        router.replace(nextUrl);
       }
     } catch (e: unknown) {
       setError(getErrorMessage(e));

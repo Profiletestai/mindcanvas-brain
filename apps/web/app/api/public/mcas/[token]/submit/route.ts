@@ -578,7 +578,9 @@ export async function POST(req: Request, ctx: RouteContext) {
     const { snapshotUrl, fullReportUrl } = buildReportUrls(reportToken);
 
     const resultUrl = testLink.show_results
-      ? snapshotUrl
+      ? testLink.report_version === "full"
+        ? fullReportUrl
+        : snapshotUrl
       : testLink.next_steps_url || snapshotUrl;
 
     return NextResponse.json({
@@ -591,6 +593,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       fullReportUrl,
       nextStepsUrl: testLink.next_steps_url,
       reportVersion: testLink.report_version,
+      showResults: testLink.show_results,
       scoring_model: scoringModel,
       scores: {
         core: coreDistribution,
