@@ -1148,56 +1148,361 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-function SuccessGuideSection({ successGuide }: { successGuide: McasSuccessGuideItem[] }) {
+const SUCCESS_GUIDE_IMAGES = [
+  "/mcas/graphics/map-listen.png",
+  "/mcas/graphics/create-alignment.png",
+  "/mcas/graphics/lead-with-presence.png",
+];
+
+function successGuideCards(
+  successGuide: McasSuccessGuideItem[]
+): McasSuccessGuideItem[] {
+  const defaults: McasSuccessGuideItem[] = [
+    {
+      period: "days_1_30",
+      title: "Map & listen",
+      description:
+        "Identify the key relationships and communication gaps in your environment. Build a simple map of who connects to whom and where misalignment exists.",
+    },
+    {
+      period: "days_31_60",
+      title: "Create your alignment structure",
+      description:
+        "Build the relational and process bridges your role requires. Establish your communication rhythms.",
+    },
+    {
+      period: "days_61_90",
+      title: "Lead with presence",
+      description:
+        "Expand your impact by taking clear directional stances and reviewing how your work is landing across the system.",
+    },
+  ];
+
+  return defaults.map((fallback, index) => successGuide[index] ?? fallback);
+}
+
+function successGuideTone(index: number) {
+  const tones = [
+    {
+      bg: "#EAF8F5",
+      label: "#028F8B",
+    },
+    {
+      bg: "#F5F8FC",
+      label: "#2563EB",
+    },
+    {
+      bg: "#FFF8EA",
+      label: "#F59E0B",
+    },
+  ];
+
+  return tones[index % tones.length];
+}
+
+function SuccessGuideSection({
+  successGuide,
+}: {
+  successGuide: McasSuccessGuideItem[];
+}) {
+  const cards = successGuideCards(successGuide);
+
   return (
-    <SectionShell id="success-guide" title="Your 30 / 60 / 90 Day Success Guide" icon="/mcas/report-icons/success-guide.png">
-      <div className="grid gap-5 lg:grid-cols-3">
-        {successGuide.map((item) => (
-          <div key={item.period} className="rounded-2xl border border-[#E2E8F0] bg-white p-5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">{periodLabel(item.period)}</p>
-            <h3 className="mt-4 text-xl font-black leading-7 text-[#0D0F1C]">{item.title}</h3>
-            <p className="mt-4 text-sm leading-7 text-[#4A5568]">{item.description}</p>
-          </div>
-        ))}
+    <section
+      id="success-guide"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/success-guide.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your 30 / 60 / 90 Day Success Guide
+        </h2>
       </div>
-    </SectionShell>
+
+      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <div className="relative mb-8 hidden px-8 md:block">
+          <div className="absolute left-[12%] right-[12%] top-[94px] h-[3px] rounded-full bg-gradient-to-r from-[#028F8B] via-[#4F7DFF] to-[#F59E0B]" />
+
+          <div className="relative grid grid-cols-3 gap-8">
+            {cards.map((item, index) => (
+              <div key={`${item.period}-timeline`} className="text-center">
+                <img
+                  src={SUCCESS_GUIDE_IMAGES[index]}
+                  alt=""
+                  className="mx-auto h-[94px] w-[94px] rounded-full object-contain"
+                />
+
+                <div
+                  className={[
+                    "relative z-10 mx-auto -mt-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white",
+                    index === 0
+                      ? "bg-[#028F8B]"
+                      : index === 1
+                        ? "bg-[#6F5CFF]"
+                        : "bg-[#F59E0B]",
+                  ].join(" ")}
+                >
+                  {index + 1}
+                </div>
+
+                <p
+                  className={[
+                    "mx-auto mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]",
+                    index === 0
+                      ? "bg-[#EAF8F5] text-[#028F8B]"
+                      : index === 1
+                        ? "bg-[#EEEAFE] text-[#6F5CFF]"
+                        : "bg-[#FFF3D6] text-[#F59E0B]",
+                  ].join(" ")}
+                >
+                  {periodLabel(item.period)}
+                </p>
+
+                <h3 className="mt-2 text-[14px] font-black leading-5 text-[#0D0F1C]">
+                  {item.title}
+                </h3>
+
+                <p className="mt-1 text-[11px] leading-4 text-[#4A5568]">
+                  {index === 0
+                    ? "Understand the landscape."
+                    : index === 1
+                      ? "Build the structure."
+                      : "Expand your impact."}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid overflow-hidden rounded-xl border border-[#E2E8F0] md:grid-cols-3">
+          {cards.map((item, index) => {
+            const tone = successGuideTone(index);
+
+            return (
+              <div
+                key={item.period}
+                className="p-5"
+                style={{ backgroundColor: tone.bg }}
+              >
+                <p
+                  className="text-[10px] font-black uppercase leading-4 tracking-[0.2em]"
+                  style={{ color: tone.label }}
+                >
+                  {periodLabel(item.period)}
+                </p>
+
+                <h3 className="mt-3 text-[14px] font-black leading-5 text-[#0D0F1C]">
+                  {item.title}
+                </h3>
+
+                <p className="mt-3 text-[12px] leading-6 text-[#4A5568]">
+                  {item.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
+function verticalCodeFromLevel(level: number) {
+  const safeLevel = Math.max(1, Math.min(6, Math.round(level)));
+  return `V${safeLevel}`;
+}
+
+function verticalLevelFromCode(code: string) {
+  const value = Number(String(code || "").replace("V", ""));
+  return Number.isFinite(value) ? value : 1;
+}
+
+function verticalSummaryForCode(payload: McasReportPayload, code: string) {
+  const item = payload.result.careerVertical.distribution.find(
+    (vertical) => vertical.code === code
+  );
+
+  if (item) {
+    return {
+      code: item.code,
+      label: item.label,
+      description: item.description ?? `${item.code} — ${item.label}`,
+    };
+  }
+
+  const fallback: Record<string, { label: string; description: string }> = {
+    V1: {
+      label: "Entry / Foundational",
+      description: "Task-level execution with guided delivery.",
+    },
+    V2: {
+      label: "Developing",
+      description: "Growing ownership with structured guidance.",
+    },
+    V3: {
+      label: "Established",
+      description: "Established execution.",
+    },
+    V4: {
+      label: "Senior Scope",
+      description: "Senior cross-functional scope.",
+    },
+    V5: {
+      label: "Strategic Leadership",
+      description: "Strategic leadership.",
+    },
+    V6: {
+      label: "Executive / Enterprise",
+      description: "Enterprise leadership and long-horizon strategy.",
+    },
+  };
+
+  return {
+    code,
+    label: fallback[code]?.label ?? code,
+    description: fallback[code]?.description ?? "Future growth pathway.",
+  };
+}
+
 function NextStepPathwaySection({ payload }: { payload: McasReportPayload }) {
-  const pathway = payload.candidateFacing.nextStepPathway;
   const primary = payload.result.careerVertical.primary;
-  const next = payload.result.careerVertical.next;
-  const currentLabel = pathway?.current ?? `${primary.code} — ${primary.label}`;
-  const nextLabel = pathway?.next ?? (next ? `${next.code} — ${next.label}` : "Next stage");
-  const futureLabel = pathway?.future ?? "Future growth";
-  const developmentFocus = pathway?.developmentFocus ?? [];
+  const primaryLevel = verticalLevelFromCode(primary.code);
+  const nextCode = verticalCodeFromLevel(primaryLevel + 1);
+  const futureCode = verticalCodeFromLevel(primaryLevel + 2);
+
+  const currentVertical = verticalSummaryForCode(payload, primary.code);
+  const nextVertical = verticalSummaryForCode(payload, nextCode);
+  const futureVertical = verticalSummaryForCode(payload, futureCode);
+
+  const developmentFocus =
+    payload.candidateFacing.nextStepPathway?.developmentFocus ?? [];
+
+  const developmentOne =
+    developmentFocus[0] ?? "Authority clarity, analytical coverage";
+  const developmentTwo =
+    developmentFocus[1] ?? "Strategic narrative, scope expansion";
 
   return (
-    <SectionShell id="pathway" title="Your Next Step Pathway" icon="/mcas/report-icons/your-next-steps.png">
-      <div className="space-y-7">
-        <p className="text-base leading-8 text-[#4A5568]">
-          Growth is not about becoming a different type of person — it is about expanding the range and sustainability of your natural pattern.
-        </p>
-        <div className="grid gap-4 md:grid-cols-[1fr_40px_1fr_40px_1fr] md:items-center">
-          <PathwayCard label="Now" value={currentLabel} />
-          <PathwayArrow />
-          <PathwayCard label="Next Stage" value={nextLabel} />
-          <PathwayArrow />
-          <PathwayCard label="Future" value={futureLabel} />
-        </div>
-        {developmentFocus.length > 0 ? (
-          <div className="rounded-2xl border border-[#E2E8F0] bg-[#EEEAFE] p-5">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#6F5CFF]">Development Preparation</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {developmentFocus.map((item) => (
-                <span key={item} className="rounded-full bg-white px-4 py-2 text-xs font-bold text-[#0D0F1C]">{item}</span>
-              ))}
-            </div>
-          </div>
-        ) : null}
+    <section
+      id="pathway"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/your-next-steps.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your Next Step Pathway
+        </h2>
       </div>
-    </SectionShell>
+
+      <div className="rounded-[18px] bg-white px-6 py-7 md:px-8 md:py-8">
+        <p className="mb-7 text-[14px] leading-7 text-[#4A5568]">
+          Growth is not about becoming a different type of person — it is about
+          expanding the range and sustainability of your natural pattern.
+        </p>
+
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-[#2F6FB8] bg-[#F8FAFC]">
+          <div className="grid divide-y divide-[#D9E2F1] md:grid-cols-[1fr_0.85fr_1fr_0.85fr_1fr] md:divide-x md:divide-y-0">
+            <PathwayStageCell
+              code={currentVertical.code}
+              label="Now"
+              description={currentVertical.description}
+              emphasis="current"
+            />
+
+            <PathwayBridgeCell
+              title="Development"
+              description={developmentOne}
+            />
+
+            <PathwayStageCell
+              code={nextVertical.code}
+              label="Next Stage"
+              description={nextVertical.description}
+              emphasis="next"
+            />
+
+            <PathwayBridgeCell
+              title="Preparation"
+              description={developmentTwo}
+            />
+
+            <PathwayStageCell
+              code={futureVertical.code}
+              label="Future"
+              description={futureVertical.description}
+              emphasis="future"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PathwayStageCell({
+  code,
+  label,
+  description,
+  emphasis,
+}: {
+  code: string;
+  label: string;
+  description: string;
+  emphasis: "current" | "next" | "future";
+}) {
+  return (
+    <div className="flex min-h-[130px] flex-col items-center justify-center px-5 py-6 text-center">
+      <p
+        className={[
+          "text-[28px] font-black leading-none",
+          emphasis === "current"
+            ? "text-[#028F8B]"
+            : emphasis === "next"
+              ? "text-[#028F8B]"
+              : "text-[#028F8B]",
+        ].join(" ")}
+      >
+        {code}
+      </p>
+
+      <p className="mt-3 text-[13px] font-black leading-5 text-[#0D0F1C]">
+        {label}
+      </p>
+
+      <p className="mt-2 text-[11px] leading-5 text-[#718096]">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function PathwayBridgeCell({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex min-h-[130px] flex-col items-center justify-center px-4 py-6 text-center">
+      <p className="text-[20px] font-black leading-none text-[#028F8B]">→</p>
+
+      <p className="mt-4 text-[12px] font-black leading-5 text-[#0D0F1C]">
+        {title}
+      </p>
+
+      <p className="mt-2 text-[11px] leading-5 text-[#718096]">
+        {description}
+      </p>
+    </div>
   );
 }
 
@@ -1283,4 +1588,3 @@ export default async function McasFullReportPage({ params }: PageProps) {
     </main>
   );
 }
-
