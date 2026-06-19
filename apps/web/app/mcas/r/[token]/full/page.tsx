@@ -560,19 +560,89 @@ function CoreCompactCard({
   );
 }
 
+function pressureStrengthCards(strengths: McasStrength[]) {
+  const extras: McasStrength[] = [
+    {
+      title: "Pattern recognition",
+      description:
+        "You notice where quality, structure, or execution can be improved before it becomes a larger issue.",
+    },
+    {
+      title: "Quality protection",
+      description:
+        "You naturally protect standards and help prevent rushed or incomplete work from becoming the default.",
+    },
+    {
+      title: "Improvement discipline",
+      description:
+        "You bring a thoughtful improvement lens that helps work become cleaner, stronger, and more sustainable.",
+    },
+  ];
+
+  const combined = [...strengths];
+
+  for (const extra of extras) {
+    if (combined.length >= 6) break;
+
+    const alreadyExists = combined.some(
+      (item) => item.title.toLowerCase() === extra.title.toLowerCase()
+    );
+
+    if (!alreadyExists) {
+      combined.push(extra);
+    }
+  }
+
+  return combined.slice(0, 6);
+}
+
 function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) {
+  const cards = pressureStrengthCards(strengths);
+
   return (
-    <SectionShell id="pressure-strengths" title="Your Strength Advantages Under Pressure" icon="/mcas/report-icons/natural-strengths.png">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {strengths.map((strength) => (
-          <div key={strength.title} className="rounded-2xl border border-[#45E0D1] bg-white p-5">
-            <img src={strengthIcon(strength)} alt="" className="mb-5 h-12 w-12 rounded-xl object-cover" />
-            <h3 className="font-black text-[#0D0F1C]">{strength.title}</h3>
-            <p className="mt-3 text-sm leading-7 text-[#4A5568]">{strength.description}</p>
-          </div>
-        ))}
+    <section
+      id="pressure-strengths"
+      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+    >
+      <div className="mb-4 flex items-center gap-3 px-2 pt-1">
+        <img
+          src="/mcas/report-icons/natural-strengths.png"
+          alt=""
+          className="h-10 w-10 rounded-xl object-cover"
+        />
+        <h2 className="text-[15px] font-bold leading-5 text-white">
+          Your Strength Advantages Under Pressure
+        </h2>
       </div>
-    </SectionShell>
+
+      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {cards.map((strength) => (
+            <StrengthCompactCard key={strength.title} strength={strength} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StrengthCompactCard({ strength }: { strength: McasStrength }) {
+  return (
+    <div className="min-h-[108px] rounded-xl border border-[#45E0D1] bg-[#F8FAFC] p-4">
+      <img
+        src={strengthIcon(strength)}
+        alt=""
+        className="mb-3 h-8 w-8 rounded-lg object-cover"
+      />
+
+      <h3 className="text-[13px] font-black leading-4 text-[#0D0F1C]">
+        {strength.title}
+      </h3>
+
+      <p className="mt-2 text-[11px] leading-5 text-[#4A5568]">
+        {strength.description}
+      </p>
+    </div>
   );
 }
 
