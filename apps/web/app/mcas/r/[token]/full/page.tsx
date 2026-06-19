@@ -214,27 +214,100 @@ function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasD
   );
 }
 
-function WorkCycleCoverage({ items, title = "Work Cycle Coverage" }: { items: McasDistributionItem<McasCoreCode>[]; title?: string }) {
+function WorkCycleCoverage({
+  items,
+  title = "Work Cycle Coverage",
+}: {
+  items: McasDistributionItem<McasCoreCode>[];
+  title?: string;
+}) {
   const byCode = new Map(items.map((item) => [item.code, item]));
+
   const create = byCode.get("CREATE")?.percentage ?? 0;
   const organise = byCode.get("ORGANISE")?.percentage ?? 0;
   const resolve = byCode.get("RESOLVE")?.percentage ?? 0;
   const examine = byCode.get("EXAMINE")?.percentage ?? 0;
 
+  const legendItems: Array<{ code: McasCoreCode; percentage: number }> = [
+    { code: "ORGANISE", percentage: organise },
+    { code: "RESOLVE", percentage: resolve },
+    { code: "CREATE", percentage: create },
+    { code: "EXAMINE", percentage: examine },
+  ];
+
   return (
-    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white p-4 text-[#0D1B2A]">
-      <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8892A4]">{title}</p>
-      <div className="mx-auto grid h-[164px] w-[164px] grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-[7px] border-[#EEEAFE] text-center text-[10px] font-bold">
-        <div className="flex flex-col items-center justify-center bg-[#2C06C1]/20"><span>Create</span><span className="text-[#1725DB]">{create}%</span></div>
-        <div className="flex flex-col items-center justify-center bg-[#1725DB]/10"><span>Organise</span><span className="text-[#0A65EE]">{organise}%</span></div>
-        <div className="flex flex-col items-center justify-center bg-[#028F8B]/20"><span>Resolve</span><span className="text-[#028F8B]">{resolve}%</span></div>
-        <div className="flex flex-col items-center justify-center bg-[#0A65EE]/20"><span>Examine</span><span className="text-[#2C06C1]">{examine}%</span></div>
+    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white px-4 pb-4 pt-4 text-[#0D1B2A]">
+      <p className="mb-2 text-[10px] font-bold uppercase leading-4 tracking-[0.18em] text-[#8892A4]">
+        {title}
+      </p>
+
+      <div className="relative mx-auto h-[200px] w-[200px] overflow-hidden">
+        <div className="absolute left-3 top-3 grid h-[176px] w-[176px] grid-cols-2 grid-rows-2 overflow-hidden rounded-full border border-[#E2E8F0]">
+          <div className="relative bg-[#2C06C1]/25">
+            <div className="absolute left-[34px] top-[38px] text-center">
+              <p className="text-[10px] font-black leading-none text-[#2C06C1]">
+                E
+              </p>
+              <p className="mt-1 text-[9px] leading-none text-[#0D1B2A]">
+                {examine}%
+              </p>
+            </div>
+          </div>
+
+          <div className="relative bg-[#1725DB]/15">
+            <div className="absolute left-[34px] top-[38px] text-center">
+              <p className="text-[10px] font-black leading-none text-[#1725DB]">
+                C
+              </p>
+              <p className="mt-1 text-[9px] leading-none text-[#0D1B2A]">
+                {create}%
+              </p>
+            </div>
+          </div>
+
+          <div className="relative bg-[#028F8B]/30">
+            <div className="absolute left-[34px] top-[38px] text-center">
+              <p className="text-[10px] font-black leading-none text-[#028F8B]">
+                R
+              </p>
+              <p className="mt-1 text-[9px] leading-none text-[#0D1B2A]">
+                {resolve}%
+              </p>
+            </div>
+          </div>
+
+          <div className="relative bg-[#0A65EE]/30">
+            <div className="absolute left-[34px] top-[38px] text-center">
+              <p className="text-[10px] font-black leading-none text-[#0A65EE]">
+                O
+              </p>
+              <p className="mt-1 text-[9px] leading-none text-[#0D1B2A]">
+                {organise}%
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute left-[74px] top-[74px] flex h-[52px] w-[52px] flex-col items-center justify-center rounded-full border border-[#E2E8F0] bg-white text-center">
+          <p className="text-[8.5px] font-black leading-none text-[#718096]">
+            CORE
+          </p>
+          <p className="mt-1 text-[8px] leading-none text-[#A0AEC0]">
+            Balance
+          </p>
+        </div>
       </div>
-      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] text-[#6B7280]">
-        {items.map((item) => (
+
+      <div className="-mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] leading-4 text-[#6B7280]">
+        {legendItems.map((item) => (
           <div key={item.code} className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CORE_COLOURS[item.code] }} />
-            <span>{CORE_SHORT[item.code]} {item.percentage}%</span>
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: CORE_COLOURS[item.code] }}
+            />
+            <span>
+              {CORE_SHORT[item.code]} {item.percentage}%
+            </span>
           </div>
         ))}
       </div>
