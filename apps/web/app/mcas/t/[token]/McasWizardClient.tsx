@@ -1,7 +1,9 @@
-//apps/web/app/mcas/t/[token]/McasWizardClient.tsx
+// apps/web/app/mcas/t/[token]/McasWizardClient.tsx
+
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Question = {
   code: string;
@@ -11,33 +13,61 @@ type Question = {
 
 type Props = {
   token: string;
-  application: {
-    partner_key: string;
-    application_id: string;
+  testLink: {
+    id: string;
+    name: string;
+    link_type: string;
     status: string;
-    candidate_first_name?: string | null;
-    candidate_last_name?: string | null;
-    candidate_email?: string | null;
+    recipient_email?: string | null;
+    report_version: "lite" | "full";
+    show_results: boolean;
+    next_steps_url?: string | null;
   };
   questions: Question[];
 };
 
-export default function McasWizardClient({ token, application, questions }: Props) {
+type SubmitResponse = {
+  ok?: boolean;
+  error?: string;
+  status?: string;
+  reportToken?: string;
+  resultUrl?: string;
+  snapshotUrl?: string;
+  fullReportUrl?: string;
+  nextStepsUrl?: string | null;
+  [key: string]: unknown;
+};
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Something went wrong.";
+}
+
+function fallbackSnapshotUrl(reportToken: string | undefined) {
+  if (!reportToken) return null;
+  return `/mcas/r/${encodeURIComponent(reportToken)}/snapshot`;
+}
+
+export default function McasWizardClient({
+  token,
+  testLink,
+  questions,
+}: Props) {
+  const router = useRouter();
   const total = questions.length;
 
   const [step, setStep] = useState<"intro" | number>("intro");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState<any>(null);
+  const [done, setDone] = useState<SubmitResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Intro fields
-  const [firstName, setFirstName] = useState(application.candidate_first_name ?? "");
-  const [lastName, setLastName] = useState(application.candidate_last_name ?? "");
-  const [email, setEmail] = useState(application.candidate_email ?? "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState(testLink.recipient_email ?? "");
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
 
-  // Answers keyed by question code
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const isIntro = step === "intro";
@@ -46,7 +76,11 @@ export default function McasWizardClient({ token, application, questions }: Prop
   const currentQuestion = isQuestionStep ? questions[index] : null;
 
   const progress = useMemo(() => {
-    const answeredCount = questions.reduce((acc, q) => acc + (answers[q.code] ? 1 : 0), 0);
+    const answeredCount = questions.reduce(
+      (acc, q) => acc + (answers[q.code] ? 1 : 0),
+      0
+    );
+
     return { answeredCount };
   }, [answers, questions]);
 
@@ -76,7 +110,9 @@ export default function McasWizardClient({ token, application, questions }: Prop
 
     try {
       for (const q of questions) {
-        if (!answers[q.code]) throw new Error(`Please answer ${q.code} before submitting.`);
+        if (!answers[q.code]) {
+          throw new Error(`Please answer ${q.code} before submitting.`);
+        }
       }
 
       const payload = {
@@ -85,7 +121,7 @@ export default function McasWizardClient({ token, application, questions }: Prop
           last_name: lastName.trim(),
           email: email.trim(),
           phone: phone.trim(),
-          consent: consent,
+          consent,
         },
         answers: questions.map((q) => ({
           question_code: q.code,
@@ -93,18 +129,40 @@ export default function McasWizardClient({ token, application, questions }: Prop
         })),
       };
 
-      const res = await fetch(`/api/public/mcas/${encodeURIComponent(token)}/submit`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+      const res = await fetch(
+        `/api/public/mcas/${encodeURIComponent(token)}/submit`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const json = (await res.json()) as SubmitResponse;
+
+      if (!res.ok) {
+        throw new Error(json?.error || "Submit failed");
+      }
+
+      const fallbackUrl = fallbackSnapshotUrl(json.reportToken);
+      const nextUrl =
+        typeof json.resultUrl === "string" && json.resultUrl.trim().length > 0
+          ? json.resultUrl
+          : typeof json.snapshotUrl === "string" &&
+              json.snapshotUrl.trim().length > 0
+            ? json.snapshotUrl
+            : fallbackUrl;
+
+      setDone({
+        ...json,
+        resultUrl: nextUrl ?? undefined,
       });
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Submit failed");
-
-      setDone(json);
-    } catch (e: any) {
-      setError(String(e?.message || e));
+      if (nextUrl) {
+        router.push(nextUrl);
+      }
+    } catch (e: unknown) {
+      setError(getErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -112,13 +170,18 @@ export default function McasWizardClient({ token, application, questions }: Prop
 
   return (
     <div className="min-h-screen bg-[#060e16] text-white">
-      <div className="max-w-3xl mx-auto px-6 py-10">
+      <div className="mx-auto max-w-3xl px-6 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="text-sm text-white/70">MCAS • {application.application_id}</div>
-          <h1 className="mt-2 text-2xl font-semibold">MindCanvas CORE Alignment System</h1>
+          <div className="text-sm text-white/70">MCAS • {testLink.name}</div>
 
-          <div className="mt-2 text-white/60 text-sm">
-            {total ? `25 questions • One question per page` : `No questions loaded`}
+          <h1 className="mt-2 text-2xl font-semibold">
+            MindCanvas CORE Alignment System
+          </h1>
+
+          <div className="mt-2 text-sm text-white/60">
+            {total
+              ? `${total} questions • One question per page`
+              : "No questions loaded"}
           </div>
 
           {error ? (
@@ -130,9 +193,19 @@ export default function McasWizardClient({ token, application, questions }: Prop
           {done ? (
             <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4">
               <div className="font-semibold">Submitted successfully</div>
-              <div className="mt-2 text-white/80 text-sm">
-                Thank you. Your responses have been recorded.
+              <div className="mt-2 text-sm text-white/80">
+                Thank you. Your responses have been recorded. We are opening
+                your report now.
               </div>
+
+              {done.resultUrl ? (
+                <a
+                  href={done.resultUrl}
+                  className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
+                >
+                  Open my report
+                </a>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -140,17 +213,17 @@ export default function McasWizardClient({ token, application, questions }: Prop
         {!done && isIntro ? (
           <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
             <h2 className="text-lg font-semibold">Before you begin</h2>
-            <p className="mt-2 text-white/70 text-sm">
+            <p className="mt-2 text-sm text-white/70">
               Please complete your details below and confirm consent to proceed.
             </p>
 
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="text-xs text-white/60">First name</label>
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-[#0b1724] border border-white/10 px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
                 />
               </div>
 
@@ -159,7 +232,7 @@ export default function McasWizardClient({ token, application, questions }: Prop
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-[#0b1724] border border-white/10 px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
                 />
               </div>
 
@@ -169,7 +242,7 @@ export default function McasWizardClient({ token, application, questions }: Prop
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   type="email"
-                  className="mt-1 w-full rounded-xl bg-[#0b1724] border border-white/10 px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
                 />
               </div>
 
@@ -178,12 +251,12 @@ export default function McasWizardClient({ token, application, questions }: Prop
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="mt-1 w-full rounded-xl bg-[#0b1724] border border-white/10 px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
                 />
               </div>
             </div>
 
-            <label className="mt-5 flex gap-3 items-start text-sm text-white/75">
+            <label className="mt-5 flex items-start gap-3 text-sm text-white/75">
               <input
                 type="checkbox"
                 checked={consent}
@@ -191,10 +264,12 @@ export default function McasWizardClient({ token, application, questions }: Prop
                 className="mt-1"
               />
               <span>
-                I agree that my responses can be used to build my profile and report.
+                I agree that my responses can be used to build my profile and
+                report.
                 <br />
-                <span className="text-white/50 text-xs">
-                  You can read our Privacy Policy and Terms &amp; Conditions for more details on how we handle your data.
+                <span className="text-xs text-white/50">
+                  You can read our Privacy Policy and Terms &amp; Conditions for
+                  more details on how we handle your data.
                 </span>
               </span>
             </label>
@@ -206,7 +281,7 @@ export default function McasWizardClient({ token, application, questions }: Prop
                 "mt-6 w-full rounded-xl px-5 py-3 font-medium transition",
                 canStart()
                   ? "bg-white text-black hover:bg-white/90"
-                  : "bg-white/20 text-white/50 cursor-not-allowed",
+                  : "cursor-not-allowed bg-white/20 text-white/50",
               ].join(" ")}
             >
               Start Test
@@ -221,27 +296,35 @@ export default function McasWizardClient({ token, application, questions }: Prop
                 Question {index + 1} of {total} • {currentQuestion.code}
               </div>
               <div>
-                Answered: <span className="text-white">{progress.answeredCount}</span> / {total}
+                Answered: {" "}
+                <span className="text-white">{progress.answeredCount}</span> /{" "}
+                {total}
               </div>
             </div>
 
-            <div className="mt-4 text-xl font-semibold">{currentQuestion.prompt}</div>
+            <div className="mt-4 text-xl font-semibold">
+              {currentQuestion.prompt}
+            </div>
 
             <div className="mt-5 grid gap-2">
               {currentQuestion.options.map((opt) => {
                 const selected = answers[currentQuestion.code] === opt.code;
+
                 return (
                   <button
                     key={opt.code}
                     type="button"
                     className={[
-                      "text-left rounded-xl border px-4 py-3 transition",
+                      "rounded-xl border px-4 py-3 text-left transition",
                       selected
                         ? "border-white/40 bg-white/15"
                         : "border-white/10 bg-white/5 hover:bg-white/10",
                     ].join(" ")}
                     onClick={() =>
-                      setAnswers((prev) => ({ ...prev, [currentQuestion.code]: opt.code }))
+                      setAnswers((prev) => ({
+                        ...prev,
+                        [currentQuestion.code]: opt.code,
+                      }))
                     }
                   >
                     <div className="text-sm text-white/60">{opt.code}</div>
@@ -257,9 +340,9 @@ export default function McasWizardClient({ token, application, questions }: Prop
                 onClick={goBack}
                 disabled={index === 0}
                 className={[
-                  "rounded-xl px-4 py-2 border transition",
+                  "rounded-xl border px-4 py-2 transition",
                   index === 0
-                    ? "border-white/10 bg-white/5 text-white/40 cursor-not-allowed"
+                    ? "cursor-not-allowed border-white/10 bg-white/5 text-white/40"
                     : "border-white/10 bg-white/5 hover:bg-white/10",
                 ].join(" ")}
               >
@@ -275,7 +358,7 @@ export default function McasWizardClient({ token, application, questions }: Prop
                     "rounded-xl px-5 py-2 font-medium transition",
                     answers[currentQuestion.code]
                       ? "bg-white text-black hover:bg-white/90"
-                      : "bg-white/20 text-white/50 cursor-not-allowed",
+                      : "cursor-not-allowed bg-white/20 text-white/50",
                   ].join(" ")}
                 >
                   Next
@@ -289,7 +372,7 @@ export default function McasWizardClient({ token, application, questions }: Prop
                     "rounded-xl px-5 py-2 font-medium transition",
                     !submitting && answers[currentQuestion.code]
                       ? "bg-white text-black hover:bg-white/90"
-                      : "bg-white/20 text-white/50 cursor-not-allowed",
+                      : "cursor-not-allowed bg-white/20 text-white/50",
                   ].join(" ")}
                 >
                   {submitting ? "Submitting…" : "Submit"}
