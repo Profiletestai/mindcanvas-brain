@@ -380,6 +380,112 @@ function TopStyleStrip({ items }: { items: McasDistributionItem<McasOperatingSty
   );
 }
 
+function AfterHeroSummary({ payload }: { payload: McasReportPayload }) {
+  const primaryVertical = payload.result.careerVertical.primary;
+  const nextVertical = payload.result.careerVertical.next;
+  const developmentFocus =
+    payload.candidateFacing.nextStepPathway?.developmentFocus ?? [];
+
+  const developmentCount = developmentFocus.length || 4;
+  const developmentSummary =
+    developmentFocus.length > 0
+      ? developmentFocus
+          .slice(0, 4)
+          .map((item) => {
+            const firstPart = item.split(/[—:.]/)[0]?.trim();
+            return firstPart || item;
+          })
+          .join(" · ")
+      : "Authority · Examine · Scope · Narrative";
+
+  const bullets =
+    developmentFocus.length > 0
+      ? developmentFocus.slice(0, 3)
+      : [
+          "Authority clarity — own a directional position consistently",
+          "Analytical partnership — build examine coverage",
+          "Scope boundary management — flag overload early",
+        ];
+
+  return (
+    <section className="bg-[#07111E] px-6 py-8 md:px-8">
+      <div className="grid gap-7 lg:grid-cols-[460px_1fr] lg:items-center">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <AfterHeroInfoCard
+            icon="▥"
+            label="Vertical Fit"
+            value={`${primaryVertical.code} Now`}
+            caption={
+              nextVertical
+                ? `${nextVertical.code} in development`
+                : payload.result.careerVertical.readinessLabel ?? "Current fit"
+            }
+          />
+
+          <AfterHeroInfoCard
+            icon="✓"
+            label="Development"
+            value={`${developmentCount} areas`}
+            caption={developmentSummary}
+          />
+        </div>
+
+        <div className="lg:pl-8">
+          <p className="text-[11px] font-black uppercase leading-4 tracking-[0.22em] text-[#2BF083]">
+            Development Areas
+          </p>
+
+          <div className="mt-3 h-px w-full max-w-xl bg-[#2BF083]/70" />
+
+          <ul className="mt-4 space-y-3">
+            {bullets.map((item) => (
+              <li
+                key={item}
+                className="flex gap-3 text-sm leading-6 text-white"
+              >
+                <span className="mt-[9px] h-2 w-2 shrink-0 rounded-full bg-[#2BF083]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AfterHeroInfoCard({
+  icon,
+  label,
+  value,
+  caption,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  caption: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#6F5CFF] bg-[#EEEAFE] px-5 py-5 shadow-sm">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-[#6F5CFF] text-xl font-black text-white">
+        {icon}
+      </div>
+
+      <p className="text-[12px] font-black uppercase leading-4 tracking-[0.2em] text-[#718096]">
+        {label}
+      </p>
+
+      <p className="mt-2 text-2xl font-black leading-tight text-[#0D1B2A]">
+        {value}
+      </p>
+
+      <p className="mt-2 text-sm leading-5 text-[#4A5568]">
+        {caption}
+      </p>
+    </div>
+  );
+}
+
 function SidebarIndex({ token }: { token: string }) {
   const links = [
     ["orientation", "Welcome and Orientation"],
@@ -1641,6 +1747,7 @@ export default async function McasFullReportPage({ params }: PageProps) {
         <ReportHeader payload={payload} />
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
+        <AfterHeroSummary payload={payload} />
 
         <div className="grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
           <SidebarIndex token={token} />
