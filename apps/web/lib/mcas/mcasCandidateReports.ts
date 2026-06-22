@@ -14,8 +14,6 @@ export type McasCandidateReportAccess = {
 
   reportVersion: "lite" | "full" | null;
   testLinkName: string | null;
-  showResults: boolean | null;
-  nextStepsUrl: string | null;
 
   snapshotUrl: string | null;
   fullReportUrl: string | null;
@@ -23,48 +21,40 @@ export type McasCandidateReportAccess = {
   candidateReportLabel: string | null;
 };
 
-type McasPartnerApplicationRow = {
+type PartnerApplicationRow = {
   id: string;
   org_id: string;
   test_link_id: string | null;
 };
 
-type McasAssessmentRow = {
+type AssessmentRow = {
   id: string;
   report_token: string | null;
   test_link_id: string | null;
   status: string | null;
-  completed_at: string | null;
 };
 
-type McasResultRow = {
+type ResultRow = {
   id: string;
 };
 
-type McasTestLinkRow = {
+type TestLinkRow = {
   id: string;
   name: string;
   report_version: "lite" | "full";
-  show_results: boolean;
-  next_steps_url: string | null;
 };
 
-function getMcasAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+function mcasSupa() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-
+  if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
   if (!serviceRoleKey) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
   }
 
-  return createClient(supabaseUrl, serviceRoleKey, {
-    db: {
-      schema: "mcas",
-    },
+  return createClient(url, serviceRoleKey, {
+    db: { schema: "mcas" },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -80,39 +70,30 @@ function cleanText(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function emptyReportAccess(
+function pending(
   reason: string,
-  partial?: Partial<McasCandidateReportAccess>
+  partial: Partial<McasCandidateReportAccess> = {}
 ): McasCandidateReportAccess {
   return {
     isReady: false,
     reason,
-
     assessmentId: null,
     assessmentStatus: null,
     reportToken: null,
-
     reportVersion: null,
     testLinkName: null,
-    showResults: null,
-    nextStepsUrl: null,
-
     snapshotUrl: null,
     fullReportUrl: null,
     candidateReportUrl: null,
     candidateReportLabel: null,
-
     ...partial,
   };
 }
 
 /**
- * Resolves the completed MCAS assessment and the correct candidate-facing report
- * for one partner application.
- *
- * This intentionally reads the live MCAS tables directly instead of depending
- * on v_admin_candidate_database. The profile button therefore works even before
- * the reporting fields are added to that database view.
+ * Resolves the public candidate report from an internal partner-application ID.
+ * It intentionally reads the MCAS tables directly, rather than relying on the
+ * admin database view, so the button works while that view evolves.
  */
 export async function getMcasCandidateReportAccess({
   orgId,
@@ -121,7 +102,7 @@ export async function getMcasCandidateReportAccess({
   orgId: string;
   candidateId: string;
 }): Promise<McasCandidateReportAccess> {
-  const supabase = getMcasAdminClient();
+  const supabase = mcasSupa();
 
   const { data: applicationData, error: applicationError } = await supabase
     .from("partner_applications")
@@ -136,45 +117,38 @@ export async function getMcasCandidateReportAccess({
     );
   }
 
-  const application = applicationData as McasPartnerApplicationRow | null;
+  const application = applicationData as PartnerApplicationRow | null;
 
   if (!application) {
-    return emptyReportAccess("Candidate application not found.");
+    return pending("Candidate application not found.");
   }
 
   const { data: assessmentData, error: assessmentError } = await supabase
     .from("assessments")
-    .select("id, report_token, test_link_id, status, completed_at")
+    .select("id, report_token, test_link_id, status")
     .eq("partner_application_id", application.id)
-    .order("completed_at", { ascending: false, nullsFirst: false })
-    .order("started_at", { ascending: false, nullsFirst: false })
+    .order("completed_at", { ascending: false })
+    .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (assessmentError) {
-    throw new Error(
-      `Failed to load MCAS assessment: ${assessmentError.message}`
-    );
+    throw new Error(`Failed to load MCAS assessment: ${assessmentError.message}`);
   }
 
-  const assessment = assessmentData as McasAssessmentRow | null;
+  const assessment = assessmentData as AssessmentRow | null;
 
   if (!assessment) {
-    return emptyReportAccess(
-      "This candidate has not submitted an assessment yet."
-    );
+    return pending("This candidate has not submitted an assessment yet.");
   }
 
   const reportToken = cleanText(assessment.report_token);
 
   if (!reportToken) {
-    return emptyReportAccess(
-      "This assessment does not have a report token yet.",
-      {
-        assessmentId: assessment.id,
-        assessmentStatus: assessment.status,
-      }
-    );
+    return pending("This assessment does not have a report token yet.", {
+      assessmentId: assessment.id,
+      assessmentStatus: assessment.status,
+    });
   }
 
   const { data: resultData, error: resultError } = await supabase
@@ -187,63 +161,49 @@ export async function getMcasCandidateReportAccess({
     throw new Error(`Failed to load MCAS result: ${resultError.message}`);
   }
 
-  const result = resultData as McasResultRow | null;
+  const result = resultData as ResultRow | null;
 
   if (!result || assessment.status !== "completed") {
-    return emptyReportAccess(
-      "The assessment is still being completed or scored.",
-      {
-        assessmentId: assessment.id,
-        assessmentStatus: assessment.status,
-        reportToken,
-      }
-    );
+    return pending("This assessment is still being completed or scored.", {
+      assessmentId: assessment.id,
+      assessmentStatus: assessment.status,
+      reportToken,
+    });
   }
 
   const testLinkId = assessment.test_link_id ?? application.test_link_id;
 
-  let testLink: McasTestLinkRow | null = null;
+  let testLink: TestLinkRow | null = null;
 
   if (testLinkId) {
     const { data: testLinkData, error: testLinkError } = await supabase
       .from("test_links")
-      .select("id, name, report_version, show_results, next_steps_url")
+      .select("id, name, report_version")
       .eq("id", testLinkId)
       .maybeSingle();
 
     if (testLinkError) {
-      throw new Error(
-        `Failed to load MCAS test link: ${testLinkError.message}`
-      );
+      throw new Error(`Failed to load MCAS test link: ${testLinkError.message}`);
     }
 
-    testLink = testLinkData as McasTestLinkRow | null;
+    testLink = testLinkData as TestLinkRow | null;
   }
 
-  /*
-   * Legacy/API applications may not have a test link. Their internal review
-   * defaults to the Full report because that is the only complete report view.
-   */
   const reportVersion = testLink?.report_version ?? "full";
-  const encodedToken = encodeURIComponent(reportToken);
-  const snapshotUrl = `/mcas/r/${encodedToken}/snapshot`;
-  const fullReportUrl = `/mcas/r/${encodedToken}/full`;
+  const token = encodeURIComponent(reportToken);
+  const snapshotUrl = `/mcas/r/${token}/snapshot`;
+  const fullReportUrl = `/mcas/r/${token}/full`;
   const candidateReportUrl =
     reportVersion === "lite" ? snapshotUrl : fullReportUrl;
 
   return {
     isReady: true,
     reason: null,
-
     assessmentId: assessment.id,
     assessmentStatus: assessment.status,
     reportToken,
-
     reportVersion,
     testLinkName: testLink?.name ?? null,
-    showResults: testLink?.show_results ?? null,
-    nextStepsUrl: testLink?.next_steps_url ?? null,
-
     snapshotUrl,
     fullReportUrl,
     candidateReportUrl,
