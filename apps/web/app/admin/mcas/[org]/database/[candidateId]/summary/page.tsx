@@ -923,12 +923,12 @@ function McasModelSection() {
       eyebrow="03 · Introducing the MCAS model"
       title="MCAS connects three layers of sustainable performance"
     >
-      <div className="grid gap-7 lg:grid-cols-[430px_minmax(0,1fr)] lg:items-center">
-        <div className="flex min-h-[300px] items-center justify-center">
+      <div className="space-y-8">
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl bg-[#F7F8FA] p-4 sm:p-6">
           <img
             src="/mcas/graphics/mcas-model.png"
             alt="MCAS model showing Career Vertical, Operating Style and CORE Behaviour"
-            className="h-auto w-full max-w-[420px] object-contain"
+            className="mx-auto h-auto w-full max-w-[900px] object-contain"
           />
         </div>
 
@@ -953,7 +953,6 @@ function McasModelSection() {
 
 function OperatingStyleIdentitySection({
   payload,
-  content,
 }: {
   payload: McasReportPayload;
   content: McasInternalReportContent;
@@ -974,95 +973,68 @@ function OperatingStyleIdentitySection({
         the role and environment.
       </p>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {(Object.keys(OS_NAMES) as McasOperatingStyleCode[]).map((code) => {
-            const active = code === primaryCode;
+      <div className="mt-6 overflow-hidden rounded-2xl bg-[#F7F8FA] p-4 sm:p-6">
+        <img
+          src="/mcas/graphics/operating-style-system.png"
+          alt="Operating Style Identity System showing all eight profiles"
+          className="mx-auto h-auto w-full max-w-[980px] object-contain"
+        />
+      </div>
 
-            return (
-              <div
-                key={code}
-                className={[
-                  "rounded-2xl border p-4 transition",
-                  active
-                    ? "border-[#6F5CFF]/55 bg-[#F0EEFF] ring-1 ring-[#6F5CFF]/25"
-                    : "border-slate-200 bg-white",
-                ].join(" ")}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={[
-                      "flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl",
-                      active
-                        ? "bg-white shadow-[0_5px_14px_rgba(79,70,229,0.16)]"
-                        : "bg-[#F7F8FA]",
-                    ].join(" ")}
-                  >
-                    <img
-                      src={OS_PROFILE_IMAGES[code]}
-                      alt={`${OS_NAMES[code]} operating style`}
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {(Object.keys(OS_NAMES) as McasOperatingStyleCode[]).map((code) => {
+          const active = code === primaryCode;
 
-                  <span
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black text-white"
-                    style={{ background: OS_COLOURS[code] }}
-                  >
-                    {code.replace("OS", "")}
-                  </span>
+          return (
+            <div
+              key={code}
+              className={[
+                "rounded-2xl border p-5 transition",
+                active
+                  ? "border-[#6F5CFF]/55 bg-[#F0EEFF] ring-1 ring-[#6F5CFF]/25"
+                  : "border-slate-200 bg-white",
+              ].join(" ")}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div
+                  className={[
+                    "flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl",
+                    active
+                      ? "bg-white shadow-[0_5px_14px_rgba(79,70,229,0.16)]"
+                      : "bg-[#F7F8FA]",
+                  ].join(" ")}
+                >
+                  <img
+                    src={OS_PROFILE_IMAGES[code]}
+                    alt={`${OS_NAMES[code]} operating style`}
+                    className="h-full w-full object-contain"
+                  />
                 </div>
 
-                <p className="mt-4 text-base font-bold text-[#201E41]">
-                  {OS_NAMES[code]}
-                </p>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  {OS_TAGLINES[code]}
-                </p>
-
-                {active ? (
-                  <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.15em] text-[#6255E8]">
-                    Candidate profile
-                  </p>
-                ) : null}
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black text-white"
+                  style={{ background: OS_COLOURS[code] }}
+                >
+                  {code.replace("OS", "")}
+                </span>
               </div>
-            );
-          })}
-        </div>
 
-        <div className="rounded-2xl border border-[#6255E8]/15 bg-[#F7F6FF] p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
-            Candidate system function
-          </p>
-
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-[0_5px_14px_rgba(79,70,229,0.14)]">
-              <img
-                src={OS_PROFILE_IMAGES[primaryCode]}
-                alt={`${OS_NAMES[primaryCode]} candidate profile`}
-                className="h-full w-full object-contain"
-              />
-            </div>
-
-            <div>
-              <p className="text-lg font-bold text-[#201E41]">
-                {OS_NAMES[primaryCode]}
+              <p className="mt-5 text-base font-bold text-[#201E41]">
+                {OS_NAMES[code]}
               </p>
+
               <p className="mt-1 text-sm text-slate-500">
-                {OS_TAGLINES[primaryCode]}
+                {OS_TAGLINES[code]}
               </p>
+
+              {active ? (
+                <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.15em] text-[#6255E8]">
+                  Candidate profile
+                </p>
+              ) : null}
             </div>
-          </div>
-
-          <p className="mt-5 text-lg font-bold leading-7 text-[#201E41]">
-            {content.primary.systemFunction}
-          </p>
-
-          <p className="mt-3 text-sm leading-6 text-slate-700">
-            {content.primary.executionSummary}
-          </p>
-        </div>
+          );
+        })}
       </div>
     </ReportSection>
   );
@@ -1078,61 +1050,145 @@ function OperatingStyleDistributionSection({
   const primary = payload.result.operatingStyle.primary;
   const secondary = payload.result.operatingStyle.secondary;
   const confidence = payload.result.confidence.score ?? primary.percentage;
+  const primaryLabel = INTERNAL_OS_LABELS[primary.code];
+  const primaryColour = SUMMARY_OS_COLOURS[primary.code];
+  const safePercentage = Math.max(0, Math.min(100, Math.round(primary.percentage)));
 
   return (
-    <ReportSection
+    <section
       id="operating-distribution"
-      icon="/mcas/report-icons/operating-style-identity-system.png"
-      eyebrow="05 · Operating Style Distribution and Confidence"
-      title="Pattern strength and confidence"
+      className="mcas-summary-section overflow-hidden rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.28)]"
     >
-      <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
-        <div className="rounded-3xl bg-[#F0EEFF] p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6255E8]">
-            Dominant operating style
+      <div className="overflow-hidden rounded-[18px] bg-white">
+        <div className="flex items-center gap-3 bg-[#6F5CFF] px-5 py-3 text-white">
+          <img
+            src="/mcas/report-icons/operating-style-identity-system.png"
+            alt=""
+            className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
+          />
+          <p className="text-xs font-bold tracking-[0.02em]">
+            Operating Style Distribution and Confidence
           </p>
-
-          <div
-            className="mt-5 flex h-28 w-28 items-center justify-center rounded-full text-3xl font-black text-white shadow-lg"
-            style={{ background: OS_COLOURS[primary.code] }}
-          >
-            {Math.round(primary.percentage)}%
-          </div>
-
-          <h3 className="mt-5 text-3xl font-black tracking-[-0.04em] text-[#201E41]">
-            {primary.label}
-          </h3>
-
-          <p className="mt-4 text-sm leading-6 text-slate-700">
-            {content.primary.executionSummary}
-          </p>
-
-          <div className="mt-6 rounded-2xl border border-[#6255E8]/15 bg-white/75 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Pattern confidence
-            </p>
-            <p className="mt-2 text-2xl font-black text-[#201E41]">
-              {Math.round(confidence)}%
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              {payload.result.confidence.level} confidence
-            </p>
-          </div>
         </div>
 
-        <div className="space-y-3">
-          {payload.result.operatingStyle.distribution.map((item) => (
-            <DistributionRow key={item.code} item={item} />
-          ))}
+        <div className="p-5 md:p-7">
+          <p className="max-w-5xl text-[11px] leading-5 text-slate-600">
+            The Operating Style reveals the candidate&apos;s natural execution pattern.
+            The distribution below reflects scored pattern strength, not a ranking
+            against others.
+          </p>
 
-          {secondary && content.secondarySummary ? (
-            <p className="rounded-2xl border border-cyan-300/30 bg-cyan-50 p-4 text-sm leading-6 text-[#174B53]">
-              {content.secondarySummary}
+          <div className="mt-6 grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500">
+                Dominant Operating Style
+              </p>
+
+              <div className="mt-5 flex flex-col items-center text-center">
+                <div
+                  className="flex h-[155px] w-[155px] items-center justify-center rounded-full"
+                  style={{
+                    background: `conic-gradient(${primaryColour} 0 ${safePercentage}%, #EEF0F5 ${safePercentage}% 100%)`,
+                  }}
+                >
+                  <div className="flex h-[118px] w-[118px] flex-col items-center justify-center rounded-full bg-white shadow-[0_5px_13px_rgba(79,70,229,0.08)]">
+                    <span className="text-4xl font-black tracking-[-0.05em]" style={{ color: primaryColour }}>
+                      {safePercentage}%
+                    </span>
+                    <span className="mt-1 text-sm font-bold text-[#0D1B2A]">
+                      {primaryLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-xs font-semibold text-slate-500">
+                  {Math.round(confidence)}% pattern confidence
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {payload.result.operatingStyle.distribution.map((item) => (
+                <OperatingDistributionRow key={item.code} item={item} />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-2 text-[11px] leading-5 text-slate-600">
+            <p>
+              The dominant <span className="font-semibold text-[#0D1B2A]">{primaryLabel}</span>{" "}
+              pattern indicates a candidate who naturally {content.primary.systemFunction.toLowerCase()}
             </p>
-          ) : null}
+            <p>{content.primary.executionSummary}</p>
+            {secondary && content.secondarySummary ? (
+              <p>
+                <span className="font-semibold text-[#0D1B2A]">
+                  {INTERNAL_OS_LABELS[secondary.code]}
+                </span>{" "}
+                is the secondary influence at {Math.round(secondary.percentage)}%. {content.secondarySummary}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
-    </ReportSection>
+    </section>
+  );
+}
+
+function OperatingDistributionRow({
+  item,
+}: {
+  item: McasDistributionItem<McasOperatingStyleCode>;
+}) {
+  const colour = SUMMARY_OS_COLOURS[item.code];
+  const percentage = Math.max(0, Math.min(100, Math.round(item.percentage)));
+
+  return (
+    <div className="grid grid-cols-[38px_minmax(86px,0.72fr)_minmax(120px,1fr)_38px_70px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <div
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
+        style={{ background: `${colour}16` }}
+      >
+        <img
+          src={OS_PROFILE_IMAGES[item.code]}
+          alt=""
+          className="h-full w-full object-contain"
+        />
+      </div>
+
+      <div className="min-w-0">
+        <p className="truncate text-sm font-bold text-[#201E41]">
+          {INTERNAL_OS_LABELS[item.code]}
+        </p>
+        <p className="mt-0.5 text-[10px] text-slate-500">
+          {distributionBandLabel(item.band).toLowerCase()} pattern
+        </p>
+      </div>
+
+      <div className="h-2 overflow-hidden rounded-full bg-[#EEF0F5]">
+        <div
+          className="h-full rounded-full"
+          style={{
+            background: colour,
+            width: `${Math.max(2, percentage)}%`,
+          }}
+        />
+      </div>
+
+      <p className="text-right text-lg font-black text-[#201E41]">
+        {percentage}%
+      </p>
+
+      <span
+        className="justify-self-end rounded-md px-2 py-1 text-[9px] font-black uppercase tracking-[0.07em]"
+        style={{
+          background: `${colour}16`,
+          color: colour,
+        }}
+      >
+        {distributionBandLabel(item.band)}
+      </span>
+    </div>
   );
 }
 
