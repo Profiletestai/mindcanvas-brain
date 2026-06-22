@@ -67,6 +67,23 @@ const OS_NAMES: Record<McasOperatingStyleCode, string> = {
 };
 
 /*
+ * Internal MCAS labels map to the existing visual assets:
+ * Visionary → Trailblazer, Catalyst → Spark, Motivator → Uplifter,
+ * Connector → Bridgebuilder, Facilitator → Steadyhand,
+ * Coordinator → Organiser, Controller → Analyst, Optimiser → Refiner.
+ */
+const OS_PROFILE_IMAGES: Record<McasOperatingStyleCode, string> = {
+  OS1: "/mcas/profile-cards/trailblazer.png",
+  OS2: "/mcas/profile-cards/spark.png",
+  OS3: "/mcas/profile-cards/uplifter.png",
+  OS4: "/mcas/profile-cards/bridgebuilder.png",
+  OS5: "/mcas/profile-cards/steadyhead.png",
+  OS6: "/mcas/profile-cards/organiser.png",
+  OS7: "/mcas/profile-cards/analyst.png",
+  OS8: "/mcas/profile-cards/refiner.png",
+};
+
+/*
  * The internal Candidate Summary follows the MCAS Knowledge Base naming:
  * Visionary, Catalyst, Motivator, Connector, Facilitator, Coordinator,
  * Controller and Optimiser.
@@ -957,48 +974,95 @@ function OperatingStyleIdentitySection({
         the role and environment.
       </p>
 
-      <div className="mt-6 rounded-2xl border border-[#6255E8]/15 bg-[#F7F6FF] p-5">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
-          Candidate system function
-        </p>
-        <p className="mt-2 text-lg font-bold text-[#201E41]">
-          {content.primary.systemFunction}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-700">
-          {content.primary.executionSummary}
-        </p>
-      </div>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {(Object.keys(OS_NAMES) as McasOperatingStyleCode[]).map((code) => {
+            const active = code === primaryCode;
 
-      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {(Object.keys(OS_NAMES) as McasOperatingStyleCode[]).map((code) => {
-          const active = code === primaryCode;
-
-          return (
-            <div
-              key={code}
-              className={[
-                "rounded-2xl border p-4",
-                active
-                  ? "border-[#6F5CFF]/50 bg-[#F0EEFF] ring-1 ring-[#6F5CFF]/20"
-                  : "border-slate-200 bg-white",
-              ].join(" ")}
-            >
-              <span
-                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
-                style={{ background: OS_COLOURS[code] }}
+            return (
+              <div
+                key={code}
+                className={[
+                  "rounded-2xl border p-4 transition",
+                  active
+                    ? "border-[#6F5CFF]/55 bg-[#F0EEFF] ring-1 ring-[#6F5CFF]/25"
+                    : "border-slate-200 bg-white",
+                ].join(" ")}
               >
-                {code.replace("OS", "")}
-              </span>
-              <p className="mt-4 font-bold text-[#201E41]">{OS_NAMES[code]}</p>
-              <p className="mt-1 text-sm text-slate-500">{OS_TAGLINES[code]}</p>
-              {active ? (
-                <p className="mt-3 text-xs font-bold uppercase tracking-[0.15em] text-[#6255E8]">
-                  Candidate profile
+                <div className="flex items-center gap-3">
+                  <div
+                    className={[
+                      "flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl",
+                      active
+                        ? "bg-white shadow-[0_5px_14px_rgba(79,70,229,0.16)]"
+                        : "bg-[#F7F8FA]",
+                    ].join(" ")}
+                  >
+                    <img
+                      src={OS_PROFILE_IMAGES[code]}
+                      alt={`${OS_NAMES[code]} operating style`}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black text-white"
+                    style={{ background: OS_COLOURS[code] }}
+                  >
+                    {code.replace("OS", "")}
+                  </span>
+                </div>
+
+                <p className="mt-4 text-base font-bold text-[#201E41]">
+                  {OS_NAMES[code]}
                 </p>
-              ) : null}
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {OS_TAGLINES[code]}
+                </p>
+
+                {active ? (
+                  <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.15em] text-[#6255E8]">
+                    Candidate profile
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="rounded-2xl border border-[#6255E8]/15 bg-[#F7F6FF] p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
+            Candidate system function
+          </p>
+
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-[0_5px_14px_rgba(79,70,229,0.14)]">
+              <img
+                src={OS_PROFILE_IMAGES[primaryCode]}
+                alt={`${OS_NAMES[primaryCode]} candidate profile`}
+                className="h-full w-full object-contain"
+              />
             </div>
-          );
-        })}
+
+            <div>
+              <p className="text-lg font-bold text-[#201E41]">
+                {OS_NAMES[primaryCode]}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {OS_TAGLINES[primaryCode]}
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-5 text-lg font-bold leading-7 text-[#201E41]">
+            {content.primary.systemFunction}
+          </p>
+
+          <p className="mt-3 text-sm leading-6 text-slate-700">
+            {content.primary.executionSummary}
+          </p>
+        </div>
       </div>
     </ReportSection>
   );
