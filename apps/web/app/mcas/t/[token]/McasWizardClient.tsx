@@ -8,50 +8,42 @@ import { useRouter } from "next/navigation";
 type Question = {
   code: string;
   prompt: string;
-  options: { code: string; label: string }[];
+  section?: string;
+  options: {
+    code: string;
+    label: string;
+  }[];
 };
 
 type Props = {
   token: string;
-  testLink: {
-    id: string;
-    name: string;
-    link_type: string;
+  application: {
+    application_id: string;
+    partner_key: string;
     status: string;
-    recipient_email?: string | null;
+    test_link_name: string;
     report_version: "lite" | "full";
     show_results: boolean;
-    next_steps_url?: string | null;
+    candidate_first_name?: string | null;
+    candidate_last_name?: string | null;
+    candidate_email?: string | null;
+    candidate_phone?: string | null;
   };
   questions: Question[];
 };
 
-type SubmitResponse = {
-  ok?: boolean;
-  error?: string;
-  status?: string;
-  reportToken?: string;
-  resultUrl?: string;
-  snapshotUrl?: string;
-  fullReportUrl?: string;
-  nextStepsUrl?: string | null;
-  [key: string]: unknown;
-};
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "Something went wrong.";
-}
-
-function fallbackSnapshotUrl(reportToken: string | undefined) {
-  if (!reportToken) return null;
-  return `/mcas/r/${encodeURIComponent(reportToken)}/snapshot`;
+function isExternalUrl(urlValue: string) {
+  try {
+    const url = new URL(urlValue, window.location.origin);
+    return url.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
 }
 
 export default function McasWizardClient({
   token,
-  testLink,
+  application,
   questions,
 }: Props) {
   const router = useRouter();
@@ -59,33 +51,40 @@ export default function McasWizardClient({
 
   const [step, setStep] = useState<"intro" | number>("intro");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState<SubmitResponse | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState(testLink.recipient_email ?? "");
-  const [phone, setPhone] = useState("");
+  const [firstName, setFirstName] = useState(
+    application.candidate_first_name ?? ""
+  );
+  const [lastName, setLastName] = useState(
+    application.candidate_last_name ?? ""
+  );
+  const [email, setEmail] = useState(application.candidate_email ?? "");
+  const [phone, setPhone] = useState(application.candidate_phone ?? "");
   const [consent, setConsent] = useState(false);
-
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
   const isIntro = step === "intro";
   const isQuestionStep = typeof step === "number";
-  const index = isQuestionStep ? step : 0;
-  const currentQuestion = isQuestionStep ? questions[index] : null;
+  const currentIndex = isQuestionStep ? step : 0;
+  const currentQuestion = isQuestionStep ? questions[currentIndex] : null;
 
   const progress = useMemo(() => {
     const answeredCount = questions.reduce(
-      (acc, q) => acc + (answers[q.code] ? 1 : 0),
+      (count, question) => count + (answers[question.code] ? 1 : 0),
       0
     );
 
-    return { answeredCount };
-  }, [answers, questions]);
+    return {
+      answeredCount,
+      percentage: total > 0 ? Math.round((answeredCount / total) * 100) : 0,
+    };
+  }, [answers, questions, total]);
 
   function canStart() {
     return (
+      total === 25 &&
       firstName.trim().length > 0 &&
       lastName.trim().length > 0 &&
       email.trim().length > 0 &&
@@ -94,271 +93,291 @@ export default function McasWizardClient({
     );
   }
 
-  function goNext() {
-    if (!isQuestionStep) return;
-    if (index < total - 1) setStep(index + 1);
-  }
-
   function goBack() {
     if (!isQuestionStep) return;
-    if (index > 0) setStep(index - 1);
+
+    if (currentIndex === 0) {
+      setStep("intro");
+      return;
+    }
+
+    setStep(currentIndex - 1);
   }
 
-  async function submitAll() {
+  function goNext() {
+    if (!isQuestionStep || !currentQuestion) return;
+
+    if (answers[currentQuestion.code] && currentIndex < total - 1) {
+      setStep(currentIndex + 1);
+    }
+  }
+
+  function chooseAnswer(questionCode: string, optionCode: string) {
+    setAnswers((current) => ({
+      ...current,
+      [questionCode]: optionCode,
+    }));
+  }
+
+  async function submitAssessment() {
     setError(null);
     setSubmitting(true);
 
     try {
-      for (const q of questions) {
-        if (!answers[q.code]) {
-          throw new Error(`Please answer ${q.code} before submitting.`);
+      for (const question of questions) {
+        if (!answers[question.code]) {
+          throw new Error(
+            `Please answer ${question.code} before submitting your assessment.`
+          );
         }
       }
 
-      const payload = {
-        candidate: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          consent,
-        },
-        answers: questions.map((q) => ({
-          question_code: q.code,
-          option_code: answers[q.code],
-        })),
-      };
-
-      const res = await fetch(
+      const response = await fetch(
         `/api/public/mcas/${encodeURIComponent(token)}/submit`,
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload),
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            candidate: {
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              consent,
+            },
+            answers: questions.map((question) => ({
+              question_code: question.code,
+              option_code: answers[question.code],
+            })),
+          }),
         }
       );
 
-      const json = (await res.json()) as SubmitResponse;
+      const body = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            resultUrl?: string;
+          }
+        | null;
 
-      if (!res.ok) {
-        throw new Error(json?.error || "Submit failed");
+      if (!response.ok) {
+        throw new Error(
+          body?.error || "Your assessment could not be submitted."
+        );
       }
 
-      const fallbackUrl = fallbackSnapshotUrl(json.reportToken);
-      const nextUrl =
-        typeof json.resultUrl === "string" && json.resultUrl.trim().length > 0
-          ? json.resultUrl
-          : typeof json.snapshotUrl === "string" &&
-              json.snapshotUrl.trim().length > 0
-            ? json.snapshotUrl
-            : fallbackUrl;
+      const resultUrl = String(body?.resultUrl || "").trim();
 
-      setDone({
-        ...json,
-        resultUrl: nextUrl ?? undefined,
-      });
-
-      if (nextUrl) {
-        router.replace(nextUrl);
+      if (!resultUrl) {
+        throw new Error(
+          "Your assessment was saved, but the result page could not be resolved."
+        );
       }
-    } catch (e: unknown) {
-      setError(getErrorMessage(e));
-    } finally {
+
+      setRedirecting(true);
+
+      if (isExternalUrl(resultUrl)) {
+        window.location.assign(resultUrl);
+        return;
+      }
+
+      router.replace(resultUrl);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Your assessment could not be submitted."
+      );
       setSubmitting(false);
+      setRedirecting(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#060e16] text-white">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="text-sm text-white/70">MCAS • {testLink.name}</div>
+    <main className="min-h-screen bg-[#060e16] px-5 py-8 text-white md:px-8">
+      <section className="mx-auto max-w-3xl">
+        <header className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/20 md:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">
+            MCAS Assessment
+          </p>
 
-          <h1 className="mt-2 text-2xl font-semibold">
-            MindCanvas CORE Alignment System
+          <h1 className="mt-3 text-2xl font-semibold md:text-3xl">
+            {application.test_link_name}
           </h1>
 
-          <div className="mt-2 text-sm text-white/60">
-            {total
-              ? `${total} questions • One question per page`
-              : "No questions loaded"}
+          <p className="mt-3 text-sm leading-6 text-slate-300">
+            This assessment explores observable work patterns, career readiness,
+            and the environments where you are most likely to contribute
+            sustainably.
+          </p>
+
+          <div className="mt-6 grid gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-sm sm:grid-cols-3">
+            <MetaItem label="Questions" value={`${total}`} />
+            <MetaItem
+              label="Report"
+              value={
+                application.report_version === "full"
+                  ? "Full Career Report"
+                  : "Lite Career Report"
+              }
+            />
+            <MetaItem label="Progress" value={`${progress.percentage}%`} />
           </div>
+        </header>
 
-          {error ? (
-            <div className="mt-5 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-red-200">
-              {error}
-            </div>
-          ) : null}
+        {error ? (
+          <div className="mt-5 rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-sm leading-6 text-red-100">
+            {error}
+          </div>
+        ) : null}
 
-          {done ? (
-            <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4">
-              <div className="font-semibold">Submitted successfully</div>
-              <div className="mt-2 text-sm text-white/80">
-                Thank you. Your responses have been recorded. We are opening
-                your report now.
-              </div>
-
-              {done.resultUrl ? (
-                <a
-                  href={done.resultUrl}
-                  className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90"
-                >
-                  Open my report
-                </a>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {!done && isIntro ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
-            <h2 className="text-lg font-semibold">Before you begin</h2>
-            <p className="mt-2 text-sm text-white/70">
-              Please complete your details below and confirm consent to proceed.
+        {isIntro ? (
+          <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
+            <h2 className="text-xl font-semibold">Before you begin</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Please confirm your details and consent before beginning the
+              assessment.
             </p>
 
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs text-white/60">First name</label>
-                <input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-white/60">Last name</label>
-                <input
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-white/60">Email</label>
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-white/60">Phone</label>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#0b1724] px-3 py-2"
-                />
-              </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <Field
+                label="First name"
+                value={firstName}
+                onChange={setFirstName}
+                autoComplete="given-name"
+              />
+              <Field
+                label="Last name"
+                value={lastName}
+                onChange={setLastName}
+                autoComplete="family-name"
+              />
+              <Field
+                label="Email"
+                value={email}
+                onChange={setEmail}
+                type="email"
+                autoComplete="email"
+              />
+              <Field
+                label="Phone"
+                value={phone}
+                onChange={setPhone}
+                type="tel"
+                autoComplete="tel"
+              />
             </div>
 
-            <label className="mt-5 flex items-start gap-3 text-sm text-white/75">
+            <label className="mt-6 flex cursor-pointer gap-3 text-sm leading-6 text-slate-300">
               <input
                 type="checkbox"
                 checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-                className="mt-1"
+                onChange={(event) => setConsent(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-300"
               />
               <span>
-                I agree that my responses can be used to build my profile and
-                report.
-                <br />
-                <span className="text-xs text-white/50">
-                  You can read our Privacy Policy and Terms &amp; Conditions for
-                  more details on how we handle your data.
-                </span>
+                I agree that my responses may be used to create my MCAS profile
+                and report.
               </span>
             </label>
 
             <button
+              type="button"
               disabled={!canStart()}
-              onClick={() => setStep(0)}
+              onClick={() => {
+                setError(null);
+                setStep(0);
+              }}
               className={[
-                "mt-6 w-full rounded-xl px-5 py-3 font-medium transition",
+                "mt-7 w-full rounded-xl px-5 py-3 text-sm font-semibold transition",
                 canStart()
-                  ? "bg-white text-black hover:bg-white/90"
-                  : "cursor-not-allowed bg-white/20 text-white/50",
+                  ? "bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                  : "cursor-not-allowed bg-white/10 text-white/40",
               ].join(" ")}
             >
-              Start Test
+              Start assessment
             </button>
-          </div>
+          </section>
         ) : null}
 
-        {!done && isQuestionStep && currentQuestion ? (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6">
-            <div className="flex items-center justify-between text-sm text-white/60">
-              <div>
-                Question {index + 1} of {total} • {currentQuestion.code}
-              </div>
-              <div>
-                Answered: {" "}
-                <span className="text-white">{progress.answeredCount}</span> /{" "}
-                {total}
-              </div>
+        {isQuestionStep && currentQuestion ? (
+          <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-medium text-slate-400">
+              <p>
+                Question {currentIndex + 1} of {total}
+              </p>
+              <p>
+                {progress.answeredCount} of {total} answered
+              </p>
             </div>
 
-            <div className="mt-4 text-xl font-semibold">
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-cyan-300 transition-[width]"
+                style={{
+                  width: `${Math.max(
+                    ((currentIndex + 1) / total) * 100,
+                    progress.percentage
+                  )}%`,
+                }}
+              />
+            </div>
+
+            <h2 className="mt-8 text-xl font-semibold leading-8 md:text-2xl">
               {currentQuestion.prompt}
-            </div>
+            </h2>
 
-            <div className="mt-5 grid gap-2">
-              {currentQuestion.options.map((opt) => {
-                const selected = answers[currentQuestion.code] === opt.code;
+            <div className="mt-6 space-y-3">
+              {currentQuestion.options.map((option) => {
+                const selected =
+                  answers[currentQuestion.code] === option.code;
 
                 return (
                   <button
-                    key={opt.code}
+                    key={option.code}
                     type="button"
-                    className={[
-                      "rounded-xl border px-4 py-3 text-left transition",
-                      selected
-                        ? "border-white/40 bg-white/15"
-                        : "border-white/10 bg-white/5 hover:bg-white/10",
-                    ].join(" ")}
                     onClick={() =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [currentQuestion.code]: opt.code,
-                      }))
+                      chooseAnswer(currentQuestion.code, option.code)
                     }
+                    className={[
+                      "w-full rounded-2xl border p-4 text-left transition",
+                      selected
+                        ? "border-cyan-300 bg-cyan-300/10"
+                        : "border-white/10 bg-white/[0.03] hover:border-white/30 hover:bg-white/[0.06]",
+                    ].join(" ")}
                   >
-                    <div className="text-sm text-white/60">{opt.code}</div>
-                    <div className="mt-1">{opt.label}</div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                      {option.code}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-white">
+                      {option.label}
+                    </p>
                   </button>
                 );
               })}
             </div>
 
-            <div className="mt-6 flex items-center justify-between gap-3">
+            <div className="mt-8 flex items-center justify-between gap-4">
               <button
                 type="button"
                 onClick={goBack}
-                disabled={index === 0}
-                className={[
-                  "rounded-xl border px-4 py-2 transition",
-                  index === 0
-                    ? "cursor-not-allowed border-white/10 bg-white/5 text-white/40"
-                    : "border-white/10 bg-white/5 hover:bg-white/10",
-                ].join(" ")}
+                className="rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
               >
                 Back
               </button>
 
-              {index < total - 1 ? (
+              {currentIndex < total - 1 ? (
                 <button
                   type="button"
                   onClick={goNext}
                   disabled={!answers[currentQuestion.code]}
                   className={[
-                    "rounded-xl px-5 py-2 font-medium transition",
+                    "rounded-xl px-5 py-3 text-sm font-semibold transition",
                     answers[currentQuestion.code]
-                      ? "bg-white text-black hover:bg-white/90"
-                      : "cursor-not-allowed bg-white/20 text-white/50",
+                      ? "bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                      : "cursor-not-allowed bg-white/10 text-white/40",
                   ].join(" ")}
                 >
                   Next
@@ -366,22 +385,70 @@ export default function McasWizardClient({
               ) : (
                 <button
                   type="button"
-                  onClick={submitAll}
-                  disabled={submitting || !answers[currentQuestion.code]}
+                  onClick={submitAssessment}
+                  disabled={
+                    submitting ||
+                    redirecting ||
+                    !answers[currentQuestion.code]
+                  }
                   className={[
-                    "rounded-xl px-5 py-2 font-medium transition",
-                    !submitting && answers[currentQuestion.code]
-                      ? "bg-white text-black hover:bg-white/90"
-                      : "cursor-not-allowed bg-white/20 text-white/50",
+                    "rounded-xl px-5 py-3 text-sm font-semibold transition",
+                    !submitting &&
+                    !redirecting &&
+                    answers[currentQuestion.code]
+                      ? "bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                      : "cursor-not-allowed bg-white/10 text-white/40",
                   ].join(" ")}
                 >
-                  {submitting ? "Submitting…" : "Submit"}
+                  {redirecting
+                    ? "Opening your report…"
+                    : submitting
+                      ? "Submitting…"
+                      : "View my report"}
                 </button>
               )}
             </div>
-          </div>
+          </section>
         ) : null}
-      </div>
+      </section>
+    </main>
+  );
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 font-medium text-slate-100">{value}</p>
     </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  autoComplete,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: "text" | "email" | "tel";
+  autoComplete?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-slate-400">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+        className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300"
+      />
+    </label>
   );
 }

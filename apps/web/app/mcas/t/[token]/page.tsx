@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import McasWizardClient from "./McasWizardClient";
 
@@ -16,25 +16,33 @@ type PageProps = {
   }>;
 };
 
-type McasTestLinkRow = {
+type McasPartnerApplicationRow = {
   id: string;
   org_id: string;
+  partner_key: string;
+  application_id: string;
   public_token: string;
-  link_type: string;
+  test_link_id: string | null;
   framework_slug: string;
   framework_version: string;
+  status: string;
+  candidate_first_name: string | null;
+  candidate_last_name: string | null;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+};
+
+type McasTestLinkRow = {
+  id: string;
   name: string;
-  contact_owner_name: string | null;
-  recipient_email: string | null;
-  send_email: boolean;
+  link_type:
+    | "candidate_assessment"
+    | "reverse_role_assessment"
+    | "internal_validation";
   report_version: "lite" | "full";
   show_results: boolean;
-  email_report: boolean;
   next_steps_url: string | null;
-  usage_limit_type: "unlimited" | "limited";
-  usage_limit_count: number | null;
   status: "active" | "paused" | "expired" | "archived";
-  settings: Record<string, unknown>;
 };
 
 type McasFrameworkRow = {
@@ -47,7 +55,10 @@ type FrameworkQuestion = {
   code: string;
   prompt: string;
   section?: string;
-  options: { code: string; label: string }[];
+  options: {
+    code: string;
+    label: string;
+  }[];
 };
 
 function mcasSupa() {
@@ -86,10 +97,7 @@ function normaliseQuestion(value: unknown): FrameworkQuestion | null {
 
           if (!optionCode || !label) return null;
 
-          return {
-            code: optionCode,
-            label,
-          };
+          return { code: optionCode, label };
         })
         .filter(
           (option): option is { code: string; label: string } =>
@@ -111,39 +119,73 @@ function questionIndex(code: string) {
   return Number(code.replace("Q", "")) || 0;
 }
 
+function reportUrlForLink(reportToken: string, testLink: McasTestLinkRow) {
+  const encodedReportToken = encodeURIComponent(reportToken);
+
+  if (!testLink.show_results) {
+    return testLink.next_steps_url || `/mcas/r/${encodedReportToken}/snapshot`;
+  }
+
+  return testLink.report_version === "full"
+    ? `/mcas/r/${encodedReportToken}/full`
+    : `/mcas/r/${encodedReportToken}/snapshot`;
+}
+
 export default async function Page({ params }: PageProps) {
   const { token } = await params;
-  const publicToken = (token || "").trim();
+  const applicationPublicToken = String(token || "").trim();
 
-  if (!publicToken) notFound();
+  if (!applicationPublicToken) notFound();
 
   const sb = mcasSupa();
+
+  /*
+   * /mcas/link/[test-link-token] creates a partner_applications row and
+   * redirects here with that new application's public_token.
+   *
+   * This token is NOT mcas.test_links.public_token.
+   */
+  const { data: applicationData, error: applicationError } = await sb
+    .from("partner_applications")
+    .select(
+      [
+        "id",
+        "org_id",
+        "partner_key",
+        "application_id",
+        "public_token",
+        "test_link_id",
+        "framework_slug",
+        "framework_version",
+        "status",
+        "candidate_first_name",
+        "candidate_last_name",
+        "candidate_email",
+        "candidate_phone",
+      ].join(", ")
+    )
+    .eq("public_token", applicationPublicToken)
+    .maybeSingle();
+
+  const application = applicationData as McasPartnerApplicationRow | null;
+
+  if (applicationError || !application) notFound();
+  if (!application.test_link_id) notFound();
 
   const { data: testLinkData, error: testLinkError } = await sb
     .from("test_links")
     .select(
       [
         "id",
-        "org_id",
-        "public_token",
-        "link_type",
-        "framework_slug",
-        "framework_version",
         "name",
-        "contact_owner_name",
-        "recipient_email",
-        "send_email",
+        "link_type",
         "report_version",
         "show_results",
-        "email_report",
         "next_steps_url",
-        "usage_limit_type",
-        "usage_limit_count",
         "status",
-        "settings",
       ].join(", ")
     )
-    .eq("public_token", publicToken)
+    .eq("id", application.test_link_id)
     .maybeSingle();
 
   const testLink = testLinkData as McasTestLinkRow | null;
@@ -157,11 +199,31 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
+  /*
+   * Reopening a completed application token should return the candidate to
+   * the report, rather than allow a duplicate assessment.
+   */
+  if (application.status === "completed") {
+    const { data: completedAssessment } = await sb
+      .from("assessments")
+      .select("report_token")
+      .eq("partner_application_id", application.id)
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const reportToken = String(completedAssessment?.report_token || "").trim();
+
+    if (reportToken) {
+      redirect(reportUrlForLink(reportToken, testLink));
+    }
+  }
+
   const { data: frameworkData, error: frameworkError } = await sb
     .from("frameworks")
     .select("slug, version, definition")
-    .eq("slug", testLink.framework_slug)
-    .eq("version", testLink.framework_version)
+    .eq("slug", application.framework_slug)
+    .eq("version", application.framework_version)
     .maybeSingle();
 
   const framework = frameworkData as McasFrameworkRow | null;
@@ -177,22 +239,24 @@ export default async function Page({ params }: PageProps) {
   const questions = rawQuestions
     .map(normaliseQuestion)
     .filter((question): question is FrameworkQuestion => question !== null)
-    .sort((a, b) => questionIndex(a.code) - questionIndex(b.code));
+    .sort((left, right) => questionIndex(left.code) - questionIndex(right.code));
 
-  if (questions.length === 0) notFound();
+  if (questions.length !== 25) notFound();
 
   return (
     <McasWizardClient
-      token={publicToken}
-      testLink={{
-        id: testLink.id,
-        name: testLink.name,
-        link_type: testLink.link_type,
-        status: testLink.status,
-        recipient_email: testLink.recipient_email,
+      token={applicationPublicToken}
+      application={{
+        application_id: application.application_id,
+        partner_key: application.partner_key,
+        status: application.status,
+        test_link_name: testLink.name,
         report_version: testLink.report_version,
         show_results: testLink.show_results,
-        next_steps_url: testLink.next_steps_url,
+        candidate_first_name: application.candidate_first_name,
+        candidate_last_name: application.candidate_last_name,
+        candidate_email: application.candidate_email,
+        candidate_phone: application.candidate_phone,
       }}
       questions={questions}
     />
