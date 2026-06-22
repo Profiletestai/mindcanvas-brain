@@ -135,6 +135,128 @@ const CORE_COPY: Record<
   },
 };
 
+
+type CareerVerticalStep = {
+  code: "V1" | "V2" | "V3" | "V4" | "V5" | "V6";
+  title: string;
+  description: string;
+};
+
+type CareerVerticalRowState = {
+  label: string;
+  rowClass: string;
+  circleClass: string;
+  badgeClass: string;
+  barClass: string;
+  barWidth: string;
+};
+
+const CAREER_VERTICAL_STEPS: CareerVerticalStep[] = [
+  {
+    code: "V1",
+    title: "Entry / Foundational",
+    description: "Task-level execution and guided delivery.",
+  },
+  {
+    code: "V2",
+    title: "Developing",
+    description: "Growing ownership with structured guidance.",
+  },
+  {
+    code: "V3",
+    title: "Established",
+    description: "Independent delivery and cross-team coordination.",
+  },
+  {
+    code: "V4",
+    title: "Senior Scope",
+    description: "Strategic influence and broader accountability.",
+  },
+  {
+    code: "V5",
+    title: "Strategic Leadership",
+    description: "Organisation-wide direction and system leadership.",
+  },
+  {
+    code: "V6",
+    title: "Executive / Enterprise",
+    description: "Enterprise leadership and long-horizon strategy.",
+  },
+];
+
+function verticalNumber(code: string | null | undefined): number {
+  const match = String(code ?? "").toUpperCase().match(/V([1-6])/);
+
+  return match ? Number(match[1]) : 0;
+}
+
+function getCareerVerticalRowState({
+  rowCode,
+  currentCode,
+  nextCode,
+}: {
+  rowCode: CareerVerticalStep["code"];
+  currentCode: string;
+  nextCode: string | null;
+}): CareerVerticalRowState {
+  const rowLevel = verticalNumber(rowCode);
+  const currentLevel = verticalNumber(currentCode);
+  const nextLevel = verticalNumber(nextCode);
+
+  if (rowLevel < currentLevel) {
+    return {
+      label: "Completed",
+      rowClass: "border-slate-200 bg-white",
+      circleClass: "border-violet-200 bg-violet-50 text-violet-700",
+      badgeClass: "border-violet-200 bg-violet-50 text-violet-700",
+      barClass: "bg-violet-500",
+      barWidth: "100%",
+    };
+  }
+
+  if (rowLevel === currentLevel) {
+    return {
+      label: "Current Fit",
+      rowClass: "border-[#6F5CFF] bg-[#F0EEFF]",
+      circleClass: "border-[#201E41] bg-[#201E41] text-white",
+      badgeClass: "border-[#201E41] bg-[#201E41] text-white",
+      barClass: "bg-[#6F5CFF]",
+      barWidth: "100%",
+    };
+  }
+
+  if (nextLevel && rowLevel === nextLevel) {
+    return {
+      label: "Stretch with support",
+      rowClass: "border-cyan-300 bg-cyan-50",
+      circleClass: "border-cyan-300 bg-cyan-50 text-cyan-800",
+      badgeClass: "border-cyan-300 bg-cyan-50 text-cyan-800",
+      barClass: "bg-cyan-400",
+      barWidth: "38%",
+    };
+  }
+
+  if (nextLevel && rowLevel === nextLevel + 1) {
+    return {
+      label: "Overreach risk",
+      rowClass: "border-amber-300 bg-amber-50",
+      circleClass: "border-amber-300 bg-amber-50 text-amber-800",
+      badgeClass: "border-amber-300 bg-amber-50 text-amber-800",
+      barClass: "bg-amber-300",
+      barWidth: "10%",
+    };
+  }
+
+  return {
+    label: "Not indicated",
+    rowClass: "border-slate-200 bg-slate-50",
+    circleClass: "border-slate-200 bg-slate-100 text-slate-500",
+    badgeClass: "border-slate-200 bg-slate-100 text-slate-500",
+    barClass: "bg-slate-300",
+    barWidth: "0%",
+  };
+}
+
 export default async function McasCandidateSummaryPage({ params }: PageProps) {
   const org = await getMcasOrganisationBySlug(params.org);
 
@@ -1381,8 +1503,6 @@ function CareerVerticalSection({
   next: string | null;
   readinessLabel?: string;
 }) {
-  const currentLevel = Number(current.replace("V", "")) || 1;
-
   return (
     <ReportSection
       id="vertical-readiness"
@@ -1390,34 +1510,146 @@ function CareerVerticalSection({
       eyebrow="08 · Career Vertical Fit and Readiness"
       title="Current scope fit and stretch horizon"
     >
-      <div className="grid gap-6 lg:grid-cols-[350px_1fr] lg:items-center">
-        <div className="rounded-3xl bg-[#0C1B2A] p-6 text-white">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#73E8D7]">
-            Current fit
+      <div className="space-y-7">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[#F7F8FA] p-3 sm:p-5">
+          <img
+            src="/mcas/graphics/career-vertical-fit.png"
+            alt="Career Vertical progression from V1 to V6"
+            className="mx-auto h-auto w-full max-w-[1160px] object-contain"
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <VerticalExplainer
+            icon="↗"
+            title="Increasing scope"
+            copy="Wider impact and responsibility."
+          />
+          <VerticalExplainer
+            icon="◎"
+            title="Increasing complexity"
+            copy="More variables and interdependencies."
+          />
+          <VerticalExplainer
+            icon="★"
+            title="Increasing accountability"
+            copy="Greater ownership and outcomes."
+          />
+        </div>
+
+        <div className="rounded-2xl border border-[#6255E8]/15 bg-[#F7F6FF] px-5 py-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
+            Current result
           </p>
-          <p className="mt-3 text-5xl font-black">{current}</p>
-          <p className="mt-3 text-lg font-semibold">
+          <p className="mt-2 text-lg font-black text-[#201E41]">
             {readinessLabel ?? `${current} fit indicated`}
           </p>
-          <p className="mt-4 text-sm leading-6 text-slate-300">
-            Higher verticals increase ambiguity, scope and accountability. The
-            next level should be treated as a development horizon, not an
-            automatic promotion recommendation.
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            Progression changes work itself. Higher verticals increase ambiguity,
+            scope and accountability. The next level should be treated as a
+            development horizon, not an automatic promotion recommendation.
           </p>
         </div>
 
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5, 6].map((level) => (
-            <VerticalRow
-              key={level}
-              level={level}
-              currentLevel={currentLevel}
-              nextLevel={next ? Number(next.replace("V", "")) : null}
-            />
-          ))}
+          {CAREER_VERTICAL_STEPS.map((step) => {
+            const state = getCareerVerticalRowState({
+              rowCode: step.code,
+              currentCode: current,
+              nextCode: next,
+            });
+
+            return (
+              <CareerVerticalRow
+                key={step.code}
+                step={step}
+                state={state}
+              />
+            );
+          })}
         </div>
       </div>
     </ReportSection>
+  );
+}
+
+function VerticalExplainer({
+  icon,
+  title,
+  copy,
+}: {
+  icon: string;
+  title: string;
+  copy: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#D8DAF3] bg-white px-5 py-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0ECFF] text-lg font-black text-[#6255E8]">
+          {icon}
+        </span>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#4F56E8]">
+            {title}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">{copy}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CareerVerticalRow({
+  step,
+  state,
+}: {
+  step: CareerVerticalStep;
+  state: CareerVerticalRowState;
+}) {
+  return (
+    <div
+      className={[
+        "grid gap-4 rounded-2xl border px-4 py-4",
+        "md:grid-cols-[52px_minmax(0,1fr)_220px_150px] md:items-center",
+        state.rowClass,
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "flex h-10 w-10 items-center justify-center rounded-full border text-sm font-black",
+          state.circleClass,
+        ].join(" ")}
+      >
+        {step.code}
+      </span>
+
+      <div>
+        <p className="text-base font-bold text-[#201E41]">
+          {step.code} · {step.title}
+        </p>
+        <p className="mt-1 text-sm text-slate-600">{step.description}</p>
+      </div>
+
+      <div className="hidden md:block">
+        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div
+            className={`h-full rounded-full ${state.barClass}`}
+            style={{ width: state.barWidth }}
+          />
+        </div>
+      </div>
+
+      <div className="md:text-right">
+        <span
+          className={[
+            "inline-flex rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.11em]",
+            state.badgeClass,
+          ].join(" ")}
+        >
+          {state.label}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -1668,55 +1900,6 @@ function DistributionRow({
   );
 }
 
-function VerticalRow({
-  level,
-  currentLevel,
-  nextLevel,
-}: {
-  level: number;
-  currentLevel: number;
-  nextLevel: number | null;
-}) {
-  const status =
-    level < currentLevel
-      ? "Completed"
-      : level === currentLevel
-        ? "Current Fit"
-        : level === nextLevel
-          ? "Stretch with support"
-          : level === currentLevel + 2
-            ? "Overreach risk"
-            : "Not indicated";
-
-  const classes =
-    status === "Current Fit"
-      ? "border-[#6255E8]/35 bg-[#F0EEFF]"
-      : status === "Stretch with support"
-        ? "border-cyan-300/45 bg-cyan-50"
-        : status === "Overreach risk"
-          ? "border-amber-300/45 bg-amber-50"
-          : "border-slate-200 bg-white";
-
-  return (
-    <div className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${classes}`}>
-      <div className="flex items-center gap-4">
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#201E41] text-sm font-black text-white">
-          V{level}
-        </span>
-        <div>
-          <p className="font-semibold text-[#201E41]">
-            {verticalLabel(level)}
-          </p>
-          <p className="mt-1 text-xs text-slate-600">{verticalCopy(level)}</p>
-        </div>
-      </div>
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#201E41]">
-        {status}
-      </span>
-    </div>
-  );
-}
-
 function NextStepCard({
   icon,
   title,
@@ -1904,31 +2087,6 @@ function getNextVertical(current: string): string | null {
   return `V${number + 1}`;
 }
 
-function verticalLabel(level: number) {
-  const labels: Record<number, string> = {
-    1: "V1 · Entry / Foundational",
-    2: "V2 · Developing",
-    3: "V3 · Established",
-    4: "V4 · Senior Scope",
-    5: "V5 · Strategic Leadership",
-    6: "V6 · Executive / Enterprise",
-  };
-
-  return labels[level] ?? `V${level}`;
-}
-
-function verticalCopy(level: number) {
-  const labels: Record<number, string> = {
-    1: "Task-level execution and guided delivery.",
-    2: "Growing ownership with structured guidance.",
-    3: "Independent delivery and cross-team coordination.",
-    4: "Strategic influence and broader accountability.",
-    5: "Organisation-wide direction and system leadership.",
-    6: "Enterprise leadership and long-horizon strategy.",
-  };
-
-  return labels[level] ?? "Career vertical progression.";
-}
 
 function humaniseRisk(level: "low" | "moderate" | "high") {
   return level === "high" ? "High" : level === "moderate" ? "Moderate" : "Low";
