@@ -8,11 +8,23 @@ import {
   formatMcasDateTime,
   getMcasCandidateDetailById,
   getMcasOrganisationBySlug,
-  type McasCandidateDatabaseRow,
 } from "@/lib/mcas/mcasAdminData";
 import { getMcasCandidateReportAccess } from "@/lib/mcas/mcasCandidateReports";
+import { buildMcasReportPayloadByApplicationId } from "@/lib/mcas/reportPayload";
+import {
+  getMcasInternalReportContent,
+  type McasInternalReportContent,
+} from "@/lib/mcas/mcasInternalReportContent";
+import type {
+  McasAlignmentStatus,
+  McasCoreCode,
+  McasDistributionItem,
+  McasOperatingStyleCode,
+  McasReportPayload,
+} from "@/lib/mcas/reportTypes";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type PageProps = {
   params: {
@@ -21,542 +33,1131 @@ type PageProps = {
   };
 };
 
-type DistributionItem = {
-  code: string;
-  value: number;
+const OS_COLOURS: Record<McasOperatingStyleCode, string> = {
+  OS1: "#300993",
+  OS2: "#9554F8",
+  OS3: "#FD464A",
+  OS4: "#F86B04",
+  OS5: "#047D7B",
+  OS6: "#4F46E5",
+  OS7: "#F7B955",
+  OS8: "#DB2777",
 };
 
-type FlagItem = {
-  label: string;
-  severity: "low" | "medium" | "high";
+const OS_TAGLINES: Record<McasOperatingStyleCode, string> = {
+  OS1: "Moves first",
+  OS2: "Creates momentum",
+  OS3: "Raises people",
+  OS4: "Connects systems",
+  OS5: "Stabilises delivery",
+  OS6: "Builds structure",
+  OS7: "Protects quality",
+  OS8: "Improves systems",
 };
 
-const OS_META: Record<
-  string,
+const OS_NAMES: Record<McasOperatingStyleCode, string> = {
+  OS1: "Visionary",
+  OS2: "Catalyst",
+  OS3: "Motivator",
+  OS4: "Connector",
+  OS5: "Facilitator",
+  OS6: "Coordinator",
+  OS7: "Controller",
+  OS8: "Optimiser",
+};
+
+const CORE_COPY: Record<
+  McasCoreCode,
   {
-    name: string;
-    systemFunction: string;
-    interviewPrompt: string;
+    letter: string;
+    copy: string;
   }
 > = {
-  OS1: {
-    name: "Trailblazer",
-    systemFunction: "Creates direction, momentum and first movement.",
-    interviewPrompt:
-      "Describe a time you had to create direction with limited information. What happened after you set the course?",
+  CREATE: {
+    letter: "C",
+    copy: "Introduces direction, possibility and forward movement.",
   },
-  OS2: {
-    name: "Spark",
-    systemFunction: "Activates attention, buy-in and energy around action.",
-    interviewPrompt:
-      "Tell us about a time you had to build momentum behind an idea that initially had limited support.",
+  ORGANISE: {
+    letter: "O",
+    copy: "Brings people, priorities and structure into alignment.",
   },
-  OS3: {
-    name: "Uplifter",
-    systemFunction: "Builds trust, engagement and sustained human commitment.",
-    interviewPrompt:
-      "Describe a time you had to hold performance expectations while supporting a team under pressure.",
+  RESOLVE: {
+    letter: "R",
+    copy: "Closes gaps, delivers outcomes and stabilises execution.",
   },
-  OS4: {
-    name: "Bridgebuilder",
-    systemFunction: "Aligns people, priorities and dependencies across work.",
-    interviewPrompt:
-      "Describe a cross-functional project with competing priorities. How did you move it to completion?",
-  },
-  OS5: {
-    name: "Steadyhand",
-    systemFunction: "Protects reliable delivery, consistency and operational stability.",
-    interviewPrompt:
-      "Tell us about a time you maintained delivery when circumstances changed around you.",
-  },
-  OS6: {
-    name: "Organiser",
-    systemFunction: "Builds structure, cadence and repeatable execution.",
-    interviewPrompt:
-      "Show us how you created a process or operating rhythm that improved reliability across a team.",
-  },
-  OS7: {
-    name: "Analyst",
-    systemFunction: "Protects evidence, quality, risk awareness and judgement.",
-    interviewPrompt:
-      "Walk us through a decision where your analysis materially changed the direction or reduced risk.",
-  },
-  OS8: {
-    name: "Refiner",
-    systemFunction: "Improves quality, raises standards and guides controlled change.",
-    interviewPrompt:
-      "Describe an improvement you led. How did you avoid over-refining and ensure the work still shipped?",
-  },
-};
-
-const CORE_META: Record<
-  string,
-  {
-    name: string;
-    short: string;
-    description: string;
-  }
-> = {
-  C: {
-    name: "Create",
-    short: "C",
-    description: "Initiates direction, ideas and forward movement.",
-  },
-  O: {
-    name: "Organise",
-    short: "O",
-    description: "Aligns people, priorities and structure so work can move coherently.",
-  },
-  R: {
-    name: "Resolve",
-    short: "R",
-    description: "Executes, delivers and stabilises outcomes.",
-  },
-  E: {
-    name: "Examine",
-    short: "E",
-    description: "Evaluates, tests and improves quality and accuracy.",
+  EXAMINE: {
+    letter: "E",
+    copy: "Protects judgement, quality, evidence and improvement.",
   },
 };
 
 export default async function McasCandidateSummaryPage({ params }: PageProps) {
   const org = await getMcasOrganisationBySlug(params.org);
 
-  if (!org) notFound();
+  if (!org) {
+    notFound();
+  }
 
   const candidate = await getMcasCandidateDetailById({
     orgId: org.id,
     candidateId: params.candidateId,
   });
 
-  if (!candidate) notFound();
+  if (!candidate) {
+    notFound();
+  }
 
   const reportAccess = await getMcasCandidateReportAccess({
     orgId: org.id,
     candidateId: params.candidateId,
   });
 
-  if (!reportAccess.isReady || !reportAccess.reportToken) {
+  if (!reportAccess.isReady) {
     return (
-      <main className="mcas-summary-page min-h-screen bg-[#07111E] px-6 py-10 text-white">
-        <section className="mcas-summary-shell mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/[0.04] p-8">
-          <Link
-            href={`/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}`}
-            className="mcas-summary-no-print text-sm font-semibold text-cyan-300 hover:text-cyan-200"
-          >
-            ← Back to candidate profile
-          </Link>
-
-          <p className="mt-8 text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
-            Candidate Summary Report
-          </p>
-
-          <h1 className="mt-3 text-3xl font-semibold">
-            Report not available yet
-          </h1>
-
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
-            {reportAccess.reason ??
-              "The candidate must complete the MCAS assessment before the internal summary report can be prepared."}
-          </p>
-        </section>
-      </main>
+      <ReportUnavailable
+        orgSlug={org.slug}
+        candidateId={candidate.partnerApplicationId}
+        candidateName={candidate.fullName}
+        reason={reportAccess.reason ?? "The assessment has not been scored yet."}
+      />
     );
   }
 
-  const osItems = readDistribution(candidate.rawOsDistribution);
-  const coreItems = readDistribution(candidate.rawCoreDistribution);
-  const primaryOs = osItems[0] ?? null;
-  const secondaryOs = osItems[1] ?? null;
-  const dominantOs = primaryOs
-    ? getOperatingStyle(primaryOs.code)
-    : {
-        name: candidate.primaryOS ?? "Operating style pending",
-        systemFunction: "No operating style distribution is available yet.",
-        interviewPrompt:
-          "Use a structured work-example interview to validate the candidate's natural execution pattern.",
-      };
+  let payload: McasReportPayload;
 
-  const primaryCore = coreItems[0] ?? null;
-  const weakestCore = coreItems[coreItems.length - 1] ?? null;
-  const flags = readFlags(candidate.rawFlags);
-  const risk = getRiskSummary(flags, weakestCore);
-  const currentVertical = candidate.verticalReadiness ?? "Not indicated";
-  const nextVertical = nextVerticalLabel(currentVertical);
-  const interviewAreas = buildInterviewAreas(
-    candidate,
-    dominantOs,
-    weakestCore,
-    currentVertical
-  );
+  try {
+    payload = await buildMcasReportPayloadByApplicationId(
+      candidate.partnerApplicationId,
+      "internal_decision"
+    );
+  } catch (error) {
+    const reason =
+      error instanceof Error
+        ? error.message
+        : "The report payload could not be prepared.";
 
-  const candidateReportHref = reportAccess.candidateReportUrl ?? null;
+    return (
+      <ReportUnavailable
+        orgSlug={org.slug}
+        candidateId={candidate.partnerApplicationId}
+        candidateName={candidate.fullName}
+        reason={reason}
+      />
+    );
+  }
+
+  const primaryOs = payload.result.operatingStyle.primary;
+  const secondaryOs = payload.result.operatingStyle.secondary;
+  const primaryVertical = payload.result.careerVertical.primary;
+  const primaryCore = payload.result.core.strongest;
+  const weakestCore = payload.result.core.weakest;
+  const confidencePercent =
+    payload.result.confidence.score ?? primaryOs.percentage;
+  const alignment = payload.internal?.roleFit?.alignmentStatus;
+  const alignmentMeta = getAlignmentMeta(alignment);
+  const riskLevel =
+    payload.internal?.riskLevel ?? inferRiskLevel(payload.result.flags);
+  const roleRows = getRoleFitRows(payload);
+  const content = getMcasInternalReportContent(payload);
+  const nextVertical = getNextVertical(primaryVertical.code);
+
   const backHref = `/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}`;
+  const candidateReportHref = reportAccess.candidateReportUrl;
 
   return (
-    <main className="mcas-summary-page min-h-screen bg-[#07111E] px-5 py-6 text-[#0D0F1C] md:px-8">
-      <div className="mcas-summary-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#F7F8FC] shadow-2xl">
-        <header className="bg-[#EDEAFF] px-6 py-6 md:px-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <Link
-                href={backHref}
-                className="mcas-summary-no-print text-sm font-semibold text-[#6255E8] hover:text-[#4C3ED2]"
-              >
-                ← Back to candidate profile
-              </Link>
+    <main className="mcas-summary-page min-h-screen bg-[#090B18] py-6 text-[#171429]">
+      <div className="mcas-summary-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
+        <ReportHeader
+          payload={payload}
+          candidateReportHref={candidateReportHref}
+          candidateReportLabel={reportAccess.candidateReportLabel}
+          backHref={backHref}
+        />
 
-              <p className="mt-7 text-sm font-semibold uppercase tracking-[0.24em] text-[#6255E8]">
-                MindCanvas CORE Alignment System
-              </p>
+        <Hero
+          payload={payload}
+          confidencePercent={confidencePercent}
+          alignmentMeta={alignmentMeta}
+          riskLevel={riskLevel}
+          content={content}
+        />
 
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#191733] md:text-4xl">
-                Candidate Summary Report
-              </h1>
+        <div className="mcas-summary-layout grid gap-6 px-6 py-8 md:px-8 lg:grid-cols-[265px_minmax(0,1fr)]">
+          <Sidebar />
 
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                Internal decision support - alignment status, operating pattern,
-                readiness, risk indicators and interview validation priorities.
-              </p>
-            </div>
-
-            <div className="mcas-summary-no-print flex flex-wrap gap-3 xl:justify-end">
-              <CandidateSummaryDownloadButton />
-
-              {candidateReportHref ? (
-                <a
-                  href={candidateReportHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center justify-center rounded-xl bg-[#191733] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2B2858]"
-                >
-                  View Candidate Report ↗
-                </a>
-              ) : null}
-            </div>
+          <div className="space-y-8">
+            <WelcomeSection
+              candidateName={payload.candidate.fullName}
+              content={content}
+            />
+            <HowToUseSection />
+            <McasModelSection />
+            <OperatingStyleIdentitySection payload={payload} content={content} />
+            <OperatingStyleDistributionSection payload={payload} content={content} />
+            <CoreBalanceSection payload={payload} content={content} />
+            <RoleFitSection
+              rows={roleRows}
+              alignmentMeta={alignmentMeta}
+              roleTitle={payload.internal?.roleBlueprint?.title ?? null}
+            />
+            <CareerVerticalSection
+              current={primaryVertical.code}
+              next={nextVertical}
+              readinessLabel={payload.result.careerVertical.readinessLabel}
+            />
+            <RiskSection risks={content.risks} />
+            <InterviewSection items={content.interviewFocus} />
+            <NextStepsSection backHref={backHref} />
           </div>
-
-          <div className="mt-7 grid gap-3 md:grid-cols-3">
-            <MetaCard label="Prepared for" value={candidate.fullName} />
-            <MetaCard
-              label="Assessment date"
-              value={formatMcasDateTime(candidate.assessmentDate)}
-            />
-            <MetaCard
-              label="Framework"
-              value={reportAccess.reportVersion === "full" ? "Full MCAS Report" : "Lite MCAS Report"}
-            />
-          </div>
-        </header>
-
-        <section className="bg-[#0B1727] px-6 py-8 text-white md:px-8">
-          <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#72E4D5]">
-                Executive summary
-              </p>
-
-              <h2 className="mt-3 text-3xl font-black tracking-[-0.04em]">
-                Candidate pattern complete.
-              </h2>
-
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
-                MCAS has assessed this candidate&apos;s observable execution
-                pattern, work-cycle coverage and current career-vertical
-                readiness. Role-specific alignment remains pending until a target
-                role blueprint is attached to this assessment.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Recommendation status
-              </p>
-              <p className="mt-2 text-xl font-bold text-white">
-                Further validation required
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Use the structured interview focus areas below before making a
-                role-fit decision.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <SummaryMetric
-              label="Operating Style"
-              value={dominantOs.name}
-              detail={primaryOs ? `${formatPct(primaryOs.value)} dominant` : "Pending"}
-            />
-            <SummaryMetric
-              label="Career Vertical"
-              value={currentVertical}
-              detail={nextVertical ? `${nextVertical} is the next scope step` : "Readiness signal"}
-            />
-            <SummaryMetric
-              label="Risk Level"
-              value={risk.level}
-              detail={risk.detail}
-            />
-            <SummaryMetric
-              label="Role Fit"
-              value="Pending"
-              detail="No role blueprint attached"
-            />
-          </div>
-        </section>
-
-        <div className="mcas-summary-grid grid gap-7 bg-[#F7F8FC] px-6 py-8 md:px-8">
-          <ReportSection
-            number="01"
-            title="Operating Style Distribution and Confidence"
-            subtitle="How the candidate naturally executes work."
-          >
-            <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-              <div className="rounded-3xl bg-[#F0EEFF] p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6255E8]">
-                  Dominant operating style
-                </p>
-                <p className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#201E41]">
-                  {dominantOs.name}
-                </p>
-                <p className="mt-4 text-sm leading-6 text-slate-700">
-                  {dominantOs.systemFunction}
-                </p>
-
-                {secondaryOs ? (
-                  <div className="mt-6 border-t border-[#6255E8]/15 pt-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Secondary influence
-                    </p>
-                    <p className="mt-2 font-semibold text-[#201E41]">
-                      {getOperatingStyle(secondaryOs.code).name} - {formatPct(secondaryOs.value)}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="space-y-3">
-                {osItems.length > 0 ? (
-                  osItems.map((item, index) => (
-                    <DistributionRow
-                      key={item.code}
-                      label={getOperatingStyle(item.code).name}
-                      value={item.value}
-                      descriptor={index === 0 ? "Dominant" : index === 1 ? "Secondary" : "Supporting"}
-                      accent={index === 0}
-                    />
-                  ))
-                ) : (
-                  <EmptyState text="No operating style distribution is available for this assessment." />
-                )}
-              </div>
-            </div>
-          </ReportSection>
-
-          <ReportSection
-            number="02"
-            title="CORE Behavioural Balance and Work Cycle Coverage"
-            subtitle="Which parts of the work cycle the candidate naturally drives, supports or undercovers."
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {["C", "O", "R", "E"].map((code) => {
-                const item = coreItems.find((core) => core.code.toUpperCase() === code);
-                const meta = CORE_META[code];
-                const isHighest = primaryCore?.code.toUpperCase() === code;
-                const isLowest = weakestCore?.code.toUpperCase() === code;
-
-                return (
-                  <div
-                    key={code}
-                    className={[
-                      "rounded-2xl border p-5",
-                      isHighest
-                        ? "border-[#6359F1]/30 bg-[#F0EEFF]"
-                        : isLowest
-                          ? "border-amber-300/40 bg-amber-50"
-                          : "border-slate-200 bg-white",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#201E41] text-sm font-black text-white">
-                        {meta.short}
-                      </span>
-                      <span className="text-2xl font-black text-[#201E41]">
-                        {item ? formatPct(item.value) : "—"}
-                      </span>
-                    </div>
-
-                    <p className="mt-5 text-lg font-bold text-[#201E41]">{meta.name}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{meta.description}</p>
-
-                    <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-[#6255E8]">
-                      {isHighest ? "Strongest coverage" : isLowest ? "Support recommended" : "Supporting coverage"}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </ReportSection>
-
-          <ReportSection
-            number="03"
-            title="Role Fit Assessment"
-            subtitle="Candidate pattern can only be assessed against a defined target role."
-          >
-            <div className="rounded-3xl border border-amber-300/40 bg-amber-50 p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-800">
-                Role blueprint required
-              </p>
-              <h3 className="mt-3 text-2xl font-black tracking-[-0.04em] text-[#3A2C10]">
-                No role-specific alignment decision has been calculated.
-              </h3>
-              <p className="mt-4 max-w-4xl text-sm leading-6 text-[#624D20]">
-                This candidate has a valid MCAS assessment, but the current test
-                link does not store a target role blueprint, target vertical or
-                required work-environment conditions. The system can therefore
-                show candidate pattern and readiness, but it should not label the
-                person aligned or misaligned to a role yet.
-              </p>
-
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
-                <RoleFitNeed label="Target role" value="Not attached" />
-                <RoleFitNeed label="Target vertical" value="Not attached" />
-                <RoleFitNeed label="Role environment" value="Not attached" />
-              </div>
-            </div>
-          </ReportSection>
-
-          <ReportSection
-            number="04"
-            title="Career Vertical Fit and Readiness"
-            subtitle="Progression changes scope, complexity and accountability."
-          >
-            <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-              <div className="rounded-3xl bg-[#0D1B2A] p-6 text-white">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#72E4D5]">
-                  Current fit
-                </p>
-                <p className="mt-3 text-4xl font-black">
-                  {currentVertical}
-                </p>
-                <p className="mt-4 text-sm leading-6 text-slate-300">
-                  Current scoring indicates the candidate&apos;s most sustainable
-                  present scope of responsibility.
-                </p>
-
-                {nextVertical ? (
-                  <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.07] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                      Development horizon
-                    </p>
-                    <p className="mt-2 font-semibold text-white">
-                      {nextVertical} - stretch with evidence and support
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5, 6].map((level) => (
-                  <VerticalRow
-                    key={level}
-                    level={level}
-                    currentVertical={currentVertical}
-                  />
-                ))}
-              </div>
-            </div>
-          </ReportSection>
-
-          <ReportSection
-            number="05"
-            title="Risk Flags and Sustainability Notes"
-            subtitle="Predictable conditions that should be validated before placement."
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              {risk.items.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-rose-200 bg-rose-50 p-5"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.17em] text-rose-700">
-                    {item.category}
-                  </p>
-                  <h3 className="mt-3 text-lg font-bold text-[#3E1521]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#6A3340]">
-                    {item.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </ReportSection>
-
-          <ReportSection
-            number="06"
-            title="Suggested Interview Focus Areas"
-            subtitle="Use these structured prompts to validate evidence, not to confirm a label."
-          >
-            <div className="grid gap-4 lg:grid-cols-2">
-              {interviewAreas.map((item, index) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-[#6255E8]/20 bg-[#F7F6FF] p-5"
-                >
-                  <div className="flex items-start gap-4">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#6255E8] text-sm font-black text-white">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.17em] text-[#6255E8]">
-                        Validation area
-                      </p>
-                      <h3 className="mt-2 text-lg font-bold text-[#201E41]">
-                        {item.title}
-                      </h3>
-                      <p className="mt-3 text-sm leading-6 text-slate-700">
-                        {item.question}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ReportSection>
         </div>
-
-        <footer className="mcas-summary-no-print bg-[#0D1B2A] px-6 py-8 text-white md:px-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-lg font-bold">Use this as decision support, not a verdict.</p>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-                MCAS explains observable work patterns, readiness and likely
-                sustainability conditions. It does not measure intelligence,
-                mental health, morality or personal worth.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <CandidateSummaryDownloadButton />
-              <Link
-                href={backHref}
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.08]"
-              >
-                Back to Profile
-              </Link>
-            </div>
-          </div>
-        </footer>
       </div>
     </main>
   );
 }
 
+function ReportUnavailable({
+  orgSlug,
+  candidateId,
+  candidateName,
+  reason,
+}: {
+  orgSlug: string;
+  candidateId: string;
+  candidateName: string;
+  reason: string;
+}) {
+  return (
+    <main className="min-h-screen bg-[#090B18] px-6 py-12 text-white">
+      <section className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/[0.04] p-8">
+        <Link
+          href={`/admin/mcas/${orgSlug}/database/${candidateId}`}
+          className="text-sm font-semibold text-cyan-300 hover:text-cyan-200"
+        >
+          ← Back to candidate profile
+        </Link>
+
+        <p className="mt-8 text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+          Candidate Summary Report
+        </p>
+
+        <h1 className="mt-3 text-3xl font-semibold">
+          {candidateName}&apos;s report is not ready yet
+        </h1>
+
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
+          {reason}
+        </p>
+      </section>
+    </main>
+  );
+}
+
+function ReportHeader({
+  payload,
+  candidateReportHref,
+  candidateReportLabel,
+  backHref,
+}: {
+  payload: McasReportPayload;
+  candidateReportHref: string | null;
+  candidateReportLabel: string | null;
+  backHref: string;
+}) {
+  return (
+    <header className="bg-[#EEEAFE] px-6 py-6 md:px-8">
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <Link
+            href={backHref}
+            className="mcas-summary-no-print text-sm font-semibold text-[#6255E8] hover:text-[#4C3ED2]"
+          >
+            ← Back to candidate profile
+          </Link>
+
+          <p className="mt-7 text-sm font-semibold uppercase tracking-[0.25em] text-[#6255E8]">
+            MindCanvas CORE Alignment System
+          </p>
+
+          <h1 className="mt-3 text-3xl font-black uppercase leading-tight tracking-[0.08em] text-[#2A2453] md:text-[34px]">
+            Candidate Summary &amp; Report
+          </h1>
+        </div>
+
+        <div className="mcas-summary-no-print flex flex-wrap gap-3 xl:justify-end">
+          <CandidateSummaryDownloadButton />
+
+          {candidateReportHref ? (
+            <a
+              href={candidateReportHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center rounded-xl bg-[#1A1836] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2B2858]"
+            >
+              {candidateReportLabel ?? "View Candidate Report"} ↗
+            </a>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-7 grid gap-3 md:grid-cols-3">
+        <MetaCard label="Prepared for" value={payload.candidate.fullName} />
+        <MetaCard
+          label="Date"
+          value={formatMcasDateTime(payload.assessment.completedAt)}
+        />
+        <MetaCard label="Framework" value="Candidate Summary & Report" />
+      </div>
+    </header>
+  );
+}
+
+function Hero({
+  payload,
+  confidencePercent,
+  alignmentMeta,
+  riskLevel,
+  content,
+}: {
+  payload: McasReportPayload;
+  confidencePercent: number;
+  alignmentMeta: AlignmentMeta;
+  riskLevel: "low" | "moderate" | "high";
+  content: McasInternalReportContent;
+}) {
+  const primary = payload.result.operatingStyle.primary;
+  const secondary = payload.result.operatingStyle.secondary;
+  const vertical = payload.result.careerVertical.primary;
+
+  return (
+    <>
+      <section className="bg-[#12112A] px-6 py-8 text-white md:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#73E8D7]">
+          Candidate Summary &amp; Report
+        </p>
+
+        <h2 className="mt-3 text-4xl font-black tracking-[-0.04em] md:text-5xl">
+          {payload.candidate.fullName}
+        </h2>
+
+        <p className="mt-4 max-w-4xl text-sm leading-6 text-slate-300">
+          Structured decision support — alignment status, operating style,
+          vertical readiness and role-fit assessment.
+        </p>
+
+        <div className="mt-7 grid gap-4 md:grid-cols-3">
+          <HeroMetric
+            label="Vertical"
+            value={`${vertical.code} Ready`}
+            detail="Current Fit Range"
+            accent="cyan"
+          />
+          <HeroMetric
+            label="Alignment"
+            value={alignmentMeta.label}
+            detail={alignmentMeta.shortDetail}
+            accent={alignmentMeta.accent}
+          />
+          <HeroMetric
+            label="Risk Level"
+            value={humaniseRisk(riskLevel)}
+            detail={
+              riskLevel === "low"
+                ? "No critical flags"
+                : "Validate risk indicators"
+            }
+            accent={riskLevel === "high" ? "rose" : riskLevel === "moderate" ? "amber" : "cyan"}
+          />
+        </div>
+      </section>
+
+      <section className="bg-[#0A1522] px-6 py-8 text-white md:px-8">
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.21em] text-[#73E8D7]">
+              Dominant operating style
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-end gap-5">
+              <div
+                className="flex h-24 w-24 items-center justify-center rounded-full text-3xl font-black text-white shadow-lg"
+                style={{ background: OS_COLOURS[primary.code] }}
+              >
+                {Math.round(primary.percentage)}%
+              </div>
+
+              <div>
+                <h3 className="text-3xl font-black tracking-[-0.04em]">
+                  {primary.label}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {content.primary.systemFunction}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <SummaryCallout
+                label="Alignment status"
+                value={alignmentMeta.label}
+                detail={alignmentMeta.description}
+              />
+              <SummaryCallout
+                label="Vertical readiness"
+                value={`${vertical.code} Ready`}
+                detail={`${vertical.label}. ${
+                  getNextVertical(vertical.code)
+                    ? `${getNextVertical(vertical.code)} is the next stretch horizon.`
+                    : "Enterprise scope readiness indicated."
+                }`}
+              />
+            </div>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#73E8D7]">
+                Sustainable contribution context
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {content.primary.environmentSummary}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Operating style distribution
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {payload.result.operatingStyle.distribution.slice(0, 4).map((item, index) => (
+                <div key={item.code} className="flex items-center gap-3">
+                  <span
+                    className="h-3 w-3 rounded-full"
+                    style={{ background: OS_COLOURS[item.code] }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-semibold text-white">{item.label}</span>
+                      <span className="font-black text-[#73E8D7]">
+                        {Math.round(item.percentage)}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          background: OS_COLOURS[item.code],
+                          width: `${Math.max(4, Math.min(100, item.percentage))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {index === 0 ? (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#73E8D7]">
+                      Dominant
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            {secondary ? (
+              <p className="mt-5 border-t border-white/10 pt-4 text-sm leading-6 text-slate-300">
+                Secondary influence:{" "}
+                <span className="font-semibold text-white">
+                  {secondary.label}
+                </span>{" "}
+                at {Math.round(secondary.percentage)}%.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function Sidebar() {
+  const links = [
+    ["welcome", "Welcome from MindCanvas"],
+    ["how-to-use", "How to use this report"],
+    ["mcas-model", "Introducing the MCAS Model"],
+    ["operating-identity", "Operating Style Identity System"],
+    ["operating-distribution", "Operating Style Distribution and Confidence"],
+    ["core-balance", "CORE Behavioural Balance and Work Cycle Coverage"],
+    ["role-fit", "Role Fit Assessment"],
+    ["vertical-readiness", "Career Vertical Fit and Readiness"],
+    ["risk-flags", "Risk Flags and Sustainability Notes"],
+    ["interview-focus", "Suggested Interview Focus Areas"],
+    ["next-steps", "Your next steps"],
+  ];
+
+  return (
+    <aside className="mcas-summary-no-print h-fit rounded-3xl border border-white/10 bg-[#1C1A3A] p-5 text-white lg:sticky lg:top-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#73E8D7]">
+        Report Index
+      </p>
+
+      <nav className="mt-5 space-y-2">
+        {links.map(([id, label], index) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            className="block rounded-xl border border-white/15 px-4 py-3 text-sm leading-5 text-white transition hover:border-[#73E8D7]/60 hover:bg-white/[0.07]"
+          >
+            {index + 1}. {label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="mt-5 space-y-3">
+        <CandidateSummaryDownloadButton className="w-full" />
+        <a
+          href="#next-steps"
+          className="block rounded-xl bg-gradient-to-r from-[#46DCD4] via-[#4B8CFF] to-[#8A5CF6] px-4 py-3 text-center text-sm font-bold text-white"
+        >
+          Next steps
+        </a>
+      </div>
+    </aside>
+  );
+}
+
+function WelcomeSection({
+  candidateName,
+  content,
+}: {
+  candidateName: string;
+  content: McasInternalReportContent;
+}) {
+  return (
+    <ReportSection
+      id="welcome"
+      icon="/mcas/report-icons/welcome-icon.png"
+      eyebrow="01 · Welcome"
+      title={`Welcome, ${candidateName}`}
+    >
+      <p className="max-w-5xl text-sm leading-7 text-slate-700">
+        This internal MCAS report is designed to support a structured hiring,
+        placement or progression conversation. It explains the candidate&apos;s
+        natural execution pattern, CORE work-cycle coverage and likely current
+        career-vertical fit. It should be read alongside role context,
+        work-history evidence and a structured interview — never as a standalone
+        judgement.
+      </p>
+
+      <div className="mt-6 rounded-2xl border border-[#6255E8]/15 bg-[#F7F6FF] p-5">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
+          Candidate pattern in context
+        </p>
+        <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-700">
+          {content.executiveSummary}
+        </p>
+      </div>
+    </ReportSection>
+  );
+}
+
+function HowToUseSection() {
+  return (
+    <ReportSection
+      id="how-to-use"
+      icon="/mcas/report-icons/how-to-use-this-report.png"
+      eyebrow="02 · How to use this report"
+      title="Use pattern data to improve the quality of the decision"
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        <InfoTile
+          number="01"
+          title="Read the pattern"
+          copy="Start with how the candidate naturally moves work, rather than treating any Operating Style as better or worse."
+        />
+        <InfoTile
+          number="02"
+          title="Check the role context"
+          copy="Compare the candidate against the role's required work cycle, operating environment and career-vertical scope."
+        />
+        <InfoTile
+          number="03"
+          title="Validate evidence"
+          copy="Use the interview prompts to test real examples, especially where a role requires behaviour outside the candidate's dominant pattern."
+        />
+      </div>
+    </ReportSection>
+  );
+}
+
+function McasModelSection() {
+  return (
+    <ReportSection
+      id="mcas-model"
+      icon="/mcas/report-icons/learn-about-mcas.png"
+      eyebrow="03 · Introducing the MCAS model"
+      title="MCAS connects three layers of sustainable performance"
+    >
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr] lg:items-center">
+        <img
+          src="/mcas/graphics/operating-style-system.png"
+          alt="MCAS operating style system"
+          className="mx-auto h-auto w-full max-w-[350px] object-contain"
+        />
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <ModelCard
+            title="CORE"
+            copy="Shows which parts of the work cycle a candidate naturally drives, supports or undercovers."
+          />
+          <ModelCard
+            title="Operating Style"
+            copy="Shows the candidate's most natural pattern for creating value and moving work forward."
+          />
+          <ModelCard
+            title="Career Vertical"
+            copy="Shows the level of scope, ambiguity and accountability the candidate can currently sustain."
+          />
+        </div>
+      </div>
+    </ReportSection>
+  );
+}
+
+function OperatingStyleIdentitySection({
+  payload,
+  content,
+}: {
+  payload: McasReportPayload;
+  content: McasInternalReportContent;
+}) {
+  const primaryCode = payload.result.operatingStyle.primary.code;
+
+  return (
+    <ReportSection
+      id="operating-identity"
+      icon="/mcas/report-icons/operating-style-identity-system.png"
+      eyebrow="04 · Operating style identity system"
+      title="The operating style reveals how the candidate naturally executes work"
+    >
+      <p className="max-w-5xl text-sm leading-7 text-slate-700">
+        The distribution below reflects scored pattern strength, not a ranking
+        against other people. Every Operating Style performs a different system
+        function; sustainable fit depends on whether that function is needed in
+        the role and environment.
+      </p>
+
+      <div className="mt-6 rounded-2xl border border-[#6255E8]/15 bg-[#F7F6FF] p-5">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
+          Candidate system function
+        </p>
+        <p className="mt-2 text-lg font-bold text-[#201E41]">
+          {content.primary.systemFunction}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          {content.primary.executionSummary}
+        </p>
+      </div>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {(Object.keys(OS_NAMES) as McasOperatingStyleCode[]).map((code) => {
+          const active = code === primaryCode;
+
+          return (
+            <div
+              key={code}
+              className={[
+                "rounded-2xl border p-4",
+                active
+                  ? "border-[#6F5CFF]/50 bg-[#F0EEFF] ring-1 ring-[#6F5CFF]/20"
+                  : "border-slate-200 bg-white",
+              ].join(" ")}
+            >
+              <span
+                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                style={{ background: OS_COLOURS[code] }}
+              >
+                {code.replace("OS", "")}
+              </span>
+              <p className="mt-4 font-bold text-[#201E41]">{OS_NAMES[code]}</p>
+              <p className="mt-1 text-sm text-slate-500">{OS_TAGLINES[code]}</p>
+              {active ? (
+                <p className="mt-3 text-xs font-bold uppercase tracking-[0.15em] text-[#6255E8]">
+                  Candidate profile
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </ReportSection>
+  );
+}
+
+function OperatingStyleDistributionSection({
+  payload,
+  content,
+}: {
+  payload: McasReportPayload;
+  content: McasInternalReportContent;
+}) {
+  const primary = payload.result.operatingStyle.primary;
+  const secondary = payload.result.operatingStyle.secondary;
+  const confidence = payload.result.confidence.score ?? primary.percentage;
+
+  return (
+    <ReportSection
+      id="operating-distribution"
+      icon="/mcas/report-icons/operating-style-identity-system.png"
+      eyebrow="05 · Operating Style Distribution and Confidence"
+      title="Pattern strength and confidence"
+    >
+      <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
+        <div className="rounded-3xl bg-[#F0EEFF] p-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#6255E8]">
+            Dominant operating style
+          </p>
+
+          <div
+            className="mt-5 flex h-28 w-28 items-center justify-center rounded-full text-3xl font-black text-white shadow-lg"
+            style={{ background: OS_COLOURS[primary.code] }}
+          >
+            {Math.round(primary.percentage)}%
+          </div>
+
+          <h3 className="mt-5 text-3xl font-black tracking-[-0.04em] text-[#201E41]">
+            {primary.label}
+          </h3>
+
+          <p className="mt-4 text-sm leading-6 text-slate-700">
+            {content.primary.executionSummary}
+          </p>
+
+          <div className="mt-6 rounded-2xl border border-[#6255E8]/15 bg-white/75 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Pattern confidence
+            </p>
+            <p className="mt-2 text-2xl font-black text-[#201E41]">
+              {Math.round(confidence)}%
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              {payload.result.confidence.level} confidence
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {payload.result.operatingStyle.distribution.map((item) => (
+            <DistributionRow key={item.code} item={item} />
+          ))}
+
+          {secondary && content.secondarySummary ? (
+            <p className="rounded-2xl border border-cyan-300/30 bg-cyan-50 p-4 text-sm leading-6 text-[#174B53]">
+              {content.secondarySummary}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </ReportSection>
+  );
+}
+
+function CoreBalanceSection({
+  payload,
+  content,
+}: {
+  payload: McasReportPayload;
+  content: McasInternalReportContent;
+}) {
+  const strongest = payload.result.core.strongest;
+  const weakest = payload.result.core.weakest;
+
+  return (
+    <ReportSection
+      id="core-balance"
+      icon="/mcas/report-icons/core-behavioural-balance.png"
+      eyebrow="06 · CORE Behavioural Balance and Work Cycle Coverage"
+      title="How the candidate moves work from idea to outcome"
+    >
+      <p className="max-w-5xl text-sm leading-7 text-slate-700">
+        The CORE system maps which parts of the work cycle the candidate
+        naturally drives, supports or undercovers. A lower score does not mean
+        inability; it signals where the role may need conscious structure,
+        partnership or validation.
+      </p>
+
+      <div className="mt-5 rounded-2xl border border-cyan-300/30 bg-cyan-50 p-4 text-sm leading-6 text-[#174B53]">
+        {content.coreSummary}
+      </div>
+
+      <div className="mt-7 grid gap-6 lg:grid-cols-[330px_1fr] lg:items-center">
+        <img
+          src="/mcas/graphics/your-core-behaviour.png"
+          alt="CORE behavioural balance"
+          className="mx-auto h-auto w-full max-w-[320px] object-contain"
+        />
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {(["CREATE", "ORGANISE", "RESOLVE", "EXAMINE"] as McasCoreCode[]).map(
+            (code) => {
+              const item =
+                payload.result.core.distribution.find(
+                  (entry) => entry.code === code
+                ) ?? null;
+              const isStrongest = strongest.code === code;
+              const isWeakest = weakest?.code === code;
+              const copy = CORE_COPY[code];
+
+              return (
+                <div
+                  key={code}
+                  className={[
+                    "rounded-2xl border p-5",
+                    isStrongest
+                      ? "border-[#6255E8]/35 bg-[#F0EEFF]"
+                      : isWeakest
+                        ? "border-amber-300/45 bg-amber-50"
+                        : "border-slate-200 bg-white",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#201E41] text-sm font-black text-white">
+                      {copy.letter}
+                    </span>
+                    <span className="text-2xl font-black text-[#201E41]">
+                      {item ? Math.round(item.percentage) : 0}%
+                    </span>
+                  </div>
+
+                  <p className="mt-5 text-lg font-bold text-[#201E41]">
+                    {item?.label ?? code}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {copy.copy}
+                  </p>
+
+                  <p className="mt-5 text-xs font-bold uppercase tracking-[0.14em] text-[#6255E8]">
+                    {isStrongest
+                      ? "Strongest coverage"
+                      : isWeakest
+                        ? "Support recommended"
+                        : "Supporting coverage"}
+                  </p>
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
+    </ReportSection>
+  );
+}
+
+function RoleFitSection({
+  rows,
+  alignmentMeta,
+  roleTitle,
+}: {
+  rows: RoleFitRow[];
+  alignmentMeta: AlignmentMeta;
+  roleTitle: string | null;
+}) {
+  return (
+    <ReportSection
+      id="role-fit"
+      icon="/mcas/report-icons/role-fit.png"
+      eyebrow="07 · Role Fit Assessment"
+      title="Candidate pattern against the target role blueprint"
+    >
+      <div
+        className={[
+          "rounded-2xl border p-5",
+          alignmentMeta.accent === "emerald"
+            ? "border-emerald-300/35 bg-emerald-50"
+            : alignmentMeta.accent === "amber"
+              ? "border-amber-300/45 bg-amber-50"
+              : alignmentMeta.accent === "rose"
+                ? "border-rose-300/45 bg-rose-50"
+                : "border-slate-200 bg-slate-50",
+        ].join(" ")}
+      >
+        <p className="text-xs font-bold uppercase tracking-[0.17em] text-slate-500">
+          Alignment status
+        </p>
+        <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h3 className="text-2xl font-black text-[#201E41]">
+              {alignmentMeta.label}
+            </h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+              {alignmentMeta.description}
+            </p>
+          </div>
+          {roleTitle ? (
+            <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#201E41] shadow-sm">
+              {roleTitle}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
+        <table className="min-w-[760px] w-full divide-y divide-slate-200 text-left text-sm">
+          <thead className="bg-[#201E41] text-xs uppercase tracking-[0.14em] text-white">
+            <tr>
+              <th className="px-5 py-4 font-semibold">Dimension</th>
+              <th className="px-5 py-4 font-semibold">Candidate Pattern</th>
+              <th className="px-5 py-4 font-semibold">Role Requirement</th>
+              <th className="px-5 py-4 font-semibold">Fit Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 bg-white">
+            {rows.map((row) => (
+              <tr key={row.dimension}>
+                <td className="px-5 py-4 font-semibold text-[#201E41]">
+                  {row.dimension}
+                </td>
+                <td className="px-5 py-4 text-slate-700">{row.candidate}</td>
+                <td className="px-5 py-4 text-slate-600">{row.requirement}</td>
+                <td className="px-5 py-4">
+                  <span className={fitStatusClasses(row.status)}>
+                    {row.statusLabel}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!roleTitle ? (
+        <p className="mt-4 text-sm leading-6 text-slate-500">
+          A target role blueprint has not yet been attached to this assessment.
+          Candidate results are complete; the role-comparison columns will become
+          fully dynamic once the reverse-role assessment or role blueprint record
+          is connected.
+        </p>
+      ) : null}
+    </ReportSection>
+  );
+}
+
+function CareerVerticalSection({
+  current,
+  next,
+  readinessLabel,
+}: {
+  current: string;
+  next: string | null;
+  readinessLabel?: string;
+}) {
+  const currentLevel = Number(current.replace("V", "")) || 1;
+
+  return (
+    <ReportSection
+      id="vertical-readiness"
+      icon="/mcas/report-icons/career-vertical-fit.png"
+      eyebrow="08 · Career Vertical Fit and Readiness"
+      title="Current scope fit and stretch horizon"
+    >
+      <div className="grid gap-6 lg:grid-cols-[350px_1fr] lg:items-center">
+        <div className="rounded-3xl bg-[#0C1B2A] p-6 text-white">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#73E8D7]">
+            Current fit
+          </p>
+          <p className="mt-3 text-5xl font-black">{current}</p>
+          <p className="mt-3 text-lg font-semibold">
+            {readinessLabel ?? `${current} fit indicated`}
+          </p>
+          <p className="mt-4 text-sm leading-6 text-slate-300">
+            Higher verticals increase ambiguity, scope and accountability. The
+            next level should be treated as a development horizon, not an
+            automatic promotion recommendation.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5, 6].map((level) => (
+            <VerticalRow
+              key={level}
+              level={level}
+              currentLevel={currentLevel}
+              nextLevel={next ? Number(next.replace("V", "")) : null}
+            />
+          ))}
+        </div>
+      </div>
+    </ReportSection>
+  );
+}
+
+function RiskSection({
+  risks,
+}: {
+  risks: McasInternalReportContent["risks"];
+}) {
+  return (
+    <ReportSection
+      id="risk-flags"
+      icon="/mcas/report-icons/risk-flags.png"
+      eyebrow="09 · Risk Flags and Sustainability Notes"
+      title="Predictable risks to validate before placement"
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        {risks.map((risk) => (
+          <div
+            key={risk.title}
+            className={[
+              "rounded-2xl border p-5",
+              risk.level === "high"
+                ? "border-rose-300/50 bg-rose-50"
+                : risk.level === "moderate"
+                  ? "border-amber-300/50 bg-amber-50"
+                  : "border-cyan-300/35 bg-cyan-50",
+            ].join(" ")}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+              {humaniseRisk(risk.level)} priority
+            </p>
+            <h3 className="mt-3 text-lg font-bold text-[#201E41]">
+              {risk.title}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {risk.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </ReportSection>
+  );
+}
+
+function InterviewSection({
+  items,
+}: {
+  items: McasInternalReportContent["interviewFocus"];
+}) {
+  return (
+    <ReportSection
+      id="interview-focus"
+      icon="/mcas/report-icons/suggested-interview-focus-areas.png"
+      eyebrow="10 · Suggested Interview Focus Areas"
+      title="Use structured questions to validate evidence"
+    >
+      <div className="grid gap-4 lg:grid-cols-2">
+        {items.map((item, index) => (
+          <div
+            key={item.title}
+            className="rounded-2xl border border-[#6255E8]/20 bg-[#F7F6FF] p-5"
+          >
+            <div className="flex items-start gap-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6255E8] text-sm font-black text-white">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6255E8]">
+                  Validation area
+                </p>
+                <h3 className="mt-2 text-lg font-bold text-[#201E41]">
+                  {item.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {item.question}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ReportSection>
+  );
+}
+
+function NextStepsSection({ backHref }: { backHref: string }) {
+  return (
+    <ReportSection
+      id="next-steps"
+      icon="/mcas/report-icons/your-next-steps.png"
+      eyebrow="11 · Your next steps"
+      title="Move from insight to a structured decision"
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        <NextStepCard
+          icon="/mcas/report-icons/download-your-report.png"
+          title="Download Your Report"
+          copy="Save a PDF copy of this internal summary for the hiring or talent-review process."
+          action={<CandidateSummaryDownloadButton className="mt-5 bg-[#201E41] text-white hover:bg-[#322D63]" />}
+        />
+        <NextStepCard
+          icon="/mcas/report-icons/discuss-with-advisor.png"
+          title="Discuss with Your Advisor"
+          copy="Use a debrief or calibration session to connect this candidate result to the role and wider team system."
+          action={
+            <Link
+              href={backHref}
+              className="mcas-summary-no-print mt-5 inline-flex rounded-xl border border-[#6255E8]/30 px-4 py-3 text-sm font-semibold text-[#6255E8] transition hover:bg-[#F0EEFF]"
+            >
+              Back to candidate profile
+            </Link>
+          }
+        />
+        <NextStepCard
+          icon="/mcas/report-icons/learn-about-mcas.png"
+          title="Complete Role Matching"
+          copy="Attach a role blueprint or reverse-role assessment to calculate the detailed alignment result."
+          action={
+            <Link
+              href={backHref}
+              className="mcas-summary-no-print mt-5 inline-flex rounded-xl border border-[#6255E8]/30 px-4 py-3 text-sm font-semibold text-[#6255E8] transition hover:bg-[#F0EEFF]"
+            >
+              Review candidate
+            </Link>
+          }
+        />
+      </div>
+    </ReportSection>
+  );
+}
+
+function ReportSection({
+  id,
+  icon,
+  eyebrow,
+  title,
+  children,
+}: {
+  id: string;
+  icon: string;
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className="mcas-summary-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.28)]"
+    >
+      <div className="rounded-[18px] bg-white p-6 md:p-8">
+        <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <img
+            src={icon}
+            alt=""
+            className="h-12 w-12 rounded-xl object-cover ring-1 ring-[#6255E8]/15"
+          />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.19em] text-[#6255E8]">
+              {eyebrow}
+            </p>
+            <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#201E41] md:text-3xl">
+              {title}
+            </h2>
+          </div>
+        </div>
+
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function MetaCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[#6255E8]/12 bg-white/80 p-4">
+    <div className="rounded-2xl border border-[#6255E8]/15 bg-white/80 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.17em] text-slate-500">
         {label}
       </p>
@@ -565,7 +1166,37 @@ function MetaCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryMetric({
+function HeroMetric({
+  label,
+  value,
+  detail,
+  accent,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  accent: "cyan" | "emerald" | "amber" | "rose" | "slate";
+}) {
+  const colour = {
+    cyan: "border-cyan-300/30 bg-cyan-300/[0.10] text-cyan-100",
+    emerald: "border-emerald-300/30 bg-emerald-300/[0.10] text-emerald-100",
+    amber: "border-amber-300/30 bg-amber-300/[0.10] text-amber-100",
+    rose: "border-rose-300/30 bg-rose-300/[0.10] text-rose-100",
+    slate: "border-white/15 bg-white/[0.06] text-white",
+  }[accent];
+
+  return (
+    <div className={`rounded-2xl border p-5 ${colour}`}>
+      <p className="text-xs font-bold uppercase tracking-[0.17em] opacity-75">
+        {label}
+      </p>
+      <p className="mt-3 text-2xl font-black">{value}</p>
+      <p className="mt-2 text-sm opacity-85">{detail}</p>
+    </div>
+  );
+}
+
+function SummaryCallout({
   label,
   value,
   detail,
@@ -575,74 +1206,77 @@ function SummaryMetric({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
         {label}
       </p>
-      <p className="mt-2 text-xl font-bold text-white">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-300">{detail}</p>
+      <p className="mt-2 text-lg font-bold text-white">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
     </div>
   );
 }
 
-function ReportSection({
+function InfoTile({
   number,
   title,
-  subtitle,
-  children,
+  copy,
 }: {
   number: string;
   title: string;
-  subtitle: string;
-  children: ReactNode;
+  copy: string;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.06)] md:p-8">
-      <div className="mb-7 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#6255E8]">
-            Section {number}
-          </p>
-          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#201E41]">
-            {title}
-          </h2>
-        </div>
+    <div className="rounded-2xl border border-slate-200 bg-[#F8F8FC] p-5">
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6255E8] text-sm font-black text-white">
+        {number}
+      </span>
+      <h3 className="mt-4 text-lg font-bold text-[#201E41]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p>
+    </div>
+  );
+}
 
-        <p className="max-w-xl text-sm leading-6 text-slate-500">{subtitle}</p>
-      </div>
-
-      {children}
-    </section>
+function ModelCard({ title, copy }: { title: string; copy: string }) {
+  return (
+    <div className="rounded-2xl border border-[#6255E8]/15 bg-[#F8F7FF] p-5">
+      <p className="text-lg font-bold text-[#201E41]">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p>
+    </div>
   );
 }
 
 function DistributionRow({
-  label,
-  value,
-  descriptor,
-  accent,
+  item,
 }: {
-  label: string;
-  value: number;
-  descriptor: string;
-  accent: boolean;
+  item: McasDistributionItem<McasOperatingStyleCode>;
 }) {
-  const percentage = percentageValue(value);
-
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="font-semibold text-[#201E41]">{label}</p>
-          <p className="mt-1 text-xs text-slate-500">{descriptor}</p>
+        <div className="flex items-center gap-3">
+          <span
+            className="h-3 w-3 rounded-full"
+            style={{ background: OS_COLOURS[item.code] }}
+          />
+          <div>
+            <p className="font-semibold text-[#201E41]">{item.label}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {item.band ?? "supporting"} pattern
+            </p>
+          </div>
         </div>
-        <p className="text-lg font-black text-[#201E41]">{formatPct(value)}</p>
+        <p className="text-lg font-black text-[#201E41]">
+          {Math.round(item.percentage)}%
+        </p>
       </div>
 
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
         <div
-          className={accent ? "h-full rounded-full bg-[#6255E8]" : "h-full rounded-full bg-[#86D7CD]"}
-          style={{ width: `${Math.max(3, Math.min(100, percentage))}%` }}
+          className="h-full rounded-full"
+          style={{
+            background: OS_COLOURS[item.code],
+            width: `${Math.max(3, Math.min(100, item.percentage))}%`,
+          }}
         />
       </div>
     </div>
@@ -651,336 +1285,272 @@ function DistributionRow({
 
 function VerticalRow({
   level,
-  currentVertical,
+  currentLevel,
+  nextLevel,
 }: {
   level: number;
-  currentVertical: string;
+  currentLevel: number;
+  nextLevel: number | null;
 }) {
-  const currentLevel = readVerticalNumber(currentVertical);
   const status =
-    currentLevel === level
-      ? "Current fit"
-      : currentLevel !== null && level === currentLevel + 1
-        ? "Stretch with support"
-        : currentLevel !== null && level < currentLevel
-          ? "Completed foundation"
-          : "Not indicated";
+    level < currentLevel
+      ? "Completed"
+      : level === currentLevel
+        ? "Current Fit"
+        : level === nextLevel
+          ? "Stretch with support"
+          : level === currentLevel + 2
+            ? "Overreach risk"
+            : "Not indicated";
 
-  const style =
-    status === "Current fit"
-      ? "border-[#6255E8]/30 bg-[#F0EEFF] text-[#201E41]"
+  const classes =
+    status === "Current Fit"
+      ? "border-[#6255E8]/35 bg-[#F0EEFF]"
       : status === "Stretch with support"
-        ? "border-cyan-300/40 bg-cyan-50 text-[#184B59]"
-        : "border-slate-200 bg-white text-slate-700";
+        ? "border-cyan-300/45 bg-cyan-50"
+        : status === "Overreach risk"
+          ? "border-amber-300/45 bg-amber-50"
+          : "border-slate-200 bg-white";
 
   return (
-    <div className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${style}`}>
+    <div className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${classes}`}>
       <div className="flex items-center gap-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#201E41] text-sm font-black text-white">
           V{level}
         </span>
         <div>
-          <p className="font-semibold">Vertical {level}</p>
-          <p className="mt-1 text-xs opacity-75">{verticalDescription(level)}</p>
+          <p className="font-semibold text-[#201E41]">
+            {verticalLabel(level)}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">{verticalCopy(level)}</p>
         </div>
       </div>
-
-      <span className="text-xs font-semibold uppercase tracking-[0.12em]">
+      <span className="text-xs font-bold uppercase tracking-[0.12em] text-[#201E41]">
         {status}
       </span>
     </div>
   );
 }
 
-function RoleFitNeed({ label, value }: { label: string; value: string }) {
+function NextStepCard({
+  icon,
+  title,
+  copy,
+  action,
+}: {
+  icon: string;
+  title: string;
+  copy: string;
+  action: ReactNode;
+}) {
   return (
-    <div className="rounded-2xl border border-amber-300/40 bg-white/70 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
-        {label}
-      </p>
-      <p className="mt-2 font-semibold text-[#3A2C10]">{value}</p>
+    <div className="rounded-2xl border border-slate-200 bg-[#F8F8FC] p-5">
+      <img src={icon} alt="" className="h-11 w-11 rounded-xl object-cover" />
+      <h3 className="mt-5 text-lg font-bold text-[#201E41]">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p>
+      {action}
     </div>
   );
 }
 
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-500">
-      {text}
-    </div>
-  );
-}
+type AlignmentMeta = {
+  label: string;
+  shortDetail: string;
+  description: string;
+  accent: "emerald" | "amber" | "rose" | "slate";
+};
 
-function readDistribution(value: unknown): DistributionItem[] {
-  if (!value) return [];
+type RoleFitRow = {
+  dimension: string;
+  candidate: string;
+  requirement: string;
+  status: "aligned" | "monitor" | "stretched" | "misaligned" | "pending";
+  statusLabel: string;
+};
 
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (!isRecord(item)) return null;
-
-        const code =
-          asString(item.code) ??
-          asString(item.key) ??
-          asString(item.label) ??
-          asString(item.name);
-
-        const rawValue =
-          asNumber(item.pct) ??
-          asNumber(item.percentage) ??
-          asNumber(item.percent) ??
-          asNumber(item.score) ??
-          asNumber(item.value) ??
-          asNumber(item.count);
-
-        if (!code || rawValue === null) return null;
-
-        return { code, value: rawValue };
-      })
-      .filter((item): item is DistributionItem => item !== null)
-      .sort((a, b) => b.value - a.value);
-  }
-
-  if (isRecord(value)) {
-    return Object.entries(value)
-      .map(([code, rawValue]) => {
-        if (typeof rawValue === "number") {
-          return { code, value: rawValue };
-        }
-
-        if (typeof rawValue === "string") {
-          const parsed = Number(rawValue);
-
-          return Number.isFinite(parsed) ? { code, value: parsed } : null;
-        }
-
-        if (isRecord(rawValue)) {
-          const nestedCode =
-            asString(rawValue.code) ??
-            asString(rawValue.key) ??
-            asString(rawValue.label) ??
-            code;
-
-          const nestedValue =
-            asNumber(rawValue.pct) ??
-            asNumber(rawValue.percentage) ??
-            asNumber(rawValue.percent) ??
-            asNumber(rawValue.score) ??
-            asNumber(rawValue.value) ??
-            asNumber(rawValue.count);
-
-          return nestedValue === null
-            ? null
-            : { code: nestedCode, value: nestedValue };
-        }
-
-        return null;
-      })
-      .filter((item): item is DistributionItem => item !== null)
-      .sort((a, b) => b.value - a.value);
-  }
-
-  return [];
-}
-
-function readFlags(value: unknown): FlagItem[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item) => {
-      if (typeof item === "string") {
-        return {
-          label: humanise(item),
-          severity: "low" as const,
-        };
-      }
-
-      if (!isRecord(item)) return null;
-
-      const label =
-        asString(item.label) ??
-        asString(item.code) ??
-        asString(item.name);
-
-      if (!label) return null;
-
-      const rawSeverity = asString(item.severity)?.toLowerCase();
-
-      const severity: FlagItem["severity"] =
-        rawSeverity === "high" || rawSeverity === "medium" || rawSeverity === "low"
-          ? rawSeverity
-          : "low";
-
+function getAlignmentMeta(
+  status: McasAlignmentStatus | undefined
+): AlignmentMeta {
+  switch (status) {
+    case "aligned":
       return {
-        label: humanise(label),
-        severity,
+        label: "Aligned",
+        shortDetail: "Role Fit Confirmed",
+        description:
+          "The candidate pattern and available role requirements are broadly consistent. Validate the decision with evidence-based interview examples.",
+        accent: "emerald",
       };
-    })
-    .filter((item): item is FlagItem => item !== null);
-}
-
-function getOperatingStyle(code: string) {
-  return (
-    OS_META[code.toUpperCase()] ?? {
-      name: humanise(code),
-      systemFunction: "Execution pattern recorded by the MCAS assessment.",
-      interviewPrompt:
-        "Describe a complex work situation where your usual way of working was tested. What did you do and what evidence shows the outcome?",
-    }
-  );
-}
-
-function getRiskSummary(
-  flags: FlagItem[],
-  weakestCore: DistributionItem | null
-) {
-  const high = flags.some((flag) => flag.severity === "high");
-  const medium = flags.some((flag) => flag.severity === "medium");
-
-  const level = high ? "Elevated" : medium ? "Moderate" : "Low";
-  const detail =
-    high || medium
-      ? `${flags.length} scored flag${flags.length === 1 ? "" : "s"} to validate`
-      : "No critical scored flags";
-
-  const items: Array<{
-    category: string;
-    title: string;
-    detail: string;
-  }> = flags.map((flag) => ({
-    category: `${flag.severity} priority`,
-    title: flag.label,
-    detail:
-      "Validate the underlying evidence through work examples, references and role-specific interview questions.",
-  }));
-
-  if (weakestCore) {
-    const core = CORE_META[weakestCore.code.toUpperCase()];
-
-    if (core) {
-      items.push({
-        category: "Work-cycle coverage",
-        title: `Lower ${core.name} coverage`,
-        detail: `The current score suggests ${core.name.toLowerCase()} work may need clearer support, structure or validation in a demanding role environment.`,
-      });
-    }
+    case "stretched":
+      return {
+        label: "Stretched",
+        shortDetail: "Support Required",
+        description:
+          "The candidate can contribute, but the role requires a meaningful stretch in one or more dimensions. Confirm support and development conditions.",
+        accent: "amber",
+      };
+    case "misaligned":
+      return {
+        label: "Misaligned",
+        shortDetail: "Role Fit Concern",
+        description:
+          "The available role requirements place sustained demand on patterns or scope outside the candidate's strongest fit.",
+        accent: "rose",
+      };
+    default:
+      return {
+        label: "Role Match Needed",
+        shortDetail: "Blueprint Not Attached",
+        description:
+          "The candidate assessment is complete. Attach the target role blueprint or reverse-role assessment to calculate the final alignment result.",
+        accent: "slate",
+      };
   }
-
-  if (items.length === 0) {
-    items.push({
-      category: "Validation note",
-      title: "No scored risk flags returned",
-      detail:
-        "Use the interview to validate the fit between the candidate's natural execution pattern and the actual role context.",
-    });
-  }
-
-  return {
-    level,
-    detail,
-    items: items.slice(0, 4),
-  };
 }
 
-function buildInterviewAreas(
-  candidate: McasCandidateDatabaseRow,
-  primaryOs: {
-    name: string;
-    systemFunction: string;
-    interviewPrompt: string;
-  },
-  weakestCore: DistributionItem | null,
-  currentVertical: string
-) {
-  const weakestMeta =
-    weakestCore ? CORE_META[weakestCore.code.toUpperCase()] : null;
+function getRoleFitRows(payload: McasReportPayload): RoleFitRow[] {
+  const primary = payload.result.operatingStyle.primary;
+  const strongestCore = payload.result.core.strongest;
+  const weakestCore = payload.result.core.weakest;
+  const vertical = payload.result.careerVertical.primary;
+  const roleFit = payload.internal?.roleFit;
+  const blueprint = payload.internal?.roleBlueprint;
+
+  if (roleFit && blueprint) {
+    const alignmentRows = roleFit.alignmentPoints.slice(0, 3).map((point, index) => ({
+      dimension: ["Primary OS", "CORE Strength", "Environment Fit"][index] ?? "Alignment Point",
+      candidate: point,
+      requirement: blueprint.title,
+      status: "aligned" as const,
+      statusLabel: "Aligned",
+    }));
+
+    const mismatchRows = roleFit.mismatchPoints.slice(0, 3).map((point, index) => ({
+      dimension: ["CORE / Risk", "Vertical Range", "Sustainability"][index] ?? "Validation Point",
+      candidate: point,
+      requirement: blueprint.title,
+      status: "monitor" as const,
+      statusLabel: "Monitor",
+    }));
+
+    return [...alignmentRows, ...mismatchRows];
+  }
 
   return [
     {
-      title: `${primaryOs.name} execution pattern`,
-      question: primaryOs.interviewPrompt,
+      dimension: "Primary OS",
+      candidate: `${primary.label} · ${Math.round(primary.percentage)}%`,
+      requirement: "Target operating-style requirement not attached",
+      status: "pending",
+      statusLabel: "Needs Blueprint",
     },
     {
-      title: "Scope and accountability",
-      question: `Tell us about a time the scope of your role expanded. How did you decide what to own, what to delegate and where to ask for support? This should validate readiness around ${currentVertical}.`,
+      dimension: "CORE Strength",
+      candidate: strongestCore.label,
+      requirement: "Target CORE requirement not attached",
+      status: "pending",
+      statusLabel: "Needs Blueprint",
     },
     {
-      title: weakestMeta
-        ? `${weakestMeta.name} coverage`
-        : "Work-cycle coverage",
-      question: weakestMeta
-        ? `Walk us through a situation requiring strong ${weakestMeta.name.toLowerCase()} work. What was your method, where did you seek support and how did you confirm quality?`
-        : "Describe a complex project that required you to work outside your natural strengths. How did you protect quality and delivery?",
+      dimension: "CORE Gap",
+      candidate: weakestCore
+        ? `${weakestCore.label} · ${Math.round(weakestCore.percentage)}%`
+        : "No gap indicated",
+      requirement: "Role support requirement not attached",
+      status: "monitor",
+      statusLabel: "Monitor",
     },
     {
-      title: "Role-environment fit",
-      question: `What work environment brings out your best contribution, and what conditions make it harder to sustain performance? Ask for evidence from recent roles, not preferences alone.`,
+      dimension: "Vertical Range",
+      candidate: `${vertical.code} primary`,
+      requirement: "Target vertical range not attached",
+      status: "pending",
+      statusLabel: "Needs Blueprint",
+    },
+    {
+      dimension: "Environment Fit",
+      candidate: payload.candidateFacing.environmentFit.workStyle,
+      requirement: "Target environment not attached",
+      status: "pending",
+      statusLabel: "Needs Blueprint",
+    },
+    {
+      dimension: "Sustainability",
+      candidate: `${vertical.code} current scope`,
+      requirement: "Target accountability range not attached",
+      status: "pending",
+      statusLabel: "Needs Blueprint",
     },
   ];
 }
 
-function nextVerticalLabel(value: string): string | null {
-  const current = readVerticalNumber(value);
+function inferRiskLevel(flags: string[]): "low" | "moderate" | "high" {
+  if (flags.some((flag) => flag.toLowerCase().includes("overreach"))) {
+    return "high";
+  }
 
-  if (!current || current >= 6) return null;
+  if (flags.length > 0) return "moderate";
 
-  return `V${current + 1}`;
+  return "low";
 }
 
-function readVerticalNumber(value: string): number | null {
-  const match = value.match(/V\s?([1-6])/i);
+function fitStatusClasses(status: RoleFitRow["status"]) {
+  const base =
+    "inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.1em]";
 
-  return match ? Number(match[1]) : null;
+  switch (status) {
+    case "aligned":
+      return `${base} bg-emerald-100 text-emerald-800`;
+    case "monitor":
+      return `${base} bg-amber-100 text-amber-800`;
+    case "stretched":
+      return `${base} bg-amber-100 text-amber-800`;
+    case "misaligned":
+      return `${base} bg-rose-100 text-rose-800`;
+    default:
+      return `${base} bg-slate-100 text-slate-600`;
+  }
 }
 
-function verticalDescription(level: number) {
+function getNextVertical(current: string): string | null {
+  const number = Number(current.replace("V", ""));
+
+  if (!Number.isFinite(number) || number >= 6) return null;
+
+  return `V${number + 1}`;
+}
+
+function verticalLabel(level: number) {
   const labels: Record<number, string> = {
-    1: "Guided delivery and foundational work.",
-    2: "Growing ownership within structured scope.",
+    1: "V1 · Entry / Foundational",
+    2: "V2 · Developing",
+    3: "V3 · Established",
+    4: "V4 · Senior Scope",
+    5: "V5 · Strategic Leadership",
+    6: "V6 · Executive / Enterprise",
+  };
+
+  return labels[level] ?? `V${level}`;
+}
+
+function verticalCopy(level: number) {
+  const labels: Record<number, string> = {
+    1: "Task-level execution and guided delivery.",
+    2: "Growing ownership with structured guidance.",
     3: "Independent delivery and cross-team coordination.",
-    4: "Broader scope, strategic influence and accountability.",
-    5: "Organisation-level direction and system leadership.",
-    6: "Enterprise scope and long-horizon accountability.",
+    4: "Strategic influence and broader accountability.",
+    5: "Organisation-wide direction and system leadership.",
+    6: "Enterprise leadership and long-horizon strategy.",
   };
 
   return labels[level] ?? "Career vertical progression.";
 }
 
-function formatPct(value: number): string {
-  return `${Math.round(percentageValue(value))}%`;
+function humaniseRisk(level: "low" | "moderate" | "high") {
+  return level === "high" ? "High" : level === "moderate" ? "Moderate" : "Low";
 }
 
-function percentageValue(value: number): number {
-  return value <= 1 ? value * 100 : value;
-}
-
-function humanise(value: string): string {
+function humaniseFlag(value: string) {
   return value
-    .replace(/^OS(\d)$/i, "Operating Style $1")
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asString(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-
-  const trimmed = value.trim();
-
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function asNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
 }

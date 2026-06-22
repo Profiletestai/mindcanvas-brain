@@ -4,7 +4,11 @@
 
 import { useState } from "react";
 
-export default function CandidateSummaryDownloadButton() {
+export default function CandidateSummaryDownloadButton({
+  className = "",
+}: {
+  className?: string;
+}) {
   const [isPreparing, setIsPreparing] = useState(false);
 
   function cleanUp() {
@@ -12,7 +16,7 @@ export default function CandidateSummaryDownloadButton() {
     setIsPreparing(false);
   }
 
-  function printSummary() {
+  function printReport() {
     setIsPreparing(true);
     document.body.classList.add("mcas-summary-printing");
 
@@ -37,9 +41,12 @@ export default function CandidateSummaryDownloadButton() {
     <>
       <button
         type="button"
-        onClick={printSummary}
+        onClick={printReport}
         disabled={isPreparing}
-        className="mcas-summary-no-print inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70"
+        className={[
+          "mcas-summary-no-print inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-70",
+          className,
+        ].join(" ")}
       >
         {isPreparing ? "Preparing PDF…" : "Download PDF"}
       </button>
@@ -63,21 +70,27 @@ export default function CandidateSummaryDownloadButton() {
           }
 
           .mcas-summary-shell {
-            width: 100% !important;
             max-width: none !important;
+            width: 100% !important;
             overflow: visible !important;
             border-radius: 0 !important;
             box-shadow: none !important;
           }
 
-          .mcas-summary-grid {
+          .mcas-summary-layout {
             display: block !important;
+            padding: 22px !important;
           }
 
-          .mcas-summary-grid > * {
+          .mcas-summary-layout > * {
             break-inside: avoid;
             page-break-inside: avoid;
             margin-bottom: 18px !important;
+          }
+
+          .mcas-summary-section {
+            break-inside: avoid;
+            page-break-inside: avoid;
           }
         }
       `}</style>
