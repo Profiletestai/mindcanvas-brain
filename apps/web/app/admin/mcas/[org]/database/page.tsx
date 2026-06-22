@@ -1,225 +1,227 @@
-// apps/web/app/admin/mcas/[org]/database/[candidateId]/page.tsx
+// apps/web/app/admin/mcas/[org]/database/page.tsx
 
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   formatMcasDateTime,
-  getMcasCandidateDetailById,
+  getMcasCandidateDatabaseRows,
   getMcasOrganisationBySlug,
 } from "@/lib/mcas/mcasAdminData";
-import { getMcasCandidateReportAccess } from "@/lib/mcas/mcasCandidateReports";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: {
     org: string;
-    candidateId: string;
+  };
+  searchParams?: {
+    q?: string;
+    status?: string;
   };
 };
 
-export default async function McasCandidateDetailPage({ params }: PageProps) {
+function isUuid(value: string | null | undefined): value is string {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value
+      )
+  );
+}
+
+export default async function McasCandidateDatabasePage({
+  params,
+  searchParams,
+}: PageProps) {
   const org = await getMcasOrganisationBySlug(params.org);
 
   if (!org) {
     notFound();
   }
 
-  const candidate = await getMcasCandidateDetailById({
+  const q = typeof searchParams?.q === "string" ? searchParams.q : "";
+  const status =
+    typeof searchParams?.status === "string" ? searchParams.status : "all";
+
+  const candidates = await getMcasCandidateDatabaseRows({
     orgId: org.id,
-    candidateId: params.candidateId,
+    query: q,
+    status,
   });
-
-  if (!candidate) {
-    notFound();
-  }
-
-  const reportAccess = await getMcasCandidateReportAccess({
-    orgId: org.id,
-    candidateId: params.candidateId,
-  });
-
-  const summaryUrl = `/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}/summary`;
 
   return (
     <div className="space-y-8">
       <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-        <Link
-          href={`/admin/mcas/${org.slug}/database`}
-          className="text-sm font-semibold text-cyan-300 hover:text-cyan-200"
-        >
-          ← Back to candidate database
-        </Link>
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+          Candidate Database
+        </p>
 
-        <div className="mt-6 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
-              Candidate Review
-            </p>
+        <h2 className="mt-3 text-3xl font-semibold text-white">{org.name}</h2>
 
-            <h2 className="mt-3 text-3xl font-semibold text-white">
-              {candidate.fullName}
-            </h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+          This is the organisation-specific MCAS candidate database. It is filtered
+          by the selected MCAS organisation and reads from the MCAS schema.
+        </p>
 
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-              Internal MCAS review page for this candidate application and
-              assessment result.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            {reportAccess.isReady && reportAccess.candidateReportUrl ? (
-              <a
-                href={reportAccess.candidateReportUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
-              >
-                {reportAccess.candidateReportLabel} ↗
-              </a>
-            ) : (
-              <span
-                title={reportAccess.reason ?? undefined}
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-slate-500"
-              >
-                Candidate report pending
-              </span>
-            )}
-
-            {reportAccess.isReady ? (
-              <Link
-                href={summaryUrl}
-                className="inline-flex items-center justify-center rounded-xl border border-violet-300/40 bg-violet-300/10 px-5 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-200 hover:bg-violet-300/20"
-              >
-                Candidate Summary Report →
-              </Link>
-            ) : null}
-          </div>
+        <div className="mt-5 rounded-2xl border border-white/10 bg-slate-900/50 px-4 py-3 text-sm text-slate-300">
+          Showing <span className="font-semibold text-white">{candidates.length}</span>{" "}
+          candidate/application record{candidates.length === 1 ? "" : "s"}.
         </div>
       </section>
 
-      {!reportAccess.isReady ? (
-        <section className="rounded-3xl border border-amber-300/20 bg-amber-300/[0.06] p-5 text-sm leading-6 text-amber-100">
-          <span className="font-semibold">Reports are not available yet.</span>{" "}
-          {reportAccess.reason ?? "Complete and score the assessment first."}
-        </section>
-      ) : null}
+      <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-6">
+        <form className="grid gap-4 md:grid-cols-[1fr_220px_auto]" method="get">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Search
+            </span>
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Search name, email, application ID, OS, CV..."
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-300/60"
+            />
+          </label>
 
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <InfoCard label="Status" value={candidate.status} />
-        <InfoCard label="Primary OS" value={candidate.primaryOS ?? "—"} />
-        <InfoCard label="Secondary OS" value={candidate.secondaryOS ?? "—"} />
-        <InfoCard label="Primary CV" value={candidate.primaryCV ?? "—"} />
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Status
+            </span>
+            <select
+              name="status"
+              defaultValue={status}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-cyan-300/60"
+            >
+              <option value="all">All statuses</option>
+              <option value="created">Created</option>
+              <option value="started">Started</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+
+          <div className="flex items-end gap-2">
+            <button
+              type="submit"
+              className="rounded-xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950"
+            >
+              Filter
+            </button>
+
+            <Link
+              href={`/admin/mcas/${org.slug}/database`}
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-300 hover:border-white/30 hover:text-white"
+            >
+              Clear
+            </Link>
+          </div>
+        </form>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Candidate Details">
-          <DetailRow label="Name" value={candidate.fullName} />
-          <DetailRow label="Email" value={candidate.email ?? "—"} />
-          <DetailRow label="Phone" value={candidate.phone ?? "—"} />
-          <DetailRow
-            label="Consent"
-            value={
-              candidate.consent === true
-                ? "Yes"
-                : candidate.consent === false
-                  ? "No"
-                  : "—"
-            }
-          />
-        </Panel>
+      <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035]">
+        <div className="border-b border-white/10 px-6 py-4">
+          <h3 className="text-lg font-semibold text-white">Candidates</h3>
+          <p className="mt-1 text-sm text-slate-400">
+            Candidate list pulled from MCAS applications, assessments, and result records.
+          </p>
+        </div>
 
-        <Panel title="Application Details">
-          <DetailRow label="Partner Key" value={candidate.partnerKey} />
-          <DetailRow label="Application ID" value={candidate.applicationId} />
-          <DetailRow label="Public Token" value={candidate.publicToken} />
-          <DetailRow
-            label="Assessment Date"
-            value={formatMcasDateTime(candidate.assessmentDate)}
-          />
-        </Panel>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10 text-sm">
+            <thead className="bg-white/[0.03] text-left text-xs uppercase tracking-[0.16em] text-slate-400">
+              <tr>
+                <th className="px-6 py-4 font-semibold">Name</th>
+                <th className="px-6 py-4 font-semibold">Email</th>
+                <th className="px-6 py-4 font-semibold">Application ID</th>
+                <th className="px-6 py-4 font-semibold">Assessment Date</th>
+                <th className="px-6 py-4 font-semibold">Primary OS</th>
+                <th className="px-6 py-4 font-semibold">Secondary OS</th>
+                <th className="px-6 py-4 font-semibold">Primary CV</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold">Action</th>
+              </tr>
+            </thead>
 
-        <Panel title="Assessment Record">
-          <DetailRow label="Assessment ID" value={candidate.assessmentId ?? "—"} />
-          <DetailRow
-            label="Assessment Status"
-            value={candidate.assessmentStatus ?? "—"}
-          />
-          <DetailRow label="Framework" value={candidate.frameworkSlug ?? "—"} />
-          <DetailRow
-            label="Framework Version"
-            value={candidate.frameworkVersion ?? "—"}
-          />
-        </Panel>
+            <tbody className="divide-y divide-white/10">
+              {candidates.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
+                    No MCAS candidate records found for this filter.
+                  </td>
+                </tr>
+              ) : (
+                candidates.map((candidate, index) => {
+                  const candidateId = isUuid(candidate.partnerApplicationId)
+                    ? candidate.partnerApplicationId
+                    : null;
 
-        <Panel title="Readiness / Result">
-          <DetailRow label="Result ID" value={candidate.resultId ?? "—"} />
-          <DetailRow label="Scoring Model" value={candidate.scoringModel ?? "—"} />
-          <DetailRow
-            label="Vertical Readiness"
-            value={candidate.verticalReadiness ?? "—"}
-          />
-        </Panel>
+                  return (
+                    <tr
+                      key={
+                        candidateId ??
+                        `${candidate.applicationId || "candidate"}-${index}`
+                      }
+                      className="transition hover:bg-white/[0.03]"
+                    >
+                      <td className="whitespace-nowrap px-6 py-4 font-medium text-white">
+                        {candidate.fullName}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.email ?? "—"}
+                      </td>
+
+                      <td className="max-w-[240px] truncate px-6 py-4 font-mono text-xs text-slate-400">
+                        {candidate.applicationId}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {formatMcasDateTime(candidate.assessmentDate)}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.primaryOS ?? "—"}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.secondaryOS ?? "—"}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.primaryCV ?? "—"}
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium capitalize text-cyan-200">
+                          {candidate.status}
+                        </span>
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4">
+                        {candidateId ? (
+                          <Link
+                            href={`/admin/mcas/${org.slug}/database/${candidateId}`}
+                            prefetch={false}
+                            className="font-semibold text-cyan-300 hover:text-cyan-200"
+                          >
+                            Review →
+                          </Link>
+                        ) : (
+                          <span
+                            title="This row does not have a linked partner application record yet."
+                            className="cursor-not-allowed text-sm font-semibold text-slate-500"
+                          >
+                            Review unavailable
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <JsonPanel
-          title="Operating Style Distribution"
-          value={candidate.rawOsDistribution}
-        />
-        <JsonPanel
-          title="CORE Distribution"
-          value={candidate.rawCoreDistribution}
-        />
-        <JsonPanel title="Confidence Payload" value={candidate.rawConfidence} />
-        <JsonPanel title="Flags" value={candidate.rawFlags} />
-      </section>
-    </div>
-  );
-}
-
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-3 text-2xl font-semibold capitalize text-white">{value}</p>
-    </div>
-  );
-}
-
-function Panel({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6">
-      <h3 className="text-lg font-semibold text-white">{title}</h3>
-      <div className="mt-5 space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-white/10 pb-3 text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium text-slate-200">{value}</span>
-    </div>
-  );
-}
-
-function JsonPanel({ title, value }: { title: string; value: unknown }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6">
-      <h3 className="text-lg font-semibold text-white">{title}</h3>
-
-      <pre className="mt-5 max-h-96 overflow-auto rounded-2xl border border-white/10 bg-slate-950 p-4 text-xs leading-6 text-slate-300">
-        {value ? JSON.stringify(value, null, 2) : "No data available."}
-      </pre>
     </div>
   );
 }

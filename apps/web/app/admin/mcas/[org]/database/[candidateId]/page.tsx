@@ -19,6 +19,15 @@ type PageProps = {
   };
 };
 
+function isUuid(value: string | null | undefined): value is string {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value
+      )
+  );
+}
+
 export default async function McasCandidateDetailPage({ params }: PageProps) {
   const org = await getMcasOrganisationBySlug(params.org);
 
@@ -26,9 +35,16 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const candidateId =
+    typeof params.candidateId === "string" ? params.candidateId.trim() : "";
+
+  if (!isUuid(candidateId)) {
+    notFound();
+  }
+
   const candidate = await getMcasCandidateDetailById({
     orgId: org.id,
-    candidateId: params.candidateId,
+    candidateId,
   });
 
   if (!candidate) {
@@ -37,10 +53,10 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
 
   const reportAccess = await getMcasCandidateReportAccess({
     orgId: org.id,
-    candidateId: params.candidateId,
+    candidateId,
   });
 
-  const candidateSummaryUrl = `/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}/summary`;
+  const summaryUrl = `/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}/summary`;
 
   return (
     <div className="space-y-8">
@@ -52,7 +68,7 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
           ← Back to candidate database
         </Link>
 
-        <div className="mt-6 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="mt-6 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
               Candidate Review
@@ -89,7 +105,7 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
 
             {reportAccess.isReady ? (
               <Link
-                href={candidateSummaryUrl}
+                href={summaryUrl}
                 className="inline-flex items-center justify-center rounded-xl border border-violet-300/40 bg-violet-300/10 px-5 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-200 hover:bg-violet-300/20"
               >
                 Candidate Summary Report →
@@ -104,29 +120,7 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
           <span className="font-semibold">Reports are not available yet.</span>{" "}
           {reportAccess.reason ?? "Complete and score the assessment first."}
         </section>
-      ) : (
-        <section className="grid gap-4 md:grid-cols-2">
-          <ReportCard
-            label="Candidate-facing report"
-            value={
-              reportAccess.reportVersion === "full"
-                ? "Full Candidate Report"
-                : "Lite Candidate Report"
-            }
-            detail={
-              reportAccess.testLinkName
-                ? `Created from: ${reportAccess.testLinkName}`
-                : "Legacy or API-created MCAS assessment"
-            }
-          />
-
-          <ReportCard
-            label="Internal report"
-            value="Candidate Summary Report"
-            detail="Decision support, risk notes, interview validation and readiness review."
-          />
-        </section>
-      )}
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <InfoCard label="Status" value={candidate.status} />
@@ -197,26 +191,6 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
         <JsonPanel title="Confidence Payload" value={candidate.rawConfidence} />
         <JsonPanel title="Flags" value={candidate.rawFlags} />
       </section>
-    </div>
-  );
-}
-
-function ReportCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
-        {label}
-      </p>
-      <p className="mt-3 text-lg font-semibold text-white">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
     </div>
   );
 }
