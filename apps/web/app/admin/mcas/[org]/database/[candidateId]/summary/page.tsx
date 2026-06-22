@@ -66,6 +66,33 @@ const OS_NAMES: Record<McasOperatingStyleCode, string> = {
   OS8: "Optimiser",
 };
 
+/*
+ * The internal Candidate Summary follows the MCAS Knowledge Base naming:
+ * Visionary, Catalyst, Motivator, Connector, Facilitator, Coordinator,
+ * Controller and Optimiser.
+ */
+const INTERNAL_OS_LABELS: Record<McasOperatingStyleCode, string> = {
+  OS1: "Visionary",
+  OS2: "Catalyst",
+  OS3: "Motivator",
+  OS4: "Connector",
+  OS5: "Facilitator",
+  OS6: "Coordinator",
+  OS7: "Controller",
+  OS8: "Optimiser",
+};
+
+const SUMMARY_OS_COLOURS: Record<McasOperatingStyleCode, string> = {
+  OS1: "#2B019E",
+  OS2: "#FD2527",
+  OS3: "#EF6001",
+  OS4: "#0049F9",
+  OS5: "#0F7B6C",
+  OS6: "#4338CA",
+  OS7: "#B45309",
+  OS8: "#DB2777",
+};
+
 const CORE_COPY: Record<
   McasCoreCode,
   {
@@ -171,7 +198,6 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
           payload={payload}
           candidateReportHref={candidateReportHref}
           candidateReportLabel={reportAccess.candidateReportLabel}
-          backHref={backHref}
         />
 
         <Hero
@@ -256,42 +282,36 @@ function ReportHeader({
   payload,
   candidateReportHref,
   candidateReportLabel,
-  backHref,
 }: {
   payload: McasReportPayload;
   candidateReportHref: string | null;
   candidateReportLabel: string | null;
-  backHref: string;
 }) {
   return (
-    <header className="bg-[#EEEAFE] px-6 py-6 md:px-8">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <Link
-            href={backHref}
-            className="mcas-summary-no-print text-sm font-semibold text-[#6255E8] hover:text-[#4C3ED2]"
-          >
-            ← Back to candidate profile
-          </Link>
+    <header className="border-b border-[#DDD9F5] bg-[#EEEAFE] px-5 py-4 md:px-7">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="h-5 w-5 rounded-md bg-[#CFC8FF]" />
 
-          <p className="mt-7 text-sm font-semibold uppercase tracking-[0.25em] text-[#6255E8]">
-            MindCanvas CORE Alignment System
-          </p>
-
-          <h1 className="mt-3 text-3xl font-black uppercase leading-tight tracking-[0.08em] text-[#2A2453] md:text-[34px]">
-            Candidate Summary &amp; Report
-          </h1>
+          <div>
+            <h1 className="text-sm font-black uppercase tracking-[0.16em] text-[#6255E8] md:text-base">
+              Candidate Summary &amp; Report
+            </h1>
+            <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.24em] text-[#2B2858]">
+              MindCanvas CORE Alignment System
+            </p>
+          </div>
         </div>
 
-        <div className="mcas-summary-no-print flex flex-wrap gap-3 xl:justify-end">
-          <CandidateSummaryDownloadButton />
+        <div className="mcas-summary-no-print flex flex-wrap items-center gap-2">
+          <CandidateSummaryDownloadButton className="rounded-md px-4 py-2 text-[11px]" />
 
           {candidateReportHref ? (
             <a
               href={candidateReportHref}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-xl bg-[#1A1836] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#2B2858]"
+              className="inline-flex items-center justify-center rounded-md bg-[#1A1836] px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-[#2B2858]"
             >
               {candidateReportLabel ?? "View Candidate Report"} ↗
             </a>
@@ -299,13 +319,13 @@ function ReportHeader({
         </div>
       </div>
 
-      <div className="mt-7 grid gap-3 md:grid-cols-3">
-        <MetaCard label="Prepared for" value={payload.candidate.fullName} />
-        <MetaCard
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <CompactMetaCard label="Prepared for" value={payload.candidate.fullName} />
+        <CompactMetaCard
           label="Date"
           value={formatMcasDateTime(payload.assessment.completedAt)}
         />
-        <MetaCard label="Framework" value="Candidate Summary & Report" />
+        <CompactMetaCard label="Framework" value="Candidate Summary & Report" />
       </div>
     </header>
   );
@@ -327,152 +347,285 @@ function Hero({
   const primary = payload.result.operatingStyle.primary;
   const secondary = payload.result.operatingStyle.secondary;
   const vertical = payload.result.careerVertical.primary;
+  const internalPrimaryLabel = INTERNAL_OS_LABELS[primary.code];
+  const internalSecondaryLabel = secondary
+    ? INTERNAL_OS_LABELS[secondary.code]
+    : null;
 
   return (
-    <>
-      <section className="bg-[#12112A] px-6 py-8 text-white md:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#73E8D7]">
-          Candidate Summary &amp; Report
-        </p>
+    <section className="bg-[#0D1B2A] px-5 py-5 text-white md:px-7">
+      <div className="grid gap-4 xl:grid-cols-[minmax(245px,0.88fr)_minmax(400px,1.35fr)_210px] xl:items-stretch">
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#69E3D5]">
+            Candidate Summary &amp; Report
+          </p>
 
-        <h2 className="mt-3 text-4xl font-black tracking-[-0.04em] md:text-5xl">
-          {payload.candidate.fullName}
-        </h2>
+          <h2 className="mt-2 text-2xl font-black tracking-[-0.045em] text-white md:text-3xl">
+            {payload.candidate.fullName}
+          </h2>
 
-        <p className="mt-4 max-w-4xl text-sm leading-6 text-slate-300">
-          Structured decision support — alignment status, operating style,
-          vertical readiness and role-fit assessment.
-        </p>
+          <p className="mt-2 max-w-md text-xs leading-5 text-slate-300">
+            Structured decision support — alignment status, operating style,
+            vertical readiness and role-fit assessment.
+          </p>
 
-        <div className="mt-7 grid gap-4 md:grid-cols-3">
-          <HeroMetric
-            label="Vertical"
-            value={`${vertical.code} Ready`}
-            detail="Current Fit Range"
-            accent="cyan"
-          />
-          <HeroMetric
-            label="Alignment"
-            value={alignmentMeta.label}
-            detail={alignmentMeta.shortDetail}
-            accent={alignmentMeta.accent}
-          />
-          <HeroMetric
-            label="Risk Level"
-            value={humaniseRisk(riskLevel)}
-            detail={
-              riskLevel === "low"
-                ? "No critical flags"
-                : "Validate risk indicators"
-            }
-            accent={riskLevel === "high" ? "rose" : riskLevel === "moderate" ? "amber" : "cyan"}
-          />
-        </div>
-      </section>
-
-      <section className="bg-[#0A1522] px-6 py-8 text-white md:px-8">
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.21em] text-[#73E8D7]">
-              Dominant operating style
-            </p>
-
-            <div className="mt-4 flex flex-wrap items-end gap-5">
-              <div
-                className="flex h-24 w-24 items-center justify-center rounded-full text-3xl font-black text-white shadow-lg"
-                style={{ background: OS_COLOURS[primary.code] }}
-              >
-                {Math.round(primary.percentage)}%
-              </div>
-
-              <div>
-                <h3 className="text-3xl font-black tracking-[-0.04em]">
-                  {primary.label}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  {content.primary.systemFunction}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <SummaryCallout
-                label="Alignment status"
-                value={alignmentMeta.label}
-                detail={alignmentMeta.description}
-              />
-              <SummaryCallout
-                label="Vertical readiness"
-                value={`${vertical.code} Ready`}
-                detail={`${vertical.label}. ${
-                  getNextVertical(vertical.code)
-                    ? `${getNextVertical(vertical.code)} is the next stretch horizon.`
-                    : "Enterprise scope readiness indicated."
-                }`}
-              />
-            </div>
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#73E8D7]">
-                Sustainable contribution context
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                {content.primary.environmentSummary}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-white/10 bg-white/[0.055] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Operating style distribution
-            </p>
-
-            <div className="mt-4 space-y-3">
-              {payload.result.operatingStyle.distribution.slice(0, 4).map((item, index) => (
-                <div key={item.code} className="flex items-center gap-3">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ background: OS_COLOURS[item.code] }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-semibold text-white">{item.label}</span>
-                      <span className="font-black text-[#73E8D7]">
-                        {Math.round(item.percentage)}%
-                      </span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          background: OS_COLOURS[item.code],
-                          width: `${Math.max(4, Math.min(100, item.percentage))}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  {index === 0 ? (
-                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#73E8D7]">
-                      Dominant
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-
-            {secondary ? (
-              <p className="mt-5 border-t border-white/10 pt-4 text-sm leading-6 text-slate-300">
-                Secondary influence:{" "}
-                <span className="font-semibold text-white">
-                  {secondary.label}
-                </span>{" "}
-                at {Math.round(secondary.percentage)}%.
-              </p>
-            ) : null}
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <HeroSummaryCard
+              label="Alignment"
+              value={alignmentMeta.label}
+              detail={alignmentMeta.shortDetail}
+              tone={alignmentMeta.accent}
+            />
+            <HeroSummaryCard
+              label="Operating Style"
+              value={internalPrimaryLabel}
+              detail="Dominant Profile"
+              tone="violet"
+            />
+            <HeroSummaryCard
+              label="Vertical"
+              value={`${vertical.code} Ready`}
+              detail="Current Fit Range"
+              tone="cyan"
+            />
+            <HeroSummaryCard
+              label="Risk Level"
+              value={humaniseRisk(riskLevel)}
+              detail={riskLevel === "low" ? "No critical flags" : "Validate indicators"}
+              tone={riskLevel === "high" ? "rose" : riskLevel === "moderate" ? "amber" : "cyan"}
+            />
           </div>
         </div>
-      </section>
-    </>
+
+        <div className="rounded-xl border border-[#DDE2EA] bg-[#F7F8FA] p-3 text-[#0D1B2A] shadow-[0_8px_22px_rgba(0,0,0,0.11)]">
+          <div className="space-y-1">
+            {payload.result.operatingStyle.distribution.map((item) => (
+              <HeroDistributionRow key={item.code} item={item} />
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[minmax(140px,1fr)_minmax(145px,1fr)] gap-3 xl:grid-cols-1">
+          <div className="flex min-h-[148px] flex-col items-center justify-center rounded-xl bg-white px-3 py-3 text-center shadow-[0_8px_22px_rgba(0,0,0,0.11)]">
+            <p className="mb-2 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Dominant Operating Style
+            </p>
+
+            <OperatingStyleRing
+              percentage={Math.round(primary.percentage)}
+              label={internalPrimaryLabel}
+              colour={SUMMARY_OS_COLOURS[primary.code]}
+            />
+
+            <p className="mt-2 text-[10px] font-semibold text-slate-500">
+              {Math.round(confidencePercent)}% confidence
+            </p>
+          </div>
+
+          <div className="flex min-h-[76px] flex-col justify-center rounded-xl bg-[#6F5CFF] px-4 py-3 text-white shadow-[0_8px_22px_rgba(0,0,0,0.14)]">
+            <p className="text-[8px] font-black uppercase tracking-[0.17em] text-[#E6E1FF]">
+              Alignment Status
+            </p>
+            <p className="mt-1 text-lg font-black tracking-[-0.04em]">
+              {alignmentMeta.label}
+            </p>
+            <p className="mt-1 text-[10px] leading-4 text-[#F0EDFF]">
+              {alignmentMeta.shortDetail}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 border-t border-[#69E3D5]/30 pt-3 md:grid-cols-2">
+        <CompactInsightList
+          title="Top strengths"
+          items={content.primary.strengths}
+        />
+        <CompactInsightList
+          title="Key risks"
+          items={content.risks.slice(0, 2).map((risk) => risk.title)}
+        />
+      </div>
+
+      {secondary && content.secondarySummary ? (
+        <p className="mt-3 text-xs leading-5 text-slate-300">
+          Secondary influence:{" "}
+          <span className="font-bold text-white">{internalSecondaryLabel}</span>{" "}
+          at {Math.round(secondary.percentage)}%. {content.secondarySummary}
+        </p>
+      ) : null}
+    </section>
   );
+}
+
+function CompactMetaCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-[#DFDDF1] bg-white/75 px-3 py-2.5">
+      <p className="text-[8px] font-black uppercase tracking-[0.17em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-xs font-semibold text-[#201E41]">{value}</p>
+    </div>
+  );
+}
+
+function HeroSummaryCard({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: "emerald" | "amber" | "rose" | "slate" | "violet" | "cyan";
+}) {
+  const palette = {
+    emerald: "border-emerald-300/25 bg-[#243241] text-emerald-100",
+    amber: "border-amber-300/35 bg-[#2D2A2A] text-amber-100",
+    rose: "border-rose-300/35 bg-[#30232C] text-rose-100",
+    slate: "border-white/15 bg-[#243241] text-white",
+    violet: "border-violet-300/25 bg-[#272440] text-violet-100",
+    cyan: "border-cyan-300/30 bg-[#203248] text-cyan-100",
+  }[tone];
+
+  return (
+    <div className={`rounded-lg border px-3 py-2.5 ${palette}`}>
+      <p className="text-[8px] font-black uppercase tracking-[0.16em] opacity-70">
+        {label}
+      </p>
+      <p className="mt-1.5 text-base font-black leading-none tracking-[-0.03em]">
+        {value}
+      </p>
+      <p className="mt-1.5 text-[10px] leading-4 opacity-80">{detail}</p>
+    </div>
+  );
+}
+
+function HeroDistributionRow({
+  item,
+}: {
+  item: McasDistributionItem<McasOperatingStyleCode>;
+}) {
+  const colour = SUMMARY_OS_COLOURS[item.code];
+  const displayLabel = INTERNAL_OS_LABELS[item.code];
+  const band = distributionBandLabel(item.band);
+
+  return (
+    <div className="grid grid-cols-[18px_minmax(72px,0.8fr)_minmax(88px,1.6fr)_32px_58px] items-center gap-2">
+      <span
+        className="flex h-[17px] w-[17px] items-center justify-center rounded-md text-[8px] font-black text-white"
+        style={{ background: colour }}
+      >
+        {item.code.replace("OS", "")}
+      </span>
+
+      <span className="truncate text-[10px] font-semibold text-[#0D1B2A]">
+        {displayLabel}
+      </span>
+
+      <span className="h-[5px] overflow-hidden rounded-full bg-[#E2E8F0]">
+        <span
+          className="block h-full rounded-full"
+          style={{
+            width: `${Math.max(2, Math.min(100, item.percentage))}%`,
+            background: colour,
+          }}
+        />
+      </span>
+
+      <span className="text-right text-[9px] font-bold text-[#4A5568]">
+        {Math.round(item.percentage)}%
+      </span>
+
+      <span
+        className="justify-self-end rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.05em]"
+        style={{
+          color: colour,
+          background: `${colour}18`,
+        }}
+      >
+        {band}
+      </span>
+    </div>
+  );
+}
+
+function OperatingStyleRing({
+  percentage,
+  label,
+  colour,
+}: {
+  percentage: number;
+  label: string;
+  colour: string;
+}) {
+  const safePercentage = Math.max(0, Math.min(100, percentage));
+
+  return (
+    <div
+      className="flex h-[95px] w-[95px] items-center justify-center rounded-full"
+      style={{
+        background: `conic-gradient(${colour} 0 ${safePercentage}%, #E8EAF2 ${safePercentage}% 100%)`,
+      }}
+    >
+      <div className="flex h-[73px] w-[73px] flex-col items-center justify-center rounded-full bg-white">
+        <span className="text-xl font-black tracking-[-0.05em] text-[#6F5CFF]">
+          {safePercentage}%
+        </span>
+        <span className="mt-0.5 max-w-[58px] text-center text-[8px] font-semibold leading-3 text-[#4A5568]">
+          {label}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CompactInsightList({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  return (
+    <div>
+      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0FCD5E]">
+        {title}
+      </p>
+      <div className="mt-2 space-y-1.5">
+        {items.slice(0, 3).map((item) => (
+          <div key={item} className="flex gap-2 text-[11px] leading-4 text-slate-200">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0FCD5E]" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function distributionBandLabel(
+  band: McasDistributionItem<McasOperatingStyleCode>["band"]
+) {
+  switch (band) {
+    case "dominant":
+      return "Dominant";
+    case "secondary":
+      return "Secondary";
+    case "tertiary":
+      return "Tertiary";
+    case "low":
+      return "Low";
+    default:
+      return "Minimal";
+  }
 }
 
 function Sidebar() {
@@ -1162,56 +1315,6 @@ function MetaCard({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="mt-2 font-semibold text-[#201E41]">{value}</p>
-    </div>
-  );
-}
-
-function HeroMetric({
-  label,
-  value,
-  detail,
-  accent,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  accent: "cyan" | "emerald" | "amber" | "rose" | "slate";
-}) {
-  const colour = {
-    cyan: "border-cyan-300/30 bg-cyan-300/[0.10] text-cyan-100",
-    emerald: "border-emerald-300/30 bg-emerald-300/[0.10] text-emerald-100",
-    amber: "border-amber-300/30 bg-amber-300/[0.10] text-amber-100",
-    rose: "border-rose-300/30 bg-rose-300/[0.10] text-rose-100",
-    slate: "border-white/15 bg-white/[0.06] text-white",
-  }[accent];
-
-  return (
-    <div className={`rounded-2xl border p-5 ${colour}`}>
-      <p className="text-xs font-bold uppercase tracking-[0.17em] opacity-75">
-        {label}
-      </p>
-      <p className="mt-3 text-2xl font-black">{value}</p>
-      <p className="mt-2 text-sm opacity-85">{detail}</p>
-    </div>
-  );
-}
-
-function SummaryCallout({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
-        {label}
-      </p>
-      <p className="mt-2 text-lg font-bold text-white">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
     </div>
   );
 }
