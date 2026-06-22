@@ -331,133 +331,6 @@ function ReportHeader({
   );
 }
 
-function Hero({
-  payload,
-  confidencePercent,
-  alignmentMeta,
-  riskLevel,
-  content,
-}: {
-  payload: McasReportPayload;
-  confidencePercent: number;
-  alignmentMeta: AlignmentMeta;
-  riskLevel: "low" | "moderate" | "high";
-  content: McasInternalReportContent;
-}) {
-  const primary = payload.result.operatingStyle.primary;
-  const secondary = payload.result.operatingStyle.secondary;
-  const vertical = payload.result.careerVertical.primary;
-  const internalPrimaryLabel = INTERNAL_OS_LABELS[primary.code];
-  const internalSecondaryLabel = secondary
-    ? INTERNAL_OS_LABELS[secondary.code]
-    : null;
-
-  return (
-    <section className="bg-[#0D1B2A] px-5 py-5 text-white md:px-7">
-      <div className="grid gap-4 xl:grid-cols-[minmax(245px,0.88fr)_minmax(400px,1.35fr)_210px] xl:items-stretch">
-        <div className="min-w-0">
-          <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#69E3D5]">
-            Candidate Summary &amp; Report
-          </p>
-
-          <h2 className="mt-2 text-2xl font-black tracking-[-0.045em] text-white md:text-3xl">
-            {payload.candidate.fullName}
-          </h2>
-
-          <p className="mt-2 max-w-md text-xs leading-5 text-slate-300">
-            Structured decision support — alignment status, operating style,
-            vertical readiness and role-fit assessment.
-          </p>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <HeroSummaryCard
-              label="Alignment"
-              value={alignmentMeta.label}
-              detail={alignmentMeta.shortDetail}
-              tone={alignmentMeta.accent}
-            />
-            <HeroSummaryCard
-              label="Operating Style"
-              value={internalPrimaryLabel}
-              detail="Dominant Profile"
-              tone="violet"
-            />
-            <HeroSummaryCard
-              label="Vertical"
-              value={`${vertical.code} Ready`}
-              detail="Current Fit Range"
-              tone="cyan"
-            />
-            <HeroSummaryCard
-              label="Risk Level"
-              value={humaniseRisk(riskLevel)}
-              detail={riskLevel === "low" ? "No critical flags" : "Validate indicators"}
-              tone={riskLevel === "high" ? "rose" : riskLevel === "moderate" ? "amber" : "cyan"}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[#DDE2EA] bg-[#F7F8FA] p-3 text-[#0D1B2A] shadow-[0_8px_22px_rgba(0,0,0,0.11)]">
-          <div className="space-y-1">
-            {payload.result.operatingStyle.distribution.map((item) => (
-              <HeroDistributionRow key={item.code} item={item} />
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[minmax(140px,1fr)_minmax(145px,1fr)] gap-3 xl:grid-cols-1">
-          <div className="flex min-h-[148px] flex-col items-center justify-center rounded-xl bg-white px-3 py-3 text-center shadow-[0_8px_22px_rgba(0,0,0,0.11)]">
-            <p className="mb-2 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
-              Dominant Operating Style
-            </p>
-
-            <OperatingStyleRing
-              percentage={Math.round(primary.percentage)}
-              label={internalPrimaryLabel}
-              colour={SUMMARY_OS_COLOURS[primary.code]}
-            />
-
-            <p className="mt-2 text-[10px] font-semibold text-slate-500">
-              {Math.round(confidencePercent)}% confidence
-            </p>
-          </div>
-
-          <div className="flex min-h-[76px] flex-col justify-center rounded-xl bg-[#6F5CFF] px-4 py-3 text-white shadow-[0_8px_22px_rgba(0,0,0,0.14)]">
-            <p className="text-[8px] font-black uppercase tracking-[0.17em] text-[#E6E1FF]">
-              Alignment Status
-            </p>
-            <p className="mt-1 text-lg font-black tracking-[-0.04em]">
-              {alignmentMeta.label}
-            </p>
-            <p className="mt-1 text-[10px] leading-4 text-[#F0EDFF]">
-              {alignmentMeta.shortDetail}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-2 border-t border-[#69E3D5]/30 pt-3 md:grid-cols-2">
-        <CompactInsightList
-          title="Top strengths"
-          items={content.primary.strengths}
-        />
-        <CompactInsightList
-          title="Key risks"
-          items={content.risks.slice(0, 2).map((risk) => risk.title)}
-        />
-      </div>
-
-      {secondary && content.secondarySummary ? (
-        <p className="mt-3 text-xs leading-5 text-slate-300">
-          Secondary influence:{" "}
-          <span className="font-bold text-white">{internalSecondaryLabel}</span>{" "}
-          at {Math.round(secondary.percentage)}%. {content.secondarySummary}
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 function CompactMetaCard({
   label,
   value,
@@ -475,119 +348,190 @@ function CompactMetaCard({
   );
 }
 
-function HeroSummaryCard({
-  label,
-  value,
-  detail,
-  tone,
+function Hero({
+  payload,
+  confidencePercent,
+  alignmentMeta,
+  riskLevel,
+  content,
 }: {
-  label: string;
-  value: string;
-  detail: string;
-  tone: "emerald" | "amber" | "rose" | "slate" | "violet" | "cyan";
+  payload: McasReportPayload;
+  confidencePercent: number;
+  alignmentMeta: AlignmentMeta;
+  riskLevel: "low" | "moderate" | "high";
+  content: McasInternalReportContent;
 }) {
-  const palette = {
-    emerald: "border-emerald-300/25 bg-[#243241] text-emerald-100",
-    amber: "border-amber-300/35 bg-[#2D2A2A] text-amber-100",
-    rose: "border-rose-300/35 bg-[#30232C] text-rose-100",
-    slate: "border-white/15 bg-[#243241] text-white",
-    violet: "border-violet-300/25 bg-[#272440] text-violet-100",
-    cyan: "border-cyan-300/30 bg-[#203248] text-cyan-100",
-  }[tone];
+  const primary = payload.result.operatingStyle.primary;
+  const secondary = payload.result.operatingStyle.secondary;
+  const vertical = payload.result.careerVertical.primary;
+  const nextVertical = getNextVertical(vertical.code);
 
   return (
-    <div className={`rounded-lg border px-3 py-2.5 ${palette}`}>
-      <p className="text-[8px] font-black uppercase tracking-[0.16em] opacity-70">
-        {label}
-      </p>
-      <p className="mt-1.5 text-base font-black leading-none tracking-[-0.03em]">
-        {value}
-      </p>
-      <p className="mt-1.5 text-[10px] leading-4 opacity-80">{detail}</p>
-    </div>
+    <>
+      <section className="border-b border-[#E2E8F0] bg-[#F7F8FA] px-5 py-3 md:px-7">
+        <div className="grid gap-y-3 md:grid-cols-2 xl:grid-cols-4 xl:gap-y-0">
+          {payload.result.operatingStyle.distribution.slice(0, 4).map((item, index) => (
+            <TopStyleStripItem
+              key={item.code}
+              item={item}
+              index={index}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-[#06111D] px-5 py-4 text-white md:px-7 md:py-5">
+        <div className="grid gap-3 lg:grid-cols-3">
+          <HeroSnapshotCard
+            icon="✓"
+            label="Alignment Status"
+            title={alignmentMeta.label}
+            copy={alignmentMeta.description}
+          />
+
+          <HeroSnapshotCard
+            icon="◉"
+            label="Operating Style"
+            title={INTERNAL_OS_LABELS[primary.code]}
+            copy={`Dominant execution pattern.${
+              secondary
+                ? ` Secondary ${INTERNAL_OS_LABELS[secondary.code]} influence at ${Math.round(
+                    secondary.percentage
+                  )}% confidence.`
+                : ""
+            }`}
+          />
+
+          <HeroSnapshotCard
+            icon="↗"
+            label="Vertical Readiness"
+            title={`${vertical.code} Ready`}
+            copy={`Current pattern aligns to ${vertical.code} scope.${
+              nextVertical
+                ? ` Stretch indicators toward ${nextVertical} with support.`
+                : " Enterprise-scope readiness indicated."
+            }`}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <CompactHeroInsightSection
+            title="Top strengths"
+            items={content.primary.strengths}
+          />
+
+          <CompactHeroInsightSection
+            title="Key risks"
+            items={content.risks.slice(0, 2).map((risk) => {
+              const firstSentence = risk.detail.split(".")[0]?.trim();
+              return firstSentence
+                ? `${risk.title} — ${firstSentence}`
+                : risk.title;
+            })}
+          />
+        </div>
+
+        <p className="mt-4 text-[10px] leading-4 text-slate-400">
+          Pattern confidence:{" "}
+          <span className="font-semibold text-slate-200">
+            {Math.round(confidencePercent)}%
+          </span>
+          {" · "}
+          Risk level:{" "}
+          <span className="font-semibold text-slate-200">
+            {humaniseRisk(riskLevel)}
+          </span>
+        </p>
+      </section>
+    </>
   );
 }
 
-function HeroDistributionRow({
+function TopStyleStripItem({
   item,
+  index,
 }: {
   item: McasDistributionItem<McasOperatingStyleCode>;
+  index: number;
 }) {
   const colour = SUMMARY_OS_COLOURS[item.code];
-  const displayLabel = INTERNAL_OS_LABELS[item.code];
-  const band = distributionBandLabel(item.band);
 
   return (
-    <div className="grid grid-cols-[18px_minmax(72px,0.8fr)_minmax(88px,1.6fr)_32px_58px] items-center gap-2">
+    <div
+      className={[
+        "flex min-w-0 items-center gap-3 px-2 py-1.5",
+        "xl:border-r xl:border-[#E2E8F0] xl:px-5",
+        index === 3 ? "xl:border-r-0" : "",
+      ].join(" ")}
+    >
       <span
-        className="flex h-[17px] w-[17px] items-center justify-center rounded-md text-[8px] font-black text-white"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] text-[11px] font-black text-white shadow-[0_2px_5px_rgba(0,0,0,0.14)]"
         style={{ background: colour }}
       >
         {item.code.replace("OS", "")}
       </span>
 
-      <span className="truncate text-[10px] font-semibold text-[#0D1B2A]">
-        {displayLabel}
-      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[11px] font-semibold text-[#0D1B2A]">
+          {INTERNAL_OS_LABELS[item.code]}
+        </p>
 
-      <span className="h-[5px] overflow-hidden rounded-full bg-[#E2E8F0]">
-        <span
-          className="block h-full rounded-full"
-          style={{
-            width: `${Math.max(2, Math.min(100, item.percentage))}%`,
-            background: colour,
-          }}
-        />
-      </span>
+        <div className="mt-1.5 h-[4px] overflow-hidden rounded-full bg-[#E2E8F0]">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.max(2, Math.min(100, item.percentage))}%`,
+              background: colour,
+            }}
+          />
+        </div>
 
-      <span className="text-right text-[9px] font-bold text-[#4A5568]">
-        {Math.round(item.percentage)}%
-      </span>
-
-      <span
-        className="justify-self-end rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.05em]"
-        style={{
-          color: colour,
-          background: `${colour}18`,
-        }}
-      >
-        {band}
-      </span>
-    </div>
-  );
-}
-
-function OperatingStyleRing({
-  percentage,
-  label,
-  colour,
-}: {
-  percentage: number;
-  label: string;
-  colour: string;
-}) {
-  const safePercentage = Math.max(0, Math.min(100, percentage));
-
-  return (
-    <div
-      className="flex h-[95px] w-[95px] items-center justify-center rounded-full"
-      style={{
-        background: `conic-gradient(${colour} 0 ${safePercentage}%, #E8EAF2 ${safePercentage}% 100%)`,
-      }}
-    >
-      <div className="flex h-[73px] w-[73px] flex-col items-center justify-center rounded-full bg-white">
-        <span className="text-xl font-black tracking-[-0.05em] text-[#6F5CFF]">
-          {safePercentage}%
-        </span>
-        <span className="mt-0.5 max-w-[58px] text-center text-[8px] font-semibold leading-3 text-[#4A5568]">
-          {label}
-        </span>
+        <p
+          className="mt-1.5 text-[10px] font-semibold"
+          style={{ color: colour }}
+        >
+          {Math.round(item.percentage)}% · {distributionBandLabel(item.band)}
+        </p>
       </div>
     </div>
   );
 }
 
-function CompactInsightList({
+function HeroSnapshotCard({
+  icon,
+  label,
+  title,
+  copy,
+}: {
+  icon: string;
+  label: string;
+  title: string;
+  copy: string;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-[#6F5CFF] bg-[#EEEAFE] p-5 text-[#0D1B2A] shadow-[0_5px_15px_rgba(0,0,0,0.16)]">
+      <div className="absolute inset-x-0 top-0 h-1 bg-[#6F5CFF]" />
+
+      <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#6F5CFF] text-lg font-black text-white">
+        {icon}
+      </span>
+
+      <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#718096]">
+        {label}
+      </p>
+
+      <h3 className="mt-1.5 text-2xl font-black tracking-[-0.04em] text-[#0D1B2A]">
+        {title}
+      </h3>
+
+      <p className="mt-3 max-w-[340px] text-sm leading-6 text-[#4A5568]">
+        {copy}
+      </p>
+    </div>
+  );
+}
+
+function CompactHeroInsightSection({
   title,
   items,
 }: {
@@ -595,19 +539,25 @@ function CompactInsightList({
   items: string[];
 }) {
   return (
-    <div>
-      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0FCD5E]">
-        {title}
-      </p>
-      <div className="mt-2 space-y-1.5">
+    <section>
+      <div className="border-b border-[#0FCD5E] pb-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0FCD5E]">
+          {title}
+        </p>
+      </div>
+
+      <div className="mt-3 space-y-2">
         {items.slice(0, 3).map((item) => (
-          <div key={item} className="flex gap-2 text-[11px] leading-4 text-slate-200">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0FCD5E]" />
+          <div
+            key={item}
+            className="flex gap-2 text-[11px] leading-5 text-slate-200"
+          >
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0FCD5E]" />
             <span>{item}</span>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
