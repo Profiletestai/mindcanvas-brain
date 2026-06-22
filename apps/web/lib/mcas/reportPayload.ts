@@ -228,23 +228,13 @@ function maybeOperatingStyleCode(value: unknown): McasOperatingStyleCode | null 
 
   const labelMap: Record<string, McasOperatingStyleCode> = {
     VISIONARY: "OS1",
-    TRAILBLAZER: "OS1",
     CATALYST: "OS2",
-    SPARK: "OS2",
     MOTIVATOR: "OS3",
-    UPLIFTER: "OS3",
     CONNECTOR: "OS4",
-    BRIDGEBUILDER: "OS4",
     FACILITATOR: "OS5",
-    STEADYHAND: "OS5",
     COORDINATOR: "OS6",
-    ORGANISER: "OS6",
-    ORGANIZER: "OS6",
     CONTROLLER: "OS7",
-    ANALYST: "OS7",
     OPTIMISER: "OS8",
-    OPTIMIZER: "OS8",
-    REFINER: "OS8",
   };
 
   return labelMap[compact] ?? null;
