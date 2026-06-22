@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    org: { id: org.id, name: org.name, status: org.status },
+    org: { id: org.id, name: org.name, slug: org.slug, status: org.status },
     usage,
     billing: ba
       ? {

@@ -42,7 +42,18 @@ async function load(slug: string) {
     .order("created_at", { ascending: false });
   if (tErr) throw new Error(`Tests query failed: ${tErr.message}`);
 
-  return { org, tests: (tests ?? []) as OrgTest[] };
+  const { data: accessRows, error: aErr } = await db
+    .schema("portal")
+    .from("org_test_access")
+    .select("test_id")
+    .eq("org_id", org.id)
+    .eq("status", "active");
+  if (aErr) throw new Error(`Org test access query failed: ${aErr.message}`);
+
+  const allowed = new Set((accessRows ?? []).map((r: any) => r.test_id as string));
+  const allowedTests = ((tests ?? []) as OrgTest[]).filter((t) => allowed.has(t.id));
+
+  return { org, tests: allowedTests };
 }
 
 async function createLinkAction(formData: FormData) {

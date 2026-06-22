@@ -192,9 +192,9 @@ export async function getSubmissionUsage(orgId: string): Promise<SubmissionUsage
 export async function getOrgRow(orgId: string) {
   const { data, error } = await portalAdmin()
     .from("orgs")
-    .select("id, name, status")
+    .select("id, name, slug, status")
     .eq("id", orgId)
     .maybeSingle();
   if (error) throw error;
-  return data as { id: string; name: string; status: string } | null;
+  return data as { id: string; name: string; slug: string | null; status: string } | null;
 }

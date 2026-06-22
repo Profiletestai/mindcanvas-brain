@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 type OrgStatus = "pending_activation" | "active" | "past_due" | "suspended" | "archived";
 
 type Summary = {
   ok: true;
-  org: { id: string; name: string; status: OrgStatus };
+  org: { id: string; name: string; slug: string | null; status: OrgStatus };
   billing: {
     tier: number | null;
     stripe_status: string | null;
@@ -194,6 +195,24 @@ export default function BillingClient({ orgId = null }: { orgId?: string | null 
       {successFlag && org.status !== "active" ? (
         <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100">
           Payment received. Activating your account…
+        </div>
+      ) : null}
+
+      {successFlag && org.status === "active" ? (
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span>Payment successful. Your account is active.</span>
+          {org.slug ? (
+            <Link
+              href={`/portal/${org.slug}/dashboard`}
+              className="inline-flex items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+              }}
+            >
+              Go to dashboard
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
