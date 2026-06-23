@@ -73,7 +73,13 @@ export default function VerifyPage() {
     }
     setResending(true);
     setResendIn(30);
-    const res = await api.signup({ first_name: first, last_name: last, email });
+    const res = await api.signup({
+      first_name: first,
+      last_name: last,
+      email,
+      terms_accepted: true,
+      privacy_accepted: true,
+    });
     setResending(false);
     if (isErr(res)) {
       setResendIn(0);

@@ -3,7 +3,6 @@ import type {
   VerifyOtpInput,
   OrgInput,
   ContactInput,
-  PlanInput,
   BrandingInput,
 } from "@/app/(v2)/onboarding/v2/_lib/schema";
 
@@ -57,13 +56,6 @@ export type ContactRequestBody = ContactInput;
 export interface ContactResponse {
   ok: true;
   org: import("@/types/database.types").PortalOrg;
-}
-
-// PATCH /api/onboarding/v2/plan
-export type PlanRequestBody = PlanInput;
-
-export interface PlanResponse {
-  ok: true;
 }
 
 // GET /api/onboarding/v2/progress

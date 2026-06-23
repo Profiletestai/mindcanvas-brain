@@ -93,7 +93,7 @@ export default function ContactPage() {
       setError("root", { message: res.error });
       return;
     }
-    router.push("/onboarding/v2/plan");
+    router.push("/onboarding/v2/branding");
   });
 
   if (!ready) {
