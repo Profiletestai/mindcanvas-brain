@@ -58,6 +58,12 @@ export const signupSchema = z.object({
   first_name: nonEmptyTrimmed,
   last_name: nonEmptyTrimmed,
   email: emailSchema,
+  terms_accepted: z.boolean().refine((v) => v === true, {
+    message: "Please accept the Terms and Privacy Policy.",
+  }),
+  privacy_accepted: z.boolean().refine((v) => v === true, {
+    message: "Please accept the Terms and Privacy Policy.",
+  }),
 });
 
 export const verifyOtpSchema = z.object({
@@ -81,20 +87,6 @@ export const contactSchema = z.object({
   phone_number: optionalPhone,
   support_email: optionalEmail,
   notification_email: optionalEmail,
-});
-
-export const planSchema = z.object({
-  tier: tierSchema,
-  terms_accepted: z.literal(true, {
-    errorMap: () => ({
-      message: "Please accept the Terms and Privacy Policy.",
-    }),
-  }),
-  privacy_accepted: z.literal(true, {
-    errorMap: () => ({
-      message: "Please accept the Terms and Privacy Policy.",
-    }),
-  }),
 });
 
 export const brandingSchema = z.object({
@@ -132,7 +124,6 @@ export type SignupInput = z.infer<typeof signupSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type OrgInput = z.infer<typeof orgSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
-export type PlanInput = z.infer<typeof planSchema>;
 export type BrandingInput = z.infer<typeof brandingSchema>;
 export type UploadLogoInput = z.infer<typeof uploadLogoSchema>;
 

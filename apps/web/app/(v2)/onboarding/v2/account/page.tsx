@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm, type Resolver } from "react-hook-form";
+import { Controller, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { api, isErr } from "../_lib/api";
@@ -33,6 +33,7 @@ export default function AccountPage() {
   const router = useRouter();
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -42,7 +43,13 @@ export default function AccountPage() {
       unknown,
       SignupFormOutput
     >,
-    defaultValues: { first_name: "", last_name: "", email: "" },
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      terms_accepted: false,
+      privacy_accepted: false,
+    },
     mode: "onTouched",
   });
 
@@ -61,7 +68,9 @@ export default function AccountPage() {
   const firstFieldError =
     errors.first_name?.message ??
     errors.last_name?.message ??
-    errors.email?.message;
+    errors.email?.message ??
+    errors.terms_accepted?.message ??
+    errors.privacy_accepted?.message;
   const errMsg = firstFieldError ?? errors.root?.message;
 
   return (
@@ -126,6 +135,57 @@ export default function AccountPage() {
           />
         </div>
 
+        <div className="mt-5 space-y-3">
+          <Controller
+            control={control}
+            name="terms_accepted"
+            render={({ field }) => (
+              <CheckboxRow
+                checked={field.value === true}
+                onChange={field.onChange}
+                label={
+                  <>
+                    I agree to the{" "}
+                    <a
+                      href="https://profiletest.ai/terms--conditions"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                      style={{ color: "rgb(42,137,190)" }}
+                    >
+                      Terms and Conditions
+                    </a>
+                  </>
+                }
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="privacy_accepted"
+            render={({ field }) => (
+              <CheckboxRow
+                checked={field.value === true}
+                onChange={field.onChange}
+                label={
+                  <>
+                    I agree to the{" "}
+                    <a
+                      href="https://profiletest.ai/privacy-policy"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                      style={{ color: "rgb(42,137,190)" }}
+                    >
+                      Privacy Policy
+                    </a>
+                  </>
+                }
+              />
+            )}
+          />
+        </div>
+
         {errMsg && <div className="mt-4 text-sm text-rose-500">{errMsg}</div>}
 
         <button
@@ -157,5 +217,61 @@ export default function AccountPage() {
         </p>
       </form>
     </StepCard>
+  );
+}
+
+function CheckboxRow({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+}) {
+  return (
+    <label
+      className="flex items-start gap-3 cursor-pointer select-none"
+      style={{ color: "rgb(24,44,62)", fontSize: "14px", lineHeight: "20px" }}
+    >
+      <span
+        className="inline-flex items-center justify-center rounded-[6px] mt-[2px] shrink-0"
+        style={{
+          width: 20,
+          height: 20,
+          background: checked ? "rgb(42,137,190)" : "#fff",
+          border: checked
+            ? "1.5px solid rgb(42,137,190)"
+            : "1.5px solid rgb(180,204,232)",
+          transition: "background 120ms, border-color 120ms",
+        }}
+      >
+        {checked && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
+          >
+            <path
+              d="M2.5 6.2 5 8.7l4.5-5"
+              stroke="#fff"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
   );
 }
