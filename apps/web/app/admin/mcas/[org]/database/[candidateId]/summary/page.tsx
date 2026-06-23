@@ -78,7 +78,7 @@ const OS_PROFILE_IMAGES: Record<McasOperatingStyleCode, string> = {
   OS3: "/mcas/profile-cards/motivator.png",
   OS4: "/mcas/profile-cards/connector.png",
   OS5: "/mcas/profile-cards/facilitator.png",
-  OS6: "/mcas/profile-cards/Coordinator.png",
+  OS6: "/mcas/profile-cards/coordinator.png",
   OS7: "/mcas/profile-cards/controller.png",
   OS8: "/mcas/profile-cards/optimiser.png",
 };
@@ -509,7 +509,7 @@ function Hero({
     <>
       {/* Candidate overview — this is the large navy block that was missing. */}
       <section className="bg-[#171331] px-5 py-4 text-white md:px-7 md:py-5">
-        <div className="grid gap-4 xl:grid-cols-[250px_minmax(400px,1fr)_185px] xl:items-stretch">
+        <div className="grid gap-4 xl:grid-cols-[250px_minmax(430px,1fr)_185px] xl:items-stretch">
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[0.24em] text-[#8F88FF]">
               Candidate Summary &amp; Report
@@ -562,8 +562,8 @@ function Hero({
             </div>
           </div>
 
-          <div className="rounded-lg bg-white p-3 text-[#0D1B2A] shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
-            <div className="space-y-1.5">
+          <div className="h-full min-h-[236px] rounded-lg bg-white p-3 text-[#0D1B2A] shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
+            <div className="flex h-full flex-col justify-between gap-1.5">
               {payload.result.operatingStyle.distribution.map((item) => (
                 <OverviewDistributionRow key={item.code} item={item} />
               ))}
@@ -686,6 +686,34 @@ function Hero({
   );
 }
 
+function ProfileIconBadge({
+  code,
+  size = "md",
+}: {
+  code: McasOperatingStyleCode;
+  size?: "sm" | "md";
+}) {
+  const sizeClasses =
+    size === "sm"
+      ? "h-6 w-6 rounded-[7px]"
+      : "h-9 w-9 rounded-[9px]";
+
+  return (
+    <div
+      className={[
+        "flex shrink-0 items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-[0_3px_8px_rgba(15,23,42,0.10)]",
+        sizeClasses,
+      ].join(" ")}
+    >
+      <img
+        src={OS_PROFILE_IMAGES[code]}
+        alt={`${INTERNAL_OS_LABELS[code]} operating style`}
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
+}
+
 function OverviewMetric({
   label,
   value,
@@ -727,13 +755,8 @@ function OverviewDistributionRow({
   const colour = SUMMARY_OS_COLOURS[item.code];
 
   return (
-    <div className="grid grid-cols-[18px_minmax(68px,0.75fr)_minmax(85px,1.55fr)_28px_54px] items-center gap-2">
-      <span
-        className="flex h-[17px] w-[17px] items-center justify-center rounded-[5px] text-[8px] font-black text-white"
-        style={{ background: colour }}
-      >
-        {item.code.replace("OS", "")}
-      </span>
+    <div className="grid min-h-[23px] grid-cols-[30px_minmax(68px,0.75fr)_minmax(85px,1.55fr)_28px_54px] items-center gap-2">
+      <ProfileIconBadge code={item.code} size="sm" />
 
       <span className="truncate text-[10px] font-semibold text-[#0D1B2A]">
         {INTERNAL_OS_LABELS[item.code]}
@@ -813,12 +836,7 @@ function TopStyleStripItem({
         index === 3 ? "xl:border-r-0" : "",
       ].join(" ")}
     >
-      <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] text-[11px] font-black text-white shadow-[0_2px_5px_rgba(0,0,0,0.14)]"
-        style={{ background: colour }}
-      >
-        {item.code.replace("OS", "")}
-      </span>
+      <ProfileIconBadge code={item.code} size="md" />
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-[11px] font-semibold text-[#0D1B2A]">
@@ -1095,11 +1113,11 @@ function OperatingStyleIdentitySection({
         the role and environment.
       </p>
 
-      <div className="mt-6 overflow-hidden rounded-2xl bg-[#F7F8FA] p-4 sm:p-6">
+      <div className="mt-6 flex min-h-[300px] items-center justify-center overflow-hidden rounded-2xl bg-[#F7F8FA] p-4 sm:min-h-[360px] sm:p-6">
         <img
           src="/mcas/graphics/operating-style-system.png"
           alt="Operating Style Identity System showing all eight profiles"
-          className="mx-auto h-auto w-full max-w-[980px] object-contain"
+          className="h-auto max-h-[360px] w-auto max-w-full object-contain"
         />
       </div>
 
