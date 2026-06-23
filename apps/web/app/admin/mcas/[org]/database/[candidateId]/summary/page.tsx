@@ -16,7 +16,6 @@ import {
   type McasInternalReportContent,
 } from "@/lib/mcas/mcasInternalReportContent";
 import type {
-  McasAlignmentStatus,
   McasCoreCode,
   McasDistributionItem,
   McasOperatingStyleCode,
@@ -313,17 +312,11 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
   }
 
   const primaryOs = payload.result.operatingStyle.primary;
-  const secondaryOs = payload.result.operatingStyle.secondary;
   const primaryVertical = payload.result.careerVertical.primary;
-  const primaryCore = payload.result.core.strongest;
-  const weakestCore = payload.result.core.weakest;
   const confidencePercent =
     payload.result.confidence.score ?? primaryOs.percentage;
-  const alignment = payload.internal?.roleFit?.alignmentStatus;
-  const alignmentMeta = getAlignmentMeta(alignment);
   const riskLevel =
     payload.internal?.riskLevel ?? inferRiskLevel(payload.result.flags);
-  const roleRows = getRoleFitRows(payload);
   const content = getMcasInternalReportContent(payload);
   const nextVertical = getNextVertical(primaryVertical.code);
 
@@ -341,7 +334,6 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
         <Hero
           payload={payload}
           confidencePercent={confidencePercent}
-          alignmentMeta={alignmentMeta}
           riskLevel={riskLevel}
           content={content}
         />
@@ -359,11 +351,6 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
             <OperatingStyleIdentitySection payload={payload} content={content} />
             <OperatingStyleDistributionSection payload={payload} content={content} />
             <CoreBalanceSection payload={payload} content={content} />
-            <RoleFitSection
-              rows={roleRows}
-              alignmentMeta={alignmentMeta}
-              roleTitle={payload.internal?.roleBlueprint?.title ?? null}
-            />
             <CareerVerticalSection
               current={primaryVertical.code}
               next={nextVertical}
@@ -435,7 +422,7 @@ function ReportHeader({
               Candidate Summary &amp; Report
             </h1>
             <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.24em] text-[#2B2858]">
-              MindCanvas CORE Alignment System
+              MindCanvas MCAS
             </p>
           </div>
         </div>
@@ -488,13 +475,11 @@ function CompactMetaCard({
 function Hero({
   payload,
   confidencePercent,
-  alignmentMeta,
   riskLevel,
   content,
 }: {
   payload: McasReportPayload;
   confidencePercent: number;
-  alignmentMeta: AlignmentMeta;
   riskLevel: "low" | "moderate" | "high";
   content: McasInternalReportContent;
 }) {
@@ -505,7 +490,6 @@ function Hero({
 
   return (
     <>
-      {/* Candidate overview — this is the large navy block that was missing. */}
       <section className="bg-[#171331] px-5 py-4 text-white md:px-7 md:py-5">
         <div className="grid gap-4 xl:grid-cols-[250px_minmax(430px,1fr)_185px] xl:items-stretch">
           <div className="min-w-0">
@@ -518,17 +502,11 @@ function Hero({
             </h2>
 
             <p className="mt-2 text-[10px] leading-4 text-slate-300">
-              Structured decision support — alignment status, operating style,
-              vertical readiness, and role-fit assessment.
+              Structured decision support — operating style, vertical readiness
+              and sustainability indicators.
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <OverviewMetric
-                label="Alignment"
-                value={alignmentMeta.label}
-                detail={alignmentMeta.shortDetail}
-                tone={alignmentMeta.accent}
-              />
               <OverviewMetric
                 label="Operating Style"
                 value={INTERNAL_OS_LABELS[primary.code]}
@@ -541,22 +519,24 @@ function Hero({
                 detail="Current Fit Range"
                 tone="cyan"
               />
-              <OverviewMetric
-                label="Risk Level"
-                value={humaniseRisk(riskLevel)}
-                detail={
-                  riskLevel === "low"
-                    ? "No critical flags"
-                    : "Validate indicators"
-                }
-                tone={
-                  riskLevel === "high"
-                    ? "rose"
-                    : riskLevel === "moderate"
-                      ? "amber"
-                      : "cyan"
-                }
-              />
+              <div className="col-span-2">
+                <OverviewMetric
+                  label="Risk Level"
+                  value={humaniseRisk(riskLevel)}
+                  detail={
+                    riskLevel === "low"
+                      ? "No critical flags"
+                      : "Validate indicators"
+                  }
+                  tone={
+                    riskLevel === "high"
+                      ? "rose"
+                      : riskLevel === "moderate"
+                        ? "amber"
+                        : "cyan"
+                  }
+                />
+              </div>
             </div>
           </div>
 
@@ -568,39 +548,24 @@ function Hero({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
-            <div className="flex min-h-[140px] flex-col items-center justify-center rounded-lg bg-white px-3 py-3 text-center shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
-              <p className="mb-2 text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
-                Dominant Operating Style
-              </p>
+          <div className="flex h-full min-h-[236px] flex-col items-center justify-center rounded-lg bg-white px-3 py-3 text-center shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
+            <p className="mb-2 text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+              Dominant Operating Style
+            </p>
 
-              <OverviewOperatingStyleRing
-                percentage={Math.round(primary.percentage)}
-                label={INTERNAL_OS_LABELS[primary.code]}
-                colour={SUMMARY_OS_COLOURS[primary.code]}
-              />
+            <OverviewOperatingStyleRing
+              percentage={Math.round(primary.percentage)}
+              label={INTERNAL_OS_LABELS[primary.code]}
+              colour={SUMMARY_OS_COLOURS[primary.code]}
+            />
 
-              <p className="mt-2 text-[9px] font-semibold text-slate-500">
-                {Math.round(confidencePercent)}% confidence
-              </p>
-            </div>
-
-            <div className="flex min-h-[74px] flex-col justify-center rounded-lg bg-[#6F5CFF] px-3 py-3 text-white shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
-              <p className="text-[8px] font-black uppercase tracking-[0.15em] text-[#E8E5FF]">
-                Alignment Status
-              </p>
-              <p className="mt-1 text-lg font-black tracking-[-0.04em]">
-                {alignmentMeta.label}
-              </p>
-              <p className="mt-1 text-[9px] leading-4 text-[#F1EFFF]">
-                {alignmentMeta.shortDetail}
-              </p>
-            </div>
+            <p className="mt-2 text-[9px] font-semibold text-slate-500">
+              {Math.round(confidencePercent)}% confidence
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Compact 4-style strip — intentionally sits below the overview hero. */}
       <section className="border-b border-[#E2E8F0] bg-[#F7F8FA] px-5 py-3 md:px-7">
         <div className="grid gap-y-3 md:grid-cols-2 xl:grid-cols-4 xl:gap-y-0">
           {payload.result.operatingStyle.distribution
@@ -615,16 +580,8 @@ function Hero({
         </div>
       </section>
 
-      {/* Candidate assessment snapshot — equal lavender cards, then strengths and risks. */}
       <section className="bg-[#06111D] px-5 py-4 text-white md:px-7 md:py-5">
-        <div className="grid gap-3 lg:grid-cols-3">
-          <HeroSnapshotCard
-            icon="✓"
-            label="Alignment Status"
-            title={alignmentMeta.label}
-            copy={alignmentMeta.description}
-          />
-
+        <div className="grid gap-3 lg:grid-cols-2">
           <HeroSnapshotCard
             icon="◉"
             label="Operating Style"
@@ -642,7 +599,7 @@ function Hero({
             icon="↗"
             label="Vertical Readiness"
             title={`${vertical.code} Ready`}
-            copy={`Current pattern aligns to ${vertical.code} scope.${
+            copy={`Current vertical result indicates ${vertical.code} scope.${
               nextVertical
                 ? ` Stretch indicators toward ${nextVertical} with support.`
                 : " Enterprise-scope readiness indicated."
@@ -951,7 +908,6 @@ function Sidebar() {
     ["operating-identity", "Operating Style Identity System"],
     ["operating-distribution", "Operating Style Distribution and Confidence"],
     ["core-balance", "CORE Behavioural Balance and Work Cycle Coverage"],
-    ["role-fit", "Role Fit Assessment"],
     ["vertical-readiness", "Career Vertical Fit and Readiness"],
     ["risk-flags", "Risk Flags and Sustainability Notes"],
     ["interview-focus", "Suggested Interview Focus Areas"],
@@ -1490,95 +1446,6 @@ function CoreCoverageCard({
   );
 }
 
-function RoleFitSection({
-  rows,
-  alignmentMeta,
-  roleTitle,
-}: {
-  rows: RoleFitRow[];
-  alignmentMeta: AlignmentMeta;
-  roleTitle: string | null;
-}) {
-  return (
-    <ReportSection
-      id="role-fit"
-      icon="/mcas/report-icons/role-fit.png"
-      eyebrow="07 · Role Fit Assessment"
-      title="Candidate pattern against the target role blueprint"
-    >
-      <div
-        className={[
-          "rounded-2xl border p-5",
-          alignmentMeta.accent === "emerald"
-            ? "border-emerald-300/35 bg-emerald-50"
-            : alignmentMeta.accent === "amber"
-              ? "border-amber-300/45 bg-amber-50"
-              : alignmentMeta.accent === "rose"
-                ? "border-rose-300/45 bg-rose-50"
-                : "border-slate-200 bg-slate-50",
-        ].join(" ")}
-      >
-        <p className="text-xs font-bold uppercase tracking-[0.17em] text-slate-500">
-          Alignment status
-        </p>
-        <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h3 className="text-2xl font-black text-[#201E41]">
-              {alignmentMeta.label}
-            </h3>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
-              {alignmentMeta.description}
-            </p>
-          </div>
-          {roleTitle ? (
-            <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#201E41] shadow-sm">
-              {roleTitle}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="min-w-[760px] w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-[#201E41] text-xs uppercase tracking-[0.14em] text-white">
-            <tr>
-              <th className="px-5 py-4 font-semibold">Dimension</th>
-              <th className="px-5 py-4 font-semibold">Candidate Pattern</th>
-              <th className="px-5 py-4 font-semibold">Role Requirement</th>
-              <th className="px-5 py-4 font-semibold">Fit Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
-            {rows.map((row) => (
-              <tr key={row.dimension}>
-                <td className="px-5 py-4 font-semibold text-[#201E41]">
-                  {row.dimension}
-                </td>
-                <td className="px-5 py-4 text-slate-700">{row.candidate}</td>
-                <td className="px-5 py-4 text-slate-600">{row.requirement}</td>
-                <td className="px-5 py-4">
-                  <span className={fitStatusClasses(row.status)}>
-                    {row.statusLabel}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {!roleTitle ? (
-        <p className="mt-4 text-sm leading-6 text-slate-500">
-          A target role blueprint has not yet been attached to this assessment.
-          Candidate results are complete; the role-comparison columns will become
-          fully dynamic once the reverse-role assessment or role blueprint record
-          is connected.
-        </p>
-      ) : null}
-    </ReportSection>
-  );
-}
-
 function CareerVerticalSection({
   current,
   next,
@@ -1592,7 +1459,7 @@ function CareerVerticalSection({
     <ReportSection
       id="vertical-readiness"
       icon="/mcas/report-icons/career-vertical-fit.png"
-      eyebrow="08 · Career Vertical Fit and Readiness"
+      eyebrow="07 · Career Vertical Fit and Readiness"
       title="Current scope fit and stretch horizon"
     >
       <div className="space-y-7">
@@ -1785,7 +1652,7 @@ function RiskSection({
             className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
           />
           <p className="text-xs font-bold tracking-[0.02em]">
-            Risk Flags and Sustainability Notes
+            08 · Risk Flags and Sustainability Notes
           </p>
         </div>
 
@@ -2088,7 +1955,7 @@ function InterviewSection({
     <ReportSection
       id="interview-focus"
       icon="/mcas/report-icons/suggested-interview-focus-areas.png"
-      eyebrow="10 · Suggested Interview Focus Areas"
+      eyebrow="09 · Suggested Interview Focus Areas"
       title="Use structured questions to validate evidence"
     >
       <div className="grid gap-4 lg:grid-cols-2">
@@ -2239,136 +2106,6 @@ function DistributionRow({
   );
 }
 
-type AlignmentMeta = {
-  label: string;
-  shortDetail: string;
-  description: string;
-  accent: "emerald" | "amber" | "rose" | "slate";
-};
-
-type RoleFitRow = {
-  dimension: string;
-  candidate: string;
-  requirement: string;
-  status: "aligned" | "monitor" | "stretched" | "misaligned" | "pending";
-  statusLabel: string;
-};
-
-function getAlignmentMeta(
-  status: McasAlignmentStatus | undefined
-): AlignmentMeta {
-  switch (status) {
-    case "aligned":
-      return {
-        label: "Aligned",
-        shortDetail: "Role Fit Confirmed",
-        description:
-          "The candidate pattern and available role requirements are broadly consistent. Validate the decision with evidence-based interview examples.",
-        accent: "emerald",
-      };
-    case "stretched":
-      return {
-        label: "Stretched",
-        shortDetail: "Support Required",
-        description:
-          "The candidate can contribute, but the role requires a meaningful stretch in one or more dimensions. Confirm support and development conditions.",
-        accent: "amber",
-      };
-    case "misaligned":
-      return {
-        label: "Misaligned",
-        shortDetail: "Role Fit Concern",
-        description:
-          "The available role requirements place sustained demand on patterns or scope outside the candidate's strongest fit.",
-        accent: "rose",
-      };
-    default:
-      return {
-        label: "Role Match Needed",
-        shortDetail: "Blueprint Not Attached",
-        description:
-          "The candidate assessment is complete. Attach the target role blueprint or reverse-role assessment to calculate the final alignment result.",
-        accent: "slate",
-      };
-  }
-}
-
-function getRoleFitRows(payload: McasReportPayload): RoleFitRow[] {
-  const primary = payload.result.operatingStyle.primary;
-  const strongestCore = payload.result.core.strongest;
-  const weakestCore = payload.result.core.weakest;
-  const vertical = payload.result.careerVertical.primary;
-  const roleFit = payload.internal?.roleFit;
-  const blueprint = payload.internal?.roleBlueprint;
-
-  if (roleFit && blueprint) {
-    const alignmentRows = roleFit.alignmentPoints.slice(0, 3).map((point, index) => ({
-      dimension: ["Primary OS", "CORE Strength", "Environment Fit"][index] ?? "Alignment Point",
-      candidate: point,
-      requirement: blueprint.title,
-      status: "aligned" as const,
-      statusLabel: "Aligned",
-    }));
-
-    const mismatchRows = roleFit.mismatchPoints.slice(0, 3).map((point, index) => ({
-      dimension: ["CORE / Risk", "Vertical Range", "Sustainability"][index] ?? "Validation Point",
-      candidate: point,
-      requirement: blueprint.title,
-      status: "monitor" as const,
-      statusLabel: "Monitor",
-    }));
-
-    return [...alignmentRows, ...mismatchRows];
-  }
-
-  return [
-    {
-      dimension: "Primary OS",
-      candidate: `${primary.label} · ${Math.round(primary.percentage)}%`,
-      requirement: "Target operating-style requirement not attached",
-      status: "pending",
-      statusLabel: "Needs Blueprint",
-    },
-    {
-      dimension: "CORE Strength",
-      candidate: strongestCore.label,
-      requirement: "Target CORE requirement not attached",
-      status: "pending",
-      statusLabel: "Needs Blueprint",
-    },
-    {
-      dimension: "CORE Gap",
-      candidate: weakestCore
-        ? `${weakestCore.label} · ${Math.round(weakestCore.percentage)}%`
-        : "No gap indicated",
-      requirement: "Role support requirement not attached",
-      status: "monitor",
-      statusLabel: "Monitor",
-    },
-    {
-      dimension: "Vertical Range",
-      candidate: `${vertical.code} primary`,
-      requirement: "Target vertical range not attached",
-      status: "pending",
-      statusLabel: "Needs Blueprint",
-    },
-    {
-      dimension: "Environment Fit",
-      candidate: payload.candidateFacing.environmentFit.workStyle,
-      requirement: "Target environment not attached",
-      status: "pending",
-      statusLabel: "Needs Blueprint",
-    },
-    {
-      dimension: "Sustainability",
-      candidate: `${vertical.code} current scope`,
-      requirement: "Target accountability range not attached",
-      status: "pending",
-      statusLabel: "Needs Blueprint",
-    },
-  ];
-}
-
 function inferRiskLevel(flags: string[]): "low" | "moderate" | "high" {
   if (flags.some((flag) => flag.toLowerCase().includes("overreach"))) {
     return "high";
@@ -2377,24 +2114,6 @@ function inferRiskLevel(flags: string[]): "low" | "moderate" | "high" {
   if (flags.length > 0) return "moderate";
 
   return "low";
-}
-
-function fitStatusClasses(status: RoleFitRow["status"]) {
-  const base =
-    "inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.1em]";
-
-  switch (status) {
-    case "aligned":
-      return `${base} bg-emerald-100 text-emerald-800`;
-    case "monitor":
-      return `${base} bg-amber-100 text-amber-800`;
-    case "stretched":
-      return `${base} bg-amber-100 text-amber-800`;
-    case "misaligned":
-      return `${base} bg-rose-100 text-rose-800`;
-    default:
-      return `${base} bg-slate-100 text-slate-600`;
-  }
 }
 
 function getNextVertical(current: string): string | null {
