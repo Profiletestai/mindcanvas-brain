@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
 import { getOperatingStyleDisplayLabel } from "@/lib/mcas/reportConstants";
+import McasFullReportActions from "./McasFullReportActions";
 import type {
   McasBlindSpot,
   McasCoreCode,
@@ -104,6 +105,38 @@ function operatingStyleLabel(code: McasOperatingStyleCode): string {
   return getOperatingStyleDisplayLabel(code);
 }
 
+type McasReportAccessWithNextSteps = McasReportPayload["access"] & {
+  nextStepsUrl?: string | null;
+};
+
+function getConfiguredNextStepsUrl(payload: McasReportPayload): string | null {
+  const access = payload.access as McasReportAccessWithNextSteps;
+  const value = access.nextStepsUrl;
+
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith("/") || /^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function reportPdfFilename(candidateName: string): string {
+  const safeName =
+    candidateName
+      .trim()
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "candidate";
+
+  return `mcas-extensive-career-report-${safeName}`;
+}
+
 function corePair(payload: McasReportPayload) {
   return payload.result.core.distribution.slice(0, 2);
 }
@@ -142,7 +175,15 @@ function MetaCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReportHeader({ payload }: { payload: McasReportPayload }) {
+function ReportHeader({
+  payload,
+  nextStepsUrl,
+  pdfFilename,
+}: {
+  payload: McasReportPayload;
+  nextStepsUrl: string | null;
+  pdfFilename: string;
+}) {
   return (
     <header className="rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
@@ -159,14 +200,12 @@ function ReportHeader({ payload }: { payload: McasReportPayload }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-3 xl:justify-end">
-            <a href="#download" className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
-              Download PDF
-            </a>
-            <a href="#pathway" className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white">
-              Next steps
-            </a>
-          </div>
+          <McasFullReportActions
+            variant="header"
+            pdfFilename={pdfFilename}
+            nextStepsUrl={nextStepsUrl}
+          />
+
           <div className="grid gap-3 md:grid-cols-3">
             <MetaCard label="Prepared for" value={payload.candidate.fullName} />
             <MetaCard label="Date" value={formatDate(payload.assessment.completedAt)} />
@@ -491,7 +530,13 @@ function AfterHeroInfoCard({
   );
 }
 
-function SidebarIndex({ token }: { token: string }) {
+function SidebarIndex({
+  token,
+  pdfFilename,
+}: {
+  token: string;
+  pdfFilename: string;
+}) {
   const links = [
     ["orientation", "Welcome and Orientation"],
     ["plain-language", "Your Work Pattern in Plain Language"],
@@ -505,19 +550,26 @@ function SidebarIndex({ token }: { token: string }) {
   ];
 
   return (
-    <aside className="rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
+    <aside className="mcas-full-report-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
+
       <nav className="space-y-2">
         {links.map(([href, label], index) => (
-          <a key={href} href={`#${href}`} className="block rounded-xl border border-white/35 px-3 py-2 text-sm leading-5 transition hover:bg-white/10">
+          <a
+            key={href}
+            href={`#${href}`}
+            className="block rounded-xl border border-white/35 px-3 py-2 text-sm leading-5 transition hover:bg-white/10"
+          >
             {index + 1}. {label}
           </a>
         ))}
       </nav>
-      <div className="mt-6 space-y-2">
-        <a id="download" href="#" className="block rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">Download PDF</a>
-        <a href={`/mcas/r/${token}/snapshot`} className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white">View Snapshot</a>
-      </div>
+
+      <McasFullReportActions
+        variant="sidebar"
+        pdfFilename={pdfFilename}
+        snapshotHref={`/mcas/r/${encodeURIComponent(token)}/snapshot`}
+      />
     </aside>
   );
 }
@@ -1720,7 +1772,11 @@ function LockedFullReport({ payload, token }: { payload: McasReportPayload; toke
   return (
     <main className="min-h-screen bg-[#0D0F1C] px-5 py-6 text-[#0D0F1C]">
       <div className="mx-auto max-w-5xl overflow-hidden rounded-[30px] bg-white shadow-2xl">
-        <ReportHeader payload={payload} />
+        <ReportHeader
+          payload={payload}
+          nextStepsUrl={getConfiguredNextStepsUrl(payload)}
+          pdfFilename={reportPdfFilename(payload.candidate.fullName)}
+        />
         <section className="bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-12 text-center text-white md:px-10">
           <div className="mx-auto max-w-3xl">
             <img src="/mcas/report-icons/unlock-full-report.png" alt="" className="mx-auto mb-5 h-16 w-16 rounded-2xl object-cover" />
@@ -1759,16 +1815,23 @@ export default async function McasFullReportPage({ params }: PageProps) {
     return <LockedFullReport payload={payload} token={token} />;
   }
 
+  const nextStepsUrl = getConfiguredNextStepsUrl(payload);
+  const pdfFilename = reportPdfFilename(payload.candidate.fullName);
+
   return (
     <main className="min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
-      <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
-        <ReportHeader payload={payload} />
+      <div className="mcas-full-report-print-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
+        <ReportHeader
+          payload={payload}
+          nextStepsUrl={nextStepsUrl}
+          pdfFilename={pdfFilename}
+        />
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
         <AfterHeroSummary payload={payload} />
 
-        <div className="grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
-          <SidebarIndex token={token} />
+        <div className="mcas-full-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
+          <SidebarIndex token={token} pdfFilename={pdfFilename} />
           <div className="space-y-8">
             <OrientationSection />
             <PlainLanguageSection payload={payload} />
