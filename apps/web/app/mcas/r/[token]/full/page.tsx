@@ -531,11 +531,11 @@ function AfterHeroInfoCard({
 }
 
 function SidebarIndex({
-  token,
   pdfFilename,
+  nextStepsUrl,
 }: {
-  token: string;
   pdfFilename: string;
+  nextStepsUrl: string | null;
 }) {
   const links = [
     ["orientation", "Welcome and Orientation"],
@@ -568,7 +568,7 @@ function SidebarIndex({
       <McasFullReportActions
         variant="sidebar"
         pdfFilename={pdfFilename}
-        snapshotHref={`/mcas/r/${encodeURIComponent(token)}/snapshot`}
+        nextStepsUrl={nextStepsUrl}
       />
     </aside>
   );
@@ -1831,7 +1831,7 @@ export default async function McasFullReportPage({ params }: PageProps) {
         <AfterHeroSummary payload={payload} />
 
         <div className="mcas-full-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
-          <SidebarIndex token={token} pdfFilename={pdfFilename} />
+          <SidebarIndex pdfFilename={pdfFilename} nextStepsUrl={nextStepsUrl} />
           <div className="space-y-8">
             <OrientationSection />
             <PlainLanguageSection payload={payload} />

@@ -7,13 +7,11 @@ type McasFullReportActionsProps =
       variant: "header";
       pdfFilename: string;
       nextStepsUrl: string | null;
-      snapshotHref?: never;
     }
   | {
       variant: "sidebar";
       pdfFilename: string;
-      snapshotHref: string;
-      nextStepsUrl?: never;
+      nextStepsUrl: string | null;
     };
 
 function safeExternalOrRelativeUrl(
@@ -117,6 +115,9 @@ export default function McasFullReportActions(
     );
   }
 
+  const nextStepsUrl = safeExternalOrRelativeUrl(props.nextStepsUrl);
+  const isExternal = Boolean(nextStepsUrl?.startsWith("http"));
+
   return (
     <>
       <PrintStyles />
@@ -130,12 +131,16 @@ export default function McasFullReportActions(
           Download PDF
         </button>
 
-        <a
-          href={props.snapshotHref}
-          className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white transition hover:brightness-105"
-        >
-          View Snapshot
-        </a>
+        {nextStepsUrl ? (
+          <a
+            href={nextStepsUrl}
+            target={isExternal ? "_blank" : undefined}
+            rel={isExternal ? "noreferrer" : undefined}
+            className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white transition hover:brightness-105"
+          >
+            Next steps
+          </a>
+        ) : null}
       </div>
     </>
   );
