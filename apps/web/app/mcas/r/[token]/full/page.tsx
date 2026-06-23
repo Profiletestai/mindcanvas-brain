@@ -20,14 +20,14 @@ type PageProps = {
 };
 
 const OS_IMAGES: Record<McasOperatingStyleCode, string> = {
-  OS1: "/mcas/profile-cards/trailblazer.png",
-  OS2: "/mcas/profile-cards/spark.png",
-  OS3: "/mcas/profile-cards/uplifter.png",
-  OS4: "/mcas/profile-cards/bridgebuilder.png",
-  OS5: "/mcas/profile-cards/steadyhead.png",
-  OS6: "/mcas/profile-cards/organiser.png",
-  OS7: "/mcas/profile-cards/analyst.png",
-  OS8: "/mcas/profile-cards/refiner.png",
+  OS1: "/mcas/profile-cards/visionary.png",
+  OS2: "/mcas/profile-cards/catalyst.png",
+  OS3: "/mcas/profile-cards/motivator.png",
+  OS4: "/mcas/profile-cards/connector.png",
+  OS5: "/mcas/profile-cards/facilitator.png",
+  OS6: "/mcas/profile-cards/coordinator.png",
+  OS7: "/mcas/profile-cards/controller.png",
+  OS8: "/mcas/profile-cards/optimiser.png",
 };
 
 const OS_COLOURS: Record<McasOperatingStyleCode, string> = {

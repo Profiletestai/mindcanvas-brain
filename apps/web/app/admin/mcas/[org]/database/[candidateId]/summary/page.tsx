@@ -327,7 +327,6 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
   const content = getMcasInternalReportContent(payload);
   const nextVertical = getNextVertical(primaryVertical.code);
 
-  const backHref = `/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}`;
   const candidateReportHref = reportAccess.candidateReportUrl;
 
   return (
@@ -372,7 +371,6 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
             />
             <RiskSection payload={payload} content={content} risks={content.risks} />
             <InterviewSection items={content.interviewFocus} />
-            <NextStepsSection backHref={backHref} />
           </div>
         </div>
       </div>
@@ -957,7 +955,6 @@ function Sidebar() {
     ["vertical-readiness", "Career Vertical Fit and Readiness"],
     ["risk-flags", "Risk Flags and Sustainability Notes"],
     ["interview-focus", "Suggested Interview Focus Areas"],
-    ["next-steps", "Your next steps"],
   ];
 
   return (
@@ -978,14 +975,8 @@ function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-5">
         <CandidateSummaryDownloadButton className="w-full" />
-        <a
-          href="#next-steps"
-          className="block rounded-xl bg-gradient-to-r from-[#46DCD4] via-[#4B8CFF] to-[#8A5CF6] px-4 py-3 text-center text-sm font-bold text-white"
-        >
-          Next steps
-        </a>
       </div>
     </aside>
   );
@@ -1343,83 +1334,159 @@ function CoreBalanceSection({
   const weakest = payload.result.core.weakest;
 
   return (
-    <ReportSection
+    <section
       id="core-balance"
-      icon="/mcas/report-icons/core-behavioural-balance.png"
-      eyebrow="06 · CORE Behavioural Balance and Work Cycle Coverage"
-      title="How the candidate moves work from idea to outcome"
+      className="mcas-summary-section overflow-hidden rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.28)]"
     >
-      <p className="max-w-5xl text-sm leading-7 text-slate-700">
-        The CORE system maps which parts of the work cycle the candidate
-        naturally drives, supports or undercovers. A lower score does not mean
-        inability; it signals where the role may need conscious structure,
-        partnership or validation.
-      </p>
+      <div className="overflow-hidden rounded-[18px] bg-white">
+        <div className="flex items-center gap-3 bg-[#6F5CFF] px-5 py-3 text-white">
+          <img
+            src="/mcas/report-icons/core-behavioural-balance.png"
+            alt=""
+            className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
+          />
+          <p className="text-xs font-bold tracking-[0.02em]">
+            CORE Behavioural Balance and Work Cycle Coverage
+          </p>
+        </div>
 
-      <div className="mt-5 rounded-2xl border border-cyan-300/30 bg-cyan-50 p-4 text-sm leading-6 text-[#174B53]">
-        {content.coreSummary}
-      </div>
+        <div className="p-5 md:p-7">
+          <p className="max-w-5xl text-[11px] leading-5 text-slate-600">
+            The CORE system maps which parts of the work cycle the candidate
+            naturally drives, supports or undercovers. A lower score does not
+            mean inability; it signals where the role may need conscious
+            structure, partnership or validation.
+          </p>
 
-      <div className="mt-7 grid gap-6 lg:grid-cols-[330px_1fr] lg:items-center">
-        <img
-          src="/mcas/graphics/your-core-behaviour.png"
-          alt="CORE behavioural balance"
-          className="mx-auto h-auto w-full max-w-[320px] object-contain"
-        />
+          <div className="mt-6 grid gap-6 lg:grid-cols-[255px_minmax(0,1fr)] lg:items-center">
+            <div className="flex min-h-[230px] items-center justify-center rounded-xl bg-[#F8F9FC] p-4">
+              <img
+                src="/mcas/graphics/your-core-behaviour.png"
+                alt="CORE behavioural balance"
+                className="h-auto max-h-[225px] w-auto max-w-full object-contain"
+              />
+            </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {(["CREATE", "ORGANISE", "RESOLVE", "EXAMINE"] as McasCoreCode[]).map(
-            (code) => {
-              const item =
-                payload.result.core.distribution.find(
-                  (entry) => entry.code === code
-                ) ?? null;
-              const isStrongest = strongest.code === code;
-              const isWeakest = weakest?.code === code;
-              const copy = CORE_COPY[code];
+            <div className="grid gap-3 md:grid-cols-2">
+              {(["CREATE", "ORGANISE", "RESOLVE", "EXAMINE"] as McasCoreCode[]).map(
+                (code) => {
+                  const item =
+                    payload.result.core.distribution.find(
+                      (entry) => entry.code === code
+                    ) ?? null;
 
-              return (
-                <div
-                  key={code}
-                  className={[
-                    "rounded-2xl border p-5",
-                    isStrongest
-                      ? "border-[#6255E8]/35 bg-[#F0EEFF]"
-                      : isWeakest
-                        ? "border-amber-300/45 bg-amber-50"
-                        : "border-slate-200 bg-white",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#201E41] text-sm font-black text-white">
-                      {copy.letter}
-                    </span>
-                    <span className="text-2xl font-black text-[#201E41]">
-                      {item ? Math.round(item.percentage) : 0}%
-                    </span>
-                  </div>
+                  return (
+                    <CoreCoverageCard
+                      key={code}
+                      code={code}
+                      percentage={item ? Math.round(item.percentage) : 0}
+                      isStrongest={strongest.code === code}
+                      isWeakest={weakest?.code === code}
+                    />
+                  );
+                }
+              )}
+            </div>
+          </div>
 
-                  <p className="mt-5 text-lg font-bold text-[#201E41]">
-                    {item?.label ?? code}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    {copy.copy}
-                  </p>
-
-                  <p className="mt-5 text-xs font-bold uppercase tracking-[0.14em] text-[#6255E8]">
-                    {isStrongest
-                      ? "Strongest coverage"
-                      : isWeakest
-                        ? "Support recommended"
-                        : "Supporting coverage"}
-                  </p>
-                </div>
-              );
-            }
-          )}
+          <div className="mt-5 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-[11px] leading-5 text-[#174B53]">
+            {content.coreSummary}
+          </div>
         </div>
       </div>
-    </ReportSection>
+    </section>
+  );
+}
+
+function CoreCoverageCard({
+  code,
+  percentage,
+  isStrongest,
+  isWeakest,
+}: {
+  code: McasCoreCode;
+  percentage: number;
+  isStrongest: boolean;
+  isWeakest: boolean;
+}) {
+  const copy = CORE_COPY[code];
+  const theme = {
+    CREATE: {
+      icon: "bg-violet-100 text-violet-700",
+      badge: "bg-violet-50 text-violet-700",
+      border: "border-violet-100",
+    },
+    ORGANISE: {
+      icon: "bg-indigo-100 text-indigo-700",
+      badge: "bg-indigo-50 text-indigo-700",
+      border: "border-indigo-100",
+    },
+    RESOLVE: {
+      icon: "bg-teal-100 text-teal-700",
+      badge: "bg-teal-50 text-teal-700",
+      border: "border-teal-100",
+    },
+    EXAMINE: {
+      icon: "bg-amber-100 text-amber-700",
+      badge: "bg-amber-50 text-amber-700",
+      border: "border-amber-100",
+    },
+  }[code];
+
+  const status = isStrongest
+    ? "Strongest coverage"
+    : isWeakest
+      ? "Support recommended"
+      : "Supporting coverage";
+
+  return (
+    <article
+      className={[
+        "rounded-xl border bg-white p-4 shadow-[0_4px_12px_rgba(15,23,42,0.04)]",
+        isStrongest
+          ? "border-[#6F5CFF] bg-[#F3F1FF]"
+          : isWeakest
+            ? "border-amber-300 bg-[#FFFBEF]"
+            : theme.border,
+      ].join(" ")}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span
+          className={[
+            "flex h-9 w-9 items-center justify-center rounded-lg text-sm font-black",
+            theme.icon,
+          ].join(" ")}
+        >
+          {copy.letter}
+        </span>
+
+        <div className="text-right">
+          <p className="text-xl font-black tracking-[-0.04em] text-[#201E41]">
+            {percentage}%
+          </p>
+          <span
+            className={[
+              "mt-1 inline-flex rounded-md px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.1em]",
+              isStrongest
+                ? "bg-[#6F5CFF] text-white"
+                : isWeakest
+                  ? "bg-amber-100 text-amber-800"
+                  : theme.badge,
+            ].join(" ")}
+          >
+            {status}
+          </span>
+        </div>
+      </div>
+
+      <h3 className="mt-4 text-sm font-bold text-[#201E41]">
+        {code.charAt(0) + code.slice(1).toLowerCase()}
+      </h3>
+
+      <p className="mt-1.5 text-[11px] leading-5 text-slate-600">
+        {copy.copy}
+      </p>
+    </article>
   );
 }
 
@@ -2053,52 +2120,6 @@ function InterviewSection({
   );
 }
 
-function NextStepsSection({ backHref }: { backHref: string }) {
-  return (
-    <ReportSection
-      id="next-steps"
-      icon="/mcas/report-icons/your-next-steps.png"
-      eyebrow="11 · Your next steps"
-      title="Move from insight to a structured decision"
-    >
-      <div className="grid gap-4 md:grid-cols-3">
-        <NextStepCard
-          icon="/mcas/report-icons/download-your-report.png"
-          title="Download Your Report"
-          copy="Save a PDF copy of this internal summary for the hiring or talent-review process."
-          action={<CandidateSummaryDownloadButton className="mt-5 bg-[#201E41] text-white hover:bg-[#322D63]" />}
-        />
-        <NextStepCard
-          icon="/mcas/report-icons/discuss-with-advisor.png"
-          title="Discuss with Your Advisor"
-          copy="Use a debrief or calibration session to connect this candidate result to the role and wider team system."
-          action={
-            <Link
-              href={backHref}
-              className="mcas-summary-no-print mt-5 inline-flex rounded-xl border border-[#6255E8]/30 px-4 py-3 text-sm font-semibold text-[#6255E8] transition hover:bg-[#F0EEFF]"
-            >
-              Back to candidate profile
-            </Link>
-          }
-        />
-        <NextStepCard
-          icon="/mcas/report-icons/learn-about-mcas.png"
-          title="Complete Role Matching"
-          copy="Attach a role blueprint or reverse-role assessment to calculate the detailed alignment result."
-          action={
-            <Link
-              href={backHref}
-              className="mcas-summary-no-print mt-5 inline-flex rounded-xl border border-[#6255E8]/30 px-4 py-3 text-sm font-semibold text-[#6255E8] transition hover:bg-[#F0EEFF]"
-            >
-              Review candidate
-            </Link>
-          }
-        />
-      </div>
-    </ReportSection>
-  );
-}
-
 function ReportSection({
   id,
   icon,
@@ -2214,27 +2235,6 @@ function DistributionRow({
           }}
         />
       </div>
-    </div>
-  );
-}
-
-function NextStepCard({
-  icon,
-  title,
-  copy,
-  action,
-}: {
-  icon: string;
-  title: string;
-  copy: string;
-  action: ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-[#F8F8FC] p-5">
-      <img src={icon} alt="" className="h-11 w-11 rounded-xl object-cover" />
-      <h3 className="mt-5 text-lg font-bold text-[#201E41]">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{copy}</p>
-      {action}
     </div>
   );
 }
