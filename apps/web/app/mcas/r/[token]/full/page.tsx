@@ -165,6 +165,12 @@ function strengthIcon(strength: McasStrength) {
     "coordination-management": "/mcas/report-icons/structure.png",
     "dependency-visibility": "/mcas/report-icons/gap-identification.png",
     "trust-through-consistency": "/mcas/report-icons/calm-under-pressure.png",
+    "continuous-improvement": "/mcas/report-icons/natural-strengths.png",
+    "efficiency-optimisation": "/mcas/report-icons/structure.png",
+    "quality-enhancement": "/mcas/report-icons/risk-flags.png",
+    "system-longevity": "/mcas/report-icons/best-fit-work-environment.png",
+    "controlled-change": "/mcas/report-icons/calm-under-pressure.png",
+    "long-term-performance-gains": "/mcas/report-icons/work-style.png",
     "calm-under-pressure": "/mcas/report-icons/calm-under-pressure.png",
     "gap-identification": "/mcas/report-icons/gap-identification.png",
   };
@@ -962,7 +968,13 @@ function roleCardsForDisplay(
   return roles.slice(0, 6);
 }
 
-function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
+function RolesSection({
+  roles,
+  primaryCode,
+}: {
+  roles: McasRoleRecommendation[];
+  primaryCode: McasOperatingStyleCode;
+}) {
   const cards = roleCardsForDisplay(roles);
   const leftCards = [cards[0], cards[2], cards[4]].filter(
     (item): item is McasRoleRecommendation => Boolean(item)
@@ -989,7 +1001,7 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
 
       <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
         <p className="mb-5 max-w-4xl text-[12px] leading-5 text-[#4A5568]">
-          These role examples are most likely to suit this operating pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical readiness should also guide the level of responsibility considered.
+          {roleContextCopy(primaryCode)}
         </p>
 
         <div className="grid gap-4 lg:hidden">
@@ -1035,6 +1047,18 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
       </div>
     </section>
   );
+}
+
+function roleContextCopy(code: McasOperatingStyleCode): string {
+  if (code === "OS8") {
+    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Vertical readiness should guide the level of responsibility considered.";
+  }
+
+  if (code === "OS4") {
+    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical readiness should guide the level of responsibility considered.";
+  }
+
+  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Vertical readiness should guide the level of responsibility considered.";
 }
 
 function RoleDiagramCard({
@@ -1722,7 +1746,10 @@ export default async function McasFullReportPage({ params }: PageProps) {
             <CoreBalanceSection payload={payload} />
             <PressureStrengthsSection strengths={payload.candidateFacing.strengths} />
             <BlindSpotsSection blindSpots={payload.candidateFacing.blindSpots ?? []} />
-            <RolesSection roles={payload.candidateFacing.roleRecommendations} />
+            <RolesSection
+              roles={payload.candidateFacing.roleRecommendations}
+              primaryCode={payload.result.operatingStyle.primary.code}
+            />
             <CareerVerticalSection payload={payload} />
             <SuccessGuideSection successGuide={payload.candidateFacing.successGuide ?? []} />
             <NextStepPathwaySection payload={payload} />

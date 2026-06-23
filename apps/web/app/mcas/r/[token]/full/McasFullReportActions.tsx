@@ -84,8 +84,9 @@ export default function McasFullReportActions(
   };
 
   if (props.variant === "header") {
-    const nextStepsUrl = safeExternalOrRelativeUrl(props.nextStepsUrl);
-    const isExternal = Boolean(nextStepsUrl?.startsWith("http"));
+    const configuredNextStepsUrl = safeExternalOrRelativeUrl(props.nextStepsUrl);
+    const nextStepsUrl = configuredNextStepsUrl ?? "#pathway";
+    const isExternal = Boolean(configuredNextStepsUrl?.startsWith("http"));
 
     return (
       <>
@@ -100,23 +101,22 @@ export default function McasFullReportActions(
             Download PDF
           </button>
 
-          {nextStepsUrl ? (
-            <a
-              href={nextStepsUrl}
-              target={isExternal ? "_blank" : undefined}
-              rel={isExternal ? "noreferrer" : undefined}
-              className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white transition hover:brightness-105"
-            >
-              Next steps
-            </a>
-          ) : null}
+          <a
+            href={nextStepsUrl}
+            target={isExternal ? "_blank" : undefined}
+            rel={isExternal ? "noreferrer" : undefined}
+            className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white transition hover:brightness-105"
+          >
+            Next steps
+          </a>
         </div>
       </>
     );
   }
 
-  const nextStepsUrl = safeExternalOrRelativeUrl(props.nextStepsUrl);
-  const isExternal = Boolean(nextStepsUrl?.startsWith("http"));
+  const configuredNextStepsUrl = safeExternalOrRelativeUrl(props.nextStepsUrl);
+  const nextStepsUrl = configuredNextStepsUrl ?? "#pathway";
+  const isExternal = Boolean(configuredNextStepsUrl?.startsWith("http"));
 
   return (
     <>
@@ -131,16 +131,14 @@ export default function McasFullReportActions(
           Download PDF
         </button>
 
-        {nextStepsUrl ? (
-          <a
-            href={nextStepsUrl}
-            target={isExternal ? "_blank" : undefined}
-            rel={isExternal ? "noreferrer" : undefined}
-            className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white transition hover:brightness-105"
-          >
-            Next steps
-          </a>
-        ) : null}
+        <a
+          href={nextStepsUrl}
+          target={isExternal ? "_blank" : undefined}
+          rel={isExternal ? "noreferrer" : undefined}
+          className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white transition hover:brightness-105"
+        >
+          Next steps
+        </a>
       </div>
     </>
   );
