@@ -1,4 +1,5 @@
-//apps/web/app/admin/mcas/[org]/database/page.tsx
+// apps/web/app/admin/mcas/[org]/database/page.tsx
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -18,6 +19,15 @@ type PageProps = {
     status?: string;
   };
 };
+
+function isUuid(value: string | null | undefined): value is string {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value
+      )
+  );
+}
 
 export default async function McasCandidateDatabasePage({
   params,
@@ -139,55 +149,74 @@ export default async function McasCandidateDatabasePage({
                   </td>
                 </tr>
               ) : (
-                candidates.map((candidate) => (
-                  <tr
-                    key={candidate.partnerApplicationId}
-                    className="transition hover:bg-white/[0.03]"
-                  >
-                    <td className="whitespace-nowrap px-6 py-4 font-medium text-white">
-                      {candidate.fullName}
-                    </td>
+                candidates.map((candidate, index) => {
+                  const candidateId = isUuid(candidate.partnerApplicationId)
+                    ? candidate.partnerApplicationId
+                    : null;
 
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-300">
-                      {candidate.email ?? "—"}
-                    </td>
+                  return (
+                    <tr
+                      key={
+                        candidateId ??
+                        `${candidate.applicationId || "candidate"}-${index}`
+                      }
+                      className="transition hover:bg-white/[0.03]"
+                    >
+                      <td className="whitespace-nowrap px-6 py-4 font-medium text-white">
+                        {candidate.fullName}
+                      </td>
 
-                    <td className="max-w-[240px] truncate px-6 py-4 font-mono text-xs text-slate-400">
-                      {candidate.applicationId}
-                    </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.email ?? "—"}
+                      </td>
 
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-300">
-                      {formatMcasDateTime(candidate.assessmentDate)}
-                    </td>
+                      <td className="max-w-[240px] truncate px-6 py-4 font-mono text-xs text-slate-400">
+                        {candidate.applicationId}
+                      </td>
 
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-300">
-                      {candidate.primaryOS ?? "—"}
-                    </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {formatMcasDateTime(candidate.assessmentDate)}
+                      </td>
 
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-300">
-                      {candidate.secondaryOS ?? "—"}
-                    </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.primaryOS ?? "—"}
+                      </td>
 
-                    <td className="whitespace-nowrap px-6 py-4 text-slate-300">
-                      {candidate.primaryCV ?? "—"}
-                    </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.secondaryOS ?? "—"}
+                      </td>
 
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium capitalize text-cyan-200">
-                        {candidate.status}
-                      </span>
-                    </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-slate-300">
+                        {candidate.primaryCV ?? "—"}
+                      </td>
 
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <Link
-                        href={`/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}`}
-                        className="font-semibold text-cyan-300 hover:text-cyan-200"
-                      >
-                        Review →
-                      </Link>
-                    </td>
-                  </tr>
-                ))
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium capitalize text-cyan-200">
+                          {candidate.status}
+                        </span>
+                      </td>
+
+                      <td className="whitespace-nowrap px-6 py-4">
+                        {candidateId ? (
+                          <Link
+                            href={`/admin/mcas/${org.slug}/database/${candidateId}`}
+                            prefetch={false}
+                            className="font-semibold text-cyan-300 hover:text-cyan-200"
+                          >
+                            Review →
+                          </Link>
+                        ) : (
+                          <span
+                            title="This row does not have a linked partner application record yet."
+                            className="cursor-not-allowed text-sm font-semibold text-slate-500"
+                          >
+                            Review unavailable
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import DownloadPdfButton from "./DownloadPdfButton";
 import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
+import { getOperatingStyleDisplayLabel } from "@/lib/mcas/reportConstants";
+import McasFullReportActions from "./McasFullReportActions";
 import type {
   McasBlindSpot,
   McasCoreCode,
@@ -20,23 +21,23 @@ type PageProps = {
 };
 
 const OS_IMAGES: Record<McasOperatingStyleCode, string> = {
-  OS1: "/mcas/profile-cards/trailblazer.png",
-  OS2: "/mcas/profile-cards/spark.png",
-  OS3: "/mcas/profile-cards/uplifter.png",
-  OS4: "/mcas/profile-cards/bridgebuilder.png",
-  OS5: "/mcas/profile-cards/steadyhead.png",
-  OS6: "/mcas/profile-cards/organiser.png",
-  OS7: "/mcas/profile-cards/analyst.png",
-  OS8: "/mcas/profile-cards/refiner.png",
+  OS1: "/mcas/profile-cards/visionary.png",
+  OS2: "/mcas/profile-cards/catalyst.png",
+  OS3: "/mcas/profile-cards/motivator.png",
+  OS4: "/mcas/profile-cards/connector.png",
+  OS5: "/mcas/profile-cards/facilitator.png",
+  OS6: "/mcas/profile-cards/coordinator.png",
+  OS7: "/mcas/profile-cards/controller.png",
+  OS8: "/mcas/profile-cards/optimiser.png",
 };
 
 const OS_COLOURS: Record<McasOperatingStyleCode, string> = {
   OS1: "#300993",
-  OS2: "#9554F8",
-  OS3: "#FD464A",
-  OS4: "#F86B04",
-  OS5: "#047D7B",
-  OS6: "#4F46E5",
+  OS2: "#FD2527",
+  OS3: "#EF6001",
+  OS4: "#0049F9",
+  OS5: "#0F7B6C",
+  OS6: "#4338CA",
   OS7: "#F7B955",
   OS8: "#DB2777",
 };
@@ -100,6 +101,42 @@ function pct(value: number | undefined) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function operatingStyleLabel(code: McasOperatingStyleCode): string {
+  return getOperatingStyleDisplayLabel(code);
+}
+
+type McasReportAccessWithNextSteps = McasReportPayload["access"] & {
+  nextStepsUrl?: string | null;
+};
+
+function getConfiguredNextStepsUrl(payload: McasReportPayload): string | null {
+  const access = payload.access as McasReportAccessWithNextSteps;
+  const value = access.nextStepsUrl;
+
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith("/") || /^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function reportPdfFilename(candidateName: string): string {
+  const safeName =
+    candidateName
+      .trim()
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "candidate";
+
+  return `mcas-extensive-career-report-${safeName}`;
+}
+
 function corePair(payload: McasReportPayload) {
   return payload.result.core.distribution.slice(0, 2);
 }
@@ -120,9 +157,20 @@ function strengthIcon(strength: McasStrength) {
   const slug = slugify(strength.title);
   const known: Record<string, string> = {
     "cross-team-alignment": "/mcas/report-icons/cross-team-alignment.png",
+    "alignment-creation": "/mcas/report-icons/cross-team-alignment.png",
     "timing-and-presence": "/mcas/report-icons/timing-presence.png",
     "communication-clarity": "/mcas/report-icons/communication-clarity.png",
     "relational-execution": "/mcas/report-icons/relational-execution.png",
+    "relationship-bridging": "/mcas/report-icons/relational-execution.png",
+    "coordination-management": "/mcas/report-icons/structure.png",
+    "dependency-visibility": "/mcas/report-icons/gap-identification.png",
+    "trust-through-consistency": "/mcas/report-icons/calm-under-pressure.png",
+    "continuous-improvement": "/mcas/report-icons/natural-strengths.png",
+    "efficiency-optimisation": "/mcas/report-icons/structure.png",
+    "quality-enhancement": "/mcas/report-icons/risk-flags.png",
+    "system-longevity": "/mcas/report-icons/best-fit-work-environment.png",
+    "controlled-change": "/mcas/report-icons/calm-under-pressure.png",
+    "long-term-performance-gains": "/mcas/report-icons/work-style.png",
     "calm-under-pressure": "/mcas/report-icons/calm-under-pressure.png",
     "gap-identification": "/mcas/report-icons/gap-identification.png",
   };
@@ -138,7 +186,15 @@ function MetaCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReportHeader({ payload }: { payload: McasReportPayload }) {
+function ReportHeader({
+  payload,
+  nextStepsUrl,
+  pdfFilename,
+}: {
+  payload: McasReportPayload;
+  nextStepsUrl: string | null;
+  pdfFilename: string;
+}) {
   return (
     <header className="rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
@@ -155,14 +211,12 @@ function ReportHeader({ payload }: { payload: McasReportPayload }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="mcas-no-print flex flex-wrap gap-3 xl:justify-end">
-            <DownloadPdfButton className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
-              Download PDF
-            </DownloadPdfButton>
-            <a href="#pathway" className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white">
-              Next steps
-            </a>
-          </div>
+          <McasFullReportActions
+            variant="header"
+            pdfFilename={pdfFilename}
+            nextStepsUrl={nextStepsUrl}
+          />
+
           <div className="grid gap-3 md:grid-cols-3">
             <MetaCard label="Prepared for" value={payload.candidate.fullName} />
             <MetaCard label="Date" value={formatDate(payload.assessment.completedAt)} />
@@ -198,7 +252,7 @@ function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasD
             <div key={item.code} className="grid grid-cols-[28px_minmax(0,1fr)_36px_70px] items-center gap-3">
               <img src={OS_IMAGES[item.code]} alt="" className="h-7 w-7 rounded-lg object-cover shadow-sm" />
               <div className="min-w-0">
-                <p className="truncate text-[12px] font-bold leading-4">{item.label}</p>
+                <p className="truncate text-[12px] font-bold leading-4">{operatingStyleLabel(item.code)}</p>
                 <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#EFF1F5]">
                   <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: colour }} />
                 </div>
@@ -331,7 +385,7 @@ function Hero({ payload }: { payload: McasReportPayload }) {
             A practical career guide — grounded, honest, and actionable. This report explains how you naturally execute work and where you are most likely to thrive.
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <HeroMetric label="Operating Style" value={primaryOs.label} caption="Dominant pattern" />
+            <HeroMetric label="Operating Style" value={operatingStyleLabel(primaryOs.code)} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
             <HeroMetric label="Vertical Fit" value={primaryVertical.code} caption={primaryVertical.label} />
             <HeroMetric label="Next Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
@@ -367,7 +421,7 @@ function TopStyleStrip({ items }: { items: McasDistributionItem<McasOperatingSty
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <img src={OS_IMAGES[item.code]} alt="" className="h-8 w-8 rounded-lg object-cover" />
-              <p className="truncate font-extrabold text-[#0D1B2A]">{item.label}</p>
+              <p className="truncate font-extrabold text-[#0D1B2A]">{operatingStyleLabel(item.code)}</p>
             </div>
             <p className="text-sm font-bold text-[#718096]">{item.percentage}%</p>
           </div>
@@ -487,7 +541,13 @@ function AfterHeroInfoCard({
   );
 }
 
-function SidebarIndex({ token, nextStepsUrl }: { token: string; nextStepsUrl?: string | null }) {
+function SidebarIndex({
+  pdfFilename,
+  nextStepsUrl,
+}: {
+  pdfFilename: string;
+  nextStepsUrl: string | null;
+}) {
   const links = [
     ["orientation", "Welcome and Orientation"],
     ["plain-language", "Your Work Pattern in Plain Language"],
@@ -501,26 +561,26 @@ function SidebarIndex({ token, nextStepsUrl }: { token: string; nextStepsUrl?: s
   ];
 
   return (
-    <aside className="mcas-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
+    <aside className="mcas-full-report-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
+
       <nav className="space-y-2">
         {links.map(([href, label], index) => (
-          <a key={href} href={`#${href}`} className="block rounded-xl border border-white/35 px-3 py-2 text-sm leading-5 transition hover:bg-white/10">
+          <a
+            key={href}
+            href={`#${href}`}
+            className="block rounded-xl border border-white/35 px-3 py-2 text-sm leading-5 transition hover:bg-white/10"
+          >
             {index + 1}. {label}
           </a>
         ))}
       </nav>
-      <div className="mt-6 space-y-2">
-        <DownloadPdfButton className="block w-full rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">
-          Download PDF
-        </DownloadPdfButton>
-        <a
-          href={nextStepsUrl || `/mcas/r/${token}/snapshot`}
-          className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white"
-        >
-          Next Steps
-        </a>
-      </div>
+
+      <McasFullReportActions
+        variant="sidebar"
+        pdfFilename={pdfFilename}
+        nextStepsUrl={nextStepsUrl}
+      />
     </aside>
   );
 }
@@ -628,7 +688,7 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
                 </p>
 
                 <h3 className="mt-2 text-[28px] font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">
-                  The {primary.label}
+                  The {operatingStyleLabel(primary.code)}
                 </h3>
 
                 <p className="mt-4 max-w-[470px] text-[13px] leading-7 text-[#5A5F7E]">
@@ -748,39 +808,7 @@ function CoreCompactCard({
 }
 
 function pressureStrengthCards(strengths: McasStrength[]) {
-  const extras: McasStrength[] = [
-    {
-      title: "Pattern recognition",
-      description:
-        "You notice where quality, structure, or execution can be improved before it becomes a larger issue.",
-    },
-    {
-      title: "Quality protection",
-      description:
-        "You naturally protect standards and help prevent rushed or incomplete work from becoming the default.",
-    },
-    {
-      title: "Improvement discipline",
-      description:
-        "You bring a thoughtful improvement lens that helps work become cleaner, stronger, and more sustainable.",
-    },
-  ];
-
-  const combined = [...strengths];
-
-  for (const extra of extras) {
-    if (combined.length >= 6) break;
-
-    const alreadyExists = combined.some(
-      (item) => item.title.toLowerCase() === extra.title.toLowerCase()
-    );
-
-    if (!alreadyExists) {
-      combined.push(extra);
-    }
-  }
-
-  return combined.slice(0, 6);
+  return strengths.slice(0, 6);
 }
 
 function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) {
@@ -834,52 +862,7 @@ function StrengthCompactCard({ strength }: { strength: McasStrength }) {
 }
 
 function blindSpotCards(blindSpots: McasBlindSpot[]) {
-  const extras: McasBlindSpot[] = [
-    {
-      title: "Over-refinement loop",
-      description:
-        "You may keep improving work beyond the point where the next useful step is release, feedback, or decision.",
-      managementStrategy:
-        "Define the standard needed for this stage before you refine. Ask whether the work needs precision, progress, or feedback.",
-    },
-    {
-      title: "Delayed release",
-      description:
-        "Your quality instinct can make it harder to move work forward while there are still visible gaps or imperfections.",
-      managementStrategy:
-        "Separate essential fixes from later improvements. Move forward when the work is safe, clear, and useful enough.",
-    },
-    {
-      title: "Standards friction",
-      description:
-        "You may experience frustration when others move quickly without checking the quality, logic, or sustainability of the work.",
-      managementStrategy:
-        "Name the standard clearly and explain why it matters. Turn the concern into a practical checkpoint instead of a blocker.",
-    },
-    {
-      title: "Improvement fatigue",
-      description:
-        "Constantly seeing what can be improved may become tiring for you and for the people around you.",
-      managementStrategy:
-        "Choose the few improvements that will create the most value. Let lower-impact refinements wait until the next review cycle.",
-    },
-  ];
-
-  const combined = [...blindSpots];
-
-  for (const extra of extras) {
-    if (combined.length >= 4) break;
-
-    const exists = combined.some(
-      (item) => item.title.toLowerCase() === extra.title.toLowerCase()
-    );
-
-    if (!exists) {
-      combined.push(extra);
-    }
-  }
-
-  return combined.slice(0, 4);
+  return blindSpots.slice(0, 4);
 }
 
 function blindSpotAccent(index: number) {
@@ -982,59 +965,16 @@ function BlindSpotsSection({
 function roleCardsForDisplay(
   roles: McasRoleRecommendation[]
 ): McasRoleRecommendation[] {
-  const fallbacks: McasRoleRecommendation[] = [
-    {
-      category: "People & Culture",
-      title: "People Partner",
-      description: "Cross-functional alignment, talent advocacy",
-    },
-    {
-      category: "Programme Management",
-      title: "Programme Lead",
-      description: "Multi-team delivery, stakeholder management",
-    },
-    {
-      category: "Strategy & Operations",
-      title: "Chief of Staff",
-      description: "Executive alignment, operational bridging",
-    },
-    {
-      category: "Customer Success",
-      title: "CS Director",
-      description: "Relationship-led retention and growth",
-    },
-    {
-      category: "Communications",
-      title: "Comms Lead",
-      description: "Narrative clarity, internal alignment",
-    },
-    {
-      category: "Consulting",
-      title: "Senior Consultant",
-      description: "Client alignment, delivery ownership",
-    },
-  ];
-
-  const combined = [...roles];
-
-  for (const fallback of fallbacks) {
-    if (combined.length >= 6) break;
-
-    const exists = combined.some(
-      (item) =>
-        item.title.toLowerCase() === fallback.title.toLowerCase() ||
-        item.category.toLowerCase() === fallback.category.toLowerCase()
-    );
-
-    if (!exists) {
-      combined.push(fallback);
-    }
-  }
-
-  return combined.slice(0, 6);
+  return roles.slice(0, 6);
 }
 
-function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
+function RolesSection({
+  roles,
+  primaryCode,
+}: {
+  roles: McasRoleRecommendation[];
+  primaryCode: McasOperatingStyleCode;
+}) {
   const cards = roleCardsForDisplay(roles);
   const leftCards = [cards[0], cards[2], cards[4]].filter(
     (item): item is McasRoleRecommendation => Boolean(item)
@@ -1060,52 +1000,74 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
       </div>
 
       <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px_1fr] lg:items-center">
-          <div className="space-y-8">
-            {leftCards.map((role) => (
-              <div key={`${role.category}-${role.title}`} className="relative lg:pr-8">
-                <div className="hidden lg:block absolute right-0 top-1/2 h-[2px] w-10 -translate-y-1/2 bg-[#6F5CFF]" />
-                <RoleDiagramCard role={role} align="left" />
-              </div>
-            ))}
-          </div>
+        <p className="mb-5 max-w-4xl text-[12px] leading-5 text-[#4A5568]">
+          {roleContextCopy(primaryCode)}
+        </p>
 
-          <div className="relative hidden h-full min-h-[380px] items-center justify-center lg:flex">
+        <div className="grid gap-4 lg:hidden">
+          {cards.map((role) => (
+            <RoleDiagramCard
+              key={`${role.category}-${role.title}`}
+              role={role}
+            />
+          ))}
+        </div>
+
+        <div className="hidden min-h-[420px] grid-cols-[minmax(0,1fr)_390px_minmax(0,1fr)] grid-rows-3 gap-y-5 lg:grid">
+          {leftCards.map((role, index) => (
+            <div
+              key={`${role.category}-${role.title}`}
+              className="relative flex items-center pr-12"
+              style={{ gridColumn: 1, gridRow: index + 1 }}
+            >
+              <RoleDiagramCard role={role} />
+              <span className="absolute right-0 top-1/2 h-[2px] w-12 -translate-y-1/2 bg-[#6F5CFF]" />
+            </div>
+          ))}
+
+          <div className="relative col-start-2 row-span-3 flex min-h-[420px] items-center justify-center px-2">
             <img
               src="/mcas/graphics/best-fit-work.png"
               alt="Best fit work"
-              className="h-auto w-full max-w-[330px] object-contain"
+              className="h-auto w-[380px] max-w-full object-contain"
             />
           </div>
 
-          <div className="space-y-8">
-            {rightCards.map((role) => (
-              <div key={`${role.category}-${role.title}`} className="relative lg:pl-8">
-                <div className="hidden lg:block absolute left-0 top-1/2 h-[2px] w-10 -translate-y-1/2 bg-[#6F5CFF]" />
-                <RoleDiagramCard role={role} align="right" />
-              </div>
-            ))}
-          </div>
+          {rightCards.map((role, index) => (
+            <div
+              key={`${role.category}-${role.title}`}
+              className="relative flex items-center pl-12"
+              style={{ gridColumn: 3, gridRow: index + 1 }}
+            >
+              <span className="absolute left-0 top-1/2 h-[2px] w-12 -translate-y-1/2 bg-[#6F5CFF]" />
+              <RoleDiagramCard role={role} />
+            </div>
+          ))}
         </div>
       </div>
     </section>
   );
 }
 
+function roleContextCopy(code: McasOperatingStyleCode): string {
+  if (code === "OS8") {
+    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Vertical readiness should guide the level of responsibility considered.";
+  }
+
+  if (code === "OS4") {
+    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical readiness should guide the level of responsibility considered.";
+  }
+
+  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Vertical readiness should guide the level of responsibility considered.";
+}
+
 function RoleDiagramCard({
   role,
-  align,
 }: {
   role: McasRoleRecommendation;
-  align: "left" | "right";
 }) {
   return (
-    <div
-      className={[
-        "rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]",
-        align === "left" ? "lg:mr-4" : "lg:ml-4",
-      ].join(" ")}
-    >
+    <div className="flex min-h-[118px] w-full flex-col justify-center rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]">
       <p className="text-[10px] font-black uppercase leading-4 tracking-[0.22em] text-[#2F6FB8]">
         {role.category}
       </p>
@@ -1335,12 +1297,6 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-const SUCCESS_GUIDE_IMAGES = [
-  "/mcas/graphics/map-listen.png",
-  "/mcas/graphics/create-alignment.png",
-  "/mcas/graphics/lead-with-presence.png",
-];
-
 function successGuideCards(
   successGuide: McasSuccessGuideItem[]
 ): McasSuccessGuideItem[] {
@@ -1410,69 +1366,31 @@ function SuccessGuideSection({
         </h2>
       </div>
 
-      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
-        <div className="relative mb-8 hidden px-8 md:block">
-          <div className="absolute left-[12%] right-[12%] top-[94px] h-[3px] rounded-full bg-gradient-to-r from-[#028F8B] via-[#4F7DFF] to-[#F59E0B]" />
+      <div className="rounded-[18px] bg-white px-6 py-7 md:px-8 md:py-8">
+        <div className="mb-8 hidden md:block">
+          <div className="relative mx-auto max-w-[920px] px-10">
+            <div className="absolute left-[16.6%] right-[16.6%] top-8 h-[3px] rounded-full bg-gradient-to-r from-[#0F9E9A] via-[#6F5CFF] to-[#F59E0B]" />
 
-          <div className="relative grid grid-cols-3 gap-8">
-            {cards.map((item, index) => (
-              <div key={`${item.period}-timeline`} className="text-center">
-                <img
-                  src={SUCCESS_GUIDE_IMAGES[index]}
-                  alt=""
-                  className="mx-auto h-[94px] w-[94px] rounded-full object-contain"
+            <div className="relative grid grid-cols-3">
+              {cards.map((item, index) => (
+                <SuccessGuideTimelineNode
+                  key={`${item.period}-timeline`}
+                  index={index}
+                  period={item.period}
                 />
-
-                <div
-                  className={[
-                    "relative z-10 mx-auto -mt-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white",
-                    index === 0
-                      ? "bg-[#028F8B]"
-                      : index === 1
-                        ? "bg-[#6F5CFF]"
-                        : "bg-[#F59E0B]",
-                  ].join(" ")}
-                >
-                  {index + 1}
-                </div>
-
-                <p
-                  className={[
-                    "mx-auto mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]",
-                    index === 0
-                      ? "bg-[#EAF8F5] text-[#028F8B]"
-                      : index === 1
-                        ? "bg-[#EEEAFE] text-[#6F5CFF]"
-                        : "bg-[#FFF3D6] text-[#F59E0B]",
-                  ].join(" ")}
-                >
-                  {periodLabel(item.period)}
-                </p>
-
-                <h3 className="mt-2 text-[14px] font-black leading-5 text-[#0D0F1C]">
-                  {item.title}
-                </h3>
-
-                <p className="mt-1 text-[11px] leading-4 text-[#4A5568]">
-                  {index === 0
-                    ? "Understand the landscape."
-                    : index === 1
-                      ? "Build the structure."
-                      : "Expand your impact."}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid overflow-hidden rounded-xl border border-[#E2E8F0] md:grid-cols-3">
+        <div className="grid overflow-hidden rounded-2xl border border-[#E2E8F0] md:grid-cols-3">
           {cards.map((item, index) => {
             const tone = successGuideTone(index);
 
             return (
               <div
                 key={item.period}
-                className="p-5"
+                className="min-h-[224px] p-6"
                 style={{ backgroundColor: tone.bg }}
               >
                 <p
@@ -1482,11 +1400,11 @@ function SuccessGuideSection({
                   {periodLabel(item.period)}
                 </p>
 
-                <h3 className="mt-3 text-[14px] font-black leading-5 text-[#0D0F1C]">
+                <h3 className="mt-4 text-[17px] font-black leading-6 text-[#0D0F1C]">
                   {item.title}
                 </h3>
 
-                <p className="mt-3 text-[12px] leading-6 text-[#4A5568]">
+                <p className="mt-3 text-[13px] leading-6 text-[#4A5568]">
                   {item.description}
                 </p>
               </div>
@@ -1495,6 +1413,57 @@ function SuccessGuideSection({
         </div>
       </div>
     </section>
+  );
+}
+
+function SuccessGuideTimelineNode({
+  index,
+  period,
+}: {
+  index: number;
+  period: McasSuccessGuideItem["period"];
+}) {
+  const tones = [
+    {
+      fill: "bg-[#0F9E9A]",
+      ring: "ring-[#CBEFEB]",
+      text: "text-[#0F9E9A]",
+    },
+    {
+      fill: "bg-[#6F5CFF]",
+      ring: "ring-[#DED8FF]",
+      text: "text-[#6F5CFF]",
+    },
+    {
+      fill: "bg-[#F59E0B]",
+      ring: "ring-[#FFE5AE]",
+      text: "text-[#F59E0B]",
+    },
+  ];
+
+  const tone = tones[index] ?? tones[0];
+
+  return (
+    <div className="flex flex-col items-center text-center">
+      <span
+        className={[
+          "relative z-10 flex h-16 w-16 items-center justify-center rounded-full text-xl font-black text-white ring-8",
+          tone.fill,
+          tone.ring,
+        ].join(" ")}
+      >
+        {index + 1}
+      </span>
+
+      <p
+        className={[
+          "mt-4 text-[10px] font-black uppercase tracking-[0.18em]",
+          tone.text,
+        ].join(" ")}
+      >
+        {periodLabel(period)}
+      </p>
+    </div>
   );
 }
 
@@ -1710,7 +1679,11 @@ function LockedFullReport({ payload, token }: { payload: McasReportPayload; toke
   return (
     <main className="min-h-screen bg-[#0D0F1C] px-5 py-6 text-[#0D0F1C]">
       <div className="mx-auto max-w-5xl overflow-hidden rounded-[30px] bg-white shadow-2xl">
-        <ReportHeader payload={payload} />
+        <ReportHeader
+          payload={payload}
+          nextStepsUrl={getConfiguredNextStepsUrl(payload)}
+          pdfFilename={reportPdfFilename(payload.candidate.fullName)}
+        />
         <section className="bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-12 text-center text-white md:px-10">
           <div className="mx-auto max-w-3xl">
             <img src="/mcas/report-icons/unlock-full-report.png" alt="" className="mx-auto mb-5 h-16 w-16 rounded-2xl object-cover" />
@@ -1749,16 +1722,23 @@ export default async function McasFullReportPage({ params }: PageProps) {
     return <LockedFullReport payload={payload} token={token} />;
   }
 
+  const nextStepsUrl = getConfiguredNextStepsUrl(payload);
+  const pdfFilename = reportPdfFilename(payload.candidate.fullName);
+
   return (
-    <main className="mcas-report-page min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
-      <div className="mcas-report-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
-        <ReportHeader payload={payload} />
+    <main className="min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
+      <div className="mcas-full-report-print-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
+        <ReportHeader
+          payload={payload}
+          nextStepsUrl={nextStepsUrl}
+          pdfFilename={pdfFilename}
+        />
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
         <AfterHeroSummary payload={payload} />
 
-        <div className="mcas-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
-          <SidebarIndex token={token} nextStepsUrl={(payload.access as { nextStepsUrl?: string | null }).nextStepsUrl} />
+        <div className="mcas-full-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
+          <SidebarIndex pdfFilename={pdfFilename} nextStepsUrl={nextStepsUrl} />
           <div className="space-y-8">
             <OrientationSection />
             <PlainLanguageSection payload={payload} />
@@ -1766,7 +1746,10 @@ export default async function McasFullReportPage({ params }: PageProps) {
             <CoreBalanceSection payload={payload} />
             <PressureStrengthsSection strengths={payload.candidateFacing.strengths} />
             <BlindSpotsSection blindSpots={payload.candidateFacing.blindSpots ?? []} />
-            <RolesSection roles={payload.candidateFacing.roleRecommendations} />
+            <RolesSection
+              roles={payload.candidateFacing.roleRecommendations}
+              primaryCode={payload.result.operatingStyle.primary.code}
+            />
             <CareerVerticalSection payload={payload} />
             <SuccessGuideSection successGuide={payload.candidateFacing.successGuide ?? []} />
             <NextStepPathwaySection payload={payload} />

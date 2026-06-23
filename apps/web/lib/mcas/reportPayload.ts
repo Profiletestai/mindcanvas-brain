@@ -570,6 +570,21 @@ function normaliseCareerVerticalDistribution(
   return ensureAllVerticalCodes(mergeDistributionItems(items));
 }
 
+function getNextCareerVertical(
+  distribution: McasDistributionItem<McasCareerVerticalCode>[],
+  primaryCode: McasCareerVerticalCode
+): McasDistributionItem<McasCareerVerticalCode> | undefined {
+  const currentLevel = Number(primaryCode.replace("V", ""));
+
+  if (!Number.isFinite(currentLevel) || currentLevel >= 6) {
+    return undefined;
+  }
+
+  const nextCode = `V${currentLevel + 1}` as McasCareerVerticalCode;
+
+  return distribution.find((item) => item.code === nextCode);
+}
+
 function normaliseFlags(value: unknown): string[] {
   if (!value) return [];
 
@@ -978,36 +993,66 @@ function getStrengths(code: McasOperatingStyleCode): McasStrength[] {
   const specific: Partial<Record<McasOperatingStyleCode, McasStrength[]>> = {
     OS4: [
       {
-        title: "Cross-team alignment",
+        title: "Alignment creation",
         description:
-          "You naturally bring people together across different priorities, styles, and perspectives.",
+          "You create shared understanding across people and teams, reducing duplication, confusion, and conflicting priorities.",
       },
       {
         title: "Communication clarity",
         description:
-          "You translate complexity into clear, actionable direction different stakeholders can understand.",
+          "You make information easier to understand consistently, helping work progress without avoidable misinterpretation.",
       },
       {
-        title: "Relational execution",
+        title: "Relationship bridging",
         description:
-          "You build trust as a working tool — relationships directly accelerate your output.",
+          "You connect the people and groups who need to collaborate, reducing silos and improving the flow of work.",
+      },
+      {
+        title: "Coordination management",
+        description:
+          "You manage dependencies, timing, and sequencing so multi-stakeholder work can move without fragmentation.",
+      },
+      {
+        title: "Dependency visibility",
+        description:
+          "You make interdependencies visible early, helping teams prevent delays, duplicated effort, and missed handoffs.",
+      },
+      {
+        title: "Trust through consistency",
+        description:
+          "You build trust through clear expectations, reliable communication, and follow-through across shared commitments.",
       },
     ],
     OS8: [
       {
         title: "Continuous improvement",
         description:
-          "You naturally see how work can be refined, sharpened, and improved.",
+          "You identify practical opportunities to refine work over time, helping systems evolve rather than stagnate.",
       },
       {
-        title: "Standards elevation",
+        title: "Efficiency optimisation",
         description:
-          "You help teams raise quality and avoid settling for average execution.",
+          "You notice wasted effort, repeated steps, and workflow friction that can be removed without lowering standards.",
       },
       {
-        title: "Optimisation thinking",
+        title: "Quality enhancement",
         description:
-          "You identify better ways to make outcomes cleaner, stronger, or more effective.",
+          "You spot weak points in outputs and processes, then improve the standard of delivery in a deliberate way.",
+      },
+      {
+        title: "System longevity",
+        description:
+          "You keep established systems relevant by upgrading them incrementally instead of allowing small issues to compound.",
+      },
+      {
+        title: "Controlled change",
+        description:
+          "You improve the way work is done while protecting stability, consistency, and the team’s ability to keep delivering.",
+      },
+      {
+        title: "Long-term performance gains",
+        description:
+          "You build cumulative improvements that strengthen efficiency, quality, and reliability beyond the immediate task.",
       },
     ],
   };
@@ -1135,19 +1180,40 @@ function getRoleRecommendations(
     ],
     OS4: [
       {
-        category: "People & Culture",
-        title: "People Partner",
-        description: "Cross-functional alignment, talent advocacy.",
+        category: "Programme Management",
+        title: "Programme Manager",
+        description:
+          "Cross-functional delivery, dependencies, stakeholder coordination, and clear execution rhythm.",
       },
       {
-        category: "Programme Management",
-        title: "Programme Lead",
-        description: "Multi-team delivery, stakeholder management.",
+        category: "Operations",
+        title: "Operations Lead",
+        description:
+          "Connects teams, priorities, and operating flow across complex shared work.",
       },
       {
         category: "Strategy & Operations",
         title: "Chief of Staff",
-        description: "Executive alignment, operational bridging.",
+        description:
+          "Executive alignment, decision flow, and cross-functional follow-through.",
+      },
+      {
+        category: "Product",
+        title: "Product Manager",
+        description:
+          "Aligns customer, delivery, commercial, and team priorities around a shared direction.",
+      },
+      {
+        category: "Transformation",
+        title: "Transformation Lead",
+        description:
+          "Coordinates stakeholders, communication, and dependencies through organisational change.",
+      },
+      {
+        category: "Client Delivery",
+        title: "Client Delivery Lead",
+        description:
+          "Aligns client expectations, internal teams, handoffs, and service outcomes.",
       },
     ],
     OS5: [
@@ -1205,18 +1271,38 @@ function getRoleRecommendations(
       {
         category: "Improvement",
         title: "Continuous Improvement Lead",
-        description: "Refinement, optimisation, and standards elevation.",
+        description:
+          "Leads targeted refinement that improves quality, efficiency, and performance over time.",
+      },
+      {
+        category: "Process Excellence",
+        title: "Process Excellence Lead",
+        description:
+          "Removes workflow friction, simplifies repeatable processes, and strengthens operational consistency.",
+      },
+      {
+        category: "Quality",
+        title: "Quality Improvement Lead",
+        description:
+          "Builds standards, feedback loops, and improvement practices that raise the quality of delivery.",
+      },
+      {
+        category: "Operations",
+        title: "Operational Excellence Manager",
+        description:
+          "Improves measurable performance while balancing controlled change with reliable day-to-day delivery.",
       },
       {
         category: "Product",
         title: "Product Optimisation Lead",
         description:
-          "Iteration, quality improvement, and user outcome refinement.",
+          "Uses evidence and feedback to refine the product, customer experience, and system outcomes.",
       },
       {
-        category: "Operations",
-        title: "Performance Improvement Manager",
-        description: "Efficiency, quality, and better operating outcomes.",
+        category: "Service Improvement",
+        title: "Service Improvement Lead",
+        description:
+          "Reduces friction across service workflows and converts recurring issues into sustainable improvements.",
       },
     ],
   };
@@ -1254,11 +1340,25 @@ function getBlindSpots(code: McasOperatingStyleCode): McasBlindSpot[] {
           "Separate refinement work from release work. Decide what must be excellent now and what can improve after feedback.",
       },
       {
-        title: "Standards frustration",
+        title: "Local optimisation trap",
         description:
-          "You may become frustrated when others move work forward before quality has been fully improved.",
+          "You may improve one part of a system without checking whether that change creates friction, delay, or cost elsewhere.",
         managementStrategy:
-          "Name the standard clearly, then agree the level of quality needed for the current stage of work.",
+          "Before changing a process, review the upstream and downstream effect. Define the system-level outcome, not only the local improvement.",
+      },
+      {
+        title: "Change without stabilisation",
+        description:
+          "Multiple improvements introduced too quickly can create inconsistency, team confusion, and reduced output.",
+        managementStrategy:
+          "Sequence changes. Give each improvement a clear owner, adoption window, and measure of success before introducing the next one.",
+      },
+      {
+        title: "Under-visibility of value",
+        description:
+          "Because your gains build gradually, others may not recognise the strategic value of your improvement work.",
+        managementStrategy:
+          "Make improvement visible through before-and-after measures, shorter cycle times, fewer errors, stronger quality, or reduced rework.",
       },
     ];
   }
@@ -1268,16 +1368,30 @@ function getBlindSpots(code: McasOperatingStyleCode): McasBlindSpot[] {
       {
         title: "Authority understatement",
         description:
-          "You may avoid taking a clear directional position when one is needed. Your instinct to maintain harmony can read as indecision in high-stakes moments.",
+          "You may delay taking a clear directional position when alignment is incomplete, which can read as indecision in high-stakes moments.",
         managementStrategy:
-          'Practice stating your position clearly before inviting input: "My recommendation is X — here is why, and I want to hear your concerns."',
+          'State your recommendation before inviting input: "My recommendation is X — here is why, and here is the decision needed."',
       },
       {
-        title: "Silent overload absorption",
+        title: "Stakeholder dependence",
         description:
-          "You may absorb more relational and organisational complexity than is sustainable without flagging it.",
+          "You may wait for additional confirmation or seek approval beyond what is necessary, slowing execution and making leadership feel unclear.",
         managementStrategy:
-          'Build a weekly check-in practice: "What am I carrying that is not mine to hold?" Name scope creep early and escalate with evidence.',
+          "Agree decision rights early. Define which input is essential, when consultation closes, and who can make the final call.",
+      },
+      {
+        title: "Diffused accountability",
+        description:
+          "A strong focus on shared ownership can blur individual responsibility, leaving tasks, deadlines, or handoffs without a clear owner.",
+        managementStrategy:
+          "Turn alignment into named ownership: clarify the accountable person, due date, dependency, and escalation route for each critical action.",
+      },
+      {
+        title: "Coordination replacing action",
+        description:
+          "Too much time spent aligning people can slow decisions and make the system dependent on you as the central bridge.",
+        managementStrategy:
+          "Build repeatable coordination structures — clear forums, handoffs, decision rules, and escalation paths — so work can move without constant intervention.",
       },
     ];
   }
@@ -1313,21 +1427,21 @@ function getSuccessGuide(code: McasOperatingStyleCode): McasSuccessGuideItem[] {
     return [
       {
         period: "days_1_30",
-        title: "Map and listen",
+        title: "Map the system",
         description:
-          "Identify the key relationships and communication gaps in your environment. Build a simple map of who connects to whom and where misalignment exists.",
+          "Identify the highest-impact relationships, decision bottlenecks, dependencies, and communication gaps. Notice where work slows because ownership or handoffs are unclear.",
       },
       {
         period: "days_31_60",
-        title: "Create your alignment structure",
+        title: "Build scalable coordination",
         description:
-          "Build the relational and process bridges your role requires. Establish your communication rhythms.",
+          "Establish communication rhythms, named decision owners, clear handoffs, and escalation paths so progress does not depend on you being the central bridge.",
       },
       {
         period: "days_61_90",
-        title: "Lead with presence",
+        title: "Lead with decisive alignment",
         description:
-          "Shift attention to your authority pattern. Take at least one clear directional stance per week and review your scope load.",
+          "State recommendations earlier, act under partial alignment when needed, and use authority to move the system forward while protecting trust.",
       },
     ];
   }
@@ -1354,6 +1468,68 @@ function getSuccessGuide(code: McasOperatingStyleCode): McasSuccessGuideItem[] {
   ];
 }
 
+function getOperatingStyleNarrative(
+  primaryCode: McasOperatingStyleCode
+): string {
+  const displayLabel = getOperatingStyleDisplayLabel(primaryCode);
+
+  if (primaryCode === "OS4") {
+    return "The Connector pattern describes how you create alignment across people, priorities, communication, and dependencies. You are most effective where multiple stakeholders and moving parts need to work together without fragmentation. Your value is not only in keeping people connected; it is in helping the system move through clear ownership, coordinated timing, and shared execution.";
+  }
+
+  if (primaryCode === "OS8") {
+    return "The Optimiser pattern describes how you create value by improving the performance, efficiency, and quality of systems that already exist. You are most effective where there is enough stability to observe patterns, use feedback, and make controlled changes that compound over time. Your contribution is strongest when improvement supports delivery rather than replacing it.";
+  }
+
+  return `The ${displayLabel} pattern describes how you most naturally move work forward. It shows the conditions, contribution patterns, and responsibility levels where your strengths are most likely to be sustainable.`;
+}
+
+function getNextStepPathway(
+  primaryCode: McasOperatingStyleCode
+): {
+  current: string;
+  next: string;
+  future: string;
+  developmentFocus: string[];
+} {
+  if (primaryCode === "OS4") {
+    return {
+      current: "Current fit indicated by your MCAS result",
+      next: "Next-stage responsibility readiness",
+      future: "Longer-term growth pathway",
+      developmentFocus: [
+        "Decisive alignment — state your recommendation and act under partial alignment when required.",
+        "Scalable coordination — build clear ownership, handoffs, decision forums, and escalation paths.",
+        "Quality counterbalance — add review checkpoints or partner for evidence, risk, and Examine coverage.",
+      ],
+    };
+  }
+
+  if (primaryCode === "OS8") {
+    return {
+      current: "Current fit indicated by your MCAS result",
+      next: "Next-stage responsibility readiness",
+      future: "Longer-term growth pathway",
+      developmentFocus: [
+        "Prioritise high-impact improvement — focus effort where quality, efficiency, or system performance will materially improve.",
+        "Strengthen timing and completion discipline — decide when to improve, when to stabilise, and when to release.",
+        "Think at system level — test how a local refinement affects dependencies, delivery capacity, and long-term performance.",
+      ],
+    };
+  }
+
+  return {
+    current: "Current fit indicated by your MCAS result",
+    next: "Next-stage responsibility readiness",
+    future: "Longer-term growth pathway",
+    developmentFocus: [
+      "Use your strongest pattern deliberately.",
+      "Strengthen the weaker parts of the CORE work cycle.",
+      "Build repeatable habits that make your contribution sustainable.",
+    ],
+  };
+}
+
 function getCandidateFacingContent(primaryCode: McasOperatingStyleCode): {
   workPatternSummary: string;
   operatingStyleNarrative: string;
@@ -1370,27 +1546,17 @@ function getCandidateFacingContent(primaryCode: McasOperatingStyleCode): {
   };
 } {
   const displayLabel = getOperatingStyleDisplayLabel(primaryCode);
-  const knowledgeLabel = MCAS_OPERATING_STYLE_LABELS[primaryCode].label;
   const stage = MCAS_OPERATING_STYLE_LABELS[primaryCode].workCycleStage;
 
   return {
     workPatternSummary: `Your strongest pattern is ${displayLabel}. This means your work energy is most naturally expressed through ${stage.toLowerCase()}. This is not a fixed personality label. It is a practical view of how you are most likely to create value through work.`,
-    operatingStyleNarrative: `The ${displayLabel} pattern, also known in the MCAS knowledge base as ${knowledgeLabel}, describes how you most naturally move work forward. It shows the conditions, contribution patterns, and responsibility levels where your strengths are most likely to be sustainable.`,
+    operatingStyleNarrative: getOperatingStyleNarrative(primaryCode),
     strengths: getStrengths(primaryCode),
     environmentFit: getEnvironmentFit(primaryCode),
     roleRecommendations: getRoleRecommendations(primaryCode),
     blindSpots: getBlindSpots(primaryCode),
     successGuide: getSuccessGuide(primaryCode),
-    nextStepPathway: {
-      current: "Current fit indicated by your MCAS result",
-      next: "Next stage responsibility readiness",
-      future: "Longer-term growth pathway",
-      developmentFocus: [
-        "Use your strongest pattern deliberately.",
-        "Strengthen the weaker parts of the CORE work cycle.",
-        "Build repeatable habits that make your contribution sustainable.",
-      ],
-    },
+    nextStepPathway: getNextStepPathway(primaryCode),
   };
 }
 
@@ -1467,7 +1633,9 @@ export async function buildMcasReportPayload(
   )[0];
 
   const primaryVertical = verticalDistribution[0];
-  const nextVertical = verticalDistribution[1];
+  const nextVertical = primaryVertical
+    ? getNextCareerVertical(verticalDistribution, primaryVertical.code)
+    : undefined;
 
   if (!primaryOperatingStyle) {
     throw new Error("MCAS operating style distribution could not be resolved.");
@@ -1605,9 +1773,8 @@ export async function buildMcasReportPayload(
       fullUnlocked: fullReportUnlocked,
       internalUnlocked: true,
       fullPurchaseEnabled: true,
-      nextStepsUrl: testLink?.next_steps_url ?? null,
     },
-  } as unknown as McasReportPayload;
+  };
 }
 
 export async function buildMcasReportPayloadByToken(

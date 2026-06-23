@@ -1,4 +1,6 @@
-//apps/web/app/admin/mcas/[org]/database/[candidateId]/page.tsx
+// apps/web/app/admin/mcas/[org]/database/[candidateId]/page.tsx
+
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -6,6 +8,7 @@ import {
   getMcasCandidateDetailById,
   getMcasOrganisationBySlug,
 } from "@/lib/mcas/mcasAdminData";
+import { getMcasCandidateReportAccess } from "@/lib/mcas/mcasCandidateReports";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,15 @@ type PageProps = {
   };
 };
 
+function isUuid(value: string | null | undefined): value is string {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value
+      )
+  );
+}
+
 export default async function McasCandidateDetailPage({ params }: PageProps) {
   const org = await getMcasOrganisationBySlug(params.org);
 
@@ -23,14 +35,28 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const candidateId =
+    typeof params.candidateId === "string" ? params.candidateId.trim() : "";
+
+  if (!isUuid(candidateId)) {
+    notFound();
+  }
+
   const candidate = await getMcasCandidateDetailById({
     orgId: org.id,
-    candidateId: params.candidateId,
+    candidateId,
   });
 
   if (!candidate) {
     notFound();
   }
+
+  const reportAccess = await getMcasCandidateReportAccess({
+    orgId: org.id,
+    candidateId,
+  });
+
+  const summaryUrl = `/admin/mcas/${org.slug}/database/${candidate.partnerApplicationId}/summary`;
 
   return (
     <div className="space-y-8">
@@ -42,18 +68,59 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
           ← Back to candidate database
         </Link>
 
-        <p className="mt-6 text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
-          Candidate Review
-        </p>
+        <div className="mt-6 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+              Candidate Review
+            </p>
 
-        <h2 className="mt-3 text-3xl font-semibold text-white">
-          {candidate.fullName}
-        </h2>
+            <h2 className="mt-3 text-3xl font-semibold text-white">
+              {candidate.fullName}
+            </h2>
 
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          Internal MCAS review page for this candidate application and assessment result.
-        </p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+              Internal MCAS review page for this candidate application and
+              assessment result.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {reportAccess.isReady && reportAccess.candidateReportUrl ? (
+              <a
+                href={reportAccess.candidateReportUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-xl bg-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+              >
+                {reportAccess.candidateReportLabel} ↗
+              </a>
+            ) : (
+              <span
+                title={reportAccess.reason ?? undefined}
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-slate-500"
+              >
+                Candidate report pending
+              </span>
+            )}
+
+            {reportAccess.isReady ? (
+              <Link
+                href={summaryUrl}
+                className="inline-flex items-center justify-center rounded-xl border border-violet-300/40 bg-violet-300/10 px-5 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-200 hover:bg-violet-300/20"
+              >
+                Candidate Summary Report →
+              </Link>
+            ) : null}
+          </div>
+        </div>
       </section>
+
+      {!reportAccess.isReady ? (
+        <section className="rounded-3xl border border-amber-300/20 bg-amber-300/[0.06] p-5 text-sm leading-6 text-amber-100">
+          <span className="font-semibold">Reports are not available yet.</span>{" "}
+          {reportAccess.reason ?? "Complete and score the assessment first."}
+        </section>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <InfoCard label="Status" value={candidate.status} />
@@ -113,8 +180,14 @@ export default async function McasCandidateDetailPage({ params }: PageProps) {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <JsonPanel title="Operating Style Distribution" value={candidate.rawOsDistribution} />
-        <JsonPanel title="CORE Distribution" value={candidate.rawCoreDistribution} />
+        <JsonPanel
+          title="Operating Style Distribution"
+          value={candidate.rawOsDistribution}
+        />
+        <JsonPanel
+          title="CORE Distribution"
+          value={candidate.rawCoreDistribution}
+        />
         <JsonPanel title="Confidence Payload" value={candidate.rawConfidence} />
         <JsonPanel title="Flags" value={candidate.rawFlags} />
       </section>
@@ -136,7 +209,7 @@ function Panel({
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/[0.035] p-6">
