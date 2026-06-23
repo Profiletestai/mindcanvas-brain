@@ -151,6 +151,7 @@ export type ReserveSubmissionResult = {
   allowance?: number;
   used?: number;
   remaining?: number;
+  exempt?: boolean;
 };
 
 export function isSubmissionQuotaEnforced(): boolean {
@@ -174,9 +175,10 @@ export async function reserveSubmission(
 export type SubmissionUsage = {
   ok: boolean;
   reason?: "no_subscription";
-  allowance: number;
+  exempt?: boolean;
+  allowance: number | null;
   used: number;
-  remaining: number;
+  remaining: number | null;
   period_start: string | null;
   period_end: string | null;
 };

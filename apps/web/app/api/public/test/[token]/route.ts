@@ -104,7 +104,7 @@ export async function GET(
     let orgLimitReached = false;
     if (isSubmissionQuotaEnforced()) {
       const usage = await getSubmissionUsage(linkRow.org_id);
-      orgLimitReached = usage.remaining <= 0;
+      orgLimitReached = !usage.exempt && (usage.remaining ?? 0) <= 0;
     }
 
     const limitReached = perLinkLimitReached || orgLimitReached;
@@ -220,7 +220,7 @@ export async function POST(
     // counted across all links (not just this one).
     if (isSubmissionQuotaEnforced()) {
       const usage = await getSubmissionUsage(link.org_id);
-      if (usage.remaining <= 0) {
+      if (!usage.exempt && (usage.remaining ?? 0) <= 0) {
         return NextResponse.json(
           {
             ok: false,
