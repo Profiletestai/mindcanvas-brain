@@ -32,11 +32,11 @@ const OS_IMAGES: Record<McasOperatingStyleCode, string> = {
 
 const OS_COLOURS: Record<McasOperatingStyleCode, string> = {
   OS1: "#300993",
-  OS2: "#9554F8",
-  OS3: "#FD464A",
-  OS4: "#F86B04",
-  OS5: "#047D7B",
-  OS6: "#4F46E5",
+  OS2: "#FD2527",
+  OS3: "#EF6001",
+  OS4: "#0049F9",
+  OS5: "#0F7B6C",
+  OS6: "#4338CA",
   OS7: "#F7B955",
   OS8: "#DB2777",
 };
@@ -1057,32 +1057,45 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
       </div>
 
       <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px_1fr] lg:items-center">
-          <div className="space-y-8">
-            {leftCards.map((role) => (
-              <div key={`${role.category}-${role.title}`} className="relative lg:pr-8">
-                <div className="hidden lg:block absolute right-0 top-1/2 h-[2px] w-10 -translate-y-1/2 bg-[#6F5CFF]" />
-                <RoleDiagramCard role={role} align="left" />
-              </div>
-            ))}
-          </div>
+        <div className="grid gap-4 lg:hidden">
+          {cards.map((role) => (
+            <RoleDiagramCard
+              key={`${role.category}-${role.title}`}
+              role={role}
+            />
+          ))}
+        </div>
 
-          <div className="relative hidden h-full min-h-[380px] items-center justify-center lg:flex">
+        <div className="hidden min-h-[420px] grid-cols-[minmax(0,1fr)_390px_minmax(0,1fr)] grid-rows-3 gap-y-5 lg:grid">
+          {leftCards.map((role, index) => (
+            <div
+              key={`${role.category}-${role.title}`}
+              className="relative flex items-center pr-12"
+              style={{ gridColumn: 1, gridRow: index + 1 }}
+            >
+              <RoleDiagramCard role={role} />
+              <span className="absolute right-0 top-1/2 h-[2px] w-12 -translate-y-1/2 bg-[#6F5CFF]" />
+            </div>
+          ))}
+
+          <div className="relative col-start-2 row-span-3 flex min-h-[420px] items-center justify-center px-2">
             <img
               src="/mcas/graphics/best-fit-work.png"
               alt="Best fit work"
-              className="h-auto w-full max-w-[330px] object-contain"
+              className="h-auto w-[380px] max-w-full object-contain"
             />
           </div>
 
-          <div className="space-y-8">
-            {rightCards.map((role) => (
-              <div key={`${role.category}-${role.title}`} className="relative lg:pl-8">
-                <div className="hidden lg:block absolute left-0 top-1/2 h-[2px] w-10 -translate-y-1/2 bg-[#6F5CFF]" />
-                <RoleDiagramCard role={role} align="right" />
-              </div>
-            ))}
-          </div>
+          {rightCards.map((role, index) => (
+            <div
+              key={`${role.category}-${role.title}`}
+              className="relative flex items-center pl-12"
+              style={{ gridColumn: 3, gridRow: index + 1 }}
+            >
+              <span className="absolute left-0 top-1/2 h-[2px] w-12 -translate-y-1/2 bg-[#6F5CFF]" />
+              <RoleDiagramCard role={role} />
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -1091,18 +1104,11 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
 
 function RoleDiagramCard({
   role,
-  align,
 }: {
   role: McasRoleRecommendation;
-  align: "left" | "right";
 }) {
   return (
-    <div
-      className={[
-        "rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]",
-        align === "left" ? "lg:mr-4" : "lg:ml-4",
-      ].join(" ")}
-    >
+    <div className="flex min-h-[118px] w-full flex-col justify-center rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]">
       <p className="text-[10px] font-black uppercase leading-4 tracking-[0.22em] text-[#2F6FB8]">
         {role.category}
       </p>
@@ -1408,8 +1414,8 @@ function SuccessGuideSection({
       </div>
 
       <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
-        <div className="relative mb-8 hidden px-8 md:block">
-          <div className="absolute left-[12%] right-[12%] top-[94px] h-[3px] rounded-full bg-gradient-to-r from-[#028F8B] via-[#4F7DFF] to-[#F59E0B]" />
+        <div className="relative mb-7 hidden px-10 pt-1 md:block">
+          <div className="absolute left-[14%] right-[14%] top-[79px] h-[3px] rounded-full bg-gradient-to-r from-[#028F8B] via-[#4F7DFF] to-[#F59E0B]" />
 
           <div className="relative grid grid-cols-3 gap-8">
             {cards.map((item, index) => (
@@ -1417,12 +1423,12 @@ function SuccessGuideSection({
                 <img
                   src={SUCCESS_GUIDE_IMAGES[index]}
                   alt=""
-                  className="mx-auto h-[94px] w-[94px] rounded-full object-contain"
+                  className="mx-auto h-[80px] w-[80px] rounded-full object-contain"
                 />
 
                 <div
                   className={[
-                    "relative z-10 mx-auto -mt-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white",
+                    "relative z-10 mx-auto -mt-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white",
                     index === 0
                       ? "bg-[#028F8B]"
                       : index === 1
@@ -1432,31 +1438,6 @@ function SuccessGuideSection({
                 >
                   {index + 1}
                 </div>
-
-                <p
-                  className={[
-                    "mx-auto mt-2 inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]",
-                    index === 0
-                      ? "bg-[#EAF8F5] text-[#028F8B]"
-                      : index === 1
-                        ? "bg-[#EEEAFE] text-[#6F5CFF]"
-                        : "bg-[#FFF3D6] text-[#F59E0B]",
-                  ].join(" ")}
-                >
-                  {periodLabel(item.period)}
-                </p>
-
-                <h3 className="mt-2 text-[14px] font-black leading-5 text-[#0D0F1C]">
-                  {item.title}
-                </h3>
-
-                <p className="mt-1 text-[11px] leading-4 text-[#4A5568]">
-                  {index === 0
-                    ? "Understand the landscape."
-                    : index === 1
-                      ? "Build the structure."
-                      : "Expand your impact."}
-                </p>
               </div>
             ))}
           </div>
