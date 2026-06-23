@@ -73,14 +73,14 @@ const OS_NAMES: Record<McasOperatingStyleCode, string> = {
  * Coordinator → Organiser, Controller → Analyst, Optimiser → Refiner.
  */
 const OS_PROFILE_IMAGES: Record<McasOperatingStyleCode, string> = {
-  OS1: "/mcas/profile-cards/trailblazer.png",
-  OS2: "/mcas/profile-cards/spark.png",
-  OS3: "/mcas/profile-cards/uplifter.png",
-  OS4: "/mcas/profile-cards/bridgebuilder.png",
-  OS5: "/mcas/profile-cards/steadyhead.png",
-  OS6: "/mcas/profile-cards/organiser.png",
-  OS7: "/mcas/profile-cards/analyst.png",
-  OS8: "/mcas/profile-cards/refiner.png",
+  OS1: "/mcas/profile-cards/visionary.png",
+  OS2: "/mcas/profile-cards/catalyst.png",
+  OS3: "/mcas/profile-cards/motivator.png",
+  OS4: "/mcas/profile-cards/connector.png",
+  OS5: "/mcas/profile-cards/facilitator.png",
+  OS6: "/mcas/profile-cards/Coordinator.png",
+  OS7: "/mcas/profile-cards/controller.png",
+  OS8: "/mcas/profile-cards/optimiser.png",
 };
 
 /*
@@ -370,7 +370,7 @@ export default async function McasCandidateSummaryPage({ params }: PageProps) {
               next={nextVertical}
               readinessLabel={payload.result.careerVertical.readinessLabel}
             />
-            <RiskSection risks={content.risks} />
+            <RiskSection payload={payload} content={content} risks={content.risks} />
             <InterviewSection items={content.interviewFocus} />
             <NextStepsSection backHref={backHref} />
           </div>
@@ -1654,44 +1654,344 @@ function CareerVerticalRow({
 }
 
 function RiskSection({
+  payload,
+  content,
   risks,
 }: {
+  payload: McasReportPayload;
+  content: McasInternalReportContent;
   risks: McasInternalReportContent["risks"];
 }) {
+  const primaryCode = payload.result.operatingStyle.primary.code;
+  const primaryLabel = INTERNAL_OS_LABELS[primaryCode];
+  const nextVertical = getNextVertical(payload.result.careerVertical.primary.code);
+
+  const strength = splitRiskInsight(
+    content.primary.strengths[0] ??
+      `${primaryLabel} contribution — Creates practical value through the dominant work pattern.`
+  );
+
+  const primaryRisk =
+    risks[0] ??
+    ({
+      title: "Sustainability check",
+      detail:
+        "Validate the conditions that allow this candidate to sustain their strongest contribution over time.",
+      level: "moderate",
+    } as McasInternalReportContent["risks"][number]);
+
+  const riskResponse = getRiskResponse(primaryCode, primaryRisk.title);
+  const growth = getGrowthGuidance(
+    primaryCode,
+    nextVertical,
+    payload.result.careerVertical.primary.code
+  );
+
   return (
-    <ReportSection
+    <section
       id="risk-flags"
-      icon="/mcas/report-icons/risk-flags.png"
-      eyebrow="09 · Risk Flags and Sustainability Notes"
-      title="Predictable risks to validate before placement"
+      className="mcas-summary-section overflow-hidden rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.28)]"
     >
-      <div className="grid gap-4 md:grid-cols-2">
-        {risks.map((risk) => (
-          <div
-            key={risk.title}
-            className={[
-              "rounded-2xl border p-5",
-              risk.level === "high"
-                ? "border-rose-300/50 bg-rose-50"
-                : risk.level === "moderate"
-                  ? "border-amber-300/50 bg-amber-50"
-                  : "border-cyan-300/35 bg-cyan-50",
-            ].join(" ")}
-          >
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              {humaniseRisk(risk.level)} priority
+      <div className="overflow-hidden rounded-[18px] bg-white">
+        <div className="flex items-center gap-3 bg-[#6F5CFF] px-5 py-3 text-white">
+          <img
+            src="/mcas/report-icons/risk-flags.png"
+            alt=""
+            className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
+          />
+          <p className="text-xs font-bold tracking-[0.02em]">
+            Risk Flags and Sustainability Notes
+          </p>
+        </div>
+
+        <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
+          <RiskSustainabilityCard
+            accent="strength"
+            icon="↗"
+            label="Strength"
+            title={strength.title}
+            copy={strength.detail}
+            footerLabel="Impact"
+            footerCopy={firstSentence(content.primary.systemFunction)}
+          />
+
+          <RiskSustainabilityCard
+            accent="risk"
+            icon="△"
+            label="Risk"
+            title={primaryRisk.title}
+            copy={firstSentence(primaryRisk.detail)}
+            footerLabel="Mitigation"
+            footerCopy={riskResponse.mitigation}
+            secondaryFooterLabel="Trigger"
+            secondaryFooterCopy={riskResponse.trigger}
+          />
+
+          <RiskSustainabilityCard
+            accent="growth"
+            icon="⌁"
+            label="Growth"
+            title={growth.title}
+            copy={growth.copy}
+            footerLabel="Action"
+            footerCopy={growth.action}
+          />
+
+          <RiskSustainabilityCard
+            accent="recommendation"
+            icon="◎"
+            label="Recommendation"
+            title="Best Fit Environment"
+            copy={firstSentence(content.primary.environmentSummary)}
+            footerLabel="Why"
+            footerCopy={`Creates the conditions for ${primaryLabel} to deliver impact while protecting sustainable execution.`}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RiskSustainabilityCard({
+  accent,
+  icon,
+  label,
+  title,
+  copy,
+  footerLabel,
+  footerCopy,
+  secondaryFooterLabel,
+  secondaryFooterCopy,
+}: {
+  accent: "strength" | "risk" | "growth" | "recommendation";
+  icon: string;
+  label: string;
+  title: string;
+  copy: string;
+  footerLabel: string;
+  footerCopy: string;
+  secondaryFooterLabel?: string;
+  secondaryFooterCopy?: string;
+}) {
+  const palette = {
+    strength: {
+      icon: "bg-[#E9FBF6] text-[#42CDB4]",
+      label: "text-[#42CDB4]",
+      divider: "border-[#CFF6EC]",
+      footer: "text-[#42CDB4]",
+    },
+    risk: {
+      icon: "bg-[#FFF2EA] text-[#FF9A69]",
+      label: "text-[#FF9A69]",
+      divider: "border-[#FFE4D7]",
+      footer: "text-[#FF9A69]",
+    },
+    growth: {
+      icon: "bg-[#F4EEFF] text-[#8F5CFF]",
+      label: "text-[#8F5CFF]",
+      divider: "border-[#E5D7FF]",
+      footer: "text-[#8F5CFF]",
+    },
+    recommendation: {
+      icon: "bg-[#EEF2FF] text-[#3D5CFF]",
+      label: "text-[#3D5CFF]",
+      divider: "border-[#DCE4FF]",
+      footer: "text-[#3D5CFF]",
+    },
+  }[accent];
+
+  return (
+    <article className="flex min-h-[280px] flex-col rounded-xl border border-slate-100 bg-white px-5 py-5 shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
+      <span
+        className={[
+          "flex h-10 w-10 items-center justify-center rounded-xl text-xl font-black",
+          palette.icon,
+        ].join(" ")}
+      >
+        {icon}
+      </span>
+
+      <p
+        className={[
+          "mt-4 text-[10px] font-black uppercase tracking-[0.13em]",
+          palette.label,
+        ].join(" ")}
+      >
+        {label}
+      </p>
+
+      <h3 className="mt-4 text-[15px] font-bold leading-5 text-[#201E41]">
+        {title}
+      </h3>
+
+      <p className="mt-2 text-[11px] leading-5 text-slate-600">{copy}</p>
+
+      <div
+        className={[
+          "relative mt-auto border-t pt-4",
+          palette.divider,
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "absolute -top-[3px] left-1/2 h-1 w-1 -translate-x-1/2 rounded-full",
+            accent === "strength"
+              ? "bg-[#8CE6D4]"
+              : accent === "risk"
+                ? "bg-[#FFC6AB]"
+                : accent === "growth"
+                  ? "bg-[#B997FF]"
+                  : "bg-[#9CB2FF]",
+          ].join(" ")}
+        />
+
+        {secondaryFooterLabel && secondaryFooterCopy ? (
+          <div className="mb-3">
+            <p className={`text-[10px] font-bold ${palette.footer}`}>
+              {secondaryFooterLabel}
             </p>
-            <h3 className="mt-3 text-lg font-bold text-[#201E41]">
-              {risk.title}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              {risk.detail}
+            <p className="mt-1 text-[10px] leading-4 text-slate-600">
+              {secondaryFooterCopy}
             </p>
           </div>
-        ))}
+        ) : null}
+
+        <p className={`text-[10px] font-bold ${palette.footer}`}>
+          {footerLabel}
+        </p>
+        <p className="mt-1 text-[10px] leading-4 text-slate-600">
+          {footerCopy}
+        </p>
       </div>
-    </ReportSection>
+    </article>
   );
+}
+
+function splitRiskInsight(value: string) {
+  const divider = value.match(/\s[—–:-]\s/);
+
+  if (!divider || divider.index === undefined) {
+    return {
+      title: value,
+      detail: "This is a practical contribution to validate through concrete work examples.",
+    };
+  }
+
+  const dividerLength = divider[0].length;
+  const title = value.slice(0, divider.index).trim();
+  const detail = value.slice(divider.index + dividerLength).trim();
+
+  return {
+    title: title || value,
+    detail:
+      detail ||
+      "This is a practical contribution to validate through concrete work examples.",
+  };
+}
+
+function firstSentence(value: string) {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^.*?[.!?](?:\s|$)/);
+
+  return match ? match[0].trim() : trimmed;
+}
+
+function getRiskResponse(
+  code: McasOperatingStyleCode,
+  riskTitle: string
+): {
+  trigger: string;
+  mitigation: string;
+} {
+  const responses: Record<
+    McasOperatingStyleCode,
+    {
+      trigger: string;
+      mitigation: string;
+    }
+  > = {
+    OS1: {
+      trigger: "Too many opportunities, unclear priorities or prolonged operational detail.",
+      mitigation:
+        "Narrow priorities, assign delivery ownership and close or pause lower-value initiatives.",
+    },
+    OS2: {
+      trigger: "High external demand, rapid activity or momentum that exceeds delivery capacity.",
+      mitigation:
+        "Align activation with delivery capacity and define what success looks like beyond early response.",
+    },
+    OS3: {
+      trigger: "Sustained team pressure, conflict avoidance or responsibility for others' emotional load.",
+      mitigation:
+        "Set clear boundaries, name accountability early and share support responsibility across the team.",
+    },
+    OS4: {
+      trigger: "Competing stakeholder expectations, unclear authority or unowned dependencies.",
+      mitigation:
+        "State the recommendation early, define decision rights and escalate dependency risk with evidence.",
+    },
+    OS5: {
+      trigger: "High workload, operational disruption or changing priorities without clear ownership.",
+      mitigation:
+        "Protect priority work, delegate practical tasks and escalate capacity risk before delivery slips.",
+    },
+    OS6: {
+      trigger: "Repeated change, incomplete information or pressure to act before a process is clear.",
+      mitigation:
+        "Create minimum viable structure, review assumptions frequently and avoid over-engineering the response.",
+    },
+    OS7: {
+      trigger: "Time pressure, incomplete evidence or responsibility for quality across too many decisions.",
+      mitigation:
+        "Set proportionate controls, time-box review and delegate validation work using clear criteria.",
+    },
+    OS8: {
+      trigger: "High standards, unclear release criteria or repeated iteration without agreed priorities.",
+      mitigation:
+        "Agree the quality threshold, separate release work from refinement work and use feedback to prioritise improvement.",
+    },
+  };
+
+  const response = responses[code];
+
+  if (riskTitle.toLowerCase().includes("overreach")) {
+    return {
+      trigger:
+        "Scope expands faster than demonstrated readiness, support or decision authority.",
+      mitigation:
+        "Stage the stretch, clarify decision boundaries and provide support before increasing accountability.",
+    };
+  }
+
+  return response;
+}
+
+function getGrowthGuidance(
+  code: McasOperatingStyleCode,
+  nextVertical: string | null,
+  currentVertical: string
+): {
+  title: string;
+  copy: string;
+  action: string;
+} {
+  const nextLabel = nextVertical ?? "broader scope";
+  const actionByStyle: Record<McasOperatingStyleCode, string> = {
+    OS1: "Practise prioritising opportunity, sequencing initiatives and handing work into accountable delivery.",
+    OS2: "Practise converting attention into sustained adoption, measurable outcomes and delivery partnership.",
+    OS3: "Practise combining people-centred leadership with direct accountability and clear performance decisions.",
+    OS4: "Practise taking a clear directional position, setting decision rights and leading across competing priorities.",
+    OS5: "Practise delegating delivery, managing capacity trade-offs and adapting systems when priorities change.",
+    OS6: "Practise influencing through adaptable systems, scenario planning and decisions under ambiguity.",
+    OS7: "Practise time-bound judgement, proportionate control and strategic decision-making with incomplete evidence.",
+    OS8: "Practise release judgement, prioritised improvement and standards influence without slowing momentum.",
+  };
+
+  return {
+    title: `Build ${nextLabel} readiness`,
+    copy: `The current result indicates ${currentVertical} scope. Growth should focus on demonstrating sustainable contribution as responsibility, ambiguity and cross-system impact increase.`,
+    action: actionByStyle[code],
+  };
 }
 
 function InterviewSection({
