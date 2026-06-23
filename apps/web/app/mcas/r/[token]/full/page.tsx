@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import DownloadPdfButton from "./DownloadPdfButton";
 import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
+import { getOperatingStyleDisplayLabel } from "@/lib/mcas/reportConstants";
 import type {
   McasBlindSpot,
   McasCoreCode,
@@ -100,6 +100,10 @@ function pct(value: number | undefined) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function operatingStyleLabel(code: McasOperatingStyleCode): string {
+  return getOperatingStyleDisplayLabel(code);
+}
+
 function corePair(payload: McasReportPayload) {
   return payload.result.core.distribution.slice(0, 2);
 }
@@ -155,10 +159,10 @@ function ReportHeader({ payload }: { payload: McasReportPayload }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="mcas-no-print flex flex-wrap gap-3 xl:justify-end">
-            <DownloadPdfButton className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
+          <div className="flex flex-wrap gap-3 xl:justify-end">
+            <a href="#download" className="inline-flex h-10 items-center rounded-lg bg-[#191733] px-5 text-sm font-bold text-white">
               Download PDF
-            </DownloadPdfButton>
+            </a>
             <a href="#pathway" className="inline-flex h-10 items-center rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-5 text-sm font-bold text-white">
               Next steps
             </a>
@@ -198,7 +202,7 @@ function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasD
             <div key={item.code} className="grid grid-cols-[28px_minmax(0,1fr)_36px_70px] items-center gap-3">
               <img src={OS_IMAGES[item.code]} alt="" className="h-7 w-7 rounded-lg object-cover shadow-sm" />
               <div className="min-w-0">
-                <p className="truncate text-[12px] font-bold leading-4">{item.label}</p>
+                <p className="truncate text-[12px] font-bold leading-4">{operatingStyleLabel(item.code)}</p>
                 <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#EFF1F5]">
                   <div className="h-full rounded-full" style={{ width: `${pct(item.percentage)}%`, backgroundColor: colour }} />
                 </div>
@@ -331,7 +335,7 @@ function Hero({ payload }: { payload: McasReportPayload }) {
             A practical career guide — grounded, honest, and actionable. This report explains how you naturally execute work and where you are most likely to thrive.
           </p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <HeroMetric label="Operating Style" value={primaryOs.label} caption="Dominant pattern" />
+            <HeroMetric label="Operating Style" value={operatingStyleLabel(primaryOs.code)} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
             <HeroMetric label="Vertical Fit" value={primaryVertical.code} caption={primaryVertical.label} />
             <HeroMetric label="Next Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
@@ -367,7 +371,7 @@ function TopStyleStrip({ items }: { items: McasDistributionItem<McasOperatingSty
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <img src={OS_IMAGES[item.code]} alt="" className="h-8 w-8 rounded-lg object-cover" />
-              <p className="truncate font-extrabold text-[#0D1B2A]">{item.label}</p>
+              <p className="truncate font-extrabold text-[#0D1B2A]">{operatingStyleLabel(item.code)}</p>
             </div>
             <p className="text-sm font-bold text-[#718096]">{item.percentage}%</p>
           </div>
@@ -487,7 +491,7 @@ function AfterHeroInfoCard({
   );
 }
 
-function SidebarIndex({ token, nextStepsUrl }: { token: string; nextStepsUrl?: string | null }) {
+function SidebarIndex({ token }: { token: string }) {
   const links = [
     ["orientation", "Welcome and Orientation"],
     ["plain-language", "Your Work Pattern in Plain Language"],
@@ -501,7 +505,7 @@ function SidebarIndex({ token, nextStepsUrl }: { token: string; nextStepsUrl?: s
   ];
 
   return (
-    <aside className="mcas-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
+    <aside className="rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
       <nav className="space-y-2">
         {links.map(([href, label], index) => (
@@ -511,15 +515,8 @@ function SidebarIndex({ token, nextStepsUrl }: { token: string; nextStepsUrl?: s
         ))}
       </nav>
       <div className="mt-6 space-y-2">
-        <DownloadPdfButton className="block w-full rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">
-          Download PDF
-        </DownloadPdfButton>
-        <a
-          href={nextStepsUrl || `/mcas/r/${token}/snapshot`}
-          className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white"
-        >
-          Next Steps
-        </a>
+        <a id="download" href="#" className="block rounded-lg bg-white px-4 py-3 text-center text-sm font-bold text-[#111827]">Download PDF</a>
+        <a href={`/mcas/r/${token}/snapshot`} className="block rounded-lg bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#8B5CF6] px-4 py-3 text-center text-sm font-bold text-white">View Snapshot</a>
       </div>
     </aside>
   );
@@ -628,7 +625,7 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
                 </p>
 
                 <h3 className="mt-2 text-[28px] font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">
-                  The {primary.label}
+                  The {operatingStyleLabel(primary.code)}
                 </h3>
 
                 <p className="mt-4 max-w-[470px] text-[13px] leading-7 text-[#5A5F7E]">
@@ -1750,15 +1747,15 @@ export default async function McasFullReportPage({ params }: PageProps) {
   }
 
   return (
-    <main className="mcas-report-page min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
-      <div className="mcas-report-shell mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
+    <main className="min-h-screen bg-[#0D0F1C] py-6 text-[#0D0F1C]">
+      <div className="mx-auto max-w-[1440px] overflow-hidden rounded-[30px] bg-[#0D0F1C] shadow-2xl">
         <ReportHeader payload={payload} />
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
         <AfterHeroSummary payload={payload} />
 
-        <div className="mcas-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
-          <SidebarIndex token={token} nextStepsUrl={(payload.access as { nextStepsUrl?: string | null }).nextStepsUrl} />
+        <div className="grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
+          <SidebarIndex token={token} />
           <div className="space-y-8">
             <OrientationSection />
             <PlainLanguageSection payload={payload} />
