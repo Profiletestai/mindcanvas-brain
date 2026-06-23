@@ -1338,12 +1338,6 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   );
 }
 
-const SUCCESS_GUIDE_IMAGES = [
-  "/mcas/graphics/map-listen.png",
-  "/mcas/graphics/create-alignment.png",
-  "/mcas/graphics/lead-with-presence.png",
-];
-
 function successGuideCards(
   successGuide: McasSuccessGuideItem[]
 ): McasSuccessGuideItem[] {
@@ -1413,44 +1407,31 @@ function SuccessGuideSection({
         </h2>
       </div>
 
-      <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
-        <div className="relative mb-7 hidden px-10 pt-1 md:block">
-          <div className="absolute left-[14%] right-[14%] top-[79px] h-[3px] rounded-full bg-gradient-to-r from-[#028F8B] via-[#4F7DFF] to-[#F59E0B]" />
+      <div className="rounded-[18px] bg-white px-6 py-7 md:px-8 md:py-8">
+        <div className="mb-8 hidden md:block">
+          <div className="relative mx-auto max-w-[920px] px-10">
+            <div className="absolute left-[16.6%] right-[16.6%] top-8 h-[3px] rounded-full bg-gradient-to-r from-[#0F9E9A] via-[#6F5CFF] to-[#F59E0B]" />
 
-          <div className="relative grid grid-cols-3 gap-8">
-            {cards.map((item, index) => (
-              <div key={`${item.period}-timeline`} className="text-center">
-                <img
-                  src={SUCCESS_GUIDE_IMAGES[index]}
-                  alt=""
-                  className="mx-auto h-[80px] w-[80px] rounded-full object-contain"
+            <div className="relative grid grid-cols-3">
+              {cards.map((item, index) => (
+                <SuccessGuideTimelineNode
+                  key={`${item.period}-timeline`}
+                  index={index}
+                  period={item.period}
                 />
-
-                <div
-                  className={[
-                    "relative z-10 mx-auto -mt-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-black text-white",
-                    index === 0
-                      ? "bg-[#028F8B]"
-                      : index === 1
-                        ? "bg-[#6F5CFF]"
-                        : "bg-[#F59E0B]",
-                  ].join(" ")}
-                >
-                  {index + 1}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid overflow-hidden rounded-xl border border-[#E2E8F0] md:grid-cols-3">
+        <div className="grid overflow-hidden rounded-2xl border border-[#E2E8F0] md:grid-cols-3">
           {cards.map((item, index) => {
             const tone = successGuideTone(index);
 
             return (
               <div
                 key={item.period}
-                className="p-5"
+                className="min-h-[224px] p-6"
                 style={{ backgroundColor: tone.bg }}
               >
                 <p
@@ -1460,11 +1441,11 @@ function SuccessGuideSection({
                   {periodLabel(item.period)}
                 </p>
 
-                <h3 className="mt-3 text-[14px] font-black leading-5 text-[#0D0F1C]">
+                <h3 className="mt-4 text-[17px] font-black leading-6 text-[#0D0F1C]">
                   {item.title}
                 </h3>
 
-                <p className="mt-3 text-[12px] leading-6 text-[#4A5568]">
+                <p className="mt-3 text-[13px] leading-6 text-[#4A5568]">
                   {item.description}
                 </p>
               </div>
@@ -1473,6 +1454,57 @@ function SuccessGuideSection({
         </div>
       </div>
     </section>
+  );
+}
+
+function SuccessGuideTimelineNode({
+  index,
+  period,
+}: {
+  index: number;
+  period: McasSuccessGuideItem["period"];
+}) {
+  const tones = [
+    {
+      fill: "bg-[#0F9E9A]",
+      ring: "ring-[#CBEFEB]",
+      text: "text-[#0F9E9A]",
+    },
+    {
+      fill: "bg-[#6F5CFF]",
+      ring: "ring-[#DED8FF]",
+      text: "text-[#6F5CFF]",
+    },
+    {
+      fill: "bg-[#F59E0B]",
+      ring: "ring-[#FFE5AE]",
+      text: "text-[#F59E0B]",
+    },
+  ];
+
+  const tone = tones[index] ?? tones[0];
+
+  return (
+    <div className="flex flex-col items-center text-center">
+      <span
+        className={[
+          "relative z-10 flex h-16 w-16 items-center justify-center rounded-full text-xl font-black text-white ring-8",
+          tone.fill,
+          tone.ring,
+        ].join(" ")}
+      >
+        {index + 1}
+      </span>
+
+      <p
+        className={[
+          "mt-4 text-[10px] font-black uppercase tracking-[0.18em]",
+          tone.text,
+        ].join(" ")}
+      >
+        {periodLabel(period)}
+      </p>
+    </div>
   );
 }
 
