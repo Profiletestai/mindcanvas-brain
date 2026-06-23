@@ -157,9 +157,14 @@ function strengthIcon(strength: McasStrength) {
   const slug = slugify(strength.title);
   const known: Record<string, string> = {
     "cross-team-alignment": "/mcas/report-icons/cross-team-alignment.png",
+    "alignment-creation": "/mcas/report-icons/cross-team-alignment.png",
     "timing-and-presence": "/mcas/report-icons/timing-presence.png",
     "communication-clarity": "/mcas/report-icons/communication-clarity.png",
     "relational-execution": "/mcas/report-icons/relational-execution.png",
+    "relationship-bridging": "/mcas/report-icons/relational-execution.png",
+    "coordination-management": "/mcas/report-icons/structure.png",
+    "dependency-visibility": "/mcas/report-icons/gap-identification.png",
+    "trust-through-consistency": "/mcas/report-icons/calm-under-pressure.png",
     "calm-under-pressure": "/mcas/report-icons/calm-under-pressure.png",
     "gap-identification": "/mcas/report-icons/gap-identification.png",
   };
@@ -797,39 +802,7 @@ function CoreCompactCard({
 }
 
 function pressureStrengthCards(strengths: McasStrength[]) {
-  const extras: McasStrength[] = [
-    {
-      title: "Pattern recognition",
-      description:
-        "You notice where quality, structure, or execution can be improved before it becomes a larger issue.",
-    },
-    {
-      title: "Quality protection",
-      description:
-        "You naturally protect standards and help prevent rushed or incomplete work from becoming the default.",
-    },
-    {
-      title: "Improvement discipline",
-      description:
-        "You bring a thoughtful improvement lens that helps work become cleaner, stronger, and more sustainable.",
-    },
-  ];
-
-  const combined = [...strengths];
-
-  for (const extra of extras) {
-    if (combined.length >= 6) break;
-
-    const alreadyExists = combined.some(
-      (item) => item.title.toLowerCase() === extra.title.toLowerCase()
-    );
-
-    if (!alreadyExists) {
-      combined.push(extra);
-    }
-  }
-
-  return combined.slice(0, 6);
+  return strengths.slice(0, 6);
 }
 
 function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) {
@@ -883,52 +856,7 @@ function StrengthCompactCard({ strength }: { strength: McasStrength }) {
 }
 
 function blindSpotCards(blindSpots: McasBlindSpot[]) {
-  const extras: McasBlindSpot[] = [
-    {
-      title: "Over-refinement loop",
-      description:
-        "You may keep improving work beyond the point where the next useful step is release, feedback, or decision.",
-      managementStrategy:
-        "Define the standard needed for this stage before you refine. Ask whether the work needs precision, progress, or feedback.",
-    },
-    {
-      title: "Delayed release",
-      description:
-        "Your quality instinct can make it harder to move work forward while there are still visible gaps or imperfections.",
-      managementStrategy:
-        "Separate essential fixes from later improvements. Move forward when the work is safe, clear, and useful enough.",
-    },
-    {
-      title: "Standards friction",
-      description:
-        "You may experience frustration when others move quickly without checking the quality, logic, or sustainability of the work.",
-      managementStrategy:
-        "Name the standard clearly and explain why it matters. Turn the concern into a practical checkpoint instead of a blocker.",
-    },
-    {
-      title: "Improvement fatigue",
-      description:
-        "Constantly seeing what can be improved may become tiring for you and for the people around you.",
-      managementStrategy:
-        "Choose the few improvements that will create the most value. Let lower-impact refinements wait until the next review cycle.",
-    },
-  ];
-
-  const combined = [...blindSpots];
-
-  for (const extra of extras) {
-    if (combined.length >= 4) break;
-
-    const exists = combined.some(
-      (item) => item.title.toLowerCase() === extra.title.toLowerCase()
-    );
-
-    if (!exists) {
-      combined.push(extra);
-    }
-  }
-
-  return combined.slice(0, 4);
+  return blindSpots.slice(0, 4);
 }
 
 function blindSpotAccent(index: number) {
@@ -1031,56 +959,7 @@ function BlindSpotsSection({
 function roleCardsForDisplay(
   roles: McasRoleRecommendation[]
 ): McasRoleRecommendation[] {
-  const fallbacks: McasRoleRecommendation[] = [
-    {
-      category: "People & Culture",
-      title: "People Partner",
-      description: "Cross-functional alignment, talent advocacy",
-    },
-    {
-      category: "Programme Management",
-      title: "Programme Lead",
-      description: "Multi-team delivery, stakeholder management",
-    },
-    {
-      category: "Strategy & Operations",
-      title: "Chief of Staff",
-      description: "Executive alignment, operational bridging",
-    },
-    {
-      category: "Customer Success",
-      title: "CS Director",
-      description: "Relationship-led retention and growth",
-    },
-    {
-      category: "Communications",
-      title: "Comms Lead",
-      description: "Narrative clarity, internal alignment",
-    },
-    {
-      category: "Consulting",
-      title: "Senior Consultant",
-      description: "Client alignment, delivery ownership",
-    },
-  ];
-
-  const combined = [...roles];
-
-  for (const fallback of fallbacks) {
-    if (combined.length >= 6) break;
-
-    const exists = combined.some(
-      (item) =>
-        item.title.toLowerCase() === fallback.title.toLowerCase() ||
-        item.category.toLowerCase() === fallback.category.toLowerCase()
-    );
-
-    if (!exists) {
-      combined.push(fallback);
-    }
-  }
-
-  return combined.slice(0, 6);
+  return roles.slice(0, 6);
 }
 
 function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
@@ -1109,6 +988,10 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
       </div>
 
       <div className="rounded-[18px] bg-white px-6 py-6 md:px-7 md:py-7">
+        <p className="mb-5 max-w-4xl text-[12px] leading-5 text-[#4A5568]">
+          These role examples are most likely to suit this operating pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical readiness should also guide the level of responsibility considered.
+        </p>
+
         <div className="grid gap-4 lg:hidden">
           {cards.map((role) => (
             <RoleDiagramCard
