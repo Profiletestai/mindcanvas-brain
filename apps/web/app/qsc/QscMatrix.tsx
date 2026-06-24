@@ -26,51 +26,45 @@ export type QscMatrixProps = {
   primaryMindset?: MindsetKey | null;
   secondaryMindset?: MindsetKey | null;
 
+  /**
+   * Reserved for future percentage-based matrix shading.
+   */
   personalityPercentages?: Partial<Record<PersonalityKey, number>>;
   mindsetPercentages?: Partial<Record<MindsetKey, number>>;
 
-  /** Optional copy overrides for GED and other white-label report families. */
+  /**
+   * Optional copy overrides for GED and other report families.
+   * Existing QSC report callers can omit these safely.
+   */
   eyebrow?: string;
   title?: string;
   description?: string;
   showLegend?: boolean;
 };
 
-const PERSONALITY_COLUMNS: {
+type PersonalityColumn = {
   key: PersonalityKey;
   label: string;
   code: "A" | "B" | "C" | "D";
-}[] = [
+};
+
+const PERSONALITY_COLUMNS: PersonalityColumn[] = [
   { key: "FIRE", label: "Fire", code: "A" },
   { key: "FLOW", label: "Flow", code: "B" },
   { key: "FORM", label: "Form", code: "C" },
   { key: "FIELD", label: "Field", code: "D" },
 ];
 
-/**
- * Keep the existing MindCanvas orientation unchanged:
- * Origin appears first, followed by Momentum, Vector, Orbit and Quantum.
- */
-const MINDSET_ROWS: { key: MindsetKey; label: string; level: number }[] = [
-  // Optional copy overrides (default to the Buyer Persona Matrix literals so
-  // existing leader/entrepreneur callers are unaffected).
-  title?: string;
-  eyebrow?: string;
-  description?: string;
+type MindsetRow = {
+  key: MindsetKey;
+  label: string;
+  level: number;
 };
 
-type PersonalityColumn = { key: PersonalityKey; label: string; code: string };
-
-const PERSONALITY_COLUMNS: PersonalityColumn[] =
-  [
-    { key: "FIRE", label: "Fire", code: "A" },
-    { key: "FLOW", label: "Flow", code: "B" },
-    { key: "FORM", label: "Form", code: "C" },
-    { key: "FIELD", label: "Field", code: "D" },
-  ];
-
-type MindsetRow = { key: MindsetKey; label: string; level: number };
-
+/**
+ * Keep the existing MindCanvas orientation unchanged:
+ * Origin first, then Momentum, Vector, Orbit and Quantum.
+ */
 const MINDSET_ROWS: MindsetRow[] = [
   { key: "ORIGIN", level: 1, label: "Origin" },
   { key: "MOMENTUM", level: 2, label: "Momentum" },
@@ -103,25 +97,24 @@ function getCellState(
   } = props;
 
   const isPrimary =
-    primaryPersonality === col && primaryMindset === row && primaryPersonality;
+    primaryPersonality === col && primaryMindset === row;
 
   if (isPrimary) return "primary";
 
-  const isSecondaryPersona =
+  const isSecondary =
     (secondaryPersonality === col && primaryMindset === row) ||
     (primaryPersonality === col && secondaryMindset === row) ||
     (secondaryPersonality === col && secondaryMindset === row);
 
-  if (isSecondaryPersona) return "secondary";
+  if (isSecondary) return "secondary";
 
-  if (
+  const isSupport =
     primaryPersonality === col ||
     primaryMindset === row ||
     secondaryPersonality === col ||
-    secondaryMindset === row
-  ) {
-    return "support";
-  }
+    secondaryMindset === row;
+
+  if (isSupport) return "support";
 
   return "inactive";
 }
@@ -129,18 +122,10 @@ function getCellState(
 export function QscMatrix({
   eyebrow = "Quantum Source Code",
   title = "Buyer Persona Matrix",
-  description =
-    "This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level. Your combined profile sits at the intersection.",
+  description = "This grid maps your Buyer Frequency Type from left to right against your Buyer Mindset Level. Your combined profile sits at the intersection.",
   showLegend = true,
   ...props
 }: QscMatrixProps) {
-export function QscMatrix(props: QscMatrixProps) {
-  const eyebrow = props.eyebrow ?? "Quantum Source Code";
-  const title = props.title ?? "Buyer Persona Matrix";
-  const description =
-    props.description ??
-    "This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection.";
-
   return (
     <section
       aria-labelledby="qsc-matrix-heading"
@@ -148,18 +133,17 @@ export function QscMatrix(props: QscMatrixProps) {
     >
       <header className="mb-5 flex flex-col gap-2 md:mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300/80">
-      <header className="flex flex-col gap-2 mb-5 md:mb-6">
-        <p className="text-xs font-semibold tracking-[0.22em] uppercase text-sky-300/80">
           {eyebrow}
         </p>
+
         <h2
           id="qsc-matrix-heading"
           className="text-xl font-semibold text-slate-50 md:text-2xl"
         >
           {title}
         </h2>
+
         <p className="max-w-2xl text-xs text-slate-300 md:text-sm">
-        <p className="text-xs md:text-sm text-slate-300 max-w-2xl">
           {description}
         </p>
       </header>
@@ -176,6 +160,7 @@ export function QscMatrix(props: QscMatrixProps) {
                   <div className="font-medium tracking-wide">
                     {col.label.toUpperCase()}
                   </div>
+
                   <div className="mt-0.5 text-[0.7rem] text-slate-400 md:text-xs">
                     Frequency {col.code}
                   </div>
@@ -194,6 +179,7 @@ export function QscMatrix(props: QscMatrixProps) {
                   <div className="text-xs font-medium text-slate-100 md:text-sm">
                     {row.label.toUpperCase()}
                   </div>
+
                   <div className="text-[0.7rem] text-slate-400 md:text-xs">
                     Mindset {row.level}
                   </div>
@@ -204,22 +190,32 @@ export function QscMatrix(props: QscMatrixProps) {
                     {PERSONALITY_COLUMNS.map((col) => {
                       const state = getCellState(row.key, col.key, props);
                       const personaLabel = `${col.label} ${row.label}`;
+
+                      /**
+                       * Fire=A, Flow=B, Form=C, Field=D.
+                       * Do not use col.key[0], as Fire, Flow and Form
+                       * would all incorrectly become F.
+                       */
                       const code = `${col.code}${row.level}`;
 
                       return (
                         <div
                           key={`${col.key}_${row.key}`}
+                          aria-label={personaLabel}
                           className={[
                             "flex min-h-[64px] flex-col items-start justify-between rounded-xl border px-2 py-3 text-xs transition-colors duration-150 ease-out md:min-h-[80px] md:px-3 md:py-4 md:text-sm",
                             CELL_STYLES[state],
                           ].join(" ")}
-                          aria-label={personaLabel}
                         >
                           <div className="text-[0.65rem] uppercase tracking-[0.18em] text-slate-200/80">
                             {personaLabel}
                           </div>
+
                           <div className="mt-1 text-[0.7rem] text-slate-950/70 dark:text-slate-100/90 md:text-xs">
-                            Code: <span className="font-mono tracking-wide">{code}</span>
+                            Code:{" "}
+                            <span className="font-mono tracking-wide">
+                              {code}
+                            </span>
                           </div>
                         </div>
                       );
@@ -236,14 +232,17 @@ export function QscMatrix(props: QscMatrixProps) {
                 <span className="inline-block h-3 w-5 rounded bg-sky-400" />
                 <span>Primary combined profile</span>
               </div>
+
               <div className="inline-flex items-center gap-2">
                 <span className="inline-block h-3 w-5 rounded bg-sky-700" />
                 <span>Secondary profile / supporting mode</span>
               </div>
+
               <div className="inline-flex items-center gap-2">
                 <span className="inline-block h-3 w-5 rounded bg-sky-900/60" />
                 <span>Related frequencies or mindsets</span>
               </div>
+
               <div className="inline-flex items-center gap-2">
                 <span className="inline-block h-3 w-5 rounded border border-slate-700/70 bg-slate-900/70" />
                 <span>Other personas</span>
