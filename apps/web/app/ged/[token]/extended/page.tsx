@@ -127,6 +127,12 @@ type SaleBlockerPlan = {
   practice: string;
 };
 
+type RealLifeExampleView = {
+  quote: string;
+  implications: string[];
+  role: string[];
+};
+
 type CoreBusinessProblem = {
   title: string;
   description: string | null;
@@ -809,6 +815,93 @@ function parseSaleBlockerPlan(value: unknown): SaleBlockerPlan {
   };
 }
 
+function parseRealLifeExample(
+  value: unknown,
+  fallback: {
+    bottleneck?: unknown;
+    firstFix?: unknown;
+  } = {}
+): RealLifeExampleView {
+  const raw = cleanStructuredPlaybookCopy(value)
+    .replace(/^real[-\s]?life\s+example\s*[:\-–—]?\s*/i, "")
+    .trim();
+
+  const empty: RealLifeExampleView = {
+    quote: "No profile-specific real-life example has been recorded.",
+    implications: [],
+    role: [],
+  };
+
+  if (!raw) {
+    const fallbackImplications = uniqueStrings([
+      ...structuredListItems(fallback.bottleneck, 4),
+      ...structuredListItems(fallback.firstFix, 2),
+    ]).slice(0, 5);
+
+    return {
+      ...empty,
+      implications: fallbackImplications,
+      role: fallback.firstFix ? textItems(fallback.firstFix, 3) : [],
+    };
+  }
+
+  const quoteHeading = /\bwhat\s+they\s+might\s+say\b\s*[:\-–—]?/i;
+  const meansHeading = /\bthis\s+means\b\s*[:\-–—]?/i;
+  const roleHeading = /\byour\s+role\b\s*[:\-–—]?/i;
+
+  const quoteMatch = quoteHeading.exec(raw);
+  const meansMatch = meansHeading.exec(raw);
+  const roleMatch = roleHeading.exec(raw);
+
+  const firstContentIndex = quoteMatch?.index != null ? quoteMatch.index + quoteMatch[0].length : 0;
+  const quoteEndCandidates = [meansMatch?.index, roleMatch?.index]
+    .filter((index): index is number => typeof index === "number" && index >= firstContentIndex)
+    .sort((a, b) => a - b);
+  const quoteRaw = raw.slice(firstContentIndex, quoteEndCandidates[0] ?? raw.length).trim();
+
+  const quotedMatch = quoteRaw.match(/[“"]([^”"]{12,700})[”"]/);
+  const quote = (
+    quotedMatch?.[1] ||
+    quoteRaw ||
+    raw.match(/[“"]([^”"]{12,700})[”"]/)?.[1] ||
+    sentence(raw, 420)
+  )
+    .replace(/^(?:what\s+they\s+might\s+say)\s*[:\-–—]?\s*/i, "")
+    .replace(/^\s*[“"]|[”"]\s*$/g, "")
+    .trim();
+
+  const meansRaw = meansMatch
+    ? raw.slice(meansMatch.index + meansMatch[0].length, roleMatch?.index ?? raw.length).trim()
+    : "";
+  const roleRaw = roleMatch
+    ? raw.slice(roleMatch.index + roleMatch[0].length).trim()
+    : "";
+
+  const implications = structuredListItems(meansRaw, 6).filter(
+    (item) => !/^(?:what\s+they\s+might\s+say|this\s+means|your\s+role)$/i.test(item)
+  );
+
+  const role = uniqueStrings([
+    ...structuredListItems(roleRaw, 4),
+    ...(roleRaw ? textItems(roleRaw, 4) : []),
+  ]).filter(
+    (item) => !/^(?:what\s+they\s+might\s+say|this\s+means|your\s+role)$/i.test(item)
+  ).slice(0, 4);
+
+  return {
+    quote: quote || empty.quote,
+    implications: implications.length
+      ? implications
+      : uniqueStrings([
+          ...structuredListItems(fallback.bottleneck, 4),
+          ...structuredListItems(fallback.firstFix, 2),
+        ]).slice(0, 5),
+    role: role.length
+      ? role
+      : (fallback.firstFix ? textItems(fallback.firstFix, 3) : []),
+  };
+}
+
 function parseDecisionPlan(value: unknown): DecisionView {
   const raw = cleanStructuredPlaybookCopy(value)
     .replace(/^how they make decisions\.?\s*/i, "")
@@ -1321,6 +1414,27 @@ export default function GedPredictiveSellingPlaybookPage({
   const fitFlags = useMemo(
     () => splitFlags(extended?.green_red_flags),
     [extended?.green_red_flags]
+  );
+
+  const realLifeExample = useMemo(
+    () =>
+      parseRealLifeExample(extended?.real_life_example, {
+        bottleneck:
+          diagnostic?.primary_bottleneck?.summary ||
+          diagnostic?.core_constraint?.summary ||
+          extended?.core_business_problems,
+        firstFix:
+          diagnostic?.primary_bottleneck?.first_fix ||
+          diagnostic?.recommended_next_step?.summary,
+      }),
+    [
+      diagnostic?.core_constraint?.summary,
+      diagnostic?.primary_bottleneck?.first_fix,
+      diagnostic?.primary_bottleneck?.summary,
+      diagnostic?.recommended_next_step?.summary,
+      extended?.core_business_problems,
+      extended?.real_life_example,
+    ]
   );
 
   /**
@@ -2530,9 +2644,61 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="example">
-              <SectionHeader icon="real-life-example.png" eyebrow="Real-life example" title="A narrative to hold in mind when speaking to this profile" />
-              <div className="mt-6 rounded-2xl bg-white p-6">
-                <NarrativeCard title="What this can sound like in the real world" content={extended.real_life_example} tone="cyan" />
+              <SectionHeader
+                icon="real-life-example.png"
+                eyebrow="Real life example"
+                title="A simple narrative you can keep in mind when speaking to this profile"
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <section>
+                  <p className="text-xs font-medium text-slate-700">What They Might Say</p>
+                  <blockquote className="mt-3 rounded-lg border border-emerald-400 bg-cyan-50 px-4 py-3 text-sm leading-6 text-slate-800 md:px-5">
+                    “{realLifeExample.quote}”
+                  </blockquote>
+                </section>
+
+                <div className="mt-5 grid gap-5 md:grid-cols-[0.94fr_1.06fr] md:items-start">
+                  <article className="rounded-lg bg-slate-100 p-4 md:p-5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      This means
+                    </p>
+                    {realLifeExample.implications.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {realLifeExample.implications.map((item, index) => (
+                          <li
+                            key={`real-life-meaning-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-emerald-500" aria-hidden="true">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        No profile-specific implications have been recorded.
+                      </p>
+                    )}
+                  </article>
+
+                  <article className="px-1 py-1 md:px-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Your role
+                    </p>
+                    {realLifeExample.role.length ? (
+                      <div className="mt-3 space-y-1.5 text-sm leading-6 text-slate-700">
+                        {realLifeExample.role.map((item, index) => (
+                          <p key={`real-life-role-${index}`}>{item}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        Use the buyer’s stated pattern to frame the conversation at the right strategic level.
+                      </p>
+                    )}
+                  </article>
+                </div>
               </div>
             </PageSection>
 
