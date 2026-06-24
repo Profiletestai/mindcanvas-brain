@@ -117,6 +117,11 @@ type TrustPlan = {
   effectiveLine: string;
 };
 
+type OfferFitPlan = {
+  fitsWell: string[];
+  doesNotFit: string[];
+};
+
 type CoreBusinessProblem = {
   title: string;
   description: string | null;
@@ -708,6 +713,53 @@ function parseTrustPlan(
   };
 }
 
+function offerFitItems(value: unknown, limit = 6): string[] {
+  const items = structuredListItems(value, limit + 4)
+    .map((item) =>
+      item
+        .replace(
+          /^(?:fits?\s+well|best\s+offer\s+fit|does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|avoid)\s*[:\-–—]?\s*/i,
+          ""
+        )
+        .trim()
+    )
+    .filter(
+      (item) =>
+        item &&
+        !/^(?:fits?\s+well|best\s+offer\s+fit|does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|avoid)$/i.test(
+          item
+        )
+    );
+
+  return uniqueStrings(items).slice(0, limit);
+}
+
+function parseOfferFitPlan(value: unknown): OfferFitPlan {
+  const raw = cleanStructuredPlaybookCopy(value);
+  if (!raw) return { fitsWell: [], doesNotFit: [] };
+
+  const fitsHeading = /\b(?:fits?\s+well|best\s+offer\s+fit)\b\s*[:\-–—]?/i;
+  const doesNotFitHeading = /\b(?:does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|does\s+not\s+suit)\b\s*[:\-–—]?/i;
+
+  const fitsMatch = fitsHeading.exec(raw);
+  const doesNotFitMatch = doesNotFitHeading.exec(raw);
+
+  const fitsRaw = fitsMatch
+    ? sliceBetweenHeadings(raw, fitsHeading, [doesNotFitHeading])
+    : doesNotFitMatch?.index != null
+      ? raw.slice(0, doesNotFitMatch.index).trim()
+      : raw;
+
+  const doesNotFitRaw = doesNotFitMatch
+    ? sliceBetweenHeadings(raw, doesNotFitHeading, [])
+    : "";
+
+  return {
+    fitsWell: offerFitItems(fitsRaw, 6),
+    doesNotFit: offerFitItems(doesNotFitRaw, 6),
+  };
+}
+
 function parseDecisionPlan(value: unknown): DecisionView {
   const raw = cleanStructuredPlaybookCopy(value)
     .replace(/^how they make decisions\.?\s*/i, "")
@@ -1205,6 +1257,11 @@ export default function GedPredictiveSellingPlaybookPage({
   const coreBusinessProblems = useMemo(
     () => parseCoreBusinessProblems(extended?.core_business_problems),
     [extended?.core_business_problems]
+  );
+
+  const offerFitPlan = useMemo(
+    () => parseOfferFitPlan(extended?.what_offer_ready_for),
+    [extended?.what_offer_ready_for]
   );
 
   // The signed-off Playbook index begins with the detailed intelligence
@@ -2128,16 +2185,56 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="offer">
-              <SectionHeader icon="what-offer-they-are-ready.png" eyebrow="What offer they are ready for" title="The level of support, shape and outcome most likely to fit" />
-              <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <NarrativeCard eyebrow="Fits well" title="Best offer fit" content={extended.what_offer_ready_for} tone="emerald" bullets />
-                <article className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-600">Does not fit</p>
-                  <p className="mt-2 text-base font-extrabold text-slate-950">Avoid leading with a mismatched offer</p>
-                  <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                    {textItems(extended.what_blocks_sale, 5).map((item, index) => <p key={`misfit-${index}`}>• {item}</p>)}
-                  </div>
-                </article>
+              <SectionHeader
+                icon="what-offer-they-are-ready.png"
+                eyebrow="What offer they are ready for"
+                title="The pricing, structure and level of support most likely to help them say yes and get results"
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <article className="rounded-xl border border-emerald-200 bg-emerald-100/90 p-4 md:p-5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">Fits well</p>
+                    {offerFitPlan.fitsWell.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {offerFitPlan.fitsWell.map((item, index) => (
+                          <li
+                            key={`offer-fit-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        No profile-specific offer-fit guidance has been recorded.
+                      </p>
+                    )}
+                  </article>
+
+                  <article className="rounded-xl border border-rose-200 bg-rose-100/90 p-4 md:p-5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">Does not fit</p>
+                    {offerFitPlan.doesNotFit.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {offerFitPlan.doesNotFit.map((item, index) => (
+                          <li
+                            key={`offer-misfit-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        No profile-specific mismatch guidance has been recorded.
+                      </p>
+                    )}
+                  </article>
+                </div>
               </div>
             </PageSection>
 
