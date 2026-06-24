@@ -135,7 +135,7 @@ const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
   quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
-  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile-graphic.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
   personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
   mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
   combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
@@ -150,7 +150,7 @@ const SECTION_ICON_PATHS = {
   recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
 } as const;
 
-const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
+const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
 const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
 
@@ -1609,6 +1609,22 @@ export default function GedEntrepreneurStrategicReportPage({
     },
   ];
 
+  const operationalImpactCards = diagnostic.operational_impact.map((impact) => ({
+    ...impact,
+    headline:
+      impact.key === "new_business_continuity"
+        ? "Pipeline growth is stalling"
+        : impact.key === "conversion"
+          ? "Sales conversion is inconsistent"
+          : impact.key === "founder_dependency"
+            ? "Founder time is the bottleneck"
+            : impact.key === "delivery_capacity"
+              ? "Delivery has a capacity ceiling"
+              : impact.key === "team_consistency"
+                ? "Team effectiveness is inconsistent without a senior lead"
+                : impact.label,
+  }));
+
   return (
     <div className="min-h-screen bg-[#09141d] text-slate-900">
       <AppBackground />
@@ -3060,6 +3076,32 @@ export default function GedEntrepreneurStrategicReportPage({
                       </article>
                     );
                   })}
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-white p-4 md:p-6">
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-emerald-500">
+                  How this bottleneck shows up in the business
+                </p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {operationalImpactCards.map((impact, index) => (
+                    <article
+                      key={`business-effect-${impact.key}`}
+                      className={`rounded-lg bg-[#0c1d1a] px-4 py-3.5 text-white md:px-5 md:py-4 ${
+                        index === operationalImpactCards.length - 1
+                          ? "md:col-span-2"
+                          : ""
+                      }`}
+                    >
+                      <h4 className="text-xs font-bold leading-4 text-white md:text-sm">
+                        {impact.headline}
+                      </h4>
+                      <p className="mt-1.5 text-[0.68rem] leading-4 text-white/60 md:text-xs md:leading-5">
+                        {impact.explanation}
+                      </p>
+                    </article>
+                  ))}
                 </div>
               </div>
             </section>
