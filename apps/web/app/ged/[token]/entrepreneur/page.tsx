@@ -116,6 +116,14 @@ const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
   FIELD: "#a855f7",
 };
 
+const MINDSET_COLORS: Record<MindsetKey, string> = {
+  ORIGIN: "#f59e0b",
+  MOMENTUM: "#38bdf8",
+  VECTOR: "#45e0d1",
+  ORBIT: "#818cf8",
+  QUANTUM: "#c084fc",
+};
+
 const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
@@ -399,24 +407,83 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-function ProfileCircle({
-  label,
-  color,
-  image,
+function RocketGlyph({ color = "#45e0d1" }: { color?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden="true" className="h-7 w-7" fill="none">
+      <path d="M29.9 6.2c4.8 1.5 8.4 5.1 9.9 9.9-2.5 7.3-7.2 13.9-13.5 18.8l-6.4-6.4c4.9-6.3 11.5-11 18.8-13.5Z" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m19.9 28.5-5.7 5.7m9.9-1.8-3 7.5m-5.7-11.4-7.5 3" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="31.1" cy="14.9" r="2.2" fill={color} />
+    </svg>
+  );
+}
+
+function QuantumProfileVisual({
+  personalityLabel,
+  mindsetLabel,
+  profileLabel,
+  personalityColor,
+  mindsetColor,
+  personalityIcon,
+  mindsetIcon,
 }: {
-  label: string;
-  color: string;
-  image: string;
+  personalityLabel: string;
+  mindsetLabel: string;
+  profileLabel: string;
+  personalityColor: string;
+  mindsetColor: string;
+  personalityIcon: string;
+  mindsetIcon: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2" style={{ borderColor: color, backgroundColor: `${color}20` }}>
-        <AssetIcon src={image} className="h-8 w-8 object-contain" />
-      </div>
-      <p className="text-lg font-extrabold" style={{ color }}>
-        {label}
+    <section
+      aria-label="Quantum Profile"
+      className="rounded-2xl border border-amber-400/30 bg-[#0a211c] p-4 shadow-inner shadow-black/20 md:p-5"
+    >
+      <p className="text-[0.66rem] font-bold uppercase tracking-[0.2em] text-emerald-300">
+        Quantum Profile
       </p>
-    </div>
+
+      <div className="mt-4 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="relative h-28 w-[196px] shrink-0" aria-label={`${personalityLabel} and ${mindsetLabel}`}>
+          <div
+            className="absolute left-0 top-0 flex h-28 w-28 flex-col items-center justify-center rounded-full border-[1.5px] bg-[#0c1d1a]"
+            style={{ borderColor: personalityColor }}
+          >
+            <AssetIcon src={personalityIcon} className="h-7 w-7 object-contain" />
+            <span className="mt-1 text-lg font-extrabold" style={{ color: personalityColor }}>
+              {personalityLabel}
+            </span>
+          </div>
+
+          <div
+            className="absolute left-[76px] top-0 flex h-28 w-28 flex-col items-center justify-center rounded-full border-[1.5px] bg-[#0c1d1a]"
+            style={{ borderColor: mindsetColor }}
+          >
+            <AssetIcon src={mindsetIcon} className="h-7 w-7 object-contain" />
+            <span className="mt-1 text-lg font-extrabold" style={{ color: mindsetColor }}>
+              {mindsetLabel}
+            </span>
+          </div>
+        </div>
+
+        <div className="hidden h-px flex-1 bg-white/35 xl:block" aria-hidden="true" />
+        <span className="hidden text-2xl text-slate-300 xl:block" aria-hidden="true">→</span>
+
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-emerald-300/60 bg-emerald-300/5">
+            <RocketGlyph color="#45e0d1" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-slate-200">Your Result</p>
+            <p className="mt-0.5 text-lg font-extrabold leading-tight md:text-xl">
+              <span style={{ color: personalityColor }}>{personalityLabel}</span>{" "}
+              <span style={{ color: mindsetColor }}>{mindsetLabel}</span>
+            </p>
+            <p className="mt-1 truncate text-xs text-slate-400">{profileLabel}</p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -669,6 +736,12 @@ export default function GedEntrepreneurStrategicReportPage({
   const mindsetIcon = primaryMindset
     ? `${REPORT_ICON_BASE}/quantum-profile-matrix/${primaryMindset.toLowerCase()}.png`
     : `${REPORT_ICON_BASE}/quantum-profile-matrix/vector.png`;
+  const primaryPersonalityColor = primaryPersonality
+    ? FREQUENCY_COLORS[primaryPersonality]
+    : "#f97316";
+  const primaryMindsetColor = primaryMindset
+    ? MINDSET_COLORS[primaryMindset]
+    : "#45e0d1";
 
   return (
     <div className="min-h-screen bg-[#09141d] text-slate-900">
@@ -737,18 +810,16 @@ export default function GedEntrepreneurStrategicReportPage({
             </div>
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-2xl border border-orange-400/40 bg-black/10 p-5">
-              <p className="text-[0.66rem] font-bold uppercase tracking-[0.2em] text-emerald-300">Your result</p>
-              <div className="mt-5 flex flex-wrap items-center gap-5">
-                <ProfileCircle label={primaryPersonalityLabel} color={primaryPersonality ? FREQUENCY_COLORS[primaryPersonality] : "#f97316"} image={personaIcon} />
-                <ProfileCircle label={primaryMindsetLabel} color="#45e0d1" image={mindsetIcon} />
-                <div className="ml-auto rounded-full border border-emerald-300/50 bg-emerald-300/10 px-4 py-3 text-center">
-                  <p className="text-xs text-emerald-100">Quantum Profile</p>
-                  <p className="mt-1 text-xl font-extrabold text-white">{canonicalProfile}</p>
-                </div>
-              </div>
-            </div>
+          <div className="mt-8 grid gap-4 lg:grid-cols-[1.22fr_0.78fr]">
+            <QuantumProfileVisual
+              personalityLabel={primaryPersonalityLabel}
+              mindsetLabel={primaryMindsetLabel}
+              profileLabel={canonicalProfile}
+              personalityColor={primaryPersonalityColor}
+              mindsetColor={primaryMindsetColor}
+              personalityIcon={personaIcon}
+              mindsetIcon={mindsetIcon}
+            />
             <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
               <p className="text-sm leading-6 text-slate-300">
                 The Growth Engine Diagnostic combines your behavioural pattern with your current operating signals, helping you see how you naturally create momentum and where the operating system needs to become more dependable.
