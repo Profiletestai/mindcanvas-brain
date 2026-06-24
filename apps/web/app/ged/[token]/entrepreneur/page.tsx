@@ -145,8 +145,57 @@ const SECTION_ICON_PATHS = {
 
 const UNDERSTAND_QUANTUM_PROFILE_GRAPH =
   `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
+const MINDSET_LAYER_INFOGRAPHIC =
+  `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE =
   `${REPORT_ICON_BASE}/quantum-profile-matrix`;
+
+type MindsetStageCopy = {
+  intro: string;
+  description: string;
+  accent: string;
+};
+
+const MINDSET_STAGE_COPY: Record<MindsetKey, MindsetStageCopy> = {
+  QUANTUM: {
+    intro:
+      "You are operating from a place of long-term influence, innovation and compounding impact. The next focus is protecting the architecture that lets your ambition scale beyond your direct involvement.",
+    description: "Peak performance. Legacy, innovation and exponential impact.",
+    accent: "#a77af8",
+  },
+  ORBIT: {
+    intro:
+      "You have established direction and are expanding your influence. The next focus is optimising operations, deepening leadership capacity and growing impact without creating unnecessary complexity.",
+    description: "Expanding influence. Optimizing operations and growing impact.",
+    accent: "#77c3fc",
+  },
+  VECTOR: {
+    intro:
+      "You've built momentum and proven your offer. Now the focus is on scaling systems, building team and creating lasting impact.",
+    description: "Clear direction established. Scaling systems and strengthening positioning.",
+    accent: "#00cac3",
+  },
+  MOMENTUM: {
+    intro:
+      "You are moving beyond the starting point and beginning to create repeatable traction. The next focus is building consistency, proving direction and protecting the habits that sustain momentum.",
+    description: "Early traction phase. Building consistency and proving direction.",
+    accent: "#56a8e2",
+  },
+  ORIGIN: {
+    intro:
+      "You are laying the first foundations for sustainable growth. The next focus is clarifying direction, validating the path forward and creating enough structure for momentum to build.",
+    description: "The starting point. Laying the foundation for what's possible.",
+    accent: "#899dc0",
+  },
+};
+
+const MINDSET_STAGE_ORDER: MindsetKey[] = [
+  "QUANTUM",
+  "ORBIT",
+  "VECTOR",
+  "MOMENTUM",
+  "ORIGIN",
+];
 
 type QuantumProfileMix = {
   personality: PersonalityKey;
@@ -1135,6 +1184,9 @@ export default function GedEntrepreneurStrategicReportPage({
   const primaryMindsetColor = primaryMindset
     ? MINDSET_COLORS[primaryMindset]
     : "#45e0d1";
+  const mindsetStageCopy = primaryMindset
+    ? MINDSET_STAGE_COPY[primaryMindset]
+    : MINDSET_STAGE_COPY.VECTOR;
 
   const onePageIconBase = `${REPORT_ICON_BASE}/one-page-quantum-section`;
   const onePageIcons = {
@@ -1671,40 +1723,101 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="mindset-layer" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="mindset-layer"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.mindset_layer}
                 eyebrow="Your Mindset Layer"
                 title="Where you are in your growth journey"
-                body="Your mindset layer shows where your focus and energy are distributed across the five Quantum growth stages."
                 dark
+                compact
               />
-              <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-                  <p className="text-sm font-bold text-white">{primaryMindsetLabel}</p>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">
-                    Current stage: <span className="font-semibold text-white">{primaryMindsetLabel}</span>. Primary operating style: <span className="font-semibold text-white">{primaryPersonalityLabel}</span>.
-                  </p>
-                  <p className="mt-5 text-sm leading-6 text-slate-300">
-                    Your Growth Engine Diagnostic uses the behavioural profile to show the conditions that make the current operating correction easier to implement and sustain.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Mindset distribution</p>
-                  <div className="mt-5 space-y-4">
-                    {(["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"] as MindsetKey[]).map((key) => (
-                      <div key={key}>
-                        <div className="flex items-center justify-between gap-4 text-sm">
-                          <span className="text-slate-200">{MINDSET_LABELS[key]}</span>
-                          <span className="tabular-nums text-slate-300">{Math.round(mindsetPercentages[key] || 0)}%</span>
-                        </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                          <div className="h-full rounded-full bg-[#45e0d1]" style={{ width: `${mindsetPercentages[key] || 0}%` }} />
-                        </div>
-                      </div>
-                    ))}
+
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white p-4 shadow-sm sm:p-6 md:p-7">
+                <div className="grid gap-8 xl:grid-cols-[minmax(0,0.72fr)_minmax(0,1.08fr)] xl:items-center">
+                  <div>
+                    <p className="text-base font-extrabold text-[#0c1d1a]">
+                      You are in the {primaryMindsetLabel} stage.
+                    </p>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-[#4b5563]">
+                      {mindsetStageCopy.intro}
+                    </p>
+
+                    <div className="mt-7 space-y-3.5">
+                      {MINDSET_STAGE_ORDER.map((key) => {
+                        const value = clampPercent(mindsetPercentages[key] || 0);
+                        const isPrimary = key === primaryMindset;
+
+                        return (
+                          <div key={key}>
+                            <div className="flex items-center justify-between gap-4 text-xs text-[#0c1d1a]">
+                              <span className={isPrimary ? "font-bold" : "font-medium"}>
+                                {MINDSET_LABELS[key]}
+                              </span>
+                              <span className="tabular-nums font-medium">{value}%</span>
+                            </div>
+                            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e3e3e3]">
+                              <div
+                                className="h-full rounded-full bg-[#34d399]"
+                                style={{ width: `${value}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="relative min-h-[240px] overflow-hidden rounded-xl bg-[#f9f8f6] sm:min-h-[300px] xl:min-h-[330px]">
+                    <AssetIcon
+                      src={MINDSET_LAYER_INFOGRAPHIC}
+                      alt="Quantum mindset growth-stage infographic"
+                      className="absolute inset-0 h-full w-full object-contain p-2 sm:p-3"
+                    />
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                {MINDSET_STAGE_ORDER.map((key) => {
+                  const stage = MINDSET_STAGE_COPY[key];
+                  const value = clampPercent(mindsetPercentages[key] || 0);
+                  const isPrimary = key === primaryMindset;
+
+                  return (
+                    <article
+                      key={key}
+                      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white p-5 shadow-sm"
+                    >
+                      <span
+                        className="absolute inset-x-0 top-0 h-1.5"
+                        style={{ backgroundColor: stage.accent }}
+                      />
+                      <p className="mt-1 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-[#6b7280]">
+                        {MINDSET_LABELS[key]}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <p
+                          className="text-3xl font-extrabold leading-none"
+                          style={{ color: isPrimary ? "#00cac3" : "#0c1d1a" }}
+                        >
+                          {value}%
+                        </p>
+                        {isPrimary ? (
+                          <span className="rounded-full bg-[#e6fffa] px-2 py-1 text-[0.56rem] font-bold uppercase tracking-[0.11em] text-[#008f8a]">
+                            Current stage
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-4 text-xs leading-5 text-[#6b7280]">
+                        {stage.description}
+                      </p>
+                    </article>
+                  );
+                })}
               </div>
             </section>
 
