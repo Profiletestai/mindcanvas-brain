@@ -27,40 +27,45 @@ export type QscMatrixProps = {
   secondaryMindset?: MindsetKey | null;
 
   /**
-   * Optional percentage inputs for future matrix shading.
+   * Reserved for future percentage-based matrix shading.
    */
   personalityPercentages?: Partial<Record<PersonalityKey, number>>;
   mindsetPercentages?: Partial<Record<MindsetKey, number>>;
 
   /**
-   * Optional GED-specific copy overrides.
-   * Existing QSC callers remain unchanged when these are not supplied.
+   * Optional copy overrides for GED and other report families.
+   * Existing QSC report callers can omit these safely.
    */
   eyebrow?: string;
   title?: string;
   description?: string;
+  showLegend?: boolean;
 };
 
-const PERSONALITY_COLUMNS: {
+type PersonalityColumn = {
   key: PersonalityKey;
   label: string;
-  code: string;
-}[] = [
+  code: "A" | "B" | "C" | "D";
+};
+
+const PERSONALITY_COLUMNS: PersonalityColumn[] = [
   { key: "FIRE", label: "Fire", code: "A" },
   { key: "FLOW", label: "Flow", code: "B" },
   { key: "FORM", label: "Form", code: "C" },
   { key: "FIELD", label: "Field", code: "D" },
 ];
 
-/**
- * Keep this order exactly as it currently appears in the existing QSC matrix:
- * Origin at the top, Quantum at the bottom.
- */
-const MINDSET_ROWS: {
+type MindsetRow = {
   key: MindsetKey;
   label: string;
   level: number;
-}[] = [
+};
+
+/**
+ * Keep the existing MindCanvas orientation unchanged:
+ * Origin first, then Momentum, Vector, Orbit and Quantum.
+ */
+const MINDSET_ROWS: MindsetRow[] = [
   { key: "ORIGIN", level: 1, label: "Origin" },
   { key: "MOMENTUM", level: 2, label: "Momentum" },
   { key: "VECTOR", level: 3, label: "Vector" },
@@ -114,13 +119,13 @@ function getCellState(
   return "inactive";
 }
 
-export function QscMatrix(props: QscMatrixProps) {
-  const matrixEyebrow = props.eyebrow ?? "Quantum Source Code";
-  const matrixTitle = props.title ?? "Buyer Persona Matrix";
-  const matrixDescription =
-    props.description ??
-    "This grid maps your Buyer Frequency Type from left to right against your Buyer Mindset Level from top to bottom. Your combined profile sits at the intersection.";
-
+export function QscMatrix({
+  eyebrow = "Quantum Source Code",
+  title = "Buyer Persona Matrix",
+  description = "This grid maps your Buyer Frequency Type from left to right against your Buyer Mindset Level. Your combined profile sits at the intersection.",
+  showLegend = true,
+  ...props
+}: QscMatrixProps) {
   return (
     <section
       aria-labelledby="qsc-matrix-heading"
@@ -128,18 +133,18 @@ export function QscMatrix(props: QscMatrixProps) {
     >
       <header className="mb-5 flex flex-col gap-2 md:mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300/80">
-          {matrixEyebrow}
+          {eyebrow}
         </p>
 
         <h2
           id="qsc-matrix-heading"
           className="text-xl font-semibold text-slate-50 md:text-2xl"
         >
-          {matrixTitle}
+          {title}
         </h2>
 
         <p className="max-w-2xl text-xs text-slate-300 md:text-sm">
-          {matrixDescription}
+          {description}
         </p>
       </header>
 
@@ -184,13 +189,12 @@ export function QscMatrix(props: QscMatrixProps) {
                   <div className="grid grid-cols-4 gap-3 md:gap-4">
                     {PERSONALITY_COLUMNS.map((col) => {
                       const state = getCellState(row.key, col.key, props);
-                      const stateClass = CELL_STYLES[state];
                       const personaLabel = `${col.label} ${row.label}`;
 
                       /**
-                       * A = Fire, B = Flow, C = Form, D = Field.
-                       * Do not use col.key[0], because Fire, Flow and Form
-                       * would all incorrectly resolve to F.
+                       * Fire=A, Flow=B, Form=C, Field=D.
+                       * Do not use col.key[0], as Fire, Flow and Form
+                       * would all incorrectly become F.
                        */
                       const code = `${col.code}${row.level}`;
 
@@ -200,7 +204,7 @@ export function QscMatrix(props: QscMatrixProps) {
                           aria-label={personaLabel}
                           className={[
                             "flex min-h-[64px] flex-col items-start justify-between rounded-xl border px-2 py-3 text-xs transition-colors duration-150 ease-out md:min-h-[80px] md:px-3 md:py-4 md:text-sm",
-                            stateClass,
+                            CELL_STYLES[state],
                           ].join(" ")}
                         >
                           <div className="text-[0.65rem] uppercase tracking-[0.18em] text-slate-200/80">
@@ -222,27 +226,29 @@ export function QscMatrix(props: QscMatrixProps) {
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3 text-[0.7rem] text-slate-400 md:text-xs">
-            <div className="inline-flex items-center gap-2">
-              <span className="inline-block h-3 w-5 rounded bg-sky-400" />
-              <span>Primary combined profile</span>
-            </div>
+          {showLegend ? (
+            <div className="mt-6 flex flex-wrap gap-3 text-[0.7rem] text-slate-400 md:text-xs">
+              <div className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-5 rounded bg-sky-400" />
+                <span>Primary combined profile</span>
+              </div>
 
-            <div className="inline-flex items-center gap-2">
-              <span className="inline-block h-3 w-5 rounded bg-sky-700" />
-              <span>Secondary profile / supporting mode</span>
-            </div>
+              <div className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-5 rounded bg-sky-700" />
+                <span>Secondary profile / supporting mode</span>
+              </div>
 
-            <div className="inline-flex items-center gap-2">
-              <span className="inline-block h-3 w-5 rounded bg-sky-900/60" />
-              <span>Related frequencies or mindsets</span>
-            </div>
+              <div className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-5 rounded bg-sky-900/60" />
+                <span>Related frequencies or mindsets</span>
+              </div>
 
-            <div className="inline-flex items-center gap-2">
-              <span className="inline-block h-3 w-5 rounded border border-slate-700/70 bg-slate-900/70" />
-              <span>Other personas</span>
+              <div className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-5 rounded border border-slate-700/70 bg-slate-900/70" />
+                <span>Other personas</span>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
     </section>
