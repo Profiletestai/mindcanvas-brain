@@ -135,7 +135,7 @@ const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
   quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
-  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile-graphic.png`,
   personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
   mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
   combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
@@ -150,7 +150,7 @@ const SECTION_ICON_PATHS = {
   recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
 } as const;
 
-const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
+const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
 const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
 
@@ -360,38 +360,6 @@ function impactLabel(level: GedImpactLevel): string {
   if (level === "significant") return "Significant";
   if (level === "moderate") return "Moderate";
   return "Low";
-}
-
-function priorityTheme(
-  priority: GedEngineDiagnostic["primary_priority"] | undefined,
-) {
-  switch (priority) {
-    case "SALES_ENGINE_PRIORITY":
-      return {
-        accent: "text-orange-600",
-        chip: "border-orange-200 bg-orange-50 text-orange-700",
-        hero: "from-orange-500/15 via-amber-400/10 to-transparent",
-      };
-    case "DELIVERY_ENGINE_PRIORITY":
-      return {
-        accent: "text-emerald-600",
-        chip: "border-emerald-200 bg-emerald-50 text-emerald-700",
-        hero: "from-emerald-500/15 via-teal-400/10 to-transparent",
-      };
-    case "SCALE_READINESS_GAP":
-      return {
-        accent: "text-amber-600",
-        chip: "border-amber-200 bg-amber-50 text-amber-700",
-        hero: "from-amber-500/15 via-orange-400/10 to-transparent",
-      };
-    case "BALANCED_ENGINE_PRIORITY":
-    default:
-      return {
-        accent: "text-cyan-700",
-        chip: "border-cyan-200 bg-cyan-50 text-cyan-700",
-        hero: "from-cyan-500/15 via-sky-400/10 to-transparent",
-      };
-  }
 }
 
 function humanDate(value: string): string {
@@ -954,7 +922,6 @@ function RocketGlyph({ color = "#45e0d1" }: { color?: string }) {
 function QuantumProfileVisual({
   personalityLabel,
   mindsetLabel,
-  profileLabel,
   personalityColor,
   mindsetColor,
   personalityIcon,
@@ -962,7 +929,6 @@ function QuantumProfileVisual({
 }: {
   personalityLabel: string;
   mindsetLabel: string;
-  profileLabel: string;
   personalityColor: string;
   mindsetColor: string;
   personalityIcon: string;
@@ -971,7 +937,8 @@ function QuantumProfileVisual({
   return (
     <section
       aria-label="Quantum Profile"
-      className="rounded-2xl border border-amber-400/30 bg-[#0a211c] p-4 shadow-inner shadow-black/20 md:p-5"
+      className="rounded-2xl border bg-[#0a211c] p-4 shadow-inner shadow-black/20 md:p-5"
+      style={{ borderColor: personalityColor }}
     >
       <p className="text-[0.66rem] font-bold uppercase tracking-[0.2em] text-emerald-300">
         Quantum Profile
@@ -1034,9 +1001,6 @@ function QuantumProfileVisual({
                 {personalityLabel}
               </span>{" "}
               <span style={{ color: mindsetColor }}>{mindsetLabel}</span>
-            </p>
-            <p className="mt-1 truncate text-xs text-slate-400">
-              {profileLabel}
             </p>
           </div>
         </div>
@@ -1423,7 +1387,6 @@ export default function GedEntrepreneurStrategicReportPage({
       ""
     ).trim() || null;
   const createdAt = humanDate(result.created_at);
-  const theme = priorityTheme(diagnostic.primary_priority);
 
   const frequencyData = (
     ["FIRE", "FLOW", "FORM", "FIELD"] as PersonalityKey[]
@@ -1698,66 +1661,61 @@ export default function GedEntrepreneurStrategicReportPage({
 
         <section
           data-ged-pdf-page
-          className={`mt-5 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br ${theme.hero} bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9`}
+          className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9"
         >
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                Quantum profile
-              </p>
-              <h2 className="mt-3 text-4xl font-extrabold tracking-tight md:text-5xl">
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:gap-10">
+            <div>
+              <h2 className="text-4xl font-extrabold tracking-tight text-white md:text-5xl">
                 {name || "Your Growth Engine"}
               </h2>
-              {company || role ? (
-                <p className="mt-2 text-base text-slate-300">
-                  {[role, company].filter(Boolean).join(" · ")}
+
+              <div className="mt-8 border-l-[6px] border-emerald-400 pl-5">
+                <p className="max-w-[31rem] text-base font-medium leading-7 text-white md:text-lg">
+                  Your personal emotional, strategic and scaling blueprint —
+                  based on your combined profile and current mindset stage.
                 </p>
-              ) : null}
-              <p className="mt-6 border-l-4 border-emerald-400 pl-4 text-base leading-7 text-slate-200">
-                A practical view of where your business is relying too heavily
-                on you, what needs attention first and how to build more
-                dependable growth.
-              </p>
+              </div>
+
+              <div className="mt-9 space-y-8">
+                <div>
+                  <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
+                    Your Personality Layer
+                  </p>
+                  <p className="mt-2 max-w-[43rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
+                    How you naturally think, act and make decisions. This is
+                    your emotional wiring and energetic pattern — it does not
+                    change overnight, which is why it is such a powerful anchor.
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
+                    Your Mindset Layer
+                  </p>
+                  <p className="mt-2 max-w-[43rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
+                    Where your business is right now and what stage of growth
+                    you are in. These needs shift as you grow — which is why
+                    you cannot keep scaling with yesterday&apos;s strategy.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                disabled={downloading}
-                className="rounded-xl border border-white/15 bg-[#1a4d41] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#235d4f] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {downloading ? "Preparing PDF…" : "Download PDF"}
-              </button>
-              {nextStepsHref ? (
-                <a
-                  href={nextStepsHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-xl bg-gradient-to-r from-[#45e0d1] via-[#4f7dff] to-[#3c2ee0] px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
-                >
-                  Next steps
-                </a>
-              ) : null}
-            </div>
-          </div>
+            <div className="flex flex-col justify-between gap-7">
+              <QuantumProfileVisual
+                personalityLabel={primaryPersonalityLabel}
+                mindsetLabel={primaryMindsetLabel}
+                personalityColor={primaryPersonalityColor}
+                mindsetColor={primaryMindsetColor}
+                personalityIcon={personaIcon}
+                mindsetIcon={mindsetIcon}
+              />
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-[1.22fr_0.78fr]">
-            <QuantumProfileVisual
-              personalityLabel={primaryPersonalityLabel}
-              mindsetLabel={primaryMindsetLabel}
-              profileLabel={canonicalProfile}
-              personalityColor={primaryPersonalityColor}
-              mindsetColor={primaryMindsetColor}
-              personalityIcon={personaIcon}
-              mindsetIcon={mindsetIcon}
-            />
-            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-              <p className="text-sm leading-6 text-slate-300">
-                The Growth Engine Diagnostic combines your behavioural pattern
-                with your current operating signals, helping you see how you
-                naturally create momentum and where the operating system needs
-                to become more dependable.
+              <p className="max-w-[34rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
+                This report gives you a clear understanding of who you are, how
+                you work, and what your business needs next. It is designed to
+                be simple, practical, and focused on helping you take confident
+                action.
               </p>
             </div>
           </div>
@@ -1766,7 +1724,11 @@ export default function GedEntrepreneurStrategicReportPage({
         <section
           data-ged-pdf-page
           id="one-page-quantum-profile"
-          className="mt-5 scroll-mt-6 overflow-hidden rounded-3xl border border-white/15 bg-[radial-gradient(circle_at_top_right,rgba(20,107,105,0.28),transparent_42%),linear-gradient(120deg,#14282a_0%,#08201f_52%,#113638_100%)] p-5 shadow-2xl shadow-black/20 md:p-7"
+          className="mt-5 scroll-mt-6 overflow-hidden rounded-3xl border border-white/15 p-5 shadow-2xl shadow-black/20 md:p-7"
+          style={{
+            background:
+              "linear-gradient(160deg, rgba(255, 138, 61, 0.14) 0%, rgba(45, 212, 191, 0.14) 100%)",
+          }}
         >
           <p className="text-[0.66rem] font-bold uppercase tracking-[0.22em] text-emerald-300">
             One-Page Quantum Profile
