@@ -2381,11 +2381,42 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="scripts">
-              <SectionHeader icon="micro-scripts-section.png" eyebrow="Their micro scripts" title="Short lines that keep your language at the right strategic altitude" />
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
-                {textItems(extended.micro_scripts, 6).map((item, index) => (
-                  <blockquote key={`script-${index}`} className="rounded-xl border border-cyan-200 bg-cyan-50 p-5 text-base font-bold leading-7 text-slate-800">“{item.replace(/^“|”$/g, "")}”</blockquote>
-                ))}
+              <header className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-300/40 bg-cyan-400/20 p-1.5">
+                  <img
+                    src={`${SECTION_ICON_BASE}/micro-scripts-section.png`}
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300">
+                    Their micro scripts
+                  </p>
+                  <h2 className="mt-0.5 text-sm font-extrabold text-white md:text-base">
+                    Short lines you can use in sales calls, emails and live launches.
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 rounded-2xl bg-white p-5 shadow-sm md:p-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  {textItems(extended.micro_scripts, 3).map((item, index) => (
+                    <blockquote
+                      key={`script-${index}`}
+                      className="rounded-xl border border-emerald-100 bg-emerald-100/80 p-4 text-sm font-medium leading-6 text-slate-800"
+                    >
+                      <div className="mb-3 flex h-7 w-7 items-center justify-center rounded-md border border-emerald-300 bg-emerald-200/80 p-1">
+                        <img
+                          src="/ged/predictive-selling-icons/micro-scripts.png"
+                          alt=""
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <p>“{item.replace(/^“|”$/g, "")}”</p>
+                    </blockquote>
+                  ))}
+                </div>
               </div>
             </PageSection>
 
