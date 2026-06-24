@@ -111,6 +111,12 @@ type DecisionView = {
   takeaway: string;
 };
 
+type TrustPlan = {
+  buildItems: string[];
+  breakItems: string[];
+  effectiveLine: string;
+};
+
 type CoreBusinessProblem = {
   title: string;
   description: string | null;
@@ -665,6 +671,43 @@ function parseCommunicationPlan(
   };
 }
 
+function isTrustHeading(value: string): boolean {
+  return /^(?:what\s+builds\s+trust|build\s+trust\s+through|break\s+trust\s+through|what\s+breaks\s+trust|effective\s+lines?)\b/i.test(
+    value.trim()
+  );
+}
+
+function trustListItems(value: unknown, limit = 6): string[] {
+  const raw = cleanStructuredPlaybookCopy(value);
+  if (!raw) return [];
+
+  const cleaned = raw
+    .replace(/(?:^|\n)\s*(?:what\s+builds\s+trust|build\s+trust\s+through|break\s+trust\s+through|what\s+breaks\s+trust|effective\s+lines?)\s*[:\-–—]?/gim, "\n")
+    .trim();
+
+  const parsed = structuredListItems(cleaned, limit + 2)
+    .map((item) => item.replace(/^(?:build|break)\s+trust\s+(?:with|through)\s*[:\-–—]?\s*/i, "").trim())
+    .filter((item) => item && !isTrustHeading(item));
+
+  return uniqueStrings(parsed).slice(0, limit);
+}
+
+function parseTrustPlan(
+  trustValue: unknown,
+  blockerValue: unknown,
+  microScriptsValue: unknown
+): TrustPlan {
+  const buildItems = trustListItems(trustValue, 6);
+  const breakItems = trustListItems(blockerValue, 6);
+  const effectiveLine = trustListItems(microScriptsValue, 1)[0] || "";
+
+  return {
+    buildItems,
+    breakItems,
+    effectiveLine,
+  };
+}
+
 function parseDecisionPlan(value: unknown): DecisionView {
   const raw = cleanStructuredPlaybookCopy(value)
     .replace(/^how they make decisions\.?\s*/i, "")
@@ -1143,6 +1186,16 @@ export default function GedPredictiveSellingPlaybookPage({
     [extended?.how_to_communicate, extended?.micro_scripts, extended?.what_blocks_sale]
   );
 
+
+  const trustPlan = useMemo(
+    () =>
+      parseTrustPlan(
+        extended?.what_builds_trust,
+        extended?.what_blocks_sale,
+        extended?.micro_scripts
+      ),
+    [extended?.micro_scripts, extended?.what_blocks_sale, extended?.what_builds_trust]
+  );
 
   const decisionPlan = useMemo(
     () => parseDecisionPlan(extended?.how_they_make_decisions),
@@ -1995,11 +2048,82 @@ export default function GedPredictiveSellingPlaybookPage({
               </div>
             </PageSection>
 
-            <PageSection id="trust">
-              <SectionHeader icon="what-builds-trust.png" eyebrow="What builds trust" title="Signals, proof and experiences that help them feel safe moving forward" />
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <NarrativeCard eyebrow="Build trust through" title="What to demonstrate" content={extended.what_builds_trust} tone="emerald" bullets />
-                <NarrativeCard eyebrow="Break trust through" title="What to avoid" content={extended.what_blocks_sale} tone="rose" bullets />
+            <PageSection id="trust" className="p-4 md:p-5">
+              <header className="flex items-start gap-3">
+                <SectionIcon file="what-builds-trust.png" alt="" />
+                <div className="pt-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                    What builds trust
+                  </p>
+                  <h2 className="mt-1 text-sm font-extrabold leading-6 text-white md:text-base">
+                    Signals, proof and experiences that help them feel safe moving forward with you.
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <article className="rounded-xl border border-emerald-200 bg-emerald-100/90 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                      Build trust through
+                    </p>
+                    {trustPlan.buildItems.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {trustPlan.buildItems.map((item, index) => (
+                          <li
+                            key={`trust-build-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-emerald-500" aria-hidden="true">
+                              ✓
+                            </span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        No profile-specific trust signals have been recorded.
+                      </p>
+                    )}
+                  </article>
+
+                  <article className="rounded-xl border border-rose-200 bg-rose-100/90 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-500">
+                      Break trust through
+                    </p>
+                    {trustPlan.breakItems.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {trustPlan.breakItems.map((item, index) => (
+                          <li
+                            key={`trust-break-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-rose-500" aria-hidden="true">
+                              ✕
+                            </span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        No profile-specific trust risks have been recorded.
+                      </p>
+                    )}
+                  </article>
+                </div>
+
+                {trustPlan.effectiveLine ? (
+                  <div className="mt-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700">
+                      Effective line
+                    </p>
+                    <blockquote className="mt-2 rounded-md border-l-2 border-cyan-400 bg-cyan-50 px-3 py-2 text-xs italic leading-5 text-slate-700 md:text-sm">
+                      “{trustPlan.effectiveLine}”
+                    </blockquote>
+                  </div>
+                ) : null}
               </div>
             </PageSection>
 
