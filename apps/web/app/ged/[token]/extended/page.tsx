@@ -104,6 +104,13 @@ type CommunicationView = {
   effectiveLines: string[];
 };
 
+type DecisionView = {
+  overview: string;
+  yesItems: string[];
+  hesitateItems: string[];
+  takeaway: string;
+};
+
 type GedEngineDiagnostic = {
   primary_priority?: string;
   priority_label?: string;
@@ -653,6 +660,58 @@ function parseCommunicationPlan(
   };
 }
 
+function parseDecisionPlan(value: unknown): DecisionView {
+  const raw = cleanStructuredPlaybookCopy(value)
+    .replace(/^how they make decisions\.?\s*/i, "")
+    .trim();
+
+  const fallback: DecisionView = {
+    overview: raw ? sentence(raw, 360) : "No profile-specific decision guidance is recorded.",
+    yesItems: [],
+    hesitateItems: [],
+    takeaway: "Use the buyer’s decision logic to frame the conversation at the right level.",
+  };
+
+  if (!raw) return fallback;
+
+  const yesHeading = /\bthey\s+say\s+yes\s+when\s*[:\-–—]?/i;
+  const hesitateHeading = /\bthey\s+hesitate\s+when\s*[:\-–—]?/i;
+  const takeawayHeading = /\bthey\s+don['’]?t\s+buy\b/i;
+
+  const yesMatch = yesHeading.exec(raw);
+  const hesitateMatch = hesitateHeading.exec(raw);
+  const takeawayMatch = takeawayHeading.exec(raw);
+
+  const firstMarker = [yesMatch?.index, hesitateMatch?.index, takeawayMatch?.index]
+    .filter((index): index is number => typeof index === "number")
+    .sort((a, b) => a - b)[0];
+
+  const overview = (typeof firstMarker === "number" ? raw.slice(0, firstMarker) : raw).trim();
+
+  const yesRaw = yesMatch
+    ? sliceBetweenHeadings(raw, yesHeading, [hesitateHeading, takeawayHeading])
+    : "";
+  const hesitateRaw = hesitateMatch
+    ? sliceBetweenHeadings(raw, hesitateHeading, [takeawayHeading])
+    : "";
+  const takeaway = takeawayMatch?.index != null
+    ? raw.slice(takeawayMatch.index).trim()
+    : "";
+
+  const allItems = structuredListItems(raw, 14);
+  const yesItems = structuredListItems(yesRaw, 6);
+  const hesitateItems = structuredListItems(hesitateRaw, 6);
+
+  return {
+    overview: overview || fallback.overview,
+    yesItems: yesItems.length ? yesItems : allItems.slice(0, 5),
+    hesitateItems: hesitateItems.length
+      ? hesitateItems
+      : allItems.slice(yesItems.length ? yesItems.length : 5, 10),
+    takeaway: takeaway || "Position the offer around the outcome this buyer wants to create, not around incremental fixes.",
+  };
+}
+
 function SectionIcon({ file, alt }: { file: string; alt: string }) {
   return (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/20 p-2 shadow-inner shadow-cyan-950/20">
@@ -1006,6 +1065,12 @@ export default function GedPredictiveSellingPlaybookPage({
         extended?.micro_scripts
       ),
     [extended?.how_to_communicate, extended?.micro_scripts, extended?.what_blocks_sale]
+  );
+
+
+  const decisionPlan = useMemo(
+    () => parseDecisionPlan(extended?.how_they_make_decisions),
+    [extended?.how_they_make_decisions]
   );
 
   // The signed-off Playbook index begins with the detailed intelligence
@@ -1735,9 +1800,70 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="decisions">
-              <SectionHeader icon="how-they-make-decisions.png" eyebrow="How they make decisions" title="What helps them say yes, makes them hesitate and shapes their filters" />
-              <div className="mt-6 rounded-2xl bg-white p-6">
-                <NarrativeCard title="Decision intelligence" content={extended.how_they_make_decisions} tone="orange" bullets />
+              <header className="flex items-start gap-3">
+                <SectionIcon file="how-they-make-decisions.png" alt="" />
+                <div className="pt-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                    How they make decisions
+                  </p>
+                  <h2 className="mt-1 text-sm font-extrabold leading-6 text-white md:text-base">
+                    What helps them say yes, makes them hesitate, and the decision filters they use.
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 rounded-2xl bg-white p-5 shadow-sm md:p-6">
+                <p className="max-w-5xl text-xs leading-5 text-slate-700 md:text-sm md:leading-6">
+                  {decisionPlan.overview}
+                </p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100/80 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-emerald-400" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                      They say yes when
+                    </p>
+                    <ul className="mt-3 space-y-2">
+                      {(decisionPlan.yesItems.length
+                        ? decisionPlan.yesItems
+                        : ["The offer is framed around a clear, high-value outcome."]
+                      ).map((item, index) => (
+                        <li
+                          key={`decision-yes-${index}`}
+                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                        >
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-emerald-500">✓</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+
+                  <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100/80 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-rose-400" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-500">
+                      They hesitate when
+                    </p>
+                    <ul className="mt-3 space-y-2">
+                      {(decisionPlan.hesitateItems.length
+                        ? decisionPlan.hesitateItems
+                        : ["The offer feels unclear, low-confidence or misaligned with the decision they need to make."]
+                      ).map((item, index) => (
+                        <li
+                          key={`decision-hesitate-${index}`}
+                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                        >
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-rose-400">×</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
+
+                <p className="mt-4 max-w-5xl text-xs leading-5 text-slate-700 md:text-sm md:leading-6">
+                  {decisionPlan.takeaway}
+                </p>
               </div>
             </PageSection>
 
