@@ -2703,16 +2703,65 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="next-step">
-              <SectionHeader icon="recommended-next-step.png" eyebrow="Recommended next step" title="What to offer, and how to position it" />
-              <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-                <NarrativeCard title={safeText(diagnostic?.recommended_next_step?.title, "Lead with the highest-leverage next move")} content={diagnostic?.recommended_next_step?.summary || diagnostic?.primary_bottleneck?.first_fix} tone="emerald" />
-                <article className="rounded-2xl border border-orange-200 bg-orange-50 p-5">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-orange-600">How to position it</p>
-                  <p className="mt-2 text-base font-extrabold text-slate-950">Use their diagnosed constraint as the opening frame.</p>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                    {strategicPriorities.map((item, index) => <li key={`priority-${index}`} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{item}</li>)}
-                  </ul>
-                </article>
+              <SectionHeader
+                icon="recommended-next-step.png"
+                eyebrow="Recommended next step"
+                title="What to offer, and how to position it"
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <p className="max-w-5xl text-xs leading-5 text-slate-700 md:text-sm md:leading-6">
+                  Lead with the pattern already visible in their results. Do not start with generic discovery questions.
+                  Name the current constraint, connect it to their stage and frame the engagement as the direct route
+                  to the next operating outcome. Position yourself as the strategic guide, not the assistant.
+                </p>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-2 md:gap-4">
+                  <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">What to do</p>
+                    <ul className="mt-3 space-y-2.5">
+                      {uniqueStrings([
+                        diagnostic?.primary_bottleneck?.label
+                          ? `Lead by naming the primary constraint: ${diagnostic.primary_bottleneck.label}.`
+                          : "Lead by naming the highest-leverage constraint you can already see.",
+                        diagnostic?.business_stage?.label
+                          ? `Reference their current stage: ${diagnostic.business_stage.label}.`
+                          : "Reference the stage they are operating from now.",
+                        diagnostic?.primary_bottleneck?.first_fix ||
+                          diagnostic?.recommended_next_step?.title ||
+                          "Propose a contained, high-impact first engagement.",
+                        diagnostic?.recommended_next_step?.summary ||
+                          strategicPriorities[0] ||
+                          "Make the outcome clear, specific and connected to the next practical move.",
+                      ]).slice(0, 4).map((item, index) => (
+                        <li
+                          key={`recommended-next-step-do-${index}`}
+                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                        >
+                          <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+
+                  <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-rose-500" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">Red flags — pause or reframe</p>
+                    <ul className="mt-3 space-y-2.5">
+                      {uniqueStrings(saleBlockerPlan.blockers).slice(0, 4).map((item, index) => (
+                        <li
+                          key={`recommended-next-step-red-flag-${index}`}
+                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                        >
+                          <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
               </div>
             </PageSection>
 
