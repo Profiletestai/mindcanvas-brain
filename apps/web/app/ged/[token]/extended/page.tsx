@@ -1411,6 +1411,41 @@ export default function GedPredictiveSellingPlaybookPage({
     [extended?.what_blocks_sale]
   );
 
+  /**
+   * Follow-up guidance is a Playbook operating framework, not a GED score.
+   * Keep its practical structure consistent while making the closing line
+   * refer to the buyer's live constraint and profile.
+   */
+  const followUpGuidance = useMemo(() => {
+    const liveConstraint = safeText(
+      diagnostic?.primary_bottleneck?.label || diagnostic?.core_constraint?.label,
+      "the strategic constraint discussed in the call"
+    );
+
+    const liveProfile = safeText(
+      profile,
+      [personalityLabel, mindsetLabel].filter(Boolean).join(" ") || "this buyer"
+    );
+
+    return {
+      works: [
+        "Send a bold, specific message — no pleasantries.",
+        "Reference one strategic insight from the conversation.",
+        `Connect the next step to ${liveConstraint}.`,
+        "Propose one specific next action — not “let me know when you’re ready.”",
+        "Keep it short — they do not need a long email to decide what happens next.",
+      ],
+      kills: [
+        "Generic check-in messages.",
+        "Re-explaining your services or packages.",
+        "Slow or delayed responses.",
+        "Asking if they have had a chance to think about it.",
+        "Any message that signals you need the sale more than they need you.",
+      ],
+      callout: `Send within 24 hours. One strategic observation. One specific next step. No fluff. Keep the follow-up relevant to ${liveProfile} and the live constraint — not a chase.`,
+    };
+  }, [diagnostic?.core_constraint?.label, diagnostic?.primary_bottleneck?.label, mindsetLabel, personalityLabel, profile]);
+
   const fitFlags = useMemo(
     () => splitFlags(extended?.green_red_flags),
     [extended?.green_red_flags]
@@ -2766,10 +2801,62 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="follow-up">
-              <SectionHeader icon="follow-up-guidance.png" eyebrow="Follow-up guidance" title="How to keep the message relevant after the call" description="This section uses the existing communication, trust and blocker intelligence. It does not introduce new profile content." />
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <NarrativeCard eyebrow="What works" title="Anchor the follow-up in the strategic insight" content={uniqueStrings([sentence(extended.what_builds_trust), sentence(extended.how_to_communicate), sentence(diagnostic?.recommended_next_step?.summary)]).join("\n")} tone="emerald" bullets />
-                <NarrativeCard eyebrow="What kills the follow-up" title="Do not repeat the blockers in a new format" content={extended.what_blocks_sale} tone="rose" bullets />
+              <header className="flex items-center gap-3">
+                <SectionIcon file="follow-up-guidance.png" alt="" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                    Follow-up guidance
+                  </p>
+                  <h2 className="mt-1 text-xl font-extrabold tracking-tight text-white md:text-2xl">
+                    What to send after the call and what language to use
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="grid gap-3 md:grid-cols-2 md:gap-4">
+                  <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100/90 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">
+                      What works in follow-up
+                    </p>
+                    <ul className="mt-3 space-y-2.5">
+                      {followUpGuidance.works.map((item, index) => (
+                        <li
+                          key={`follow-up-work-${index}`}
+                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                        >
+                          <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+
+                  <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100/90 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-rose-500" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">
+                      What kills the follow-up
+                    </p>
+                    <ul className="mt-3 space-y-2.5">
+                      {followUpGuidance.kills.map((item, index) => (
+                        <li
+                          key={`follow-up-kill-${index}`}
+                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                        >
+                          <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
+
+                <aside className="mt-4 rounded-xl border border-emerald-400 bg-cyan-50 px-4 py-3 md:px-5 md:py-4">
+                  <p className="text-xs font-semibold leading-5 text-slate-800 md:text-sm md:leading-6">
+                    {followUpGuidance.callout}
+                  </p>
+                </aside>
               </div>
             </PageSection>
 
