@@ -1659,8 +1659,12 @@ export default function GedEntrepreneurStrategicReportPage({
         >
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,190px))] xl:items-center">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-xs font-black tracking-[0.12em]">
-                PT
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-1.5">
+                <img
+                  src="/ged/report-icons/section-icons/profiletest.ai-Insignia.png"
+                  alt="ProfileTest.ai insignia"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-2xl font-extrabold uppercase tracking-[0.12em] md:text-[2rem]">
@@ -2998,29 +3002,102 @@ export default function GedEntrepreneurStrategicReportPage({
                 dark
               />
 
-              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-5 md:p-6">
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-500">
-                  How this bottleneck shows up in the business
-                </p>
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-6">
+                <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-500">
+                      Operational Impact Analysis
+                    </p>
+                    <h3 className="mt-1 text-sm font-bold leading-5 text-[#1a1a1a] md:text-base">
+                      How the {diagnostic.primary_bottleneck.label} affects your business engine
+                    </h3>
+                  </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {diagnostic.operational_impact.map((impact, index) => (
-                    <article
-                      key={impact.key}
-                      className={`rounded-lg bg-[#0c1d1a] p-4 text-white shadow-sm ${
-                        index === diagnostic.operational_impact.length - 1
-                          ? "md:col-span-2"
-                          : ""
-                      }`}
-                    >
-                      <h3 className="text-sm font-bold leading-5 text-white">
-                        {impact.label}
-                      </h3>
-                      <p className="mt-1.5 max-w-4xl text-xs leading-5 text-slate-300">
-                        {impact.explanation}
-                      </p>
-                    </article>
-                  ))}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6rem] font-semibold text-[#4b5563]">
+                    {([
+                      ["Critical", "#dc2626"],
+                      ["Significant", "#ea580c"],
+                      ["Moderate", "#d97706"],
+                      ["Low", "#16a34a"],
+                    ] as const).map(([label, color]) => (
+                      <span key={label} className="inline-flex items-center gap-1.5">
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 rounded-sm"
+                          style={{ backgroundColor: color }}
+                        />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {diagnostic.operational_impact.map((impact) => {
+                    const severity =
+                      impact.key === "founder_dependency"
+                        ? diagnostic.scores.founder_dependency
+                        : impact.key === "delivery_capacity" ||
+                            impact.key === "team_consistency"
+                          ? 100 - diagnostic.scores.growth_engine
+                          : 100 - diagnostic.scores.sales_engine;
+
+                    const tone =
+                      impact.level === "critical"
+                        ? "border-red-200 bg-red-50"
+                        : impact.level === "significant"
+                          ? "border-orange-200 bg-orange-50"
+                          : impact.level === "moderate"
+                            ? "border-amber-200 bg-amber-50"
+                            : "border-emerald-200 bg-emerald-50";
+
+                    const pillTone =
+                      impact.level === "critical"
+                        ? "bg-red-100 text-red-700"
+                        : impact.level === "significant"
+                          ? "bg-orange-100 text-orange-700"
+                          : impact.level === "moderate"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700";
+
+                    return (
+                      <article
+                        key={impact.key}
+                        className={`grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(180px,0.9fr)_minmax(0,2.15fr)_auto] md:items-center md:gap-4 ${tone}`}
+                      >
+                        <div>
+                          <h4 className="text-xs font-bold leading-4 text-[#1a1a1a] md:text-sm">
+                            {impact.label}
+                          </h4>
+                          <p className="mt-0.5 text-[0.65rem] leading-4 text-[#4b5563] md:text-xs">
+                            {impact.explanation}
+                          </p>
+                        </div>
+
+                        <div>
+                          <div className="mb-1 flex items-center justify-between text-[0.55rem] text-slate-400">
+                            <span>No impact</span>
+                            <span>Critical impact</span>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className="h-full min-w-[8px] rounded-full"
+                              style={{
+                                width: `${Math.max(8, clampPercent(severity))}%`,
+                                backgroundColor: impactAccent(impact.level),
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <span
+                          className={`inline-flex w-fit shrink-0 rounded-md px-2 py-1 text-[0.6rem] font-extrabold uppercase tracking-[0.06em] ${pillTone}`}
+                        >
+                          {impactLabel(impact.level)}
+                        </span>
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
             </section>
@@ -3100,80 +3177,192 @@ export default function GedEntrepreneurStrategicReportPage({
               <SectionMarker
                 icon={SECTION_ICON_PATHS.executive_summary}
                 eyebrow="Your One-Page Executive Summary"
-                title="Your full diagnostic at a glance"
+                title="Your Full Diagnostic at a Glance"
                 body="Everything in one view — share with your leadership team or revisit before your strategy session."
                 dark
+                compact
               />
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <ContentCard title="Growth Engine Profile">
-                  <p className="text-lg font-extrabold text-slate-950">
+
+              <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <header className="flex flex-col gap-4 bg-[#0c1d1a] px-5 py-5 text-white md:flex-row md:items-end md:justify-between md:px-7 md:py-6">
+                  <div>
+                    <h3 className="text-xl font-extrabold tracking-tight md:text-2xl">
+                      GED Strategic Growth Report
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-300 md:text-sm">
+                      {[name, createdAt ? `Generated ${createdAt}` : null, "ProfileTest.ai"]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-emerald-200 md:text-right">
                     {canonicalProfile}
                   </p>
-                  <p className="mt-2">
-                    Personality: {primaryPersonalityLabel}. Mindset stage:{" "}
-                    {primaryMindsetLabel}.
-                  </p>
-                </ContentCard>
-                <ContentCard title="Primary Bottleneck">
-                  <p className="text-lg font-extrabold text-slate-950">
-                    {diagnostic.primary_bottleneck.label}
-                  </p>
-                  <p className="mt-2">{diagnostic.urgency.window}</p>
-                </ContentCard>
-                <ContentCard title="Engine Scorecard">
-                  <p>
-                    Growth Engine:{" "}
-                    <span className="font-bold text-slate-950">
-                      {diagnostic.scores.growth_engine}%
-                    </span>
-                  </p>
-                  <p>
-                    Sales Engine:{" "}
-                    <span className="font-bold text-slate-950">
-                      {diagnostic.scores.sales_engine}%
-                    </span>
-                  </p>
-                  <p>
-                    Scale readiness:{" "}
-                    <span className="font-bold text-slate-950">
-                      {diagnostic.scores.scale_readiness}%
-                    </span>
-                  </p>
-                </ContentCard>
-                <ContentCard title="Business Context">
-                  <p>{diagnostic.business_stage.label}</p>
-                  <p className="mt-2">
-                    Constraint: {diagnostic.core_constraint.label}
-                  </p>
-                </ContentCard>
-                <div id="growth-roadmap" className="scroll-mt-6">
-                  <ContentCard title="Next 90 Days">
-                    {strategicPriorities.length ? (
-                      <ul className="space-y-2">
-                        {strategicPriorities.map((priority) => (
-                          <li key={priority} className="flex gap-2">
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-700" />
-                            {priority}
+                </header>
+
+                <div className="grid md:grid-cols-3">
+                  <article className="border-b border-slate-200 p-5 md:border-r md:p-6">
+                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Growth Engine Profile
+                    </p>
+                    <h4 className="mt-3 text-lg font-extrabold text-slate-950">
+                      {canonicalProfile}
+                    </h4>
+                    <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-600">
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>
+                          Personality: {primaryPersonalityLabel} · {clampPercent(personalityPercentages[primaryPersonality || "FIRE"] || 0)}%
+                        </span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>
+                          Mindset Stage: {primaryMindsetLabel} · {clampPercent(mindsetPercentages[primaryMindset || "ORIGIN"] || 0)}%
+                        </span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>
+                          Profile Code: {result.combined_profile_code || canonicalProfile}
+                        </span>
+                      </li>
+                    </ul>
+                  </article>
+
+                  <article className="border-b border-slate-200 p-5 md:border-r md:p-6">
+                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Business Context
+                    </p>
+                    <h4 className="mt-3 text-base font-extrabold text-slate-950">
+                      {diagnostic.business_stage.label}
+                    </h4>
+                    <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-600">
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>Constraint: {diagnostic.core_constraint.label}</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>Scale readiness: {diagnostic.scores.scale_readiness}%</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>
+                          Self-diagnosis: {diagnostic.self_diagnosis || "Not provided"}
+                        </span>
+                      </li>
+                    </ul>
+                  </article>
+
+                  <article className="border-b border-slate-200 p-5 md:p-6">
+                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Engine Scorecard
+                    </p>
+                    <h4 className="mt-3 text-base font-extrabold text-slate-950">
+                      {diagnostic.scores.overall_engine}% Overall Health
+                    </h4>
+                    <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-600">
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>Growth Engine: {diagnostic.scores.growth_engine}%</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-amber-600">›</span>
+                        <span>Sales Engine: {diagnostic.scores.sales_engine}%</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-amber-600">›</span>
+                        <span>Scale Readiness: {diagnostic.scores.scale_readiness}%</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-rose-600">›</span>
+                        <span>Founder Dependency: {diagnostic.scores.founder_dependency}%</span>
+                      </li>
+                    </ul>
+                  </article>
+
+                  <article className="border-b border-slate-200 p-5 md:border-b-0 md:border-r md:p-6">
+                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Primary Bottleneck
+                    </p>
+                    <h4 className="mt-3 text-base font-extrabold text-rose-600">
+                      {diagnostic.primary_bottleneck.label}
+                    </h4>
+                    <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-600">
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>{diagnostic.primary_bottleneck.first_fix}</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>{diagnostic.primary_bottleneck.why_it_matters}</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-emerald-500">›</span>
+                        <span>Urgency: {diagnostic.urgency.window}</span>
+                      </li>
+                    </ul>
+                  </article>
+
+                  <article className="border-b border-slate-200 p-5 md:border-b-0 md:border-r md:p-6">
+                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Revenue Impact
+                    </p>
+                    <h4 className="mt-3 text-base font-extrabold text-emerald-600">
+                      {primaryOperationalImpact
+                        ? `${impactLabel(primaryOperationalImpact.level)} commercial impact`
+                        : "Commercial pressure identified"}
+                    </h4>
+                    {diagnostic.operational_impact.length ? (
+                      <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-600">
+                        {diagnostic.operational_impact.slice(0, 3).map((impact) => (
+                          <li key={impact.key} className="flex gap-2">
+                            <span className="text-emerald-500">›</span>
+                            <span>{impact.label}: {impact.explanation}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p>
-                        Protect the new operating rhythm, strengthen ownership
-                        and remove the next founder dependency once the first
-                        change is working.
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        {diagnostic.primary_bottleneck.why_it_matters}
                       </p>
                     )}
-                  </ContentCard>
+                  </article>
+
+                  <article id="growth-roadmap" className="scroll-mt-6 p-5 md:p-6">
+                    <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-slate-500">
+                      Strategic Priorities
+                    </p>
+                    <h4 className="mt-3 text-base font-extrabold text-slate-950">
+                      Next 90 Days
+                    </h4>
+                    {strategicPriorities.length ? (
+                      <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-600">
+                        {strategicPriorities.map((priority) => (
+                          <li key={priority} className="flex gap-2">
+                            <span className="text-emerald-500">›</span>
+                            <span>{priority}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        Protect the new operating rhythm, strengthen ownership and remove the next founder dependency once the first change is working.
+                      </p>
+                    )}
+                  </article>
                 </div>
-                <ContentCard title="Recommended Next Step">
-                  <p className="font-bold text-slate-950">
-                    {diagnostic.recommended_next_step.title}
+
+                <footer className="flex flex-col gap-2 border-t border-slate-200 bg-[#f9f8f6] px-5 py-3 text-[0.68rem] text-slate-600 sm:flex-row sm:items-center sm:justify-between md:px-7">
+                  <p className="font-semibold text-slate-700">
+                    <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
+                    ProfileTest.ai — Growth Engine Diagnostic
                   </p>
-                  <p className="mt-2">
-                    {diagnostic.recommended_next_step.summary}
+                  <p>
+                    © {new Date().getFullYear()} — Confidential Report for {name || "the participant"}
                   </p>
-                </ContentCard>
+                </footer>
               </div>
             </section>
 
