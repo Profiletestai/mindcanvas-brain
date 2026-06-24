@@ -2756,41 +2756,100 @@ export default function GedEntrepreneurStrategicReportPage({
               <SectionMarker
                 icon={SECTION_ICON_PATHS.what_this_means}
                 eyebrow="What This Means"
-                title={`${canonicalProfile} — decoded for operators`}
+                title={`${canonicalProfile} — Decoded for Operators`}
                 body="What your combined profile signals about your strengths, your risks, and where the highest-leverage moves live."
                 dark
+                compact
               />
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <ContentCard
-                  title="Strategic Strength"
-                  className="border-emerald-200 bg-emerald-50/60"
-                >
-                  <p className="font-semibold text-slate-950">
-                    {persona?.combined_strengths ||
-                      "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
-                  </p>
-                </ContentCard>
-                <ContentCard
-                  title="Growth Risk"
-                  className="border-rose-200 bg-rose-50/60"
-                >
-                  <p className="font-semibold text-slate-950">
-                    {persona?.combined_risks ||
-                      "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}
-                  </p>
-                </ContentCard>
-                <ContentCard
-                  title="Biggest Lever"
-                  className="border-emerald-200 bg-emerald-50/60"
-                >
-                  <p className="font-semibold text-slate-950">
-                    {persona?.combined_big_lever ||
-                      "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}
-                  </p>
-                </ContentCard>
+
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-8">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <article className="relative min-h-[198px] overflow-hidden rounded-[14px] border border-[#fddcbf] bg-[#fff8f4] p-5 pt-6">
+                    <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#34d399]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#34a77c]">
+                      Strategic Strength
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      Your natural advantage
+                    </h3>
+                    <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                      {persona?.combined_strengths ||
+                        "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[198px] overflow-hidden rounded-[14px] border border-[#fecaca] bg-[#fef2f2] p-5 pt-6">
+                    <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#dc2626]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#dc2626]">
+                      Growth Risk
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      The pattern to manage
+                    </h3>
+                    <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                      {persona?.combined_risks ||
+                        "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[198px] overflow-hidden rounded-[14px] border border-[#bbf7d0] bg-[#f0fdf4] p-5 pt-6">
+                    <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#16a34a]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#16a34a]">
+                      Biggest Lever
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      The highest-leverage move
+                    </h3>
+                    <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                      {persona?.combined_big_lever ||
+                        "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[198px] overflow-hidden rounded-[14px] border border-[#fddcbf] bg-[#fff8f4] p-5 pt-6">
+                    <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#34d399]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#34a77c]">
+                      What Stabilises You
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      Conditions that support you
+                    </h3>
+                    <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                      {persona?.emotional_stabilises ||
+                        "Clear ownership, visible progress and a small number of priorities help you stay out of reactive founder mode."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[198px] overflow-hidden rounded-[14px] border border-[#fecaca] bg-[#fef2f2] p-5 pt-6">
+                    <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#dc2626]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#dc2626]">
+                      What Destabilises You
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      The conditions to watch
+                    </h3>
+                    <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                      {persona?.emotional_destabilises ||
+                        "Unclear ownership, repeated escalation and too many decisions returning to you can increase pressure and reduce follow-through."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[198px] overflow-hidden rounded-[14px] border border-[#fde68a] bg-[#fffbeb] p-5 pt-6">
+                    <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#34d399]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#34a77c]">
+                      Energised By
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      Where you do your best work
+                    </h3>
+                    <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                      {persona?.energisers ||
+                        "Protected strategic time, meaningful progress and work that makes full use of your natural strengths will give you the greatest energy."}
+                    </p>
+                  </article>
+                </div>
               </div>
             </section>
-
             <section
               data-ged-pdf-page
               id="revenue-impact"
