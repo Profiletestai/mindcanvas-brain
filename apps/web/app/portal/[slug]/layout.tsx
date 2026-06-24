@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { createClient } from "@supabase/supabase-js";
 import BackgroundGrid from "@/components/ui/BackgroundGrid";
 import PortalChrome from "@/components/portal/PortalChrome";
+import PilotGracePopup from "./PilotGracePopup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,6 +85,8 @@ export default async function OrgLayout({
           {children}
         </PortalChrome>
       </div>
+
+      <PilotGracePopup />
     </div>
   );
 }

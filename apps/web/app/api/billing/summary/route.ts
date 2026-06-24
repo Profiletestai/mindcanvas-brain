@@ -6,9 +6,12 @@ import { NextResponse } from "next/server";
 
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
 import {
+  getActiveEntitlement,
   getOrgRow,
   getOwnerBillingAccount,
   getSubmissionUsage,
+  PILOT_GRACE_HOURS,
+  PILOT_TIER,
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
 
@@ -42,6 +45,18 @@ export async function GET(req: Request) {
 
   const ba = await getOwnerBillingAccount(orgId);
   const usage = await getSubmissionUsage(orgId);
+  const ent = await getActiveEntitlement(orgId);
+
+  // Pilot status is derived from the active tier-0 entitlement. Its period_end
+  // already = pilot_end + grace, so pilot_end is period_end - PILOT_GRACE_HOURS.
+  const isPilot = ent?.tier === PILOT_TIER;
+  const graceEndsAt = isPilot ? ent?.period_end ?? null : null;
+  const pilotEndDate =
+    isPilot && ent?.period_end
+      ? new Date(
+          new Date(ent.period_end).getTime() - PILOT_GRACE_HOURS * 60 * 60 * 1000
+        ).toISOString()
+      : null;
 
   return NextResponse.json({
     ok: true,
@@ -56,6 +71,9 @@ export async function GET(req: Request) {
           period_start: ba.period_start,
           period_end: ba.period_end,
           past_due_since: ba.past_due_since,
+          is_pilot: isPilot,
+          pilot_end_date: pilotEndDate,
+          pilot_grace_ends_at: graceEndsAt,
         }
       : null,
     next_action: deriveNextAction(org.status),
