@@ -1,8 +1,7 @@
-//apps/web/app/ged/[token]/extended/page.tsx
+// apps/web/app/ged/[token]/extended/page.tsx
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -15,13 +14,17 @@ type QscResultsRow = {
   id: string;
   test_id: string;
   token: string;
-  primary_personality: PersonalityKey | null;
-  secondary_personality: PersonalityKey | null;
-  primary_mindset: MindsetKey | null;
-  secondary_mindset: MindsetKey | null;
-  combined_profile_code: string | null;
+  taker_id: string | null;
   audience: "entrepreneur" | "leader" | null;
+  combined_profile_code: string | null;
+  qsc_profile_id: string | null;
   created_at: string;
+  primary_personality?: PersonalityKey | null;
+  secondary_personality?: PersonalityKey | null;
+  primary_mindset?: MindsetKey | null;
+  secondary_mindset?: MindsetKey | null;
+  personality_percentages?: Partial<Record<PersonalityKey, number>> | null;
+  mindset_percentages?: Partial<Record<MindsetKey, number>> | null;
 };
 
 type QscProfileRow = {
@@ -32,23 +35,29 @@ type QscProfileRow = {
   profile_label: string | null;
 };
 
-type QscExtendedRow = {
+type TakerRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  company: string | null;
+  role_title: string | null;
+};
+
+type EntrepreneurExtendedRow = {
   persona_label: string | null;
   personality_label: string | null;
   mindset_label: string | null;
   profile_code: string | null;
-
   personality_layer: string | null;
   mindset_layer: string | null;
   combined_quantum_pattern: string | null;
-
   how_to_communicate: string | null;
   how_they_make_decisions: string | null;
   core_business_problems: string | null;
   what_builds_trust: string | null;
   what_offer_ready_for: string | null;
   what_blocks_sale: string | null;
-
   pre_call_questions: string | null;
   micro_scripts: string | null;
   green_red_flags: string | null;
@@ -56,617 +65,865 @@ type QscExtendedRow = {
   final_summary: string | null;
 };
 
-type QscTakerRow = {
-  id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
+type GedImpactLevel = "critical" | "significant" | "moderate" | "low";
+
+type GedOperationalImpact = {
+  label?: string;
+  summary?: string;
+  level?: GedImpactLevel;
+  score?: number;
+};
+
+type GedEngineDiagnostic = {
+  primary_priority?: string;
+  priority_label?: string;
+  priority_summary?: string;
+  business_stage?: { label?: string; summary?: string };
+  core_constraint?: { label?: string; summary?: string };
+  scale_readiness_signal?: { label?: string; summary?: string };
+  self_diagnosis?: string | null;
+  scale_readiness_level?: string;
+  primary_bottleneck?: {
+    label?: string;
+    summary?: string;
+    why_it_matters?: string;
+    first_fix?: string;
+  };
+  urgency?: { label?: string; window?: string; summary?: string };
+  confidence?: string;
+  scores?: {
+    growth_engine?: number;
+    sales_engine?: number;
+    scale_readiness?: number;
+    founder_dependency?: number;
+    overall_engine?: number;
+  };
+  operational_impact?: GedOperationalImpact[];
+  action_plan?: Array<{
+    week?: number;
+    title?: string;
+    actions?: string[];
+  }>;
+  recommended_next_step?: { title?: string; summary?: string };
+};
+
+type LinkMeta = {
+  next_steps_url?: string | null;
+  redirect_url?: string | null;
 };
 
 type QscExtendedPayload = {
-  results: QscResultsRow;
-  profile: QscProfileRow | null;
-  extended: QscExtendedRow | null;
-  taker: QscTakerRow | null;
+  ok?: boolean;
+  results?: QscResultsRow | null;
+  profile?: QscProfileRow | null;
+  extended?: EntrepreneurExtendedRow | null;
+  taker?: TakerRow | null;
+  error?: string;
 };
 
-type SectionMeta = {
-  id: string;
-  number: number;
-  title: string;
+type GedPayload = {
+  ok?: boolean;
+  results?: QscResultsRow | null;
+  profile?: QscProfileRow | null;
+  taker?: TakerRow | null;
+  link?: LinkMeta | null;
+  ged?: {
+    engine_diagnostic?: GedEngineDiagnostic | null;
+  } | null;
+  error?: string;
 };
 
-const SECTIONS: SectionMeta[] = [
-  { id: "sec-1-personality", number: 1, title: "Personality Layer" },
-  { id: "sec-2-mindset", number: 2, title: "Mindset Layer" },
-  { id: "sec-3-quantum", number: 3, title: "Combined Growth Pattern" },
-  { id: "sec-4-communicate", number: 4, title: "How to Communicate" },
-  { id: "sec-5-decisions", number: 5, title: "How They Make Decisions" },
-  { id: "sec-6-problems", number: 6, title: "Core Business Problems" },
-  { id: "sec-7-trust", number: 7, title: "What Builds Trust" },
-  { id: "sec-8-offer", number: 8, title: "What Offer They Are Ready For" },
-  { id: "sec-9-blockers", number: 9, title: "What Blocks the Sale Completely" },
-  { id: "sec-10-precall", number: 10, title: "Pre-Call Questions" },
-  { id: "sec-11-microscripts", number: 11, title: "Micro Scripts" },
-  { id: "sec-12-flags", number: 12, title: "Green & Red Flags" },
-  { id: "sec-13-example", number: 13, title: "Real-Life Example" },
-  { id: "sec-14-summary", number: 14, title: "Final Summary" },
-];
+type Tone = "emerald" | "cyan" | "sky" | "orange" | "rose" | "amber" | "violet";
 
-function fallbackCopy(value: string | null | undefined, fallback: string) {
-  const trimmed = (value || "").trim();
-  return trimmed.length > 0 ? trimmed : fallback;
+const ASSET_BASE = "/ged/predictive-selling-icons";
+const SECTION_ICON_BASE = `${ASSET_BASE}/section-icons`;
+
+const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
+  FIRE: "Fire",
+  FLOW: "Flow",
+  FORM: "Form",
+  FIELD: "Field",
+};
+
+const MINDSET_LABELS: Record<MindsetKey, string> = {
+  ORIGIN: "Origin",
+  MOMENTUM: "Momentum",
+  VECTOR: "Vector",
+  ORBIT: "Orbit",
+  QUANTUM: "Quantum",
+};
+
+const PERSONALITY_TONES: Record<PersonalityKey, string> = {
+  FIRE: "text-orange-400",
+  FLOW: "text-sky-400",
+  FORM: "text-emerald-400",
+  FIELD: "text-violet-400",
+};
+
+const TONE_STYLE: Record<
+  Tone,
+  { label: string; top: string; panel: string; border: string; icon: string; dot: string }
+> = {
+  emerald: {
+    label: "text-emerald-600",
+    top: "bg-emerald-500",
+    panel: "bg-emerald-50",
+    border: "border-emerald-200",
+    icon: "bg-emerald-100 border-emerald-300",
+    dot: "bg-emerald-500",
+  },
+  cyan: {
+    label: "text-cyan-600",
+    top: "bg-cyan-500",
+    panel: "bg-cyan-50",
+    border: "border-cyan-200",
+    icon: "bg-cyan-100 border-cyan-300",
+    dot: "bg-cyan-500",
+  },
+  sky: {
+    label: "text-sky-600",
+    top: "bg-sky-500",
+    panel: "bg-sky-50",
+    border: "border-sky-200",
+    icon: "bg-sky-100 border-sky-300",
+    dot: "bg-sky-500",
+  },
+  orange: {
+    label: "text-orange-600",
+    top: "bg-orange-500",
+    panel: "bg-orange-50",
+    border: "border-orange-200",
+    icon: "bg-orange-100 border-orange-300",
+    dot: "bg-orange-500",
+  },
+  rose: {
+    label: "text-rose-600",
+    top: "bg-rose-500",
+    panel: "bg-rose-50",
+    border: "border-rose-200",
+    icon: "bg-rose-100 border-rose-300",
+    dot: "bg-rose-500",
+  },
+  amber: {
+    label: "text-amber-600",
+    top: "bg-amber-500",
+    panel: "bg-amber-50",
+    border: "border-amber-200",
+    icon: "bg-amber-100 border-amber-300",
+    dot: "bg-amber-500",
+  },
+  violet: {
+    label: "text-violet-600",
+    top: "bg-violet-500",
+    panel: "bg-violet-50",
+    border: "border-violet-200",
+    icon: "bg-violet-100 border-violet-300",
+    dot: "bg-violet-500",
+  },
+};
+
+function safeText(value: unknown, fallback = "Not available for this profile."): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || fallback;
 }
 
-function getFullName(taker: QscTakerRow | null | undefined): string | null {
-  if (!taker) return null;
-
-  const rawFirst =
-    (typeof taker.first_name === "string" && taker.first_name) ||
-    (typeof taker.firstName === "string" && taker.firstName) ||
-    "";
-  const rawLast =
-    (typeof taker.last_name === "string" && taker.last_name) ||
-    (typeof taker.lastName === "string" && taker.lastName) ||
-    "";
-
-  const first = rawFirst.trim();
-  const last = rawLast.trim();
-  const full = `${first} ${last}`.trim();
-  if (full) return full;
-
-  const email = (taker.email || "").trim();
-  return email || null;
+function normalisePercent(value: unknown): number {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, n > 0 && n <= 1.5 ? n * 100 : n));
 }
 
-type InsightSectionProps = {
-  id: string;
-  number: number;
-  title: string;
-  kicker?: string;
-  children: string;
-  variant?: "default" | "danger";
-};
+function formatProfilePart(value: unknown): string {
+  const raw = safeText(value, "");
+  if (!raw) return "";
+  return raw
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
 
-function InsightSection({
-  id,
-  number,
-  title,
-  kicker,
-  children,
-  variant = "default",
-}: InsightSectionProps) {
-  const danger = variant === "danger";
+function getName(taker: TakerRow | null | undefined): string {
+  const name = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
+  return name || taker?.email?.trim() || "Buyer";
+}
 
+function sentence(value: unknown, maxLength = 180): string {
+  const text = safeText(value, "").replace(/\s+/g, " ").trim();
+  if (!text) return "Not recorded";
+  const first = text.match(/^(.+?[.!?])(?:\s|$)/)?.[1] || text;
+  return first.length > maxLength ? `${first.slice(0, maxLength - 1).trim()}…` : first;
+}
+
+function textItems(value: unknown, limit = 8): string[] {
+  const raw = safeText(value, "");
+  if (!raw) return [];
+
+  const lines = raw
+    .replace(/\r/g, "")
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=\.)\s+(?=[A-Z“])/))
+    .map((line) => line.replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "").trim())
+    .filter(Boolean);
+
+  if (lines.length > 1) return lines.slice(0, limit);
+
+  return raw
+    .split(/(?<=[.!?])\s+(?=[A-Z“])/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function uniqueStrings(items: string[]): string[] {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+}
+
+function firstAction(steps: GedEngineDiagnostic["action_plan"]): string {
+  for (const step of steps || []) {
+    const action = step?.actions?.find((item) => item?.trim());
+    if (action) return action.trim();
+  }
+  return "Use the diagnostic evidence to agree a clear first move.";
+}
+
+function splitFlags(value: unknown): { green: string[]; red: string[] } {
+  const all = textItems(value, 16);
+  const green: string[] = [];
+  const red: string[] = [];
+  let side: "green" | "red" = "green";
+
+  for (const item of all) {
+    const lower = item.toLowerCase();
+    if (lower.includes("red flag") || lower.includes("pause") || lower.includes("weaker fit")) {
+      side = "red";
+      continue;
+    }
+    if (lower.includes("green flag") || lower.includes("stronger fit") || lower.includes("strong fit")) {
+      side = "green";
+      continue;
+    }
+    if (side === "green") green.push(item);
+    else red.push(item);
+  }
+
+  if (!red.length && green.length > 3) {
+    return { green: green.slice(0, Math.ceil(green.length / 2)), red: green.slice(Math.ceil(green.length / 2)) };
+  }
+
+  return { green, red };
+}
+
+function SectionIcon({ file, alt }: { file: string; alt: string }) {
   return (
-    <section
-      id={id}
-      className={[
-        "scroll-mt-28 rounded-3xl border p-6 md:p-8 space-y-3 shadow-sm",
-        danger ? "border-rose-200 bg-white" : "border-slate-200 bg-white",
-      ].join(" ")}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={[
-            "mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold border",
-            danger
-              ? "bg-rose-50 text-rose-700 border-rose-200"
-              : "bg-sky-50 text-sky-700 border-sky-200",
-          ].join(" ")}
-        >
-          {number}
-        </div>
-        <div className="space-y-1.5">
-          <h2
-            className={[
-              "text-lg md:text-xl font-semibold",
-              danger ? "text-rose-900" : "text-slate-900",
-            ].join(" ")}
-          >
-            {title}
-          </h2>
-          {kicker && (
-            <p
-              className={[
-                "text-[15px] leading-relaxed",
-                danger ? "text-rose-800/80" : "text-slate-600",
-              ].join(" ")}
-            >
-              {kicker}
-            </p>
-          )}
-        </div>
-      </div>
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/20 p-2 shadow-inner shadow-cyan-950/20">
+      <img src={`${SECTION_ICON_BASE}/${file}`} alt={alt} className="h-full w-full object-contain" />
+    </span>
+  );
+}
 
-      <div
-        className={[
-          "pt-3 text-[15px] leading-relaxed whitespace-pre-line",
-          danger ? "text-rose-900" : "text-slate-700",
-        ].join(" ")}
-      >
-        {children}
+function SectionHeader({
+  icon,
+  eyebrow,
+  title,
+  description,
+}: {
+  icon: string;
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <header className="flex gap-4">
+      <SectionIcon file={icon} alt="" />
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">{eyebrow}</p>
+        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white md:text-3xl">{title}</h2>
+        {description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">{description}</p> : null}
       </div>
+    </header>
+  );
+}
+
+function PageSection({
+  id,
+  children,
+  className = "",
+}: {
+  id?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section id={id} className={`scroll-mt-8 rounded-[1.6rem] border border-white/10 bg-[#0c1d1a] p-5 shadow-[0_16px_60px_rgba(0,0,0,0.18)] md:p-7 ${className}`}>
+      {children}
     </section>
   );
 }
 
-export default function GedExtendedPage({ params }: { params: { token: string } }) {
-  const token = params.token;
+function InfoCard({
+  label,
+  value,
+  detail,
+  tone = "emerald",
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: Tone;
+}) {
+  const style = TONE_STYLE[tone];
+  return (
+    <article className={`relative overflow-hidden rounded-xl border ${style.border} bg-white p-4 shadow-sm`}>
+      <div className={`absolute inset-x-0 top-0 h-1 ${style.top}`} />
+      <p className={`text-[10px] font-bold uppercase tracking-[0.16em] ${style.label}`}>{label}</p>
+      <p className="mt-2 text-base font-extrabold text-slate-950">{value}</p>
+      {detail ? <p className="mt-2 text-xs leading-5 text-slate-600">{detail}</p> : null}
+    </article>
+  );
+}
+
+function NarrativeCard({
+  eyebrow,
+  title,
+  content,
+  tone = "emerald",
+  bullets = false,
+}: {
+  eyebrow?: string;
+  title: string;
+  content: unknown;
+  tone?: Tone;
+  bullets?: boolean;
+}) {
+  const style = TONE_STYLE[tone];
+  const lines = textItems(content);
+
+  return (
+    <article className={`relative overflow-hidden rounded-xl border ${style.border} ${style.panel} p-5`}>
+      <div className={`absolute inset-x-0 top-0 h-1 ${style.top}`} />
+      {eyebrow ? <p className={`text-[10px] font-bold uppercase tracking-[0.17em] ${style.label}`}>{eyebrow}</p> : null}
+      <h3 className="mt-2 text-base font-extrabold text-slate-950">{title}</h3>
+      {bullets ? (
+        <ul className="mt-3 space-y-2.5">
+          {lines.map((line, index) => (
+            <li key={`${title}-${index}`} className="flex gap-2 text-sm leading-5 text-slate-600">
+              <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+          {lines.map((line, index) => <p key={`${title}-${index}`}>{line}</p>)}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ProgressBar({ label, value, tone = "emerald", description }: { label: string; value: number; tone?: Tone; description?: string }) {
+  const safe = normalisePercent(value);
+  const style = TONE_STYLE[tone];
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-4 text-sm">
+        <div>
+          <p className="font-bold text-slate-900">{label}</p>
+          {description ? <p className="mt-1 text-xs leading-4 text-slate-500">{description}</p> : null}
+        </div>
+        <span className={`font-extrabold ${style.label}`}>{Math.round(safe)}%</span>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-slate-200">
+        <div className={`h-2 rounded-full ${style.top}`} style={{ width: `${safe}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function Donut({ score }: { score: number }) {
+  const safe = normalisePercent(score);
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (safe / 100) * circumference;
+
+  return (
+    <div className="relative grid h-40 w-40 place-items-center">
+      <svg className="h-full w-full -rotate-90" viewBox="0 0 112 112" aria-hidden="true">
+        <circle cx="56" cy="56" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="9" />
+        <circle
+          cx="56"
+          cy="56"
+          r={radius}
+          fill="none"
+          stroke="#34d399"
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+        />
+      </svg>
+      <div className="absolute text-center">
+        <p className="text-3xl font-extrabold text-slate-950">{Math.round(safe)}%</p>
+        <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">Call readiness</p>
+      </div>
+    </div>
+  );
+}
+
+export default function GedPredictiveSellingPlaybookPage({
+  params,
+}: {
+  params: { token: string };
+}) {
+  const token = String(params?.token || "").trim();
   const searchParams = useSearchParams();
-  const tid = searchParams?.get("tid") ?? "";
+  const tid = String(searchParams.get("tid") || "").trim();
+  const reportRef = useRef<HTMLDivElement>(null);
 
+  const [extendedPayload, setExtendedPayload] = useState<QscExtendedPayload | null>(null);
+  const [gedPayload, setGedPayload] = useState<GedPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-  const [payload, setPayload] = useState<QscExtendedPayload | null>(null);
-
-  const reportRef = useRef<HTMLDivElement | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let alive = true;
+    let active = true;
 
-    (async () => {
+    async function load() {
+      setLoading(true);
+      setError(null);
+
       try {
-        setLoading(true);
-        setErr(null);
+        const suffix = tid ? `?tid=${encodeURIComponent(tid)}` : "";
+        const [extendedResponse, gedResponse] = await Promise.all([
+          fetch(`/api/public/qsc/${encodeURIComponent(token)}/extended${suffix}`, { cache: "no-store" }),
+          fetch(`/api/public/ged/${encodeURIComponent(token)}/result${suffix}`, { cache: "no-store" }),
+        ]);
 
-        const apiUrl = tid
-          ? `/api/public/qsc/${encodeURIComponent(token)}/extended?tid=${encodeURIComponent(tid)}`
-          : `/api/public/qsc/${encodeURIComponent(token)}/extended`;
+        const [extendedJson, gedJson] = await Promise.all([
+          extendedResponse.json().catch(() => ({})),
+          gedResponse.json().catch(() => ({})),
+        ]);
 
-        const res = await fetch(apiUrl, { cache: "no-store" });
+        if (!active) return;
 
-        const ct = res.headers.get("content-type") || "";
-        if (!ct.includes("application/json")) {
-          const text = await res.text();
-          throw new Error(`Non-JSON response (${res.status}): ${text.slice(0, 200)}`);
+        const extended = extendedJson as QscExtendedPayload;
+        const ged = gedJson as GedPayload;
+
+        if (!extendedResponse.ok || extended.ok === false) {
+          throw new Error(extended.error || "The Playbook content could not be loaded.");
         }
 
-        const j = (await res.json()) as any;
-
-        if (!res.ok || j?.ok === false) {
-          if (
-            res.status === 409 &&
-            String(j?.error || "").includes("AMBIGUOUS_TOKEN_REQUIRES_TID")
-          ) {
-            throw new Error(
-              "This link has multiple results. Please open the Extended page from the GED snapshot (or add ?tid=...) so we can load the correct report."
-            );
-          }
-          throw new Error(j?.error || `HTTP ${res.status}`);
-        }
-
-        if (alive && j?.results) {
-          setPayload({
-            results: j.results,
-            profile: j.profile ?? null,
-            extended: j.extended ?? null,
-            taker: j.taker ?? null,
-          });
-        }
-      } catch (e: any) {
-        if (alive) setErr(String(e?.message || e || "Unknown error"));
+        setExtendedPayload(extended);
+        setGedPayload(gedResponse.ok && ged.ok !== false ? ged : null);
+      } catch (loadError: any) {
+        if (!active) return;
+        setError(String(loadError?.message || "Unexpected error while loading the Playbook."));
       } finally {
-        if (alive) setLoading(false);
+        if (active) setLoading(false);
       }
-    })();
+    }
+
+    if (token) load();
+    else {
+      setError("Missing report token.");
+      setLoading(false);
+    }
 
     return () => {
-      alive = false;
+      active = false;
     };
   }, [token, tid]);
 
   async function handleDownloadPdf() {
-    if (!reportRef.current) return;
+    if (!reportRef.current || downloading) return;
+    setDownloading(true);
 
-    const element = reportRef.current;
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#0b1220",
-    });
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#06111b",
+        windowWidth: reportRef.current.scrollWidth,
+      });
+      const imageData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageHeight = (canvas.height * pageWidth) / canvas.width;
+      let position = 0;
+      let heightLeft = imageHeight;
 
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      pdf.addImage(imageData, "PNG", 0, position, pageWidth, imageHeight);
       heightLeft -= pageHeight;
-    }
 
-    pdf.save(`growth-engine-diagnostic-extended-${token}.pdf`);
+      while (heightLeft > 0) {
+        position = heightLeft - imageHeight;
+        pdf.addPage();
+        pdf.addImage(imageData, "PNG", 0, position, pageWidth, imageHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`predictive-selling-playbook-${token}.pdf`);
+    } finally {
+      setDownloading(false);
+    }
   }
 
-  const results = payload?.results ?? null;
-  const profile = payload?.profile ?? null;
-  const extended = payload?.extended ?? null;
-  const taker = payload?.taker ?? null;
+  const result = extendedPayload?.results || gedPayload?.results || null;
+  const extended = extendedPayload?.extended || null;
+  const taker = extendedPayload?.taker || gedPayload?.taker || null;
+  const diagnostic = gedPayload?.ged?.engine_diagnostic || null;
+
+  const profile = useMemo(() => {
+    const personality = formatProfilePart(result?.primary_personality || extended?.personality_label);
+    const mindset = formatProfilePart(result?.primary_mindset || extended?.mindset_label);
+    const stored = safeText(extended?.persona_label || extended?.profile_code || "", "");
+    return stored || [personality, mindset].filter(Boolean).join(" ") || "Quantum Profile";
+  }, [extended?.mindset_label, extended?.persona_label, extended?.personality_label, extended?.profile_code, result?.primary_mindset, result?.primary_personality]);
+
+  const personality = useMemo<PersonalityKey | null>(() => {
+    const raw = String(result?.primary_personality || extended?.personality_label || "").trim().toUpperCase();
+    return raw === "FIRE" || raw === "FLOW" || raw === "FORM" || raw === "FIELD" ? raw : null;
+  }, [extended?.personality_label, result?.primary_personality]);
+
+  const mindset = useMemo<MindsetKey | null>(() => {
+    const raw = String(result?.primary_mindset || extended?.mindset_label || "").trim().toUpperCase();
+    return raw === "ORIGIN" || raw === "MOMENTUM" || raw === "VECTOR" || raw === "ORBIT" || raw === "QUANTUM" ? raw : null;
+  }, [extended?.mindset_label, result?.primary_mindset]);
+
+  const fullName = getName(taker);
+  const company = safeText(taker?.company, "");
+  const role = safeText(taker?.role_title, "");
+  const completedOn = formatDate(result?.created_at);
+  const nextStepsHref = safeText(gedPayload?.link?.next_steps_url || gedPayload?.link?.redirect_url, "");
+  const readiness = normalisePercent(diagnostic?.scores?.scale_readiness);
+  const callReadiness = Math.round((readiness + (100 - normalisePercent(diagnostic?.scores?.founder_dependency))) / 2);
+  const decisionStyle = sentence(extended?.how_they_make_decisions, 115);
+  const buyerMode = sentence(extended?.what_offer_ready_for, 115);
+  const strategicPriorities = uniqueStrings([
+    firstAction(diagnostic?.action_plan),
+    diagnostic?.primary_bottleneck?.first_fix || "",
+    diagnostic?.recommended_next_step?.title || "",
+  ]).slice(0, 3);
+
+  const reportIndex = [
+    ["fast-read", "Fast Read Sales Summary"],
+    ["personality", "Their Personality Layer"],
+    ["mindset", "Their Mindset Layer"],
+    ["quantum-profile", "Understand the Quantum Profile"],
+    ["combined-pattern", "Combined Quantum Pattern"],
+    ["communicate", "How to Communicate"],
+    ["decisions", "How They Make Decisions"],
+    ["problems", "Their Core Business Problems"],
+    ["trust", "What Builds Trust"],
+    ["offer", "What Offer They Are Ready For"],
+    ["blockers", "What Blocks the Sale"],
+    ["pre-call", "Pre-Call Questions"],
+    ["scripts", "Micro Scripts"],
+    ["flags", "Green & Red Flags"],
+    ["example", "Real-Life Example"],
+    ["next-step", "Recommended Next Step"],
+    ["follow-up", "Follow-Up Guidance"],
+    ["final-summary", "Final Sale Summary"],
+  ] as const;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="relative min-h-screen bg-[#06111b] text-white">
         <AppBackground />
-        <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
-            Growth Engine Diagnostic
-          </p>
-          <h1 className="mt-3 text-3xl font-bold">Preparing Extended Internal Insights…</h1>
+        <main className="relative mx-auto max-w-6xl px-5 py-16">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Growth Engine Diagnostic</p>
+          <h1 className="mt-3 text-3xl font-extrabold">Preparing your Predictive Selling Playbook…</h1>
         </main>
       </div>
     );
   }
 
-  if (err || !results) {
-    const snapshotHref = tid
-      ? `/ged/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
-      : `/ged/${encodeURIComponent(token)}`;
-
+  if (error || !result || !extended) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-50">
+      <div className="relative min-h-screen bg-[#06111b] text-white">
         <AppBackground />
-        <main className="mx-auto max-w-5xl px-4 py-12 space-y-4">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
-            Growth Engine Diagnostic
+        <main className="relative mx-auto max-w-5xl px-5 py-16">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Predictive Selling Playbook</p>
+          <h1 className="mt-3 text-3xl font-extrabold">We could not prepare this Playbook</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+            This internal report needs a completed QSC result and a matching entrepreneur extended-report record.
           </p>
-          <h1 className="text-3xl font-bold">Couldn&apos;t load insights</h1>
-          <p className="text-[15px] text-slate-300">
-            We weren&apos;t able to load the Extended Internal Insights for this profile.
-          </p>
-
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Link
-              href={snapshotHref}
-              className="inline-flex items-center rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium hover:bg-slate-800"
-            >
-              ← Back to GED Snapshot
-            </Link>
-          </div>
-
-          <pre className="mt-2 rounded-xl border border-slate-800 bg-slate-950/90 p-3 text-xs text-slate-100 whitespace-pre-wrap">
-            {err || "No data"}
-          </pre>
+          <pre className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs text-slate-300">{error || "Extended report content was not available."}</pre>
         </main>
       </div>
     );
   }
-
-  const createdAt = new Date(results.created_at);
-  const personaLabel =
-    extended?.persona_label ||
-    profile?.profile_label ||
-    results.combined_profile_code ||
-    "Growth profile";
-
-  const takerDisplayName = getFullName(taker);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
+    <div className="min-h-screen bg-[#06111b] text-slate-900">
       <AppBackground />
-
-      <main ref={reportRef} className="mx-auto max-w-6xl px-4 py-10 md:py-12 space-y-10">
-        <header className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-300/80">
-              Growth Engine Diagnostic
-            </p>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Extended Internal Insights
-            </h1>
-            {takerDisplayName && (
-              <p className="text-[15px] text-slate-300">
-                For: <span className="font-semibold text-slate-50">{takerDisplayName}</span>
-              </p>
-            )}
-            <p className="text-[15px] leading-relaxed text-slate-300 max-w-2xl">
-              Deep sales and messaging insights for this profile. Use this as your reference
-              when designing offers, sales pages, email sequences and live launch scripts.
-            </p>
-          </div>
-
-          <div className="flex flex-col items-end gap-2 text-xs text-slate-400">
-            <button
-              onClick={handleDownloadPdf}
-              className="inline-flex items-center rounded-xl border border-slate-600 bg-slate-900 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm hover:bg-slate-800"
-            >
-              Download PDF
-            </button>
-
-            <span>
-              Snapshot created{" "}
-              {createdAt.toLocaleString(undefined, {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-
-            <span className="text-[11px] text-slate-500">
-              Combined profile: <span className="font-semibold text-slate-100">{personaLabel}</span>
-            </span>
-
-            {extended && (
-              <span className="text-[11px] text-slate-500">
-                Pattern:{" "}
-                <span className="font-semibold text-slate-100">
-                  {extended.personality_label} • {extended.mindset_label} ({extended.profile_code})
-                </span>
-              </span>
-            )}
-          </div>
-        </header>
-
-        <div className="grid gap-8 md:grid-cols-[260px,minmax(0,1fr)] items-start">
-          <aside className="rounded-3xl border border-slate-800 bg-slate-950/90 p-5 md:p-6 md:sticky md:top-6 space-y-3">
+      <main ref={reportRef} className="relative mx-auto max-w-[1440px] space-y-7 px-3 py-4 md:space-y-9 md:px-6 md:py-7">
+        <section className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-gradient-to-r from-[#0c1d1a] via-[#123a32] to-[#2b284c] p-5 text-white shadow-2xl shadow-black/30 md:p-7">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-400">
-                Quick index
-              </p>
-              <p className="text-[13px] md:text-[14px] leading-relaxed text-slate-300">
-                Jump straight to the section you need during calls, campaigns or copywriting.
-              </p>
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-200">Predictive Selling Playbook</p>
+              <p className="mt-2 text-sm font-medium text-white/80">Growth Engine Diagnostic · Internal Sales Intelligence</p>
+              <h1 className="mt-5 text-3xl font-extrabold tracking-tight md:text-5xl">{fullName}</h1>
+              <p className="mt-2 text-base text-white/75">{[role, company].filter(Boolean).join(" · ") || "Completed diagnostic"}</p>
             </div>
-            <div className="mt-2 flex flex-col gap-2">
-              {SECTIONS.map((sec) => (
-                <a
-                  key={sec.id}
-                  href={`#${sec.id}`}
-                  className="group inline-flex items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-[14px] hover:border-sky-500/80 hover:bg-slate-900"
+            <div className="flex flex-col items-start gap-2 lg:items-end">
+              <p className="text-xs text-white/70">Prepared {completedOn}</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={downloading}
+                  className="rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-[11px] font-semibold text-slate-100 group-hover:bg-sky-500 group-hover:text-slate-950">
-                      {sec.number}
-                    </span>
-                    <span className="font-medium text-slate-100 group-hover:text-sky-50">
-                      {sec.title}
-                    </span>
-                  </div>
-                  <span className="hidden text-[11px] text-slate-500 group-hover:text-sky-200 lg:inline">
-                    View
-                  </span>
+                  {downloading ? "Preparing PDF…" : "Download PDF"}
+                </button>
+                {nextStepsHref ? (
+                  <a href={nextStepsHref} className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300">
+                    Next steps
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-7 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <InfoCard label="Buyer profile" value={profile} detail={`Framework: ${result.combined_profile_code || extended.profile_code || "—"}`} tone="emerald" />
+            <InfoCard label="Business stage" value={safeText(diagnostic?.business_stage?.label, "Not recorded")} detail={safeText(diagnostic?.business_stage?.summary, "No qualifying answer recorded.")} tone="cyan" />
+            <InfoCard label="Core constraint" value={safeText(diagnostic?.core_constraint?.label, "Not recorded")} detail={safeText(diagnostic?.core_constraint?.summary, "No qualifying answer recorded.")} tone="orange" />
+            <InfoCard label="Scale readiness" value={`${Math.round(readiness)}%`} detail={safeText(diagnostic?.scale_readiness_signal?.label || diagnostic?.scale_readiness_level, "Readiness signal unavailable.")} tone="sky" />
+          </div>
+        </section>
+
+        <PageSection id="fast-read">
+          <SectionHeader
+            icon="key-insights.png"
+            eyebrow="Read this before you dial in"
+            title="Fast Read Sales Summary"
+            description="An advisor-only guide to how this buyer thinks, communicates, decides and buys — built to be read before the call, not during it."
+          />
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <NarrativeCard title="Who they are" content={extended.combined_quantum_pattern || extended.personality_layer} tone="emerald" />
+            <NarrativeCard title="How they think" content={extended.personality_layer} tone="cyan" />
+            <NarrativeCard title="Where they are now" content={diagnostic?.business_stage?.summary || diagnostic?.scale_readiness_signal?.summary} tone="sky" />
+            <NarrativeCard title="Combined pattern" content={extended.combined_quantum_pattern} tone="violet" />
+            <NarrativeCard title="How to communicate" content={extended.how_to_communicate} tone="emerald" />
+            <NarrativeCard title="How they decide" content={extended.how_they_make_decisions} tone="orange" />
+            <NarrativeCard title="What they need" content={extended.what_offer_ready_for} tone="cyan" />
+            <NarrativeCard title="What blocks the sale" content={extended.what_blocks_sale} tone="rose" />
+          </div>
+        </PageSection>
+
+        <div className="grid gap-7 xl:grid-cols-[250px_minmax(0,1fr)]">
+          <aside className="h-fit rounded-2xl border border-white/10 bg-[#0c1d1a] p-4 text-white xl:sticky xl:top-5">
+            <p className="px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/70">Report index</p>
+            <nav className="mt-3 space-y-2" aria-label="Playbook report index">
+              {reportIndex.map(([id, label]) => (
+                <a key={id} href={`#${id}`} className="block rounded-lg border border-white/50 px-3 py-2 text-xs font-medium text-white transition hover:border-emerald-300 hover:bg-white/10">
+                  {label}
                 </a>
               ))}
-            </div>
+            </nav>
+            <button type="button" onClick={handleDownloadPdf} className="mt-4 w-full rounded-lg bg-emerald-400 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-emerald-300">
+              Download PDF
+            </button>
+            {nextStepsHref ? <a href={nextStepsHref} className="mt-2 block rounded-lg bg-gradient-to-r from-orange-300 to-emerald-400 px-3 py-2 text-center text-xs font-bold text-slate-950">Next steps</a> : null}
           </aside>
 
-          <div className="space-y-8">
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 space-y-4 shadow-sm text-slate-800">
-              <div className="space-y-3">
-                <p className="text-[11px] font-semibold tracking-[0.22em] uppercase text-sky-700">
-                  Profile summary
-                </p>
-                <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-                  How to sell to this profile
-                </h2>
-                <p className="text-[15px] leading-relaxed text-slate-700 max-w-2xl">
-                  This page is for you as the <span className="font-semibold">test owner</span>. It gives
-                  you the core sales, messaging and offer-fit insights you need to convert this profile
-                  without needing to read their entire Strategic Growth Report.
-                </p>
+          <div className="space-y-7">
+            <PageSection id="personality">
+              <SectionHeader icon="personality-layer.png" eyebrow="Their personality layer" title="How they think, behave and decide" description="The emotional wiring and energetic pattern shaping their pace, attention and buyer behaviour." />
+              <div className="mt-6 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                <article className="rounded-2xl bg-white p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Personality layer</p>
+                  <p className={`mt-3 text-3xl font-extrabold ${personality ? PERSONALITY_TONES[personality] : "text-slate-950"}`}>{personality ? PERSONALITY_LABELS[personality] : safeText(extended.personality_label)}</p>
+                  <p className="mt-4 text-sm leading-6 text-slate-600">{safeText(extended.personality_layer)}</p>
+                </article>
+                <NarrativeCard eyebrow="Key insights" title="What this means for the call" content={extended.personality_layer} tone="cyan" bullets />
               </div>
+            </PageSection>
 
-              {extended && (
-                <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] text-slate-800 md:grid-cols-2">
-                  <div>
-                    <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
-                      Personality layer
-                    </p>
-                    <p className="mt-1 font-semibold text-slate-900">{extended.personality_label}</p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      How they naturally think, lead and relate.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-slate-500">
-                      Mindset layer
-                    </p>
-                    <p className="mt-1 font-semibold text-slate-900">{extended.mindset_label}</p>
-                    <p className="mt-1 text-xs text-slate-600">
-                      Where their business is right now and what it needs to grow sustainably.
-                    </p>
+            <PageSection id="mindset">
+              <SectionHeader icon="mindset-layer.png" eyebrow="Their mindset layer" title="Where they are in their current business journey" description="The buyer's current growth stage shapes what they want, what they will fund and what will feel too small." />
+              <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <NarrativeCard title={mindset ? `${MINDSET_LABELS[mindset]} stage` : "Current stage"} content={extended.mindset_layer} tone="violet" />
+                <article className="rounded-2xl bg-white p-6">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Lead snapshot</p>
+                  <dl className="mt-4 space-y-4 text-sm">
+                    <div><dt className="text-slate-500">Decision style</dt><dd className="mt-1 font-bold text-slate-950">{decisionStyle}</dd></div>
+                    <div><dt className="text-slate-500">Offer readiness</dt><dd className="mt-1 font-bold text-slate-950">{buyerMode}</dd></div>
+                    <div><dt className="text-slate-500">Strategic self-diagnosis</dt><dd className="mt-1 text-slate-700">{safeText(diagnostic?.self_diagnosis, "Not recorded.")}</dd></div>
+                  </dl>
+                </article>
+              </div>
+            </PageSection>
+
+            <PageSection id="quantum-profile">
+              <SectionHeader icon="understand-quantum-profile.png" eyebrow="Understand the quantum profile" title="The behavioural pattern beneath the sales conversation" description="Use this as a visual cue for the level of pace, complexity and strategic altitude the buyer expects from you." />
+              <div className="mt-6 overflow-hidden rounded-2xl bg-white p-4 md:p-6">
+                <div className="grid items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                  <img src={`${ASSET_BASE}/quantum-profile-graphic.png`} alt="Quantum profile framework" className="mx-auto w-full max-w-2xl object-contain" />
+                  <div className="space-y-3">
+                    <InfoCard label="Quantum profile" value={profile} detail={`Personality: ${personality ? PERSONALITY_LABELS[personality] : "—"} · Mindset: ${mindset ? MINDSET_LABELS[mindset] : "—"}`} tone="emerald" />
+                    <NarrativeCard title="The signal to listen for" content={extended.combined_quantum_pattern} tone="cyan" />
                   </div>
                 </div>
-              )}
-            </section>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[11px] font-semibold tracking-[0.22em] uppercase text-slate-400">
-                  Diagnostic layers • Who they are &amp; where they are in business
-                </h2>
-                <div className="h-px flex-1 ml-4 bg-gradient-to-r from-slate-700/60 via-slate-800 to-transparent" />
               </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-1-personality"
-                number={1}
-                title="Personality Layer"
-                kicker="How they think, behave and decide at this stage."
-                children={fallbackCopy(
-                  extended?.personality_layer,
-                  "Personality layer details have not been defined yet."
-                )}
-              />
-
-              <InsightSection
-                id="sec-2-mindset"
-                number={2}
-                title="Mindset Layer"
-                kicker="Where they are in their current business journey."
-                children={fallbackCopy(
-                  extended?.mindset_layer,
-                  "Mindset layer details have not been defined yet."
-                )}
-              />
-
-              <InsightSection
-                id="sec-3-quantum"
-                number={3}
-                title="Combined Growth Pattern"
-                kicker="How their behaviour and mindset interact to create specific patterns."
-                children={fallbackCopy(
-                  extended?.combined_quantum_pattern,
-                  "Combined pattern has not been defined yet."
-                )}
-              />
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-between pt-4">
-                <h2 className="text-[11px] font-semibold tracking-[0.22em] uppercase text-slate-400">
-                  Sales playbook • How to communicate, position &amp; sell
-                </h2>
-                <div className="h-px flex-1 ml-4 bg-gradient-to-r from-slate-700/60 via-slate-800 to-transparent" />
+            <PageSection id="combined-pattern">
+              <SectionHeader icon="combined-quantum-pattern.png" eyebrow="Their combined quantum pattern" title="How their behaviour and mindset interact" description="This is the commercial pattern behind the buyer's urgency, ambition and likely friction." />
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <NarrativeCard title="Combined pattern" content={extended.combined_quantum_pattern} tone="emerald" />
+                <NarrativeCard title="Real commercial gap" content={diagnostic?.primary_bottleneck?.summary || diagnostic?.core_constraint?.summary} tone="rose" />
               </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-4-communicate"
-                number={4}
-                title="How to Communicate"
-                kicker="Tone, language and delivery style that makes this buyer feel understood and safe."
-                children={fallbackCopy(
-                  extended?.how_to_communicate,
-                  "No communication guidance is available yet."
-                )}
-              />
+            <PageSection id="communicate">
+              <SectionHeader icon="how-to-communicate.png" eyebrow="How to communicate" title="Tone, language and delivery style that makes them feel understood" description="The role is not to mirror every preference; it is to show strategic relevance at the speed and altitude they trust." />
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <NarrativeCard eyebrow="Use" title="What to lean into" content={extended.how_to_communicate} tone="emerald" bullets />
+                <NarrativeCard eyebrow="Avoid" title="What will reduce trust" content={extended.what_blocks_sale} tone="rose" bullets />
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-5-decisions"
-                number={5}
-                title="How They Make Decisions"
-                kicker="What helps them say yes, what makes them hesitate, and the decision filters they use."
-                children={fallbackCopy(
-                  extended?.how_they_make_decisions,
-                  "Decision style has not been defined yet."
-                )}
-              />
+            <PageSection id="decisions">
+              <SectionHeader icon="how-they-make-decisions.png" eyebrow="How they make decisions" title="What helps them say yes, makes them hesitate and shapes their filters" />
+              <div className="mt-6 rounded-2xl bg-white p-6">
+                <NarrativeCard title="Decision intelligence" content={extended.how_they_make_decisions} tone="orange" bullets />
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-6-problems"
-                number={6}
-                title="Core Business Problems"
-                kicker="The recurring patterns and friction points that show up most often for this buyer."
-                children={fallbackCopy(
-                  extended?.core_business_problems,
-                  "Core business problems have not been defined yet."
-                )}
-              />
+            <PageSection id="problems">
+              <SectionHeader icon="core-business-problems.png" eyebrow="Their core business problems" title="The recurring patterns and friction likely to show up" />
+              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {textItems(extended.core_business_problems, 9).map((item, index) => (
+                  <NarrativeCard key={`${item}-${index}`} title={`Problem ${index + 1}`} content={item} tone={index % 3 === 0 ? "rose" : index % 3 === 1 ? "orange" : "amber"} />
+                ))}
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-7-trust"
-                number={7}
-                title="What Builds Trust"
-                kicker="Signals, proof and experiences that help them feel safe moving forward with you."
-                children={fallbackCopy(
-                  extended?.what_builds_trust,
-                  "Trust-building patterns have not been defined yet."
-                )}
-              />
+            <PageSection id="trust">
+              <SectionHeader icon="what-builds-trust.png" eyebrow="What builds trust" title="Signals, proof and experiences that help them feel safe moving forward" />
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <NarrativeCard eyebrow="Build trust through" title="What to demonstrate" content={extended.what_builds_trust} tone="emerald" bullets />
+                <NarrativeCard eyebrow="Break trust through" title="What to avoid" content={extended.what_blocks_sale} tone="rose" bullets />
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-8-offer"
-                number={8}
-                title="What Offer They Are Ready For"
-                kicker="The pricing, structure and level of support most likely to help them say yes and get results."
-                children={fallbackCopy(
-                  extended?.what_offer_ready_for,
-                  "Offer readiness has not been defined yet."
-                )}
-              />
+            <PageSection id="offer">
+              <SectionHeader icon="what-offer-they-are-ready.png" eyebrow="What offer they are ready for" title="The level of support, shape and outcome most likely to fit" />
+              <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <NarrativeCard eyebrow="Fits well" title="Best offer fit" content={extended.what_offer_ready_for} tone="emerald" bullets />
+                <article className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-600">Does not fit</p>
+                  <p className="mt-2 text-base font-extrabold text-slate-950">Avoid leading with a mismatched offer</p>
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                    {textItems(extended.what_blocks_sale, 5).map((item, index) => <p key={`misfit-${index}`}>• {item}</p>)}
+                  </div>
+                </article>
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-9-blockers"
-                number={9}
-                title="What Blocks the Sale Completely"
-                kicker="Fear triggers, misalignments and risk perceptions that stop them from moving ahead."
-                variant="danger"
-                children={fallbackCopy(
-                  extended?.what_blocks_sale,
-                  "Sale blockers have not been defined yet."
-                )}
-              />
+            <PageSection id="blockers">
+              <SectionHeader icon="what-block-sale.png" eyebrow="What blocks the sale completely" title="Fear triggers, misalignments and role perceptions to watch" />
+              <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-6">
+                <NarrativeCard title="Complete sale blockers" content={extended.what_blocks_sale} tone="rose" bullets />
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-10-precall"
-                number={10}
-                title="Pre-Call Questions"
-                kicker="Conversation starters that reveal both the emotional and structural gaps."
-                children={fallbackCopy(
-                  extended?.pre_call_questions,
-                  "Pre-call questions have not been defined yet."
-                )}
-              />
+            <PageSection id="pre-call">
+              <SectionHeader icon="pre-call-questions.png" eyebrow="Pre-call questions" title="Conversation starters that unlock the real strategic gap" />
+              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                {textItems(extended.pre_call_questions, 5).map((item, index) => (
+                  <article key={`question-${index}`} className="rounded-xl bg-white p-5 shadow-sm">
+                    <p className="text-xs font-extrabold text-emerald-600">{String(index + 1).padStart(2, "0")}</p>
+                    <p className="mt-3 text-sm font-bold leading-6 text-slate-950">{item}</p>
+                  </article>
+                ))}
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-11-microscripts"
-                number={11}
-                title="Micro Scripts"
-                kicker="Short lines you can use in sales calls, emails and live launches."
-                children={fallbackCopy(
-                  extended?.micro_scripts,
-                  "Micro scripts have not been defined yet."
-                )}
-              />
+            <PageSection id="scripts">
+              <SectionHeader icon="micro-scripts-section.png" eyebrow="Their micro scripts" title="Short lines that keep your language at the right strategic altitude" />
+              <div className="mt-6 grid gap-3 md:grid-cols-3">
+                {textItems(extended.micro_scripts, 6).map((item, index) => (
+                  <blockquote key={`script-${index}`} className="rounded-xl border border-cyan-200 bg-cyan-50 p-5 text-base font-bold leading-7 text-slate-800">“{item.replace(/^“|”$/g, "")}”</blockquote>
+                ))}
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-12-flags"
-                number={12}
-                title="Green & Red Flags"
-                kicker="What tells you they are a strong fit — and what tells you to pause or reframe."
-                children={fallbackCopy(
-                  extended?.green_red_flags,
-                  "Green and red flags have not been defined yet."
-                )}
-              />
+            <PageSection id="flags">
+              <SectionHeader icon="green-red-flag.png" eyebrow="Green & red flags" title="What signals fit, and what signals a need to pause or reframe" />
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <NarrativeCard eyebrow="Green flags" title="Signals of stronger fit" content={splitFlags(extended.green_red_flags).green.join("\n")} tone="emerald" bullets />
+                <NarrativeCard eyebrow="Red flags" title="Pause, qualify or reframe" content={splitFlags(extended.green_red_flags).red.join("\n") || extended.what_blocks_sale} tone="rose" bullets />
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-13-example"
-                number={13}
-                title="Real-Life Example"
-                kicker="A simple narrative you can keep in mind when speaking to this profile."
-                children={fallbackCopy(
-                  extended?.real_life_example,
-                  "Real-life example has not been defined yet."
-                )}
-              />
+            <PageSection id="example">
+              <SectionHeader icon="real-life-example.png" eyebrow="Real-life example" title="A narrative to hold in mind when speaking to this profile" />
+              <div className="mt-6 rounded-2xl bg-white p-6">
+                <NarrativeCard title="What this can sound like in the real world" content={extended.real_life_example} tone="cyan" />
+              </div>
+            </PageSection>
 
-              <InsightSection
-                id="sec-14-summary"
-                number={14}
-                title="Final Summary"
-                kicker="How to hold this profile in your mind when designing offers and communication."
-                children={fallbackCopy(
-                  extended?.final_summary,
-                  "Final summary has not been defined yet."
-                )}
-              />
-            </div>
+            <PageSection id="next-step">
+              <SectionHeader icon="recommended-next-step.png" eyebrow="Recommended next step" title="What to offer, and how to position it" />
+              <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+                <NarrativeCard title={safeText(diagnostic?.recommended_next_step?.title, "Lead with the highest-leverage next move")} content={diagnostic?.recommended_next_step?.summary || diagnostic?.primary_bottleneck?.first_fix} tone="emerald" />
+                <article className="rounded-2xl border border-orange-200 bg-orange-50 p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-orange-600">How to position it</p>
+                  <p className="mt-2 text-base font-extrabold text-slate-950">Use their diagnosed constraint as the opening frame.</p>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                    {strategicPriorities.map((item, index) => <li key={`priority-${index}`} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />{item}</li>)}
+                  </ul>
+                </article>
+              </div>
+            </PageSection>
 
-            <footer className="pt-2 pb-8 text-xs text-slate-500 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <span>© {new Date().getFullYear()} Powered by Profiletest.ai</span>
-              <span className="text-[11px] text-slate-500">
-                Internal use only — Growth Engine Diagnostic internal insights.
-              </span>
-            </footer>
+            <PageSection id="follow-up">
+              <SectionHeader icon="follow-up-guidance.png" eyebrow="Follow-up guidance" title="How to keep the message relevant after the call" description="This section uses the existing communication, trust and blocker intelligence. It does not introduce new profile content." />
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <NarrativeCard eyebrow="What works" title="Anchor the follow-up in the strategic insight" content={uniqueStrings([sentence(extended.what_builds_trust), sentence(extended.how_to_communicate), sentence(diagnostic?.recommended_next_step?.summary)]).join("\n")} tone="emerald" bullets />
+                <NarrativeCard eyebrow="What kills the follow-up" title="Do not repeat the blockers in a new format" content={extended.what_blocks_sale} tone="rose" bullets />
+              </div>
+            </PageSection>
+
+            <PageSection id="final-summary">
+              <SectionHeader icon="final-summary.png" eyebrow="Final sale summary" title="The short version to hold in mind before you design the offer" />
+              <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_280px]">
+                <article className="rounded-2xl bg-gradient-to-br from-emerald-100 via-cyan-50 to-violet-100 p-7">
+                  <p className="text-sm leading-7 text-slate-800">{safeText(extended.final_summary)}</p>
+                </article>
+                <article className="flex flex-col items-center justify-center rounded-2xl bg-white p-6 text-center">
+                  <Donut score={callReadiness} />
+                  <p className="mt-1 text-base font-extrabold text-slate-950">{safeText(diagnostic?.urgency?.label, "Strategic call priority")}</p>
+                  <p className="mt-1 text-sm text-slate-600">{safeText(diagnostic?.urgency?.window, "Use the Playbook to prepare the next conversation.")}</p>
+                </article>
+              </div>
+            </PageSection>
           </div>
         </div>
+
+        <footer className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0c1d1a] px-5 py-4 text-xs text-slate-300 md:flex-row md:items-center md:justify-between">
+          <span>ProfileTest.ai · Predictive Selling Playbook</span>
+          <span>Confidential internal sales intelligence · {fullName}</span>
+        </footer>
       </main>
     </div>
   );
