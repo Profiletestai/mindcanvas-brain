@@ -143,6 +143,59 @@ const SECTION_ICON_PATHS = {
   recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
 } as const;
 
+const UNDERSTAND_QUANTUM_PROFILE_GRAPH =
+  `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
+const QUANTUM_PROFILE_MIX_ICON_BASE =
+  `${REPORT_ICON_BASE}/quantum-profile-matrix`;
+
+type QuantumProfileMix = {
+  personality: PersonalityKey;
+  mindset: MindsetKey;
+  label: string;
+  title: string;
+  description: string;
+  color: string;
+};
+
+const QUANTUM_PROFILE_MIXES: QuantumProfileMix[] = [
+  {
+    personality: "FIRE",
+    mindset: "ORIGIN",
+    label: "Fire Origin",
+    title: "Activation Entrepreneur",
+    description:
+      "Drives through energy, urgency, and visible action. Creates momentum where none exists.",
+    color: "#f97316",
+  },
+  {
+    personality: "FLOW",
+    mindset: "MOMENTUM",
+    label: "Flow Momentum",
+    title: "Adaptive Entrepreneur",
+    description:
+      "Moves with market signals, pivots intelligently, and builds through relationships and trust.",
+    color: "#0ea5e9",
+  },
+  {
+    personality: "FORM",
+    mindset: "VECTOR",
+    label: "Form Vector",
+    title: "Structural Entrepreneur",
+    description:
+      "Builds with precision and systems. Creates the operational foundations that scale requires.",
+    color: "#22c55e",
+  },
+  {
+    personality: "FIELD",
+    mindset: "ORBIT",
+    label: "Field Orbit",
+    title: "Ecosystem Entrepreneur",
+    description:
+      "Creates through networks, positioning, and strategic ecosystem building at scale.",
+    color: "#a855f7",
+  },
+];
+
 function normalisePercent(raw: number | undefined | null): number {
   if (raw == null || !Number.isFinite(raw)) return 0;
   if (raw > 0 && raw <= 1.5) return Math.min(100, Math.max(0, raw * 100));
@@ -500,6 +553,121 @@ function QuantumProfileVisual({
         </div>
       </div>
     </section>
+  );
+}
+
+
+function QuantumProfileDiagram() {
+  const nodes = [
+    {
+      label: "Fire Origin",
+      personality: "FIRE" as PersonalityKey,
+      side: "left" as const,
+      vertical: "top" as const,
+      color: "#f97316",
+    },
+    {
+      label: "Flow Momentum",
+      personality: "FLOW" as PersonalityKey,
+      side: "right" as const,
+      vertical: "top" as const,
+      color: "#0ea5e9",
+    },
+    {
+      label: "Form Vector",
+      personality: "FORM" as PersonalityKey,
+      side: "left" as const,
+      vertical: "bottom" as const,
+      color: "#22c55e",
+    },
+    {
+      label: "Field Orbit",
+      personality: "FIELD" as PersonalityKey,
+      side: "right" as const,
+      vertical: "bottom" as const,
+      color: "#a855f7",
+    },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm md:p-6">
+      <div className="relative mx-auto min-h-[360px] max-w-[1000px] overflow-hidden rounded-xl bg-white md:min-h-[430px]">
+        <div className="absolute left-1/2 top-1/2 z-10 h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2 md:h-[330px] md:w-[330px]">
+          <AssetIcon
+            src={UNDERSTAND_QUANTUM_PROFILE_GRAPH}
+            alt="Quantum Profile diagram"
+            className="h-full w-full object-contain"
+          />
+        </div>
+
+        {nodes.map((node) => {
+          const position = [
+            "absolute z-20 flex items-center gap-3 md:gap-4",
+            node.vertical === "top" ? "top-6 md:top-10" : "bottom-6 md:bottom-10",
+            node.side === "left" ? "left-2 md:left-[14%]" : "right-2 md:right-[14%]",
+            node.side === "left" ? "flex-row-reverse text-right" : "text-left",
+          ].join(" ");
+
+          return (
+            <div key={node.label} className={position}>
+              <p className="max-w-[88px] text-[0.68rem] font-extrabold uppercase leading-4 tracking-[0.05em] text-[#0c1d1a] sm:max-w-[112px] sm:text-xs md:max-w-[138px] md:text-sm md:leading-5">
+                {node.label}
+              </p>
+              <span
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full md:h-[78px] md:w-[78px]"
+                style={{ backgroundColor: node.color }}
+              >
+                <AssetIcon
+                  src={`${QUANTUM_PROFILE_MIX_ICON_BASE}/${node.personality.toLowerCase()}.png`}
+                  alt=""
+                  className="h-8 w-8 object-contain md:h-11 md:w-11"
+                />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function QuantumProfileMixCard({
+  mix,
+  isPrimary,
+}: {
+  mix: QuantumProfileMix;
+  isPrimary: boolean;
+}) {
+  return (
+    <article
+      className="relative min-h-[236px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+      style={{ borderTopWidth: "6px", borderTopColor: mix.color }}
+    >
+      <div
+        className="flex h-11 w-11 items-center justify-center rounded-xl"
+        style={{ backgroundColor: mix.color }}
+      >
+        <AssetIcon
+          src={`${QUANTUM_PROFILE_MIX_ICON_BASE}/${mix.personality.toLowerCase()}.png`}
+          alt=""
+          className="h-7 w-7 object-contain"
+        />
+      </div>
+
+      <p className="mt-4 text-[0.65rem] font-extrabold uppercase tracking-[0.12em] text-slate-500">
+        {mix.label}
+      </p>
+      <h3 className="mt-2 max-w-[12rem] text-lg font-extrabold leading-6 text-[#0c1d1a]">
+        {mix.title}
+      </h3>
+      <p className="mt-3 text-xs leading-5 text-slate-500">{mix.description}</p>
+
+      {isPrimary ? (
+        <span className="absolute bottom-5 left-5 rounded-full bg-[#2fe6ac] px-3 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-white">
+          Your Primary
+        </span>
+      ) : null}
+    </article>
   );
 }
 
@@ -1266,30 +1434,34 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="understand-quantum-profile" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="understand-quantum-profile"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.understand_quantum_profile}
                 eyebrow="Understand the Quantum Profile"
                 title="Your Quantum Profile"
-                body="Your combined profile is where your personality layer and mindset stage meet. The result explains how you naturally create momentum and where the business needs more structure to keep pace."
                 dark
+                compact
               />
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <DarkContentCard title={`Your Personality Layer — ${primaryPersonalityLabel}`}>
-                  <p>{persona?.combined_strengths || "Your personality layer shows how you naturally think, act, make decisions and respond when the business needs more structure."}</p>
-                </DarkContentCard>
-                <DarkContentCard title={`Your Mindset Layer — ${primaryMindsetLabel}`}>
-                  <p>
-                    Your current mindset stage is <span className="font-semibold text-white">{primaryMindsetLabel}</span>. It shows where your focus and energy are distributed across the Quantum growth stages.
-                  </p>
-                </DarkContentCard>
+
+              <div className="mt-6">
+                <QuantumProfileDiagram />
               </div>
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Your result</p>
-                <p className="mt-2 text-3xl font-extrabold text-white">{canonicalProfile}</p>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-                  The Growth Engine Diagnostic uses your QSC result as behavioural intelligence: it shows how you naturally create momentum, make decisions and respond when the business needs more structure.
-                </p>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {QUANTUM_PROFILE_MIXES.map((mix) => (
+                  <QuantumProfileMixCard
+                    key={mix.label}
+                    mix={mix}
+                    isPrimary={
+                      primaryPersonality === mix.personality &&
+                      primaryMindset === mix.mindset
+                    }
+                  />
+                ))}
               </div>
             </section>
 
