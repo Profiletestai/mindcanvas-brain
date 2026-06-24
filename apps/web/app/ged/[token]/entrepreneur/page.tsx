@@ -16,8 +16,8 @@ import type {
 type PersonalityKey = "FIRE" | "FLOW" | "FORM" | "FIELD";
 type MindsetKey = "ORIGIN" | "MOMENTUM" | "VECTOR" | "ORBIT" | "QUANTUM";
 
-type PersonalityPercentages = Partial<Record<PersonalityKey, number>>;
-type MindsetPercentages = Partial<Record<MindsetKey, number>>;
+type PersonalityPercMap = Partial<Record<PersonalityKey, number>>;
+type MindsetPercMap = Partial<Record<MindsetKey, number>>;
 
 type QscResultsRow = {
   id: string;
@@ -25,9 +25,9 @@ type QscResultsRow = {
   token: string;
   audience: "entrepreneur" | "leader" | null;
   personality_totals: Record<string, number> | null;
-  personality_percentages: PersonalityPercentages | null;
+  personality_percentages: PersonalityPercMap | null;
   mindset_totals: Record<string, number> | null;
-  mindset_percentages: MindsetPercentages | null;
+  mindset_percentages: MindsetPercMap | null;
   primary_personality: PersonalityKey | null;
   secondary_personality: PersonalityKey | null;
   primary_mindset: MindsetKey | null;
@@ -110,18 +110,35 @@ const MINDSET_LABELS: Record<MindsetKey, string> = {
 };
 
 const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
-  FIRE: "#F97316",
-  FLOW: "#0EA5E9",
-  FORM: "#22C55E",
-  FIELD: "#A855F7",
+  FIRE: "#f97316",
+  FLOW: "#0ea5e9",
+  FORM: "#22c55e",
+  FIELD: "#a855f7",
 };
 
-const REPORT_ICON_ROOT = "/ged/report-icons";
+const REPORT_ICON_BASE = "/ged/report-icons";
 
-function normalisePercent(value: number | null | undefined): number {
-  if (value == null || !Number.isFinite(value)) return 0;
-  if (value > 0 && value <= 1.5) return Math.max(0, Math.min(100, value * 100));
-  return Math.max(0, Math.min(100, value));
+const SECTION_ICON_PATHS = {
+  quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
+  personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
+  mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
+  combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
+  emotional_alignment: `${REPORT_ICON_BASE}/section-icons/emotional-operational-alignment.png`,
+  business_context: `${REPORT_ICON_BASE}/section-icons/business-context.png`,
+  engine_scorecard: `${REPORT_ICON_BASE}/section-icons/engine-scorecard.png`,
+  primary_bottleneck: `${REPORT_ICON_BASE}/section-icons/primary-bottleneck.png`,
+  what_this_means: `${REPORT_ICON_BASE}/section-icons/what-this-means.png`,
+  revenue_impact: `${REPORT_ICON_BASE}/section-icons/your-revenue-impact.png`,
+  focus_plan: `${REPORT_ICON_BASE}/section-icons/30-day-focus-plan.png`,
+  executive_summary: `${REPORT_ICON_BASE}/section-icons/one-page-executive-summary.png`,
+  recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
+} as const;
+
+function normalisePercent(raw: number | undefined | null): number {
+  if (raw == null || !Number.isFinite(raw)) return 0;
+  if (raw > 0 && raw <= 1.5) return Math.min(100, Math.max(0, raw * 100));
+  return Math.min(100, Math.max(0, raw));
 }
 
 function getFullName(taker: QscTakerRow | null): string | null {
@@ -134,16 +151,70 @@ function derivePrimary<K extends string>(
   values: Partial<Record<K, number>>,
   keys: readonly K[]
 ): K | null {
-  const ranked = [...keys]
+  const winner = [...keys]
     .map((key) => ({ key, value: normalisePercent(values[key] ?? 0) }))
-    .sort((a, b) => b.value - a.value);
+    .sort((a, b) => b.value - a.value)[0];
 
-  return ranked[0]?.value ? ranked[0].key : null;
+  return winner && winner.value > 0 ? winner.key : null;
 }
 
-function formatDate(value: string): string {
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function scoreTone(score: number): string {
+  if (score >= 72) return "text-emerald-600";
+  if (score >= 48) return "text-amber-600";
+  return "text-rose-600";
+}
+
+function impactTone(level: GedImpactLevel): string {
+  if (level === "critical") return "border-rose-200 bg-rose-50 text-rose-700";
+  if (level === "significant") return "border-orange-200 bg-orange-50 text-orange-700";
+  if (level === "moderate") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
+function impactLabel(level: GedImpactLevel): string {
+  if (level === "critical") return "Critical";
+  if (level === "significant") return "Significant";
+  if (level === "moderate") return "Moderate";
+  return "Low";
+}
+
+function priorityTheme(priority: GedEngineDiagnostic["primary_priority"] | undefined) {
+  switch (priority) {
+    case "SALES_ENGINE_PRIORITY":
+      return {
+        accent: "text-orange-600",
+        chip: "border-orange-200 bg-orange-50 text-orange-700",
+        hero: "from-orange-500/15 via-amber-400/10 to-transparent",
+      };
+    case "DELIVERY_ENGINE_PRIORITY":
+      return {
+        accent: "text-emerald-600",
+        chip: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        hero: "from-emerald-500/15 via-teal-400/10 to-transparent",
+      };
+    case "SCALE_READINESS_GAP":
+      return {
+        accent: "text-amber-600",
+        chip: "border-amber-200 bg-amber-50 text-amber-700",
+        hero: "from-amber-500/15 via-orange-400/10 to-transparent",
+      };
+    case "BALANCED_ENGINE_PRIORITY":
+    default:
+      return {
+        accent: "text-cyan-700",
+        chip: "border-cyan-200 bg-cyan-50 text-cyan-700",
+        hero: "from-cyan-500/15 via-sky-400/10 to-transparent",
+      };
+  }
+}
+
+function humanDate(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString(undefined, {
     day: "2-digit",
     month: "short",
@@ -151,135 +222,123 @@ function formatDate(value: string): string {
   });
 }
 
-function clamp(value: number): number {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function scoreColor(score: number): string {
-  if (score >= 72) return "#16A34A";
-  if (score >= 48) return "#D97706";
-  return "#DC2626";
-}
-
-function impactLabel(level: GedImpactLevel): string {
-  switch (level) {
-    case "critical":
-      return "Critical";
-    case "significant":
-      return "Significant";
-    case "moderate":
-      return "Moderate";
-    default:
-      return "Low";
-  }
-}
-
-function impactTheme(level: GedImpactLevel): {
-  chip: string;
-  bar: string;
-  panel: string;
-} {
-  switch (level) {
-    case "critical":
-      return {
-        chip: "bg-rose-100 text-rose-700",
-        bar: "bg-rose-600",
-        panel: "border-rose-200 bg-rose-50",
-      };
-    case "significant":
-      return {
-        chip: "bg-orange-100 text-orange-700",
-        bar: "bg-orange-500",
-        panel: "border-orange-200 bg-orange-50",
-      };
-    case "moderate":
-      return {
-        chip: "bg-amber-100 text-amber-800",
-        bar: "bg-amber-500",
-        panel: "border-amber-200 bg-amber-50",
-      };
-    default:
-      return {
-        chip: "bg-emerald-100 text-emerald-700",
-        bar: "bg-emerald-500",
-        panel: "border-emerald-200 bg-emerald-50",
-      };
-  }
-}
-
-function priorityTheme(priority: GedEngineDiagnostic["primary_priority"]) {
-  switch (priority) {
-    case "SALES_ENGINE_PRIORITY":
-      return {
-        accent: "#F97316",
-        soft: "from-orange-400/20 via-orange-500/8 to-transparent",
-        pill: "bg-orange-400/10 text-orange-200 ring-orange-300/25",
-      };
-    case "DELIVERY_ENGINE_PRIORITY":
-      return {
-        accent: "#34D399",
-        soft: "from-emerald-400/20 via-emerald-500/8 to-transparent",
-        pill: "bg-emerald-400/10 text-emerald-200 ring-emerald-300/25",
-      };
-    case "SCALE_READINESS_GAP":
-      return {
-        accent: "#FBBF24",
-        soft: "from-amber-300/20 via-amber-500/8 to-transparent",
-        pill: "bg-amber-400/10 text-amber-100 ring-amber-300/25",
-      };
-    case "DIAGNOSTIC_CLARITY_GAP":
-      return {
-        accent: "#38BDF8",
-        soft: "from-sky-400/20 via-sky-500/8 to-transparent",
-        pill: "bg-sky-400/10 text-sky-100 ring-sky-300/25",
-      };
-    case "BALANCED_ENGINE_PRIORITY":
-    default:
-      return {
-        accent: "#45E0D1",
-        soft: "from-cyan-300/20 via-teal-400/8 to-transparent",
-        pill: "bg-cyan-300/10 text-cyan-100 ring-cyan-200/25",
-      };
-  }
-}
-
-function ReportIcon({
+function AssetIcon({
   src,
-  alt,
+  alt = "",
   className = "",
 }: {
   src: string;
-  alt: string;
+  alt?: string;
   className?: string;
 }) {
+  return <img src={src} alt={alt} className={className} />;
+}
+
+function SectionMarker({
+  icon,
+  eyebrow,
+  title,
+  body,
+  dark = false,
+}: {
+  icon: string;
+  eyebrow: string;
+  title: string;
+  body?: string;
+  dark?: boolean;
+}) {
   return (
-    <span className={`flex shrink-0 items-center justify-center ${className}`}>
-      <img src={src} alt={alt} className="max-h-full max-w-full object-contain" />
-    </span>
+    <div className="flex gap-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 ring-1 ring-cyan-400/30">
+        <AssetIcon src={icon} className="h-7 w-7 object-contain" />
+      </div>
+      <div className="min-w-0">
+        <p className={`text-[0.67rem] font-bold uppercase tracking-[0.22em] ${dark ? "text-emerald-300" : "text-cyan-700"}`}>
+          {eyebrow}
+        </p>
+        <h2 className={`mt-1 text-2xl font-extrabold tracking-tight md:text-[2rem] ${dark ? "text-white" : "text-[#111827]"}`}>
+          {title}
+        </h2>
+        {body ? (
+          <p className={`mt-2 max-w-4xl text-sm leading-6 ${dark ? "text-slate-300" : "text-slate-600"}`}>{body}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
-function FrequencyDonut({
-  data,
+function ContentCard({
+  title,
+  children,
+  className = "",
 }: {
-  data: { key: PersonalityKey; value: number }[];
+  title: string;
+  children: ReactNode;
+  className?: string;
 }) {
+  return (
+    <article className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
+      <h3 className="text-sm font-bold text-slate-950">{title}</h3>
+      <div className="mt-3 text-sm leading-6 text-slate-600">{children}</div>
+    </article>
+  );
+}
+
+function DarkContentCard({
+  title,
+  children,
+  className = "",
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <article className={`rounded-xl border border-white/10 bg-white/[0.035] p-5 ${className}`}>
+      <h3 className="text-sm font-bold text-white">{title}</h3>
+      <div className="mt-3 text-sm leading-6 text-slate-300">{children}</div>
+    </article>
+  );
+}
+
+function Meter({
+  label,
+  score,
+  accent = "#22c55e",
+  caption,
+}: {
+  label: string;
+  score: number;
+  accent?: string;
+  caption?: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-semibold text-slate-800">{label}</p>
+        <p className="text-sm font-bold tabular-nums" style={{ color: accent }}>
+          {clampPercent(score)}%
+        </p>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-full rounded-full" style={{ width: `${clampPercent(score)}%`, backgroundColor: accent }} />
+      </div>
+      {caption ? <p className="mt-2 text-xs leading-5 text-slate-500">{caption}</p> : null}
+    </div>
+  );
+}
+
+function FrequencyDonut({ data }: { data: { key: PersonalityKey; value: number }[] }) {
   const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
-  const radius = 54;
+  const radius = 55;
+  const stroke = 17;
   const center = 72;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
 
   return (
-    <svg viewBox="0 0 144 144" className="h-40 w-40 shrink-0" aria-label="Personality layer distribution">
-      <circle
-        cx={center}
-        cy={center}
-        r={radius}
-        fill="transparent"
-        stroke="rgba(255,255,255,0.12)"
-        strokeWidth="17"
-      />
+    <svg viewBox="0 0 144 144" className="h-40 w-40 shrink-0" aria-label="Personality distribution">
+      <circle cx={center} cy={center} r={radius} stroke="rgba(148,163,184,0.18)" strokeWidth={stroke} fill="transparent" />
       {data.map((item) => {
         const dash = (item.value / total) * circumference;
         const node = (
@@ -288,190 +347,97 @@ function FrequencyDonut({
             cx={center}
             cy={center}
             r={radius}
-            fill="transparent"
             stroke={FREQUENCY_COLORS[item.key]}
+            strokeWidth={stroke}
+            fill="transparent"
             strokeDasharray={`${dash} ${circumference}`}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            strokeWidth="17"
             transform={`rotate(-90 ${center} ${center})`}
           />
         );
         offset -= dash;
         return node;
       })}
-      <circle cx={center} cy={center} r="35" fill="#0C1D1A" />
-      <text x={center} y="68" fill="#E2E8F0" fontSize="8" letterSpacing="1.4" textAnchor="middle">
+      <circle cx={center} cy={center} r={35} fill="#0c1d1a" />
+      <text x={center} y={68} textAnchor="middle" fill="#e2e8f0" fontSize="8" letterSpacing="1.4">
         PERSONALITY
       </text>
-      <text x={center} y="80" fill="#E2E8F0" fontSize="8" letterSpacing="1.4" textAnchor="middle">
+      <text x={center} y={79} textAnchor="middle" fill="#e2e8f0" fontSize="8" letterSpacing="1.4">
         LAYER
       </text>
     </svg>
   );
 }
 
-function ScoreRing({
-  score,
-  label,
-  sublabel,
-}: {
-  score: number;
-  label: string;
-  sublabel: string;
-}) {
-  const radius = 44;
+function ScoreRing({ score }: { score: number }) {
+  const radius = 49;
   const circumference = 2 * Math.PI * radius;
-  const dash = (clamp(score) / 100) * circumference;
+  const dash = (clampPercent(score) / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center text-center">
-      <svg viewBox="0 0 120 120" className="h-32 w-32" aria-label={`${label}: ${score}%`}>
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="transparent"
-          stroke="rgba(255,255,255,0.14)"
-          strokeWidth="9"
-        />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="transparent"
-          stroke="#45E0D1"
-          strokeDasharray={`${dash} ${circumference}`}
-          strokeLinecap="round"
-          strokeWidth="9"
-          transform="rotate(-90 60 60)"
-        />
-        <text x="60" y="60" fill="#F8FAFC" fontSize="23" fontWeight="800" textAnchor="middle">
-          {clamp(score)}
-        </text>
-        <text x="60" y="76" fill="#94A3B8" fontSize="8" letterSpacing="1.1" textAnchor="middle">
-          INDICATOR
-        </text>
-      </svg>
-      <p className="mt-1 text-sm font-semibold text-white">{label}</p>
-      <p className="mt-1 max-w-[14rem] text-xs leading-5 text-slate-400">{sublabel}</p>
-    </div>
+    <svg viewBox="0 0 132 132" className="h-36 w-36" aria-label={`Overall engine score: ${score}%`}>
+      <circle cx="66" cy="66" r={radius} stroke="rgba(148,163,184,0.20)" strokeWidth="10" fill="transparent" />
+      <circle
+        cx="66"
+        cy="66"
+        r={radius}
+        stroke="#2dd4bf"
+        strokeWidth="10"
+        fill="transparent"
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${circumference}`}
+        transform="rotate(-90 66 66)"
+      />
+      <text x="66" y="66" textAnchor="middle" fill="#f8fafc" fontSize="23" fontWeight="800">
+        {clampPercent(score)}
+      </text>
+      <text x="66" y="82" textAnchor="middle" fill="#94a3b8" fontSize="8" letterSpacing="1.2">
+        ENGINE SCORE
+      </text>
+    </svg>
   );
 }
 
-function EngineIndicator({
+function ProfileCircle({
   label,
-  score,
-  caption,
-  icon,
+  color,
+  image,
 }: {
   label: string;
-  score: number;
-  caption: string;
-  icon?: string;
+  color: string;
+  image: string;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        {icon ? (
-          <ReportIcon
-            src={icon}
-            alt=""
-            className="h-10 w-10 rounded-lg bg-[#E8FBF8] p-2"
-          />
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-4">
-            <p className="text-sm font-semibold text-[#0C1D1A]">{label}</p>
-            <p className="text-2xl font-extrabold tabular-nums" style={{ color: scoreColor(score) }}>
-              {clamp(score)}%
-            </p>
-          </div>
-          <p className="mt-2 text-xs leading-5 text-slate-600">{caption}</p>
-        </div>
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2" style={{ borderColor: color, backgroundColor: `${color}20` }}>
+        <AssetIcon src={image} className="h-8 w-8 object-contain" />
       </div>
-      <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-200">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${clamp(score)}%`,
-            background:
-              "linear-gradient(90deg, #DC2626 0%, #F59E0B 52%, #16A34A 100%)",
-          }}
-        />
-      </div>
-    </article>
-  );
-}
-
-function SectionHeading({
-  icon,
-  eyebrow,
-  title,
-  body,
-  inverse = false,
-}: {
-  icon: string;
-  eyebrow: string;
-  title: string;
-  body?: string;
-  inverse?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-4">
-      <ReportIcon
-        src={icon}
-        alt=""
-        className={`h-11 w-11 rounded-xl p-2.5 ${
-          inverse ? "bg-cyan-300/15 ring-1 ring-white/10" : "bg-[#06B6CA] shadow-sm"
-        }`}
-      />
-      <div className="max-w-3xl">
-        <p
-          className={`text-[0.68rem] font-bold uppercase tracking-[0.24em] ${
-            inverse ? "text-emerald-300" : "text-cyan-700"
-          }`}
-        >
-          {eyebrow}
-        </p>
-        <h2
-          className={`mt-2 text-2xl font-bold tracking-tight md:text-3xl ${
-            inverse ? "text-white" : "text-[#0C1D1A]"
-          }`}
-        >
-          {title}
-        </h2>
-        {body ? (
-          <p className={`mt-3 text-sm leading-6 md:text-base ${inverse ? "text-slate-300" : "text-slate-600"}`}>
-            {body}
-          </p>
-        ) : null}
-      </div>
+      <p className="text-lg font-extrabold" style={{ color }}>
+        {label}
+      </p>
     </div>
   );
 }
 
-function LightCard({
-  title,
-  children,
-  icon,
-  className = "",
-}: {
-  title: string;
-  children: ReactNode;
-  icon?: string;
-  className?: string;
-}) {
+function ReportIndex({ items }: { items: { href: string; label: string }[] }) {
   return (
-    <article className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
-      {icon ? (
-        <ReportIcon src={icon} alt="" className="h-9 w-9 rounded-lg bg-[#FEE8D6] p-2" />
-      ) : null}
-      <h3 className={`${icon ? "mt-4" : ""} text-xs font-bold uppercase tracking-[0.15em] text-slate-500`}>
-        {title}
-      </h3>
-      <div className="mt-3 text-sm leading-6 text-slate-600">{children}</div>
-    </article>
+    <aside className="hidden xl:block">
+      <div className="sticky top-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20">
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-300">Report Index</p>
+        <nav className="mt-4 space-y-2">
+          {items.map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="block rounded-xl border border-white/15 px-3 py-2.5 text-sm text-slate-100 transition hover:border-emerald-300/70 hover:bg-white/5"
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+    </aside>
   );
 }
 
@@ -508,10 +474,8 @@ export default function GedEntrepreneurStrategicReportPage({
 
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("application/json")) {
-          const responseText = await response.text();
-          throw new Error(
-            `Non-JSON response (${response.status}): ${responseText.slice(0, 180)}`
-          );
+          const text = await response.text();
+          throw new Error(`Non-JSON response (${response.status}): ${text.slice(0, 180)}`);
         }
 
         const json = (await response.json()) as {
@@ -539,14 +503,8 @@ export default function GedEntrepreneurStrategicReportPage({
             ged: json.ged ?? null,
           });
         }
-      } catch (cause: unknown) {
-        if (alive) {
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : String(cause || "Unknown report error")
-          );
-        }
+      } catch (cause: any) {
+        if (alive) setError(String(cause?.message || cause || "Unknown error"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -562,36 +520,35 @@ export default function GedEntrepreneurStrategicReportPage({
 
     try {
       setDownloading(true);
-
-      const element = reportRef.current;
-      const canvas = await html2canvas(element, {
-        backgroundColor: "#09141D",
-        scale: 2,
-        useCORS: true,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
-      });
-
+      const report = reportRef.current;
+      const units = Array.from(report.querySelectorAll<HTMLElement>("[data-ged-pdf-page]"));
+      const pages = units.length ? units : [report];
       const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imageWidth = pageWidth;
-      const imageHeight = (canvas.height * imageWidth) / canvas.width;
-      const imageData = canvas.toDataURL("image/png");
+      const pdfPageWidth = pdf.internal.pageSize.getWidth();
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
+      let isFirstPdfPage = true;
 
-      let y = 0;
-      let remainingHeight = imageHeight;
+      for (const page of pages) {
+        const canvas = await html2canvas(page, {
+          backgroundColor: "#09141d",
+          scale: 2,
+          useCORS: true,
+          windowWidth: page.scrollWidth,
+          windowHeight: page.scrollHeight,
+          logging: false,
+        });
 
-      pdf.addImage(imageData, "PNG", 0, y, imageWidth, imageHeight);
-      remainingHeight -= pageHeight;
+        const imageWidth = pdfPageWidth;
+        const imageHeight = (canvas.height * imageWidth) / canvas.width;
+        const imageData = canvas.toDataURL("image/png");
+        let renderedHeight = 0;
 
-      while (remainingHeight > 0) {
-        y = remainingHeight - imageHeight;
-        pdf.addPage();
-        pdf.addImage(imageData, "PNG", 0, y, imageWidth, imageHeight);
-        remainingHeight -= pageHeight;
+        while (renderedHeight < imageHeight) {
+          if (!isFirstPdfPage) pdf.addPage();
+          pdf.addImage(imageData, "PNG", 0, -renderedHeight, imageWidth, imageHeight);
+          renderedHeight += pdfPageHeight;
+          isFirstPdfPage = false;
+        }
       }
 
       pdf.save(`growth-engine-diagnostic-${token}.pdf`);
@@ -605,36 +562,34 @@ export default function GedEntrepreneurStrategicReportPage({
   const taker = payload?.taker ?? null;
   const diagnostic = payload?.ged?.engine_diagnostic ?? null;
 
-  const personalityPercentages = useMemo<PersonalityPercentages>(() => {
-    const source = result?.personality_percentages || {};
+  const personalityPercentages = useMemo<Partial<Record<PersonalityKey, number>>>(() => {
+    const raw = result?.personality_percentages || {};
     return {
-      FIRE: normalisePercent(source.FIRE),
-      FLOW: normalisePercent(source.FLOW),
-      FORM: normalisePercent(source.FORM),
-      FIELD: normalisePercent(source.FIELD),
+      FIRE: normalisePercent(raw.FIRE),
+      FLOW: normalisePercent(raw.FLOW),
+      FORM: normalisePercent(raw.FORM),
+      FIELD: normalisePercent(raw.FIELD),
     };
   }, [result]);
 
-  const mindsetPercentages = useMemo<MindsetPercentages>(() => {
-    const source = result?.mindset_percentages || {};
+  const mindsetPercentages = useMemo<Partial<Record<MindsetKey, number>>>(() => {
+    const raw = result?.mindset_percentages || {};
     return {
-      ORIGIN: normalisePercent(source.ORIGIN),
-      MOMENTUM: normalisePercent(source.MOMENTUM),
-      VECTOR: normalisePercent(source.VECTOR),
-      ORBIT: normalisePercent(source.ORBIT),
-      QUANTUM: normalisePercent(source.QUANTUM),
+      ORIGIN: normalisePercent(raw.ORIGIN),
+      MOMENTUM: normalisePercent(raw.MOMENTUM),
+      VECTOR: normalisePercent(raw.VECTOR),
+      ORBIT: normalisePercent(raw.ORBIT),
+      QUANTUM: normalisePercent(raw.QUANTUM),
     };
   }, [result]);
 
   if (loading) {
     return (
-      <div className="relative min-h-screen bg-[#09141D] text-white">
+      <div className="relative min-h-screen bg-[#09141d] text-white">
         <AppBackground />
-        <main className="relative mx-auto max-w-6xl px-5 py-20">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">
-            Growth Engine Diagnostic
-          </p>
-          <h1 className="mt-4 text-3xl font-bold">Preparing your Strategic Client Report…</h1>
+        <main className="relative mx-auto max-w-5xl px-5 py-16">
+          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">Growth Engine Diagnostic</p>
+          <h1 className="mt-3 text-3xl font-semibold">Preparing your Strategic Client Report…</h1>
         </main>
       </div>
     );
@@ -642,18 +597,15 @@ export default function GedEntrepreneurStrategicReportPage({
 
   if (error || !result || !diagnostic) {
     return (
-      <div className="relative min-h-screen bg-[#09141D] text-white">
+      <div className="relative min-h-screen bg-[#09141d] text-white">
         <AppBackground />
-        <main className="relative mx-auto max-w-4xl px-5 py-20">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-emerald-300">
-            Growth Engine Diagnostic
+        <main className="relative mx-auto max-w-4xl px-5 py-16">
+          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">Growth Engine Diagnostic</p>
+          <h1 className="mt-3 text-3xl font-semibold">We could not prepare this report</h1>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+            The Strategic Client Report needs the GED qualification answers as well as the QSC result. Please complete the diagnostic again or contact the person who sent you this link.
           </p>
-          <h1 className="mt-4 text-3xl font-bold">We could not prepare this report</h1>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">
-            The Strategic Client Report needs the GED qualification answers as well as the QSC result.
-            Please complete the diagnostic again or contact the person who sent you this link.
-          </p>
-          <pre className="mt-7 overflow-x-auto rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-slate-300">
+          <pre className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-xs text-slate-300">
             {error || "GED diagnostic data was not available for this report."}
           </pre>
         </main>
@@ -661,34 +613,15 @@ export default function GedEntrepreneurStrategicReportPage({
     );
   }
 
-  const derivedPersonality = derivePrimary(personalityPercentages, [
-    "FIRE",
-    "FLOW",
-    "FORM",
-    "FIELD",
-  ]);
-  const derivedMindset = derivePrimary(mindsetPercentages, [
-    "ORIGIN",
-    "MOMENTUM",
-    "VECTOR",
-    "ORBIT",
-    "QUANTUM",
-  ]);
+  const derivedPersonality = derivePrimary(personalityPercentages, ["FIRE", "FLOW", "FORM", "FIELD"]);
+  const derivedMindset = derivePrimary(mindsetPercentages, ["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"]);
 
-  /**
-   * Stored QSC values remain the single source of truth. The distributions are
-   * only a compatibility fallback for legacy results.
-   */
+  // Stored QSC result is the source of truth; percentages are only a compatibility fallback.
   const primaryPersonality = result.primary_personality || derivedPersonality;
   const primaryMindset = result.primary_mindset || derivedMindset;
-  const primaryPersonalityLabel = primaryPersonality
-    ? PERSONALITY_LABELS[primaryPersonality]
-    : "—";
-  const primaryMindsetLabel = primaryMindset
-    ? MINDSET_LABELS[primaryMindset]
-    : "—";
+  const primaryPersonalityLabel = primaryPersonality ? PERSONALITY_LABELS[primaryPersonality] : "—";
+  const primaryMindsetLabel = primaryMindset ? MINDSET_LABELS[primaryMindset] : "—";
   const canonicalProfile = `${primaryPersonalityLabel} ${primaryMindsetLabel}`.trim();
-
   const secondaryProfile =
     result.secondary_personality || result.secondary_mindset
       ? `${result.secondary_personality ? PERSONALITY_LABELS[result.secondary_personality] : ""} ${
@@ -699,109 +632,87 @@ export default function GedEntrepreneurStrategicReportPage({
   const name = getFullName(taker);
   const company = taker?.company?.trim() || null;
   const role = taker?.role_title?.trim() || null;
-  const createdAt = formatDate(result.created_at);
-  const nextStepsHref =
-    (payload?.link?.next_steps_url || payload?.link?.redirect_url || "").trim() || null;
+  const nextStepsHref = (payload?.link?.next_steps_url || payload?.link?.redirect_url || "").trim() || null;
+  const createdAt = humanDate(result.created_at);
   const theme = priorityTheme(diagnostic.primary_priority);
-  const profileIcon = primaryPersonality
-    ? `${REPORT_ICON_ROOT}/4-profile-icons/${primaryPersonality.toLowerCase()}.png`
-    : `${REPORT_ICON_ROOT}/4-profile-icons/fire.png`;
 
-  const frequencyData = (["FIRE", "FLOW", "FORM", "FIELD"] as PersonalityKey[]).map(
-    (key) => ({
-      key,
-      value: personalityPercentages[key] || 0,
-    })
-  );
+  const frequencyData = (['FIRE', 'FLOW', 'FORM', 'FIELD'] as PersonalityKey[]).map((key) => ({
+    key,
+    value: personalityPercentages[key] || 0,
+  }));
 
-  const snapshotItems = [
-    {
-      label: "Your priority",
-      value: diagnostic.priority_label,
-      detail: diagnostic.priority_summary,
-      accent: theme.accent,
-    },
-    {
-      label: "Primary bottleneck",
-      value: diagnostic.primary_bottleneck.label,
-      detail: diagnostic.urgency.window,
-      accent: "#F8FAFC",
-    },
-    {
-      label: "Scale readiness",
-      value: `${diagnostic.scores.scale_readiness}%`,
-      detail: `${diagnostic.scale_readiness_level} readiness without adding founder load.`,
-      accent: scoreColor(diagnostic.scores.scale_readiness),
-    },
-    {
-      label: "Growth operating style",
-      value: canonicalProfile,
-      detail: secondaryProfile
-        ? `Supporting mode: ${secondaryProfile}.`
-        : "Your QSC pattern explains how you create momentum under pressure.",
-      accent: "#45E0D1",
-    },
+  const strategicPriorities = [
+    persona?.strategic_priority_1,
+    persona?.strategic_priority_2,
+    persona?.strategic_priority_3,
+  ].filter((value): value is string => Boolean(value && value.trim()));
+
+  const indexItems = [
+    { href: "#quantum-profile-matrix", label: "Quantum Profile Matrix" },
+    { href: "#understand-quantum-profile", label: "Understand the Quantum Profile" },
+    { href: "#personality-layer", label: "Your Personality Layer" },
+    { href: "#mindset-layer", label: "Your Mindset Layer" },
+    { href: "#combined-pattern", label: "Your Combined Quantum Pattern" },
+    { href: "#emotional-alignment", label: "Emotional & Operational Alignment" },
+    { href: "#business-context", label: "Your Business Context" },
+    { href: "#engine-scorecard", label: "Your Engine Scorecard" },
+    { href: "#primary-bottleneck", label: "Your Primary Bottleneck" },
+    { href: "#what-this-means", label: "What This Means" },
+    { href: "#revenue-impact", label: "Your Revenue Impact" },
+    { href: "#focus-plan", label: "Your 30-Day Focus Plan" },
+    { href: "#executive-summary", label: "One-Page Executive Summary" },
   ];
 
-  return (
-    <div className="min-h-screen bg-[#09141D] text-slate-900">
-      <AppBackground />
+  const personaIcon = primaryPersonality
+    ? `${REPORT_ICON_BASE}/4-profile-icons/${primaryPersonality.toLowerCase()}.png`
+    : `${REPORT_ICON_BASE}/4-profile-icons/fire.png`;
+  const mindsetIcon = primaryMindset
+    ? `${REPORT_ICON_BASE}/quantum-profile-matrix/${primaryMindset.toLowerCase()}.png`
+    : `${REPORT_ICON_BASE}/quantum-profile-matrix/vector.png`;
 
-      <main ref={reportRef} className="relative mx-auto max-w-[1440px] px-3 py-4 md:px-6 md:py-7">
-        <header className="overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#17403A] px-5 py-6 text-white shadow-2xl shadow-black/30 md:px-9 md:py-8">
-          <div className="flex flex-col gap-7 xl:flex-row xl:items-end xl:justify-between">
-            <div className="flex min-w-0 items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-sm font-black tracking-[0.1em]">
+  return (
+    <div className="min-h-screen bg-[#09141d] text-slate-900">
+      <AppBackground />
+      <main ref={reportRef} className="relative mx-auto max-w-[1440px] px-3 py-4 md:px-5 md:py-6">
+        <header data-ged-pdf-page className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,190px))] xl:items-center">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-xs font-black tracking-[0.12em]">
                 PT
               </div>
               <div>
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.28em] text-emerald-300">
-                  Growth Engine Diagnostic
-                </p>
-                <h1 className="mt-2 text-2xl font-semibold uppercase tracking-[0.12em] md:text-3xl">
-                  Strategic Growth Report
-                </h1>
-                <p className="mt-2 text-sm text-emerald-100/85">
-                  Strategic Client Report · Powered by ProfileTest.ai
-                </p>
+                <h1 className="text-2xl font-extrabold uppercase tracking-[0.12em] md:text-[2rem]">Strategic Growth Report</h1>
+                <p className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-emerald-300">Growth Engine Diagnostic</p>
+                <p className="mt-1 text-xs text-white/80">Strategic Client Report · Powered by ProfileTest.ai</p>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/15 bg-black/10 px-4 py-3">
-                <p className="text-[0.68rem] text-white/55">Prepared for</p>
-                <p className="mt-1 text-sm font-semibold">{name || "Participant"}</p>
+            <div className="grid grid-cols-3 gap-2 xl:contents">
+              <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
+                <p className="text-[0.65rem] text-white/55">Prepared for</p>
+                <p className="mt-1 truncate text-sm font-bold">{name || "—"}</p>
               </div>
-              <div className="rounded-2xl border border-white/15 bg-black/10 px-4 py-3">
-                <p className="text-[0.68rem] text-white/55">Date</p>
-                <p className="mt-1 text-sm font-semibold">{createdAt}</p>
+              <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
+                <p className="text-[0.65rem] text-white/55">Date</p>
+                <p className="mt-1 text-sm font-bold">{createdAt}</p>
               </div>
-              <div className="rounded-2xl border border-white/15 bg-black/10 px-4 py-3">
-                <p className="text-[0.68rem] text-white/55">Framework</p>
-                <p className="mt-1 text-sm font-semibold">{canonicalProfile}</p>
+              <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
+                <p className="text-[0.65rem] text-white/55">Framework</p>
+                <p className="mt-1 text-sm font-bold">{canonicalProfile}</p>
               </div>
             </div>
           </div>
         </header>
 
-        <section className={`mt-5 overflow-hidden rounded-[1.7rem] border border-white/10 bg-gradient-to-br ${theme.soft} bg-[#0C1D1A] p-6 text-white shadow-2xl shadow-black/20 md:mt-7 md:p-10`}>
-          <div className="flex flex-col gap-7 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[0.68rem] font-bold uppercase tracking-[0.25em] text-emerald-300">
-                Executive snapshot
+        <section data-ged-pdf-page className={`mt-5 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br ${theme.hero} bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9`}>
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">Quantum profile</p>
+              <h2 className="mt-3 text-4xl font-extrabold tracking-tight md:text-5xl">{name || "Your Growth Engine"}</h2>
+              {company || role ? <p className="mt-2 text-base text-slate-300">{[role, company].filter(Boolean).join(" · ")}</p> : null}
+              <p className="mt-6 border-l-4 border-emerald-400 pl-4 text-base leading-7 text-slate-200">
+                A practical view of where your business is relying too heavily on you, what needs attention first and how to build more dependable growth.
               </p>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight md:text-5xl">
-                Your business needs a stronger engine, not more founder effort.
-              </h2>
-              <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-                A practical view of where the business is relying too heavily on you, what needs attention
-                first and how to build more dependable growth.
-              </p>
-              {company || role ? (
-                <p className="mt-5 text-sm text-slate-400">
-                  {[role, company].filter(Boolean).join(" · ")}
-                </p>
-              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -809,7 +720,7 @@ export default function GedEntrepreneurStrategicReportPage({
                 type="button"
                 onClick={handleDownloadPdf}
                 disabled={downloading}
-                className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-white/15 bg-[#1a4d41] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#235d4f] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {downloading ? "Preparing PDF…" : "Download PDF"}
               </button>
@@ -818,7 +729,7 @@ export default function GedEntrepreneurStrategicReportPage({
                   href={nextStepsHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-xl bg-gradient-to-r from-[#45E0D1] via-[#4F7DFF] to-[#3C2EE0] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-900/30"
+                  className="rounded-xl bg-gradient-to-r from-[#45e0d1] via-[#4f7dff] to-[#3c2ee0] px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
                 >
                   Next steps
                 </a>
@@ -826,458 +737,514 @@ export default function GedEntrepreneurStrategicReportPage({
             </div>
           </div>
 
-          <div className="mt-9 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {snapshotItems.map((item) => (
-              <article key={item.label} className="rounded-2xl border border-white/10 bg-black/15 p-5">
-                <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  {item.label}
-                </p>
-                <p className="mt-3 text-xl font-bold" style={{ color: item.accent }}>
-                  {item.value}
-                </p>
-                <p className="mt-3 text-xs leading-5 text-slate-300">{item.detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-[#F9F8F6] p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/engine-scorecard.png`}
-              eyebrow="Your engine scorecard"
-              title="A practical view of the operating system"
-              body="These are response indicators, not a financial forecast. They show where sales reliability, delivery reliability and founder dependency need the most attention."
-            />
-
-            <div className="mt-7 grid gap-5 lg:grid-cols-[1fr_1fr_0.76fr]">
-              <EngineIndicator
-                label="Delivery & Operating Engine"
-                score={diagnostic.scores.delivery_engine}
-                caption="Delivery capacity, team execution and operating ownership that protect client outcomes as the business grows."
-                icon={`${REPORT_ICON_ROOT}/section-icons/engine-scorecard.png`}
-              />
-              <EngineIndicator
-                label="Sales Engine"
-                score={diagnostic.scores.sales_engine}
-                caption="Conversion, follow-up and the ability to create consistent revenue without founder-led closing."
-                icon={`${REPORT_ICON_ROOT}/section-icons/primary-bottleneck.png`}
-              />
-              <div className="rounded-2xl bg-[#0C1D1A] p-5">
-                <ScoreRing
-                  score={diagnostic.scores.overall_engine}
-                  label="Overall engine health"
-                  sublabel="A combined indicator of sales and delivery reliability."
-                />
+          <div className="mt-8 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-2xl border border-orange-400/40 bg-black/10 p-5">
+              <p className="text-[0.66rem] font-bold uppercase tracking-[0.2em] text-emerald-300">Your result</p>
+              <div className="mt-5 flex flex-wrap items-center gap-5">
+                <ProfileCircle label={primaryPersonalityLabel} color={primaryPersonality ? FREQUENCY_COLORS[primaryPersonality] : "#f97316"} image={personaIcon} />
+                <ProfileCircle label={primaryMindsetLabel} color="#45e0d1" image={mindsetIcon} />
+                <div className="ml-auto rounded-full border border-emerald-300/50 bg-emerald-300/10 px-4 py-3 text-center">
+                  <p className="text-xs text-emerald-100">Quantum Profile</p>
+                  <p className="mt-1 text-xl font-extrabold text-white">{canonicalProfile}</p>
+                </div>
               </div>
             </div>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <LightCard title="Scale readiness">
-                <p className="text-xl font-extrabold text-[#0C1D1A]">
-                  {diagnostic.scores.scale_readiness}% indicator
-                </p>
-                <p className="mt-2">{diagnostic.urgency.window}</p>
-              </LightCard>
-              <LightCard title="Founder dependency">
-                <p className="text-xl font-extrabold text-[#0C1D1A]">
-                  {diagnostic.scores.founder_dependency}% dependency
-                </p>
-                <p className="mt-2">
-                  This is the current degree of reliance on founder judgement, intervention or personal follow-through.
-                </p>
-              </LightCard>
-              <LightCard title="Response alignment">
-                <p className="text-xl font-extrabold text-[#0C1D1A]">
-                  {diagnostic.response_alignment.label}
-                </p>
-                <p className="mt-2">{diagnostic.response_alignment.summary}</p>
-              </LightCard>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+              <p className="text-sm leading-6 text-slate-300">
+                The Growth Engine Diagnostic combines your behavioural pattern with your current operating signals, helping you see how you naturally create momentum and where the operating system needs to become more dependable.
+              </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-[#F9F8F6] p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/business-context.png`}
-              eyebrow="Your business context"
-              title="What your diagnostic answers tell us"
-              body="Your qualifying responses translated into practical business intelligence. These signals shape the priorities throughout this report."
-            />
+        <section data-ged-pdf-page className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-orange-400/10 via-transparent to-teal-400/10 p-5 shadow-2xl shadow-black/20 md:p-7">
+          <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-emerald-300">One-page Quantum Profile</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">Your at-a-glance growth profile</h2>
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1.02fr_1.02fr_1.2fr]">
+            <article className="rounded-2xl border-2 border-emerald-400 bg-[#0c1d1a] p-5 text-white">
+              <p className="text-sm font-bold text-emerald-300">Your Quantum Profile</p>
+              <p className="mt-4 text-3xl font-extrabold">{canonicalProfile}</p>
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <span className="text-sm text-slate-300">Personality</span>
+                  <span className="font-bold" style={{ color: primaryPersonality ? FREQUENCY_COLORS[primaryPersonality] : "#f97316" }}>{primaryPersonalityLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <span className="text-sm text-slate-300">Mindset Stage</span>
+                  <span className="font-bold text-cyan-300">{primaryMindsetLabel}</span>
+                </div>
+              </div>
+            </article>
 
-            <div className="mt-7 grid gap-4 lg:grid-cols-2">
-              <LightCard
-                title="Business stage"
-                icon={`${REPORT_ICON_ROOT}/business-context/business-stage.png`}
-              >
-                <p className="text-lg font-bold text-[#0C1D1A]">{diagnostic.business_stage.label}</p>
-                <p className="mt-2">{diagnostic.business_stage.summary}</p>
-              </LightCard>
+            <article className="rounded-2xl border-2 border-cyan-400 bg-[#0c1d1a] p-5 text-white">
+              <p className="text-sm font-bold text-cyan-300">Your Strengths</p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
+              <p className="mt-6 text-sm font-bold text-rose-300">Your Risks</p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
+            </article>
 
-              <LightCard
-                title="Core constraint"
-                icon={`${REPORT_ICON_ROOT}/business-context/core-constraint.png`}
-              >
-                <p className="text-lg font-bold text-[#0C1D1A]">{diagnostic.core_constraint.label}</p>
-                <p className="mt-2">{diagnostic.core_constraint.summary}</p>
-              </LightCard>
+            <article className="rounded-2xl border-2 border-[#0d7cc4] bg-[#0c1d1a] p-5 text-white">
+              <p className="text-sm font-bold text-sky-300">Top strategic priorities</p>
+              <ol className="mt-5 space-y-4 text-sm leading-6 text-slate-200">
+                {(strategicPriorities.length ? strategicPriorities : [
+                  "Protect the new operating rhythm.",
+                  "Strengthen ownership across the team.",
+                  "Remove the next founder dependency once the first change is working.",
+                ]).map((priority, index) => (
+                  <li key={priority} className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0d7cc4] text-xs font-bold text-white">{index + 1}</span>
+                    <span>{priority}</span>
+                  </li>
+                ))}
+              </ol>
+            </article>
+          </div>
 
-              <LightCard
-                title="30-day founder-dependency signal"
-                icon={`${REPORT_ICON_ROOT}/business-context/scale-readiness.png`}
-              >
-                <p className="text-lg font-bold text-[#0C1D1A]">{diagnostic.scale_readiness_signal.label}</p>
-                <p className="mt-2">{diagnostic.scale_readiness_signal.summary}</p>
-              </LightCard>
-
-              <LightCard
-                title="Your own diagnosis"
-                icon={`${REPORT_ICON_ROOT}/business-context/strategic-self-diagnosis.png`}
-              >
-                <p className="text-base font-medium leading-7 text-[#0C1D1A]">
-                  {diagnostic.self_diagnosis
-                    ? `“${diagnostic.self_diagnosis}”`
-                    : "You did not add a written self-diagnosis. The report is using your selected answers to identify the most likely pressure point."}
-                </p>
-              </LightCard>
-            </div>
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1fr_1.1fr_0.9fr]">
+            <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white">
+              <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">Scale readiness gap</p>
+              <p className={`mt-3 text-3xl font-extrabold ${scoreTone(diagnostic.scores.scale_readiness)}`}>{diagnostic.scores.scale_readiness}%</p>
+              <p className="mt-2 text-sm text-slate-300">{diagnostic.scale_readiness_level} readiness for growth without adding more founder load.</p>
+            </article>
+            <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white">
+              <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">Urgency level</p>
+              <p className="mt-3 text-3xl font-extrabold text-amber-300">{diagnostic.urgency.label}</p>
+              <p className="mt-2 text-sm text-slate-300">{diagnostic.urgency.window}</p>
+            </article>
+            <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white">
+              <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">Your priority</p>
+              <p className={`mt-3 text-lg font-extrabold ${theme.accent}`}>{diagnostic.priority_label}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">{diagnostic.priority_summary}</p>
+            </article>
+            <article className="flex flex-col items-center justify-center rounded-2xl bg-[#0c1d1a] p-4 text-center">
+              <ScoreRing score={diagnostic.scores.overall_engine} />
+              <p className="-mt-1 text-sm font-bold text-white">Overall Engine Score</p>
+            </article>
           </div>
         </section>
 
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-6 text-white shadow-2xl shadow-black/20 md:mt-7 md:p-9">
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
-            <div>
-              <div className="flex items-start gap-4">
-                <ReportIcon
-                  src={profileIcon}
-                  alt=""
-                  className="h-12 w-12 rounded-xl bg-white/10 p-2.5"
+        <div className="mt-5 grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
+          <ReportIndex items={indexItems} />
+
+          <div className="space-y-5">
+            <section data-ged-pdf-page id="quantum-profile-matrix" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.quantum_profile_matrix}
+                eyebrow="Quantum Profile Matrix"
+                title="Where your buyer frequency meets your mindset level"
+                body="Each cell represents a different Quantum buyer persona. Your primary pattern is highlighted — this is where your emotional wiring and current growth stage meet."
+                dark
+              />
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 md:p-5">
+                <QscMatrix
+                  primaryPersonality={primaryPersonality}
+                  secondaryPersonality={result.secondary_personality}
+                  primaryMindset={primaryMindset}
+                  secondaryMindset={result.secondary_mindset}
+                  personalityPercentages={personalityPercentages}
+                  mindsetPercentages={mindsetPercentages}
+                  eyebrow="Quantum Source Code"
+                  title="Quantum Profile Matrix"
+                  description="This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection."
                 />
-                <div>
-                  <p className="text-[0.68rem] font-bold uppercase tracking-[0.24em] text-emerald-300">
-                    Your growth operating style
+              </div>
+            </section>
+
+            <section data-ged-pdf-page id="understand-quantum-profile" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.understand_quantum_profile}
+                eyebrow="Understand the Quantum Profile"
+                title="Your Quantum Profile"
+                body="Your combined profile is where your personality layer and mindset stage meet. The result explains how you naturally create momentum and where the business needs more structure to keep pace."
+                dark
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <DarkContentCard title={`Your Personality Layer — ${primaryPersonalityLabel}`}>
+                  <p>{persona?.combined_strengths || "Your personality layer shows how you naturally think, act, make decisions and respond when the business needs more structure."}</p>
+                </DarkContentCard>
+                <DarkContentCard title={`Your Mindset Layer — ${primaryMindsetLabel}`}>
+                  <p>
+                    Your current mindset stage is <span className="font-semibold text-white">{primaryMindsetLabel}</span>. It shows where your focus and energy are distributed across the Quantum growth stages.
                   </p>
-                  <h2 className="mt-2 text-3xl font-bold tracking-tight">{canonicalProfile}</h2>
-                </div>
+                </DarkContentCard>
               </div>
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-300">Your result</p>
+                <p className="mt-2 text-3xl font-extrabold text-white">{canonicalProfile}</p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+                  The Growth Engine Diagnostic uses your QSC result as behavioural intelligence: it shows how you naturally create momentum, make decisions and respond when the business needs more structure.
+                </p>
+              </div>
+            </section>
 
-              <p className="mt-5 max-w-xl text-sm leading-7 text-slate-300">
-                The Growth Engine Diagnostic uses your QSC result as behavioural intelligence. It explains how you naturally create momentum, make decisions and respond when the business needs more structure.
-              </p>
-
-              <div className="mt-7 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-                <FrequencyDonut data={frequencyData} />
-                <div className="w-full space-y-3">
-                  {frequencyData.map((item) => (
-                    <div key={item.key} className="flex items-center gap-3 text-sm">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: FREQUENCY_COLORS[item.key] }}
-                      />
-                      <span className="w-12 text-slate-300">{PERSONALITY_LABELS[item.key]}</span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${item.value}%`,
-                            backgroundColor: FREQUENCY_COLORS[item.key],
-                          }}
-                        />
+            <section data-ged-pdf-page id="personality-layer" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.personality_layer}
+                eyebrow="Your Personality Layer"
+                title="How you show up emotionally & behaviourally"
+                body="Your personality layer is your emotional wiring and energetic pattern. It does not change overnight, which is why it is such a powerful anchor for business design."
+                dark
+              />
+              <div className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+                <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 sm:flex-row">
+                  <FrequencyDonut data={frequencyData} />
+                  <div className="w-full space-y-3">
+                    {frequencyData.map((item) => (
+                      <div key={item.key} className="flex items-center gap-3 text-sm">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: FREQUENCY_COLORS[item.key] }} />
+                        <span className="min-w-14 text-slate-300">{PERSONALITY_LABELS[item.key]}</span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                          <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: FREQUENCY_COLORS[item.key] }} />
+                        </div>
+                        <span className="w-10 text-right tabular-nums text-slate-200">{Math.round(item.value)}%</span>
                       </div>
-                      <span className="w-10 text-right tabular-nums text-slate-200">
-                        {Math.round(item.value)}%
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <DarkContentCard title="Core pattern">
+                    <p>{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
+                  </DarkContentCard>
+                  <DarkContentCard title="What energises you">
+                    <p>{persona?.energisers || "You operate best when your strengths are directed toward the work that creates strategic momentum."}</p>
+                  </DarkContentCard>
+                  <DarkContentCard title="What drains you">
+                    <p>{persona?.drains || "Repeated escalation, unclear ownership and work that should be carried by the operating system can drain your highest-value energy."}</p>
+                  </DarkContentCard>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-300">
-                Mindset distribution
-              </p>
-              <div className="mt-6 space-y-4">
-                {(["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"] as MindsetKey[]).map(
-                  (key) => {
-                    const value = mindsetPercentages[key] || 0;
-                    return (
+            <section data-ged-pdf-page id="mindset-layer" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.mindset_layer}
+                eyebrow="Your Mindset Layer"
+                title="Where you are in your growth journey"
+                body="Your mindset layer shows where your focus and energy are distributed across the five Quantum growth stages."
+                dark
+              />
+              <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                  <p className="text-sm font-bold text-white">{primaryMindsetLabel}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">
+                    Current stage: <span className="font-semibold text-white">{primaryMindsetLabel}</span>. Primary operating style: <span className="font-semibold text-white">{primaryPersonalityLabel}</span>.
+                  </p>
+                  <p className="mt-5 text-sm leading-6 text-slate-300">
+                    Your Growth Engine Diagnostic uses the behavioural profile to show the conditions that make the current operating correction easier to implement and sustain.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Mindset distribution</p>
+                  <div className="mt-5 space-y-4">
+                    {(["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"] as MindsetKey[]).map((key) => (
                       <div key={key}>
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between gap-4 text-sm">
                           <span className="text-slate-200">{MINDSET_LABELS[key]}</span>
-                          <span className="tabular-nums text-slate-300">{Math.round(value)}%</span>
+                          <span className="tabular-nums text-slate-300">{Math.round(mindsetPercentages[key] || 0)}%</span>
                         </div>
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full rounded-full bg-[#45E0D1]"
-                            style={{ width: `${value}%` }}
-                          />
+                          <div className="h-full rounded-full bg-[#45e0d1]" style={{ width: `${mindsetPercentages[key] || 0}%` }} />
                         </div>
                       </div>
-                    );
-                  }
-                )}
-              </div>
-              <p className="mt-6 rounded-xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm leading-6 text-cyan-50">
-                Primary mindset: <span className="font-semibold">{primaryMindsetLabel}</span>. Primary operating style:{" "}
-                <span className="font-semibold">{primaryPersonalityLabel}</span>.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-white p-3 md:p-5">
-            <QscMatrix
-              primaryPersonality={primaryPersonality}
-              secondaryPersonality={result.secondary_personality}
-              primaryMindset={primaryMindset}
-              secondaryMindset={result.secondary_mindset}
-              personalityPercentages={personalityPercentages}
-              mindsetPercentages={mindsetPercentages}
-              eyebrow="Growth operating pattern"
-              title="How your operating style meets your current business stage"
-              description="Your growth pattern is the intersection of how you naturally move through business and the stage your current operating system can support."
-            />
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-[#F9F8F6] p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/primary-bottleneck.png`}
-              eyebrow="Your primary bottleneck"
-              title={diagnostic.primary_bottleneck.label}
-              body={diagnostic.primary_bottleneck.summary}
-            />
-
-            <div className="mt-7 grid gap-4 md:grid-cols-3">
-              <LightCard title="Why it matters">
-                <p>{diagnostic.primary_bottleneck.why_it_matters}</p>
-              </LightCard>
-              <LightCard title="The first practical fix">
-                <p>{diagnostic.primary_bottleneck.first_fix}</p>
-              </LightCard>
-              <LightCard title="Urgency window">
-                <p className="text-2xl font-extrabold text-[#0C1D1A]">{diagnostic.urgency.label}</p>
-                <p className="mt-1 font-semibold text-slate-800">{diagnostic.urgency.window}</p>
-                <p className="mt-3">{diagnostic.urgency.summary}</p>
-              </LightCard>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-white p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/what-this-means.png`}
-              eyebrow="Operational impact analysis"
-              title="Where the bottleneck is likely to show up"
-              body="This is not a revenue forecast. It is a practical view of where the current constraint is most likely to create drag, inconsistency or founder overload."
-            />
-
-            <div className="mt-7 space-y-3">
-              {diagnostic.operational_impact.map((impact) => {
-                const themeForImpact = impactTheme(impact.level);
-                const impactScore =
-                  impact.level === "critical"
-                    ? 92
-                    : impact.level === "significant"
-                      ? 74
-                      : impact.level === "moderate"
-                        ? 52
-                        : 25;
-
-                return (
-                  <article
-                    key={impact.key}
-                    className={`grid gap-4 rounded-2xl border p-4 md:grid-cols-[minmax(10rem,0.72fr)_1fr_auto] md:items-center ${themeForImpact.panel}`}
-                  >
-                    <div>
-                      <h3 className="text-sm font-bold text-[#0C1D1A]">{impact.label}</h3>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{impact.explanation}</p>
-                    </div>
-                    <div>
-                      <div className="h-2 overflow-hidden rounded-full bg-white">
-                        <div
-                          className={`h-full rounded-full ${themeForImpact.bar}`}
-                          style={{ width: `${impactScore}%` }}
-                        />
-                      </div>
-                      <div className="mt-2 flex justify-between text-[0.68rem] text-slate-400">
-                        <span>Low impact</span>
-                        <span>Critical impact</span>
-                      </div>
-                    </div>
-                    <span className={`inline-flex w-fit rounded-md px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] ${themeForImpact.chip}`}>
-                      {impactLabel(impact.level)}
-                    </span>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-6 text-white shadow-2xl shadow-black/20 md:mt-7 md:p-9">
-          <SectionHeading
-            icon={`${REPORT_ICON_ROOT}/section-icons/30-day-focus-plan.png`}
-            eyebrow="30-day focus plan"
-            title="Build the next layer of your engine"
-            body="The aim is not to fix everything at once. Remove the highest-cost dependency, create clear ownership and establish a rhythm the team can repeat without you."
-            inverse
-          />
-
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {diagnostic.action_plan.map((step) => (
-              <article key={step.week} className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-emerald-300">
-                  {step.week}
-                </p>
-                <h3 className="mt-3 text-lg font-bold text-white">{step.title}</h3>
-                <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-                  {step.actions.map((action) => (
-                    <li key={action} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#45E0D1]" />
-                      <span>{action}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-[#F9F8F6] p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/recommended-next-steps.png`}
-              eyebrow="Your 90-day roadmap"
-              title="Turn the first correction into an operating model"
-              body="The first 30 days reveal the constraint. The next 60 days turn the correction into stronger ownership, a measurable rhythm and less founder dependency."
-            />
-
-            <div className="mt-7 grid gap-4 lg:grid-cols-3">
-              {diagnostic.ninety_day_roadmap.map((phase) => (
-                <LightCard key={phase.phase} title={phase.phase}>
-                  <p className="text-lg font-bold text-[#0C1D1A]">{phase.title}</p>
-                  <p className="mt-3">{phase.summary}</p>
-                  <ul className="mt-4 space-y-2 text-sm">
-                    {phase.actions.map((action) => (
-                      <li key={action} className="flex gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#06B6CA]" />
-                        <span>{action}</span>
-                      </li>
                     ))}
-                  </ul>
-                </LightCard>
-              ))}
-            </div>
-          </div>
-        </section>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-white p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/emotional-operational-alignment.png`}
-              eyebrow="Behavioural intelligence"
-              title="How to work with your operating style"
-              body="Your behavioural profile does not replace the operating diagnosis. It explains the conditions that help you implement the right fix and the patterns that may pull you back into the bottleneck."
-            />
+            <section data-ged-pdf-page id="combined-pattern" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.combined_pattern}
+                eyebrow="Your Combined Quantum Pattern"
+                title="How your behaviour and mindset interact"
+                body="Your combined profile is more than the sum of its parts. It shows how your emotional wiring and current growth stage create a distinct operating pattern, with specific strengths, risks and levers."
+                dark
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <DarkContentCard title="Strategic strengths">
+                  <p>{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
+                </DarkContentCard>
+                <DarkContentCard title="Growth risks & loops">
+                  <p>{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
+                </DarkContentCard>
+                <DarkContentCard title="Biggest lever">
+                  <p>{persona?.combined_big_lever || "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}</p>
+                </DarkContentCard>
+              </div>
+            </section>
 
-            <div className="mt-7 grid gap-4 md:grid-cols-3">
-              <LightCard title="What you bring">
-                <p>{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
-              </LightCard>
-              <LightCard title="What can create drag">
-                <p>{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
-              </LightCard>
-              <LightCard title="Your biggest behavioural lever">
-                <p>{persona?.combined_big_lever || "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}</p>
-              </LightCard>
-              <LightCard title="What stabilises you">
-                <p>{persona?.emotional_stabilises || "Clear ownership, visible progress and a small number of priorities help you stay out of reactive founder mode."}</p>
-              </LightCard>
-              <LightCard title="What destabilises you">
-                <p>{persona?.emotional_destabilises || "Unclear ownership, repeated escalation and too many decisions returning to you can increase pressure and reduce follow-through."}</p>
-              </LightCard>
-              <LightCard title="Support yourself better">
-                <p>{persona?.support_yourself || "Protect time for strategic work, use simple decision rules and review whether the team is truly owning the work you have delegated."}</p>
-              </LightCard>
-            </div>
-          </div>
-        </section>
+            <section data-ged-pdf-page id="emotional-alignment" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.emotional_alignment}
+                eyebrow="Your Emotional & Operational Alignment"
+                title="How to support yourself inside this pattern"
+                body="Your behavioural result does not replace the operational diagnosis. It explains the conditions that help you implement the right fix and the patterns that may pull you back into the bottleneck."
+                dark
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <DarkContentCard title="What stabilises you">
+                  <p>{persona?.emotional_stabilises || "Clear ownership, visible progress and a small number of priorities help you stay out of reactive founder mode."}</p>
+                </DarkContentCard>
+                <DarkContentCard title="What destabilises you">
+                  <p>{persona?.emotional_destabilises || "Unclear ownership, repeated escalation and too many decisions returning to you can increase pressure and reduce follow-through."}</p>
+                </DarkContentCard>
+                <DarkContentCard title="Support yourself better">
+                  <p>{persona?.support_yourself || "Protect time for strategic work, use simple decision rules and review whether the team is truly owning the work you have delegated."}</p>
+                </DarkContentCard>
+              </div>
+            </section>
 
-        <section className="mt-5 rounded-[1.7rem] border border-white/10 bg-[#0C1D1A] p-4 shadow-2xl shadow-black/20 md:mt-7 md:p-7">
-          <div className="rounded-[1.25rem] bg-[#F9F8F6] p-5 md:p-8">
-            <SectionHeading
-              icon={`${REPORT_ICON_ROOT}/section-icons/one-page-executive-summary.png`}
-              eyebrow="One-page executive summary"
-              title="Your Growth Engine at a glance"
-              body="Save this page, bring it to your strategy session or use it with your leadership team when deciding what to strengthen next."
-            />
+            <section data-ged-pdf-page id="business-context" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.business_context}
+                eyebrow="Your Business Context"
+                title="Where you are right now"
+                body="Your qualifying responses translated into business intelligence. These four signals shape the diagnostic priorities throughout this report."
+                dark
+              />
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <ContentCard title="Business stage">
+                    <p className="text-lg font-extrabold text-slate-950">{diagnostic.business_stage.label}</p>
+                    <p className="mt-2">{diagnostic.business_stage.summary}</p>
+                  </ContentCard>
+                  <ContentCard title="Core constraint">
+                    <p className="text-lg font-extrabold text-slate-950">{diagnostic.core_constraint.label}</p>
+                    <p className="mt-2">{diagnostic.core_constraint.summary}</p>
+                  </ContentCard>
+                  <ContentCard title="Scale readiness">
+                    <p className={`text-2xl font-extrabold ${scoreTone(diagnostic.scores.scale_readiness)}`}>{diagnostic.scores.scale_readiness}% Ready</p>
+                    <p className="mt-2">{diagnostic.scale_readiness_signal.summary}</p>
+                  </ContentCard>
+                  <ContentCard title="Strategic self-diagnosis">
+                    <p className="text-sm leading-6 text-slate-700">
+                      {diagnostic.self_diagnosis
+                        ? `“${diagnostic.self_diagnosis}”`
+                        : "You did not add a written self-diagnosis. The scorecard still identifies the most likely operating pressure point from your answers."}
+                    </p>
+                  </ContentCard>
+                </div>
+              </div>
+            </section>
 
-            <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <LightCard title="Growth operating style">
-                <p className="text-lg font-bold text-[#0C1D1A]">{canonicalProfile}</p>
-                <p className="mt-2">
-                  Personality: {primaryPersonalityLabel}. Primary mindset: {primaryMindsetLabel}.
+            <section data-ged-pdf-page id="engine-scorecard" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.engine_scorecard}
+                eyebrow="Your Engine Scorecard"
+                title="Growth Engine Health Check"
+                body="A diagnostic view across the core dimensions that determine your ability to scale sustainably."
+                dark
+              />
+              <div className="mt-6 rounded-2xl bg-white p-5 md:p-6">
+                <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
+                    <ScoreRing score={diagnostic.scores.overall_engine} />
+                    <p className="mt-1 text-sm font-bold text-slate-950">Overall Engine Score</p>
+                    <div className="mt-5 w-full space-y-3 text-left text-sm">
+                      <div className="flex items-center justify-between"><span className="text-slate-600">Growth Profile</span><strong className="text-slate-950">{diagnostic.scores.growth_engine}%</strong></div>
+                      <div className="flex items-center justify-between"><span className="text-slate-600">Scale Readiness</span><strong className="text-slate-950">{diagnostic.scores.scale_readiness}%</strong></div>
+                      <div className="flex items-center justify-between"><span className="text-slate-600">Founder Dependency</span><strong className="text-slate-950">{diagnostic.scores.founder_dependency}%</strong></div>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 p-5">
+                    <p className="text-base font-bold text-slate-950">Diagnostic Score Breakdown</p>
+                    <div className="mt-5 space-y-5">
+                      <div>
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">Operational Layer</p>
+                        <div className="mt-4 space-y-4">
+                          <Meter label="Growth Engine" score={diagnostic.scores.growth_engine} accent="#16a34a" caption="Delivery capacity, team execution and operating structure." />
+                          <Meter label="Sales Engine" score={diagnostic.scores.sales_engine} accent="#d97706" caption="Conversion, follow-up and consistent revenue without founder-led closing." />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">Readiness Layer</p>
+                        <div className="mt-4 space-y-4">
+                          <Meter label="Scale Readiness" score={diagnostic.scores.scale_readiness} accent="#d97706" />
+                          <Meter label="Founder Dependency" score={100 - diagnostic.scores.founder_dependency} accent="#dc2626" caption="Higher dependency reduces the readiness score." />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section data-ged-pdf-page id="primary-bottleneck" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.primary_bottleneck}
+                eyebrow="Your Primary Bottleneck"
+                title="What is capping your growth"
+                body="Your diagnostic identifies one primary constraint preventing sustainable scale right now."
+                dark
+              />
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-6">
+                <div className="rounded-2xl border border-emerald-300 bg-emerald-100/60 p-5">
+                  <p className="text-sm font-extrabold text-emerald-800">{diagnostic.primary_bottleneck.label}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">{diagnostic.primary_bottleneck.summary}</p>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <ContentCard title="Why it matters"><p>{diagnostic.primary_bottleneck.why_it_matters}</p></ContentCard>
+                  <ContentCard title="The first practical fix"><p>{diagnostic.primary_bottleneck.first_fix}</p></ContentCard>
+                  <ContentCard title="Urgency window">
+                    <p className="text-lg font-extrabold text-slate-950">{diagnostic.urgency.label}</p>
+                    <p className="mt-2 font-semibold text-slate-800">{diagnostic.urgency.window}</p>
+                    <p className="mt-3">{diagnostic.urgency.summary}</p>
+                  </ContentCard>
+                </div>
+              </div>
+            </section>
+
+            <section data-ged-pdf-page id="what-this-means" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.what_this_means}
+                eyebrow="What This Means"
+                title={`${canonicalProfile} — decoded for operators`}
+                body="What your combined profile signals about your strengths, your risks, and where the highest-leverage moves live."
+                dark
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <ContentCard title="Strategic Strength" className="border-emerald-200 bg-emerald-50/60">
+                  <p className="font-semibold text-slate-950">{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
+                </ContentCard>
+                <ContentCard title="Growth Risk" className="border-rose-200 bg-rose-50/60">
+                  <p className="font-semibold text-slate-950">{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
+                </ContentCard>
+                <ContentCard title="Biggest Lever" className="border-emerald-200 bg-emerald-50/60">
+                  <p className="font-semibold text-slate-950">{persona?.combined_big_lever || "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}</p>
+                </ContentCard>
+              </div>
+            </section>
+
+            <section data-ged-pdf-page id="revenue-impact" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.revenue_impact}
+                eyebrow="Your Revenue Impact"
+                title="What the bottleneck is costing you"
+                body="The commercial case for resolving your primary constraint in the next 90 days."
+                dark
+              />
+              <div className="mt-6 rounded-2xl bg-white p-5 md:p-6">
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-cyan-700">Operational impact analysis</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Where the bottleneck is likely to show up</h3>
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+                  This is not a revenue forecast. It is a practical view of where the current constraint is most likely to create drag, inconsistency or founder overload.
                 </p>
-              </LightCard>
-              <LightCard title="Primary bottleneck">
-                <p className="text-lg font-bold text-[#0C1D1A]">{diagnostic.primary_bottleneck.label}</p>
-                <p className="mt-2">{diagnostic.urgency.window}</p>
-              </LightCard>
-              <LightCard title="Engine indicators">
-                <p>Delivery & operating: <span className="font-bold text-[#0C1D1A]">{diagnostic.scores.delivery_engine}%</span></p>
-                <p>Sales: <span className="font-bold text-[#0C1D1A]">{diagnostic.scores.sales_engine}%</span></p>
-                <p>Scale readiness: <span className="font-bold text-[#0C1D1A]">{diagnostic.scores.scale_readiness}%</span></p>
-              </LightCard>
-              <LightCard title="Business context">
-                <p>{diagnostic.business_stage.label}</p>
-                <p className="mt-2">Constraint: {diagnostic.core_constraint.label}</p>
-              </LightCard>
-              <LightCard title="Next 90 days">
-                <p>{diagnostic.ninety_day_roadmap[2]?.summary || "Protect the new operating rhythm and remove the next founder dependency once the first change is working."}</p>
-              </LightCard>
-              <LightCard title="Recommended next step">
-                <p className="font-bold text-[#0C1D1A]">{diagnostic.recommended_next_step.title}</p>
-                <p className="mt-2">{diagnostic.recommended_next_step.summary}</p>
-              </LightCard>
-            </div>
+                <div className="mt-5 space-y-3">
+                  {diagnostic.operational_impact.map((impact) => {
+                    const severity = impact.level === "critical" ? 92 : impact.level === "significant" ? 72 : impact.level === "moderate" ? 52 : 28;
+                    return (
+                      <article key={impact.key} className={`rounded-xl border p-4 ${impactTone(impact.level)}`}>
+                        <div className="grid gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(260px,1.1fr)_auto] md:items-center">
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-950">{impact.label}</h3>
+                            <p className="mt-1 text-xs leading-5 text-slate-600">{impact.explanation}</p>
+                          </div>
+                          <div>
+                            <div className="h-2 overflow-hidden rounded-full bg-white/80">
+                              <div className="h-full rounded-full" style={{ width: `${severity}%`, backgroundColor: impact.level === "critical" ? "#e11d48" : impact.level === "significant" ? "#f97316" : impact.level === "moderate" ? "#d97706" : "#10b981" }} />
+                            </div>
+                            <div className="mt-1 flex justify-between text-[0.65rem] text-slate-400"><span>Low impact</span><span>Critical impact</span></div>
+                          </div>
+                          <span className="rounded-lg bg-white/80 px-3 py-2 text-[0.68rem] font-bold uppercase tracking-[0.14em]">{impactLabel(impact.level)}</span>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
 
-            <p className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-500">
-              {diagnostic.scope_note}
-            </p>
+            <section data-ged-pdf-page id="focus-plan" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.focus_plan}
+                eyebrow="Your 30-Day Focus Plan"
+                title="Your first month, week by week"
+                body="Concrete actions mapped across four weeks to start resolving your primary bottleneck immediately."
+                dark
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {diagnostic.action_plan.map((step) => (
+                  <article key={step.week} className="rounded-xl border border-white/10 bg-white/[0.035] p-5 text-white">
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-300">{step.week}</p>
+                    <h3 className="mt-3 text-lg font-extrabold">{step.title}</h3>
+                    <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+                      {step.actions.map((action) => (
+                        <li key={action} className="flex gap-2">
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section data-ged-pdf-page id="executive-summary" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+              <SectionMarker
+                icon={SECTION_ICON_PATHS.executive_summary}
+                eyebrow="Your One-Page Executive Summary"
+                title="Your full diagnostic at a glance"
+                body="Everything in one view — share with your leadership team or revisit before your strategy session."
+                dark
+              />
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <ContentCard title="Growth Engine Profile">
+                  <p className="text-lg font-extrabold text-slate-950">{canonicalProfile}</p>
+                  <p className="mt-2">Personality: {primaryPersonalityLabel}. Mindset stage: {primaryMindsetLabel}.</p>
+                </ContentCard>
+                <ContentCard title="Primary Bottleneck">
+                  <p className="text-lg font-extrabold text-slate-950">{diagnostic.primary_bottleneck.label}</p>
+                  <p className="mt-2">{diagnostic.urgency.window}</p>
+                </ContentCard>
+                <ContentCard title="Engine Scorecard">
+                  <p>Growth Engine: <span className="font-bold text-slate-950">{diagnostic.scores.growth_engine}%</span></p>
+                  <p>Sales Engine: <span className="font-bold text-slate-950">{diagnostic.scores.sales_engine}%</span></p>
+                  <p>Scale readiness: <span className="font-bold text-slate-950">{diagnostic.scores.scale_readiness}%</span></p>
+                </ContentCard>
+                <ContentCard title="Business Context">
+                  <p>{diagnostic.business_stage.label}</p>
+                  <p className="mt-2">Constraint: {diagnostic.core_constraint.label}</p>
+                </ContentCard>
+                <ContentCard title="Next 90 Days">
+                  {strategicPriorities.length ? (
+                    <ul className="space-y-2">
+                      {strategicPriorities.map((priority) => (
+                        <li key={priority} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-700" />{priority}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>Protect the new operating rhythm, strengthen ownership and remove the next founder dependency once the first change is working.</p>
+                  )}
+                </ContentCard>
+                <ContentCard title="Recommended Next Step">
+                  <p className="font-bold text-slate-950">{diagnostic.recommended_next_step.title}</p>
+                  <p className="mt-2">{diagnostic.recommended_next_step.summary}</p>
+                </ContentCard>
+              </div>
+            </section>
+
+            <section data-ged-pdf-page className="overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-br from-[#45e0d1] via-[#b3f5ed] to-[#d9f99d] p-7 shadow-2xl shadow-black/20 md:p-10">
+              <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-slate-700">Your Recommended Next Step</p>
+              <h2 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 md:text-5xl">Turn the diagnostic into a live execution plan.</h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
+                You now have a clear view of the pressure point. The next move is to translate it into ownership, an operating rhythm and a focused 90-day plan.
+              </p>
+              {nextStepsHref ? (
+                <a
+                  href={nextStepsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-7 inline-flex rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Book your strategy session
+                </a>
+              ) : null}
+            </section>
           </div>
-        </section>
+        </div>
 
-        <section className="mt-5 overflow-hidden rounded-[1.7rem] border border-cyan-200/40 bg-gradient-to-br from-[#45E0D1] via-[#B4F4EA] to-[#E8FFF7] p-7 shadow-2xl shadow-black/20 md:mt-7 md:p-11">
-          <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-bold uppercase tracking-[0.24em] text-slate-700">
-              Your recommended next step
-            </p>
-            <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-[#0C1D1A] md:text-5xl">
-              Turn the diagnostic into a live execution plan.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-700">
-              You now have a clear view of the pressure point. The next move is to translate it into ownership, an operating rhythm and a focused 90-day plan.
-            </p>
-            {nextStepsHref ? (
-              <a
-                href={nextStepsHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-8 inline-flex rounded-xl bg-[#0C1D1A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20"
-              >
-                Book your strategy session
-              </a>
-            ) : null}
-          </div>
-        </section>
-
-        <footer className="px-4 py-8 text-center text-xs text-slate-500">
+        <footer className="py-7 text-center text-xs text-slate-400">
           © {new Date().getFullYear()} ProfileTest.ai · Growth Engine Diagnostic · Confidential Strategic Client Report
         </footer>
       </main>
