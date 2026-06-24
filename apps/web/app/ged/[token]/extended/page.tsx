@@ -111,6 +111,11 @@ type DecisionView = {
   takeaway: string;
 };
 
+type CoreBusinessProblem = {
+  title: string;
+  description: string | null;
+};
+
 type GedEngineDiagnostic = {
   primary_priority?: string;
   priority_label?: string;
@@ -712,6 +717,77 @@ function parseDecisionPlan(value: unknown): DecisionView {
   };
 }
 
+function normaliseCoreProblemLine(value: string): string {
+  return value
+    .replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .replace(/^\*+|\*+$/g, "")
+    .trim();
+}
+
+function isLikelyCoreProblemTitle(value: string): boolean {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return (
+    compact.length >= 3 &&
+    compact.length <= 72 &&
+    !/[.!?]$/.test(compact) &&
+    !/^\s*(?:what|they|this|the|a|an|their|our|you)\b/i.test(compact)
+  );
+}
+
+function parseCoreBusinessProblems(value: unknown): CoreBusinessProblem[] {
+  const raw = cleanStructuredPlaybookCopy(value);
+  if (!raw) return [];
+
+  const lines = raw
+    .replace(/[•✓✔✕✗❌➜▸]/g, "\n")
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+(?=[A-Z“"])/))
+    .map(normaliseCoreProblemLine)
+    .filter(Boolean);
+
+  const parsed: CoreBusinessProblem[] = [];
+
+  for (let index = 0; index < lines.length; ) {
+    const current = lines[index];
+    const next = lines[index + 1];
+
+    const headingMatch = current.match(/^(.{3,72}?)(?:\s*[:–—-]\s+)(.+)$/);
+    if (headingMatch) {
+      parsed.push({
+        title: headingMatch[1].trim(),
+        description: headingMatch[2].trim() || null,
+      });
+      index += 1;
+      continue;
+    }
+
+    if (isLikelyCoreProblemTitle(current)) {
+      const title = current.replace(/:$/, "").trim();
+      const description = next && next.length > 18 ? next : null;
+      parsed.push({ title, description });
+      index += description ? 2 : 1;
+      continue;
+    }
+
+    parsed.push({
+      title: `Commercial pressure ${parsed.length + 1}`,
+      description: current,
+    });
+    index += 1;
+  }
+
+  const seen = new Set<string>();
+  return parsed
+    .filter((item) => {
+      const key = `${item.title}::${item.description || ""}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 6);
+}
+
 function SectionIcon({ file, alt }: { file: string; alt: string }) {
   return (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/20 p-2 shadow-inner shadow-cyan-950/20">
@@ -1071,6 +1147,11 @@ export default function GedPredictiveSellingPlaybookPage({
   const decisionPlan = useMemo(
     () => parseDecisionPlan(extended?.how_they_make_decisions),
     [extended?.how_they_make_decisions]
+  );
+
+  const coreBusinessProblems = useMemo(
+    () => parseCoreBusinessProblems(extended?.core_business_problems),
+    [extended?.core_business_problems]
   );
 
   // The signed-off Playbook index begins with the detailed intelligence
@@ -1868,11 +1949,49 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="problems">
-              <SectionHeader icon="core-business-problems.png" eyebrow="Their core business problems" title="The recurring patterns and friction likely to show up" />
-              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {textItems(extended.core_business_problems, 9).map((item, index) => (
-                  <NarrativeCard key={`${item}-${index}`} title={`Problem ${index + 1}`} content={item} tone={index % 3 === 0 ? "rose" : index % 3 === 1 ? "orange" : "amber"} />
-                ))}
+              <header className="flex items-start gap-3">
+                <SectionIcon file="core-business-problems.png" alt="" />
+                <div className="pt-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                    Their core business problems
+                  </p>
+                  <h2 className="mt-1 text-sm font-extrabold leading-6 text-white md:text-base">
+                    The recurring patterns and friction points that show up most often for this buyer.
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                {coreBusinessProblems.length ? (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {coreBusinessProblems.map((problem, index) => (
+                      <article
+                        key={`${problem.title}-${index}`}
+                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-300 bg-rose-300/75 p-1.5">
+                          <img
+                            src={`${ASSET_BASE}/business-problems.png`}
+                            alt=""
+                            className="h-full w-full object-contain"
+                          />
+                        </span>
+                        <h3 className="mt-3 text-sm font-extrabold text-slate-950">
+                          {problem.title}
+                        </h3>
+                        {problem.description ? (
+                          <p className="mt-2 text-xs leading-5 text-slate-600 md:text-sm md:leading-5">
+                            {problem.description}
+                          </p>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm leading-6 text-slate-600">
+                    No profile-specific core business problems have been recorded for this buyer.
+                  </p>
+                )}
               </div>
             </PageSection>
 
