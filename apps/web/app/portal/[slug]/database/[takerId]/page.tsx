@@ -479,15 +479,14 @@ export default async function TakerDetail({
       .limit(1)
       .maybeSingle();
 
-    const audience = (qscRow?.audience as QscAudience | null) ?? null;
     qscRow = data;
   }
 
   if (isQsc && taker.link_token) {
     const aud = (qscRow?.audience as QscAudience | null) ?? null;
 
-    if (audience === "leader" || audience === "entrepreneur") {
-      qscAudience = audience;
+    if (aud === "leader" || aud === "entrepreneur") {
+      qscAudience = aud;
     } else if (test?.slug === "qsc-leaders") {
       qscAudience = "leader";
     } else {
@@ -897,6 +896,8 @@ export default async function TakerDetail({
               </div>
             )}
           </>
+        )}
+
         {!isVisibility && !isQsc && !isGed && (
           <StandardResultGraphs
             freq={freqChart}
