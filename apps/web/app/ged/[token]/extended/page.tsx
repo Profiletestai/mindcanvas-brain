@@ -122,6 +122,11 @@ type OfferFitPlan = {
   doesNotFit: string[];
 };
 
+type SaleBlockerPlan = {
+  blockers: string[];
+  practice: string;
+};
+
 type CoreBusinessProblem = {
   title: string;
   description: string | null;
@@ -760,6 +765,50 @@ function parseOfferFitPlan(value: unknown): OfferFitPlan {
   };
 }
 
+function parseSaleBlockerPlan(value: unknown): SaleBlockerPlan {
+  const raw = cleanStructuredPlaybookCopy(value);
+  if (!raw) return { blockers: [], practice: "" };
+
+  const practiceHeading = /\bwhat\s+this\s+means\s+in\s+practice\b\s*[:\-–—]?/i;
+  const practiceMatch = practiceHeading.exec(raw);
+  const blockerRaw = practiceMatch?.index != null ? raw.slice(0, practiceMatch.index).trim() : raw;
+  const practice = practiceMatch
+    ? raw.slice(practiceMatch.index + practiceMatch[0].length).trim()
+    : "";
+
+  const withoutHeading = blockerRaw
+    .replace(
+      /^(?:what\s+blocks\s+the\s+sale(?:\s+completely)?|complete\s+sale\s+blockers?|sale\s+blockers?)\s*[:\-–—]?\s*/i,
+      ""
+    )
+    .trim();
+
+  const explicitItems = structuredListItems(withoutHeading, 12)
+    .map((item) =>
+      item
+        .replace(
+          /^(?:what\s+blocks\s+the\s+sale(?:\s+completely)?|complete\s+sale\s+blockers?|sale\s+blockers?)\s*[:\-–—]?\s*/i,
+          ""
+        )
+        .trim()
+    )
+    .filter(Boolean);
+
+  const titleCaseItems = withoutHeading
+    .split(/\n+|(?<=[a-z])\s+(?=[A-Z])/)
+    .map((item) => item.replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "").trim())
+    .filter(Boolean);
+
+  const blockers = uniqueStrings(
+    explicitItems.length > 1 ? explicitItems : titleCaseItems
+  ).slice(0, 8);
+
+  return {
+    blockers,
+    practice: practice || (/[.!?]/.test(withoutHeading) ? sentence(withoutHeading, 520) : ""),
+  };
+}
+
 function parseDecisionPlan(value: unknown): DecisionView {
   const raw = cleanStructuredPlaybookCopy(value)
     .replace(/^how they make decisions\.?\s*/i, "")
@@ -1262,6 +1311,11 @@ export default function GedPredictiveSellingPlaybookPage({
   const offerFitPlan = useMemo(
     () => parseOfferFitPlan(extended?.what_offer_ready_for),
     [extended?.what_offer_ready_for]
+  );
+
+  const saleBlockerPlan = useMemo(
+    () => parseSaleBlockerPlan(extended?.what_blocks_sale),
+    [extended?.what_blocks_sale]
   );
 
   // The signed-off Playbook index begins with the detailed intelligence
@@ -2239,9 +2293,50 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="blockers">
-              <SectionHeader icon="what-block-sale.png" eyebrow="What blocks the sale completely" title="Fear triggers, misalignments and role perceptions to watch" />
-              <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-6">
-                <NarrativeCard title="Complete sale blockers" content={extended.what_blocks_sale} tone="rose" bullets />
+              <SectionHeader
+                icon="what-block-sale.png"
+                eyebrow="What blocks the sale completely"
+                title="Fear triggers, misalignments and role perceptions that stop them from moving ahead"
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <article className="rounded-xl border border-rose-200 bg-white p-4 md:p-5">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-sm font-extrabold text-rose-500" aria-hidden="true">
+                      ✕
+                    </span>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose-500">
+                      Complete sale blockers
+                    </p>
+                  </div>
+
+                  {saleBlockerPlan.blockers.length ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {saleBlockerPlan.blockers.map((item, index) => (
+                        <span
+                          key={`sale-blocker-${index}`}
+                          className="rounded-full border border-rose-300 bg-rose-100 px-3 py-1 text-xs font-medium leading-4 text-slate-700"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm leading-6 text-slate-600">
+                      No profile-specific sale blockers have been recorded.
+                    </p>
+                  )}
+                </article>
+
+                <article className="mt-4 rounded-xl border border-slate-200 bg-white p-4 md:p-5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-500">
+                    What this means in practice
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-slate-700">
+                    {saleBlockerPlan.practice ||
+                      "No additional practice note is stored for this profile."}
+                  </p>
+                </article>
               </div>
             </PageSection>
 
