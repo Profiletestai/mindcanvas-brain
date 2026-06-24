@@ -135,7 +135,7 @@ const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
   quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
-  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile-graphic.png`,
   personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
   mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
   combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
@@ -150,7 +150,7 @@ const SECTION_ICON_PATHS = {
   recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
 } as const;
 
-const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
+const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
 const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
 
@@ -353,15 +353,6 @@ function urgencyAccent(level: GedEngineDiagnostic["urgency"]["level"]): string {
   if (level === "high") return "#d97706";
   if (level === "moderate") return "#ea580c";
   return "#16a34a";
-}
-
-function impactTone(level: GedImpactLevel): string {
-  if (level === "critical") return "border-rose-200 bg-rose-50 text-rose-700";
-  if (level === "significant")
-    return "border-orange-200 bg-orange-50 text-orange-700";
-  if (level === "moderate")
-    return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
 function impactLabel(level: GedImpactLevel): string {
@@ -2862,71 +2853,30 @@ export default function GedEntrepreneurStrategicReportPage({
                 body="The commercial case for resolving your primary constraint in the next 90 days."
                 dark
               />
-              <div className="mt-6 rounded-2xl bg-white p-5 md:p-6">
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-cyan-700">
-                  Operational impact analysis
+
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-5 md:p-6">
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-500">
+                  How this bottleneck shows up in the business
                 </p>
-                <h3 className="mt-2 text-xl font-extrabold text-slate-950">
-                  Where the bottleneck is likely to show up
-                </h3>
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                  This is not a revenue forecast. It is a practical view of
-                  where the current constraint is most likely to create drag,
-                  inconsistency or founder overload.
-                </p>
-                <div className="mt-5 space-y-3">
-                  {diagnostic.operational_impact.map((impact) => {
-                    const severity =
-                      impact.level === "critical"
-                        ? 92
-                        : impact.level === "significant"
-                          ? 72
-                          : impact.level === "moderate"
-                            ? 52
-                            : 28;
-                    return (
-                      <article
-                        key={impact.key}
-                        className={`rounded-xl border p-4 ${impactTone(impact.level)}`}
-                      >
-                        <div className="grid gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(260px,1.1fr)_auto] md:items-center">
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-950">
-                              {impact.label}
-                            </h3>
-                            <p className="mt-1 text-xs leading-5 text-slate-600">
-                              {impact.explanation}
-                            </p>
-                          </div>
-                          <div>
-                            <div className="h-2 overflow-hidden rounded-full bg-white/80">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${severity}%`,
-                                  backgroundColor:
-                                    impact.level === "critical"
-                                      ? "#e11d48"
-                                      : impact.level === "significant"
-                                        ? "#f97316"
-                                        : impact.level === "moderate"
-                                          ? "#d97706"
-                                          : "#10b981",
-                                }}
-                              />
-                            </div>
-                            <div className="mt-1 flex justify-between text-[0.65rem] text-slate-400">
-                              <span>Low impact</span>
-                              <span>Critical impact</span>
-                            </div>
-                          </div>
-                          <span className="rounded-lg bg-white/80 px-3 py-2 text-[0.68rem] font-bold uppercase tracking-[0.14em]">
-                            {impactLabel(impact.level)}
-                          </span>
-                        </div>
-                      </article>
-                    );
-                  })}
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {diagnostic.operational_impact.map((impact, index) => (
+                    <article
+                      key={impact.key}
+                      className={`rounded-lg bg-[#0c1d1a] p-4 text-white shadow-sm ${
+                        index === diagnostic.operational_impact.length - 1
+                          ? "md:col-span-2"
+                          : ""
+                      }`}
+                    >
+                      <h3 className="text-sm font-bold leading-5 text-white">
+                        {impact.label}
+                      </h3>
+                      <p className="mt-1.5 max-w-4xl text-xs leading-5 text-slate-300">
+                        {impact.explanation}
+                      </p>
+                    </article>
+                  ))}
                 </div>
               </div>
             </section>
@@ -3091,3 +3041,4 @@ export default function GedEntrepreneurStrategicReportPage({
     </div>
   );
 }
+
