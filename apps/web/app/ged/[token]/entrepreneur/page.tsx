@@ -743,6 +743,76 @@ export default function GedEntrepreneurStrategicReportPage({
     ? MINDSET_COLORS[primaryMindset]
     : "#45e0d1";
 
+  const onePageIconBase = `${REPORT_ICON_BASE}/one-page-quantum-section`;
+  const onePageIcons = {
+    personality: `${onePageIconBase}/personality.png`,
+    mindsetStage: `${onePageIconBase}/mindset-stage.png`,
+    strengths: `${onePageIconBase}/your-strengths.png`,
+    priorities: `${onePageIconBase}/top-strength-priorities.png`,
+  };
+
+  const displayReadinessLevel =
+    diagnostic.scale_readiness_level.charAt(0).toUpperCase() +
+    diagnostic.scale_readiness_level.slice(1);
+
+  const readinessStyle =
+    diagnostic.scale_readiness_level === "high"
+      ? {
+          border: "border-emerald-400/70",
+          text: "text-emerald-300",
+          meter: "#34d399",
+          card: "from-emerald-500/10 to-transparent",
+        }
+      : diagnostic.scale_readiness_level === "moderate"
+        ? {
+            border: "border-orange-400/70",
+            text: "text-orange-300",
+            meter: "#f97316",
+            card: "from-orange-500/10 to-transparent",
+          }
+        : {
+            border: "border-rose-400/70",
+            text: "text-rose-300",
+            meter: "#fb7185",
+            card: "from-rose-500/10 to-transparent",
+          };
+
+  const urgencyStyle =
+    diagnostic.urgency.level === "high"
+      ? {
+          border: "border-rose-500/70",
+          text: "text-rose-300",
+          dot: "bg-rose-400",
+        }
+      : diagnostic.urgency.level === "moderate"
+        ? {
+            border: "border-orange-400/70",
+            text: "text-orange-300",
+            dot: "bg-orange-400",
+          }
+        : {
+            border: "border-emerald-400/70",
+            text: "text-emerald-300",
+            dot: "bg-emerald-400",
+          };
+
+  const priorityText = diagnostic.priority_label.toLowerCase();
+  const activeJourneyStep = priorityText.includes("sales")
+    ? 3
+    : priorityText.includes("delivery") || priorityText.includes("growth")
+      ? 5
+      : priorityText.includes("scale")
+        ? 2
+        : 4;
+
+  const engineJourney = [
+    { step: 5, title: "Scale & Systemize", detail: "Predictable growth engine" },
+    { step: 4, title: "Optimise & Expand", detail: "Increase efficiency & margin" },
+    { step: 3, title: "Build & Convert", detail: "Strong pipeline & a sales system" },
+    { step: 2, title: "Validate & Offer", detail: "Market fit & offer clarity" },
+    { step: 1, title: "Foundation", detail: "Clarity, positioning & early traction" },
+  ];
+
   return (
     <div className="min-h-screen bg-[#09141d] text-slate-900">
       <AppBackground />
@@ -828,42 +898,91 @@ export default function GedEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        <section data-ged-pdf-page className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-orange-400/10 via-transparent to-teal-400/10 p-5 shadow-2xl shadow-black/20 md:p-7">
-          <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-emerald-300">One-page Quantum Profile</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Your at-a-glance growth profile</h2>
-          <div className="mt-5 grid gap-4 xl:grid-cols-[1.02fr_1.02fr_1.2fr]">
-            <article className="rounded-2xl border-2 border-emerald-400 bg-[#0c1d1a] p-5 text-white">
+        <section
+          data-ged-pdf-page
+          className="mt-5 overflow-hidden rounded-3xl border border-white/15 bg-[radial-gradient(circle_at_top_right,rgba(20,107,105,0.28),transparent_42%),linear-gradient(120deg,#14282a_0%,#08201f_52%,#113638_100%)] p-5 shadow-2xl shadow-black/20 md:p-7"
+        >
+          <p className="text-[0.66rem] font-bold uppercase tracking-[0.22em] text-emerald-300">
+            One-Page Quantum Profile
+          </p>
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-white md:text-2xl">
+            Your at-a-glance growth profile
+          </h2>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[0.94fr_1.08fr_1.08fr]">
+            <article className="min-h-[206px] rounded-2xl border-2 border-emerald-400 bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
               <p className="text-sm font-bold text-emerald-300">Your Quantum Profile</p>
-              <p className="mt-4 text-3xl font-extrabold">{canonicalProfile}</p>
-              <div className="mt-5 space-y-3">
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                  <span className="text-sm text-slate-300">Personality</span>
-                  <span className="font-bold" style={{ color: primaryPersonality ? FREQUENCY_COLORS[primaryPersonality] : "#f97316" }}>{primaryPersonalityLabel}</span>
+              <p className="mt-3 text-2xl font-extrabold tracking-tight md:text-3xl">{canonicalProfile}</p>
+
+              <div className="mt-5 space-y-2.5">
+                <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-3 py-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-400/10">
+                    <AssetIcon src={onePageIcons.personality} className="h-4 w-4 object-contain" />
+                  </span>
+                  <span className="flex-1 text-xs font-medium text-slate-300">Personality</span>
+                  <span
+                    className="text-xs font-bold"
+                    style={{ color: primaryPersonalityColor }}
+                  >
+                    {primaryPersonalityLabel}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                  <span className="text-sm text-slate-300">Mindset Stage</span>
-                  <span className="font-bold text-cyan-300">{primaryMindsetLabel}</span>
+
+                <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-3 py-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-cyan-400/10">
+                    <AssetIcon src={onePageIcons.mindsetStage} className="h-4 w-4 object-contain" />
+                  </span>
+                  <span className="flex-1 text-xs font-medium text-slate-300">Mindset Stage</span>
+                  <span
+                    className="text-xs font-bold"
+                    style={{ color: primaryMindsetColor }}
+                  >
+                    {primaryMindsetLabel}
+                  </span>
                 </div>
               </div>
             </article>
 
-            <article className="rounded-2xl border-2 border-cyan-400 bg-[#0c1d1a] p-5 text-white">
-              <p className="text-sm font-bold text-cyan-300">Your Strengths</p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
-              <p className="mt-6 text-sm font-bold text-rose-300">Your Risks</p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
+            <article className="min-h-[206px] rounded-2xl border border-white/10 bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/60 bg-cyan-400/10">
+                  <AssetIcon src={onePageIcons.strengths} className="h-4 w-4 object-contain" />
+                </span>
+                <p className="text-sm font-bold text-cyan-300">Your Strengths</p>
+              </div>
+              <p className="mt-3 text-sm leading-5 text-slate-200">
+                {persona?.combined_strengths ||
+                  "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
+              </p>
+
+              <p className="mt-5 text-sm font-bold text-rose-300">Your Risks</p>
+              <p className="mt-2 text-sm leading-5 text-slate-200">
+                {persona?.combined_risks ||
+                  "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}
+              </p>
             </article>
 
-            <article className="rounded-2xl border-2 border-[#0d7cc4] bg-[#0c1d1a] p-5 text-white">
-              <p className="text-sm font-bold text-sky-300">Top strategic priorities</p>
-              <ol className="mt-5 space-y-4 text-sm leading-6 text-slate-200">
-                {(strategicPriorities.length ? strategicPriorities : [
-                  "Protect the new operating rhythm.",
-                  "Strengthen ownership across the team.",
-                  "Remove the next founder dependency once the first change is working.",
-                ]).map((priority, index) => (
-                  <li key={priority} className="flex gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0d7cc4] text-xs font-bold text-white">{index + 1}</span>
+            <article className="min-h-[206px] rounded-2xl border border-[#168bd2] bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#168bd2]/70 bg-[#168bd2]/10">
+                  <AssetIcon src={onePageIcons.priorities} className="h-4 w-4 object-contain" />
+                </span>
+                <p className="text-sm font-bold text-sky-300">Top strategic priorities</p>
+              </div>
+
+              <ol className="mt-4 space-y-3 text-sm leading-5 text-slate-200">
+                {(strategicPriorities.length
+                  ? strategicPriorities
+                  : [
+                      "Protect the new operating rhythm.",
+                      "Strengthen ownership across the team.",
+                      "Remove the next founder dependency once the first change is working.",
+                    ]
+                ).map((priority, index) => (
+                  <li key={priority} className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#2d91e8] text-[0.56rem] font-black text-white">
+                      {index + 1}
+                    </span>
                     <span>{priority}</span>
                   </li>
                 ))}
@@ -871,27 +990,165 @@ export default function GedEntrepreneurStrategicReportPage({
             </article>
           </div>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1fr_1.1fr_0.9fr]">
-            <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white">
-              <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">Scale readiness gap</p>
-              <p className={`mt-3 text-3xl font-extrabold ${scoreTone(diagnostic.scores.scale_readiness)}`}>{diagnostic.scores.scale_readiness}%</p>
-              <p className="mt-2 text-sm text-slate-300">{diagnostic.scale_readiness_level} readiness for growth without adding more founder load.</p>
+          <div className="mt-4 grid gap-4 xl:grid-cols-[0.78fr_0.9fr_1.42fr_0.92fr]">
+            <article
+              className={`min-h-[188px] rounded-2xl border bg-gradient-to-br ${readinessStyle.border} ${readinessStyle.card} p-5 text-white shadow-inner shadow-black/20`}
+            >
+              <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-slate-300">
+                Scale Readiness Gap
+              </p>
+              <p className={`mt-3 text-2xl font-extrabold ${readinessStyle.text}`}>
+                {displayReadinessLevel}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-slate-200">
+                {diagnostic.scale_readiness_level} readiness for growth without adding more founder load.
+              </p>
+              <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${clampPercent(diagnostic.scores.scale_readiness)}%`,
+                    backgroundColor: readinessStyle.meter,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-[0.68rem] text-slate-300">
+                Readiness score: {diagnostic.scores.scale_readiness}%
+              </p>
             </article>
-            <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white">
-              <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">Urgency level</p>
-              <p className="mt-3 text-3xl font-extrabold text-amber-300">{diagnostic.urgency.label}</p>
-              <p className="mt-2 text-sm text-slate-300">{diagnostic.urgency.window}</p>
+
+            <article
+              className={`min-h-[188px] rounded-2xl border bg-[#09211c] p-5 text-white shadow-inner shadow-black/20 ${urgencyStyle.border}`}
+            >
+              <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-slate-300">
+                Urgency Level
+              </p>
+              <p className={`mt-3 text-2xl font-extrabold ${urgencyStyle.text}`}>
+                {diagnostic.urgency.label}
+              </p>
+              <p className="mt-2 text-xs font-medium text-slate-100">{diagnostic.urgency.window}</p>
+              <div className="mt-3 flex gap-2 text-xs leading-5 text-slate-300">
+                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${urgencyStyle.dot}`} />
+                <span>{diagnostic.urgency.summary}</span>
+              </div>
             </article>
-            <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white">
-              <p className="text-[0.66rem] font-bold uppercase tracking-[0.18em] text-slate-400">Your priority</p>
-              <p className={`mt-3 text-lg font-extrabold ${theme.accent}`}>{diagnostic.priority_label}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{diagnostic.priority_summary}</p>
+
+            <article className="min-h-[188px] rounded-2xl border border-white/10 bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
+              <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-emerald-300">
+                {diagnostic.priority_label}
+              </p>
+
+              <div className="mt-3 space-y-1.5">
+                {engineJourney.map((item) => {
+                  const active = item.step === activeJourneyStep;
+
+                  return (
+                    <div
+                      key={item.step}
+                      className={[
+                        "flex items-center gap-2 rounded-md border px-2.5 py-1.5",
+                        active
+                          ? "border-emerald-300/80 bg-[#3ed9aa] text-[#09211c]"
+                          : "border-white/[0.05] bg-[#061713] text-slate-100",
+                      ].join(" ")}
+                    >
+                      <span
+                        className={[
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.55rem] font-black",
+                          active ? "bg-[#0a7d5f] text-white" : "bg-emerald-400/20 text-emerald-200",
+                        ].join(" ")}
+                      >
+                        {item.step}
+                      </span>
+                      <div className="min-w-0">
+                        <p className={`text-[0.68rem] font-bold leading-4 ${active ? "text-[#09211c]" : "text-slate-100"}`}>
+                          {item.title}
+                        </p>
+                        <p className={`text-[0.56rem] leading-3 ${active ? "text-[#09211c] opacity-75" : "text-slate-400"}`}>
+                          {item.detail}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-slate-300">{diagnostic.priority_summary}</p>
             </article>
-            <article className="flex flex-col items-center justify-center rounded-2xl bg-[#0c1d1a] p-4 text-center">
+
+            <article className="flex min-h-[188px] flex-col items-center justify-center rounded-2xl border border-emerald-300/50 bg-[#1b5148] p-4 text-center text-white shadow-inner shadow-black/20">
+              <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-emerald-200">
+                Progress Circle
+              </p>
               <ScoreRing score={diagnostic.scores.overall_engine} />
-              <p className="-mt-1 text-sm font-bold text-white">Overall Engine Score</p>
+              <p className="-mt-2 text-sm font-bold text-white">Overall Engine Score</p>
+              <p className="mt-2 text-xs leading-5 text-emerald-50/85">
+                Overall engine health
+              </p>
             </article>
           </div>
+        </section>
+
+        <section
+          data-ged-pdf-page
+          id="profile-distributions"
+          className="mt-5 grid gap-4 lg:grid-cols-2"
+        >
+          <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20 md:p-6">
+            <h2 className="text-base font-bold text-white md:text-lg">Your Personality Layer</h2>
+            <p className="mt-3 max-w-xl text-xs leading-5 text-slate-300 md:text-sm">
+              Your emotional &amp; energetic style across Fire, Flow, Form and Field in the way you buy and build.
+            </p>
+
+            <div className="mt-5 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+              <FrequencyDonut data={frequencyData} />
+
+              <div className="w-full space-y-3">
+                {frequencyData.map((item) => (
+                  <div key={item.key} className="flex items-center gap-3 text-xs md:text-sm">
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: FREQUENCY_COLORS[item.key] }}
+                    />
+                    <span className="flex-1 text-slate-200">
+                      {PERSONALITY_LABELS[item.key]}
+                    </span>
+                    <span className="w-10 text-right tabular-nums text-slate-200">
+                      {Math.round(item.value)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20 md:p-6">
+            <h2 className="text-base font-bold text-white md:text-lg">Your Mindset Layer</h2>
+            <p className="mt-3 max-w-xl text-xs leading-5 text-slate-300 md:text-sm">
+              Where your focus and energy are distributed across the five Quantum growth stages.
+            </p>
+
+            <div className="mt-5 space-y-3">
+              {(["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"] as MindsetKey[]).map((key) => {
+                const value = clampPercent(mindsetPercentages[key] || 0);
+
+                return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between gap-4 text-xs md:text-sm">
+                      <span className="text-slate-200">{MINDSET_LABELS[key]}</span>
+                      <span className="tabular-nums text-slate-200">{value}%</span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-[#45e0d1]"
+                        style={{ width: `${value}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
         </section>
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
