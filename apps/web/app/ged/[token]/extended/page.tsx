@@ -83,6 +83,14 @@ type PersonalityLayerView = {
   role: string;
 };
 
+type MindsetLayerView = {
+  overview: string;
+  focusSignals: string[];
+  exampleStatements: string[];
+  perceivedProblems: string[];
+  realProblems: string[];
+};
+
 type GedEngineDiagnostic = {
   primary_priority?: string;
   priority_label?: string;
@@ -450,6 +458,90 @@ function parsePersonalityLayer(value: unknown): PersonalityLayerView {
     exampleBehaviours,
     listenFor,
     role,
+  };
+}
+
+
+function cleanStructuredPlaybookCopy(value: unknown): string {
+  return safeText(value, "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function structuredListItems(value: unknown, limit = 8): string[] {
+  const raw = cleanStructuredPlaybookCopy(value);
+  if (!raw) return [];
+
+  const chunks = raw
+    .replace(/[•✓✔➜▸]/g, "\n")
+    .replace(/\s+[–—]\s+(?=[A-Z“"])/g, "\n")
+    .replace(/\s+-\s+(?=[A-Z“"])/g, "\n")
+    .replace(/\s+(?=[“"])/g, "\n")
+    .split(/\n+/)
+    .flatMap((line) => line.split(/(?<=[.!?])\s+(?=[A-Z“"])/))
+    .map((item) =>
+      item
+        .replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "")
+        .replace(/^["“]|["”]$/g, "")
+        .trim()
+    )
+    .filter(Boolean);
+
+  return uniqueStrings(chunks).slice(0, limit);
+}
+
+function parseMindsetLayer(value: unknown): MindsetLayerView {
+  const raw = cleanStructuredPlaybookCopy(value)
+    .replace(/^where they are in (?:their|the) current business journey\.?\s*/i, "")
+    .trim();
+
+  if (!raw) {
+    return {
+      overview: "Not recorded for this profile.",
+      focusSignals: [],
+      exampleStatements: [],
+      perceivedProblems: [],
+      realProblems: [],
+    };
+  }
+
+  const exampleHeading = /\bexample\s+statements?\s+(?:they\s+)?make\s*[:\-–—]?/i;
+  const perceivedHeading = /\bwhat\s+they\s+think\s+the\s+problem\s+is\s*[:\-–—]?/i;
+  const realHeading = /\bwhat\s+the\s+real\s+problem\s+is\s*[:\-–—]?/i;
+
+  const positions = [exampleHeading, perceivedHeading, realHeading]
+    .map((pattern) => {
+      const match = pattern.exec(raw);
+      return match?.index ?? -1;
+    })
+    .filter((position) => position >= 0);
+
+  const introEnd = positions.length ? Math.min(...positions) : raw.length;
+  const introItems = structuredListItems(raw.slice(0, introEnd), 8);
+
+  const exampleStatements = structuredListItems(
+    sliceBetweenHeadings(raw, exampleHeading, [perceivedHeading, realHeading]),
+    6
+  );
+
+  const perceivedProblems = structuredListItems(
+    sliceBetweenHeadings(raw, perceivedHeading, [realHeading]),
+    6
+  );
+
+  const realProblems = structuredListItems(
+    sliceBetweenHeadings(raw, realHeading, []),
+    7
+  );
+
+  return {
+    overview: introItems[0] || sentence(raw, 260),
+    focusSignals: introItems.slice(1, 4),
+    exampleStatements,
+    perceivedProblems,
+    realProblems,
   };
 }
 
@@ -1115,18 +1207,161 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="mindset">
-              <SectionHeader icon="mindset-layer.png" eyebrow="Their mindset layer" title="Where they are in their current business journey" description="The buyer's current growth stage shapes what they want, what they will fund and what will feel too small." />
-              <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                <NarrativeCard title={mindset ? `${MINDSET_LABELS[mindset]} stage` : "Current stage"} content={extended.mindset_layer} tone="violet" />
-                <article className="rounded-2xl bg-white p-6">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Lead snapshot</p>
-                  <dl className="mt-4 space-y-4 text-sm">
-                    <div><dt className="text-slate-500">Decision style</dt><dd className="mt-1 font-bold text-slate-950">{decisionStyle}</dd></div>
-                    <div><dt className="text-slate-500">Offer readiness</dt><dd className="mt-1 font-bold text-slate-950">{buyerMode}</dd></div>
-                    <div><dt className="text-slate-500">Strategic self-diagnosis</dt><dd className="mt-1 text-slate-700">{safeText(diagnostic?.self_diagnosis, "Not recorded.")}</dd></div>
-                  </dl>
-                </article>
-              </div>
+              {(() => {
+                const mindsetView = parseMindsetLayer(extended.mindset_layer);
+
+                const fallbackSignals = uniqueStrings([
+                  diagnostic?.business_stage?.summary || "",
+                  diagnostic?.scale_readiness_signal?.summary || "",
+                ]).slice(0, 3);
+
+                const exampleStatements = mindsetView.exampleStatements.length
+                  ? mindsetView.exampleStatements
+                  : uniqueStrings([
+                      diagnostic?.self_diagnosis || "",
+                      diagnostic?.primary_bottleneck?.summary || "",
+                    ]).slice(0, 4);
+
+                const perceivedProblems = mindsetView.perceivedProblems.length
+                  ? mindsetView.perceivedProblems
+                  : uniqueStrings([
+                      diagnostic?.self_diagnosis || "",
+                      diagnostic?.core_constraint?.label || "",
+                      diagnostic?.scale_readiness_signal?.summary || "",
+                    ]).slice(0, 5);
+
+                const realProblems = mindsetView.realProblems.length
+                  ? mindsetView.realProblems
+                  : textItems(extended.core_business_problems, 6);
+
+                const leftStatements = exampleStatements.slice(
+                  0,
+                  Math.max(1, Math.ceil(exampleStatements.length / 2))
+                );
+                const rightStatements = exampleStatements.slice(leftStatements.length);
+
+                return (
+                  <>
+                    <header className="flex items-center gap-3">
+                      <SectionIcon file="mindset-layer.png" alt="" />
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                          Their mindset layer
+                        </p>
+                        <h2 className="mt-1 text-base font-extrabold text-white md:text-lg">
+                          Where they are in their current business journey.
+                        </h2>
+                      </div>
+                    </header>
+
+                    <div className="mt-5 rounded-2xl bg-white p-5 md:p-7">
+                      <div className="text-sm leading-5 text-slate-800">
+                        <p>{mindsetView.overview}</p>
+                        {(mindsetView.focusSignals.length
+                          ? mindsetView.focusSignals
+                          : fallbackSignals
+                        ).length ? (
+                          <ul className="mt-2 space-y-1">
+                            {(mindsetView.focusSignals.length
+                              ? mindsetView.focusSignals
+                              : fallbackSignals
+                            ).map((signal, index) => (
+                              <li key={`mindset-signal-${index}`} className="flex gap-2">
+                                <span className="mt-0.5 text-emerald-500">›</span>
+                                <span>{signal}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+
+                      {exampleStatements.length ? (
+                        <div className="mt-6">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-500">
+                            Example statements they make
+                          </p>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <article className="rounded-xl bg-[#0c2a22] px-5 py-4">
+                              <ul className="space-y-3">
+                                {leftStatements.map((statement, index) => (
+                                  <li
+                                    key={`mindset-example-left-${index}`}
+                                    className="flex gap-2.5 text-sm leading-5 text-white/90"
+                                  >
+                                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                                    <span>“{statement.replace(/^["“]|["”]$/g, "")}”</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </article>
+                            <article className="rounded-xl bg-[#0c2a22] px-5 py-4">
+                              <ul className="space-y-3">
+                                {(rightStatements.length ? rightStatements : leftStatements).map(
+                                  (statement, index) => (
+                                    <li
+                                      key={`mindset-example-right-${index}`}
+                                      className="flex gap-2.5 text-sm leading-5 text-white/90"
+                                    >
+                                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                                      <span>“{statement.replace(/^["“]|["”]$/g, "")}”</span>
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </article>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="mt-8 grid gap-5 lg:grid-cols-2">
+                        <article>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-slate-500">
+                            What they think the problem is
+                          </p>
+                          <div className="mt-3 space-y-2">
+                            {perceivedProblems.length ? (
+                              perceivedProblems.map((problem, index) => (
+                                <div
+                                  key={`perceived-problem-${index}`}
+                                  className="rounded-lg border-l-[3px] border-[#0c2a22] bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900"
+                                >
+                                  {problem}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="rounded-lg border-l-[3px] border-[#0c2a22] bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">
+                                Not recorded.
+                              </div>
+                            )}
+                          </div>
+                        </article>
+
+                        <article>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">
+                            What the real problem is
+                          </p>
+                          <div className="mt-3 space-y-2">
+                            {realProblems.length ? (
+                              realProblems.map((problem, index) => (
+                                <div
+                                  key={`real-problem-${index}`}
+                                  className="rounded-lg border-l-[3px] border-rose-500 bg-rose-200/80 px-4 py-3 text-sm font-semibold text-slate-900"
+                                >
+                                  {problem}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="rounded-lg border-l-[3px] border-rose-500 bg-rose-200/80 px-4 py-3 text-sm font-semibold text-slate-900">
+                                Not recorded.
+                              </div>
+                            )}
+                          </div>
+                        </article>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </PageSection>
 
             <PageSection id="quantum-profile">
