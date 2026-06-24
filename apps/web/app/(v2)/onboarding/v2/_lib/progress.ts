@@ -8,7 +8,7 @@ export const STEP_TO_PATH: Record<Exclude<OnboardingStep, "complete">, string> =
   2: "/onboarding/v2/verify",
   3: "/onboarding/v2/organisation",
   4: "/onboarding/v2/contact",
-  5: "/onboarding/v2/plan",
+  5: "/onboarding/v2/branding",
   6: "/onboarding/v2/branding",
 };
 
@@ -32,20 +32,19 @@ export const PATH_TO_STEP: Record<string, OnboardingStep> = {
   [STEP_TO_PATH[3]]: 3,
   [STEP_TO_PATH[4]]: 4,
   [STEP_TO_PATH[5]]: 5,
-  [STEP_TO_PATH[6]]: 6,
   [COMPLETE_PATH]: "complete",
 };
 
-export const TOTAL_STEPS = 7;
+export const TOTAL_STEPS = 6;
 
 export function displayStep(step: OnboardingStep | undefined): number {
   if (step === "complete") return TOTAL_STEPS;
-  if (typeof step === "number") return step;
+  if (typeof step === "number") return Math.min(step, TOTAL_STEPS);
   return 1;
 }
 
 export function stepIndex(step: OnboardingStep): number {
-  return step === "complete" ? TOTAL_STEPS : step;
+  return step === "complete" ? TOTAL_STEPS + 1 : step;
 }
 
 export type GuardDecision =
