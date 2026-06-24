@@ -128,7 +128,7 @@ const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
   quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
-  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile-graphic.png`,
   personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
   mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
   combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
@@ -444,6 +444,156 @@ function FrequencyDonut({ data }: { data: { key: PersonalityKey; value: number }
         LAYER
       </text>
     </svg>
+  );
+}
+
+
+function LightFrequencyDonut({
+  data,
+  primaryKey,
+}: {
+  data: { key: PersonalityKey; value: number }[];
+  primaryKey: PersonalityKey | null;
+}) {
+  const displayColors: Record<PersonalityKey, string> = {
+    FIRE: "#d6580b",
+    FLOW: "#34d399",
+    FORM: "#ffb347",
+    FIELD: "#e5e7eb",
+  };
+  const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
+  const radius = 52;
+  const stroke = 13;
+  const center = 68;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+  const primaryValue = primaryKey
+    ? Math.round(data.find((item) => item.key === primaryKey)?.value || 0)
+    : 0;
+  const primaryLabel = primaryKey ? PERSONALITY_LABELS[primaryKey] : "—";
+
+  return (
+    <svg
+      viewBox="0 0 136 136"
+      className="h-40 w-40 shrink-0 sm:h-44 sm:w-44"
+      aria-label="Frequency distribution"
+    >
+      <circle
+        cx={center}
+        cy={center}
+        r={radius}
+        stroke="#e5e7eb"
+        strokeWidth={stroke}
+        fill="transparent"
+      />
+      {data.map((item) => {
+        const dash = (item.value / total) * circumference;
+        const node = dash > 0 ? (
+          <circle
+            key={item.key}
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke={displayColors[item.key]}
+            strokeWidth={stroke}
+            fill="transparent"
+            strokeDasharray={`${dash} ${circumference}`}
+            strokeDashoffset={offset}
+            strokeLinecap="butt"
+            transform={`rotate(-90 ${center} ${center})`}
+          />
+        ) : null;
+        offset -= dash;
+        return node;
+      })}
+      <circle cx={center} cy={center} r={34} fill="#ffffff" />
+      <text
+        x={center}
+        y="64"
+        textAnchor="middle"
+        fill="#1a1a1a"
+        fontSize="16"
+        fontWeight="800"
+      >
+        {primaryLabel}
+      </text>
+      <text
+        x={center}
+        y="83"
+        textAnchor="middle"
+        fill="#4b5563"
+        fontSize="14"
+        fontWeight="500"
+      >
+        {primaryValue}%
+      </text>
+    </svg>
+  );
+}
+
+function PersonalityFrequencyPanel({
+  data,
+  primaryKey,
+}: {
+  data: { key: PersonalityKey; value: number }[];
+  primaryKey: PersonalityKey | null;
+}) {
+  const displayColors: Record<PersonalityKey, string> = {
+    FIRE: "#d6580b",
+    FLOW: "#34d399",
+    FORM: "#ffb347",
+    FIELD: "#e5e7eb",
+  };
+
+  return (
+    <article className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm sm:p-6">
+      <p className="text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#4b5563]">
+        Frequency distribution
+      </p>
+
+      <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:justify-center">
+        <LightFrequencyDonut data={data} primaryKey={primaryKey} />
+
+        <div className="w-full max-w-[10rem] space-y-2.5">
+          {data.map((item) => (
+            <div key={item.key} className="flex items-center gap-2 text-xs">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: displayColors[item.key] }}
+              />
+              <span className="flex-1 font-semibold text-[#1a1a1a]">
+                {PERSONALITY_LABELS[item.key]}
+              </span>
+              <span className="tabular-nums font-bold text-[#4b5563]">
+                {Math.round(item.value)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-6 space-y-3.5">
+        {data.map((item) => (
+          <div key={item.key} className="grid grid-cols-[42px_minmax(0,1fr)_30px] items-center gap-3 text-xs">
+            <span className="font-semibold text-[#1a1a1a]">
+              {PERSONALITY_LABELS[item.key]}
+            </span>
+            <div className="h-2.5 overflow-hidden rounded bg-[#e5e7eb]">
+              <div
+                className="h-full rounded"
+                style={{
+                  width: `${Math.max(0, Math.min(100, item.value))}%`,
+                  backgroundColor: displayColors[item.key],
+                }}
+              />
+            </div>
+            <span className="text-right font-bold tabular-nums text-[#1a1a1a]">
+              {Math.round(item.value)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -1465,40 +1615,58 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="personality-layer" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="personality-layer"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.personality_layer}
                 eyebrow="Your Personality Layer"
                 title="How you show up emotionally & behaviourally"
                 body="Your personality layer is your emotional wiring and energetic pattern. It does not change overnight, which is why it is such a powerful anchor for business design."
                 dark
+                compact
               />
-              <div className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-                <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-5 sm:flex-row">
-                  <FrequencyDonut data={frequencyData} />
-                  <div className="w-full space-y-3">
-                    {frequencyData.map((item) => (
-                      <div key={item.key} className="flex items-center gap-3 text-sm">
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: FREQUENCY_COLORS[item.key] }} />
-                        <span className="min-w-14 text-slate-300">{PERSONALITY_LABELS[item.key]}</span>
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-                          <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: FREQUENCY_COLORS[item.key] }} />
-                        </div>
-                        <span className="w-10 text-right tabular-nums text-slate-200">{Math.round(item.value)}%</span>
-                      </div>
-                    ))}
+
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 sm:p-5 md:p-6">
+                <div className="grid gap-5 lg:grid-cols-[0.9fr_1fr] lg:items-stretch">
+                  <PersonalityFrequencyPanel
+                    data={frequencyData}
+                    primaryKey={primaryPersonality}
+                  />
+
+                  <div className="grid gap-3">
+                    <article className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                      <p className="text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#34d399]">
+                        Core pattern — {primaryPersonalityLabel}
+                      </p>
+                      <h3 className="mt-2 text-base font-extrabold leading-6 text-[#1a1a1a]">
+                        {primaryPersonalityLabel} operating pattern
+                      </h3>
+                      <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                        {persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
+                      </p>
+                    </article>
+
+                    <article className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                      <p className="text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#34d399]">
+                        What energises you
+                      </p>
+                      <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                        {persona?.energisers || "You operate best when your strengths are directed toward work that creates strategic momentum."}
+                      </p>
+                    </article>
+
+                    <article className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                      <p className="text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#34d399]">
+                        What drains you
+                      </p>
+                      <p className="mt-3 text-sm leading-5 text-[#4b5563]">
+                        {persona?.drains || "Repeated escalation, unclear ownership and work that should be carried by the operating system can drain your highest-value energy."}
+                      </p>
+                    </article>
                   </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <DarkContentCard title="Core pattern">
-                    <p>{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
-                  </DarkContentCard>
-                  <DarkContentCard title="What energises you">
-                    <p>{persona?.energisers || "You operate best when your strengths are directed toward the work that creates strategic momentum."}</p>
-                  </DarkContentCard>
-                  <DarkContentCard title="What drains you">
-                    <p>{persona?.drains || "Repeated escalation, unclear ownership and work that should be carried by the operating system can drain your highest-value energy."}</p>
-                  </DarkContentCard>
                 </div>
               </div>
             </section>
