@@ -8,6 +8,8 @@ import type {
   GetOrgResponse,
   ContactRequestBody,
   ContactResponse,
+  PlanRequestBody,
+  PlanResponse,
   BrandingRequestBody,
   BrandingResponse,
   ProgressResponse,
@@ -20,6 +22,7 @@ export type {
   VerifyOtpRequestBody,
   CreateOrgRequestBody,
   ContactRequestBody,
+  PlanRequestBody,
   BrandingRequestBody,
   ProgressResponse,
 };
@@ -52,6 +55,8 @@ export const api = {
   getOrg: () => send<undefined, GetOrgResponse>("/org", "GET"),
   patchContact: (body: ContactRequestBody) =>
     send<ContactRequestBody, ContactResponse>("/contact", "PATCH", body),
+  patchPlan: (body: PlanRequestBody) =>
+    send<PlanRequestBody, PlanResponse>("/plan", "PATCH", body),
   patchBranding: (body: BrandingRequestBody) =>
     send<BrandingRequestBody, BrandingResponse>("/branding", "PATCH", body),
   progress: () => send<undefined, ProgressResponse>("/progress", "GET"),

@@ -60,15 +60,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: rpcError.message }, { status: 500 });
     }
 
-    const nowIso = new Date().toISOString();
-    const { error: consentError } = await admin
-      .from("orgs")
-      .update({ terms_accepted_at: nowIso, privacy_accepted_at: nowIso })
-      .eq("id", orgId);
-    if (consentError) {
-      console.error("[onboarding/org] consent timestamps update failed", consentError);
-    }
-
     return NextResponse.json({ ok: true, org: { id: orgId, slug, name } });
   } catch (e: any) {
     return NextResponse.json(

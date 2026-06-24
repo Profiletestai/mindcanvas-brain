@@ -5,7 +5,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
-import { StandardResultGraphs, QscResultGraphs } from "./ResultGraphs";
 
 export const dynamic = "force-dynamic";
 
@@ -389,27 +388,6 @@ export default async function TakerDetail({
   });
 
   const labels = ["Primary profile", "Secondary", "Tertiary"];
-  // Standard-test chart data (mirrors the Frequencies bars + Personality Map
-  // radar the respondent's own report renders).
-  const freqChart = (["A", "B", "C", "D"] as const).map((code) => ({
-    code,
-    name:
-      (freqSource.find(
-        (x: any) => String(x?.code).toUpperCase() === code,
-      )?.label as string) ||
-      freqLabels[code] ||
-      code,
-    pct: freqPct[code] ?? 0,
-  }));
-
-  const profileRadarLabels = profiles.map((p) => ({
-    code: codeToPShort(p.code) || p.name,
-    name: p.name,
-  }));
-
-  const profileRadarPct: Record<string, number> = Object.fromEntries(
-    profiles.map((p) => [codeToPShort(p.code) || p.name, profilePct[p.name] ?? 0]),
-  );
 
   const slugLower = String(test?.slug || "").toLowerCase();
   const testNameLower = String(test?.name || "").toLowerCase();
@@ -464,15 +442,11 @@ export default async function TakerDetail({
   let qscStrategicUrl: string | null = null;
 
   let qscAudience: QscAudience | null = null;
-  // QSC and GED both read from qsc_results (same table/API). Fetch once.
-  let qscRow: any = null;
 
-  if ((isQsc || isGed) && taker.link_token) {
-    const { data } = await sb
+  if (isQsc && taker.link_token) {
+    const { data: qscRow } = await sb
       .from("qsc_results")
-      .select(
-        "audience, created_at, personality_percentages, mindset_percentages, primary_personality, secondary_personality, primary_mindset, secondary_mindset, combined_profile_code",
-      )
+      .select("audience, created_at")
       .eq("token", taker.link_token)
       .eq("taker_id", taker.id)
       .order("created_at", { ascending: false })
@@ -480,11 +454,6 @@ export default async function TakerDetail({
       .maybeSingle();
 
     const audience = (qscRow?.audience as QscAudience | null) ?? null;
-    qscRow = data;
-  }
-
-  if (isQsc && taker.link_token) {
-    const aud = (qscRow?.audience as QscAudience | null) ?? null;
 
     if (audience === "leader" || audience === "entrepreneur") {
       qscAudience = audience;
@@ -704,7 +673,7 @@ export default async function TakerDetail({
                   : "—"}
               </dd>
 
-              {!isVisibility && !isQsc && !isGed && (
+              {!isVisibility && (
                 <>
                   <dt className="text-gray-500">Top profile</dt>
                   <dd className="col-span-2">
@@ -897,30 +866,6 @@ export default async function TakerDetail({
               </div>
             )}
           </>
-        {!isVisibility && !isQsc && !isGed && (
-          <StandardResultGraphs
-            freq={freqChart}
-            profileLabels={profileRadarLabels}
-            profilePct={profileRadarPct}
-          />
-        )}
-
-        {(isQsc || isGed) && qscRow && (
-          <QscResultGraphs
-            variant={
-              isGed
-                ? "ged"
-                : qscAudience === "leader"
-                  ? "qsc-leader"
-                  : "qsc-entrepreneur"
-            }
-            personality={qscRow.personality_percentages ?? {}}
-            mindset={qscRow.mindset_percentages ?? {}}
-            primaryPersonality={qscRow.primary_personality}
-            secondaryPersonality={qscRow.secondary_personality}
-            primaryMindset={qscRow.primary_mindset}
-            secondaryMindset={qscRow.secondary_mindset}
-          />
         )}
       </section>
 
