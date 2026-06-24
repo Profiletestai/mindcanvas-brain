@@ -299,6 +299,23 @@ function firstAction(steps: GedEngineDiagnostic["action_plan"]): string {
   return "Use the diagnostic evidence to agree a clear first move.";
 }
 
+function compactDecisionStyle(value: unknown): string {
+  const text = safeText(value, "").toLowerCase();
+  if (/instant|immediate|fast decision|quick decision|decisive/.test(text)) return "Instant";
+  if (/evidence|proof|data|logic/.test(text)) return "Evidence-led";
+  if (/relationship|consensus|collaborative/.test(text)) return "Collaborative";
+  if (/careful|deliberate|considered/.test(text)) return "Considered";
+  return "Strategic";
+}
+
+function compactBuyerMode(value: unknown): string {
+  const text = safeText(value, "").toLowerCase();
+  if (/scale|expansion|leverage|ecosystem/.test(text)) return "Buys scale, not improvement";
+  if (/clarity|certainty|confidence|safety/.test(text)) return "Buys confidence and clarity";
+  if (/strategy|advisory|framework/.test(text)) return "Buys strategic leverage";
+  return "Buys outcomes, not tactics";
+}
+
 function splitFlags(value: unknown): { green: string[]; red: string[] } {
   const all = textItems(value, 16);
   const green: string[] = [];
@@ -614,6 +631,11 @@ export default function GedPredictiveSellingPlaybookPage({
   const callReadiness = Math.round((readiness + (100 - normalisePercent(diagnostic?.scores?.founder_dependency))) / 2);
   const decisionStyle = sentence(extended?.how_they_make_decisions, 115);
   const buyerMode = sentence(extended?.what_offer_ready_for, 115);
+  const compactDecision = compactDecisionStyle(extended?.how_they_make_decisions);
+  const compactBuyer = compactBuyerMode(extended?.what_offer_ready_for);
+  const personalityLabel = personality ? PERSONALITY_LABELS[personality] : safeText(extended?.personality_label, "Not recorded");
+  const mindsetLabel = mindset ? MINDSET_LABELS[mindset] : safeText(extended?.mindset_label, "Not recorded");
+  const frameworkLabel = mindsetLabel || "—";
   const strategicPriorities = uniqueStrings([
     firstAction(diagnostic?.action_plan),
     diagnostic?.primary_bottleneck?.first_fix || "",
@@ -673,39 +695,129 @@ export default function GedPredictiveSellingPlaybookPage({
     <div className="min-h-screen bg-[#06111b] text-slate-900">
       <AppBackground />
       <main ref={reportRef} className="relative mx-auto max-w-[1440px] space-y-7 px-3 py-4 md:space-y-9 md:px-6 md:py-7">
-        <section className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-gradient-to-r from-[#0c1d1a] via-[#123a32] to-[#2b284c] p-5 text-white shadow-2xl shadow-black/30 md:p-7">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-emerald-200">Predictive Selling Playbook</p>
-              <p className="mt-2 text-sm font-medium text-white/80">Growth Engine Diagnostic · Internal Sales Intelligence</p>
-              <h1 className="mt-5 text-3xl font-extrabold tracking-tight md:text-5xl">{fullName}</h1>
-              <p className="mt-2 text-base text-white/75">{[role, company].filter(Boolean).join(" · ") || "Completed diagnostic"}</p>
-            </div>
-            <div className="flex flex-col items-start gap-2 lg:items-end">
-              <p className="text-xs text-white/70">Prepared {completedOn}</p>
-              <div className="flex flex-wrap gap-2">
+        <section className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-[#0c1d1a] text-white shadow-2xl shadow-black/30">
+          <header className="border-b border-white/10 bg-[#14483f] px-5 py-4 md:px-7 md:py-5">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-center">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/20 bg-white/15 p-2">
+                  <img
+                    src="/ged/report-icons/section-icons/profiletest.ai-Insignia.png"
+                    alt="ProfileTest.ai"
+                    className="h-full w-full object-contain"
+                  />
+                </span>
+                <div>
+                  <p className="text-xl font-extrabold uppercase tracking-[0.18em] text-white md:text-2xl">
+                    Predictive Selling Playbook
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200">
+                    <span>Growth Engine Diagnostic</span>
+                    <span className="rounded-full bg-white/10 px-2 py-1 normal-case tracking-normal text-white/75">
+                      Powered by ProfileTest.ai
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="min-w-[132px] rounded-xl border border-white/25 bg-white/[0.04] px-3 py-2.5">
+                  <p className="text-[9px] text-white/50">Prepared for</p>
+                  <p className="mt-1 font-bold text-white">{fullName}</p>
+                </div>
+                <div className="min-w-[120px] rounded-xl border border-white/25 bg-white/[0.04] px-3 py-2.5">
+                  <p className="text-[9px] text-white/50">Date</p>
+                  <p className="mt-1 font-bold text-white">{completedOn}</p>
+                </div>
+                <div className="min-w-[104px] rounded-xl border border-white/25 bg-white/[0.04] px-3 py-2.5">
+                  <p className="text-[9px] text-white/50">Framework</p>
+                  <p className="mt-1 font-bold text-white">{frameworkLabel}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 xl:justify-end">
                 <button
                   type="button"
                   onClick={handleDownloadPdf}
                   disabled={downloading}
-                  className="rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/15 disabled:opacity-60"
+                  className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/15 disabled:opacity-60"
                 >
                   {downloading ? "Preparing PDF…" : "Download PDF"}
                 </button>
                 {nextStepsHref ? (
-                  <a href={nextStepsHref} className="rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300">
+                  <a
+                    href={nextStepsHref}
+                    className="rounded-lg bg-gradient-to-r from-cyan-400 to-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:from-cyan-300 hover:to-indigo-500"
+                  >
                     Next steps
                   </a>
                 ) : null}
               </div>
             </div>
-          </div>
+          </header>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <InfoCard label="Buyer profile" value={profile} detail={`Framework: ${result.combined_profile_code || extended.profile_code || "—"}`} tone="emerald" />
-            <InfoCard label="Business stage" value={safeText(diagnostic?.business_stage?.label, "Not recorded")} detail={safeText(diagnostic?.business_stage?.summary, "No qualifying answer recorded.")} tone="cyan" />
-            <InfoCard label="Core constraint" value={safeText(diagnostic?.core_constraint?.label, "Not recorded")} detail={safeText(diagnostic?.core_constraint?.summary, "No qualifying answer recorded.")} tone="orange" />
-            <InfoCard label="Scale readiness" value={`${Math.round(readiness)}%`} detail={safeText(diagnostic?.scale_readiness_signal?.label || diagnostic?.scale_readiness_level, "Readiness signal unavailable.")} tone="sky" />
+          <div className="p-5 md:p-7">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)] lg:items-start">
+              <div>
+                <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">{fullName}</h1>
+                <p className="mt-1 text-sm text-white/70">{[role, company].filter(Boolean).join(" · ") || "Completed diagnostic"}</p>
+
+                <div className="mt-5 max-w-2xl border-l-4 border-emerald-400 pl-4 text-sm font-medium leading-6 text-white/90">
+                  An advisor-only guide to how this buyer thinks, communicates, decides and buys — built to be read before the call, not during it.
+                </div>
+
+                <div className="mt-5 grid max-w-xl gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Buyer profile</p>
+                    <p className="mt-1 text-lg font-extrabold text-emerald-300">{profile}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Report type</p>
+                    <p className="mt-1 text-sm font-extrabold text-emerald-300">Internal Sales Intelligence</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Personality layer</p>
+                  <p className="mt-1 text-base font-extrabold text-white">{personalityLabel}</p>
+                </article>
+                <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Mindset layer</p>
+                  <p className="mt-1 text-base font-extrabold text-white">{mindsetLabel}</p>
+                </article>
+                <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Decision style</p>
+                  <p className="mt-1 text-base font-extrabold text-white">{compactDecision}</p>
+                </article>
+                <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Buyer mode</p>
+                  <p className="mt-1 text-base font-extrabold leading-5 text-white">{compactBuyer}</p>
+                </article>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Business stage</p>
+                <p className="mt-2 text-sm font-extrabold text-white">{safeText(diagnostic?.business_stage?.label, "Not recorded")}</p>
+                <p className="mt-2 text-xs leading-5 text-white/70">{safeText(diagnostic?.business_stage?.summary, "No qualifying answer recorded.")}</p>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Core constraint</p>
+                <p className="mt-2 text-sm font-extrabold text-white">{safeText(diagnostic?.core_constraint?.label, "Not recorded")}</p>
+                <p className="mt-2 text-xs leading-5 text-white/70">{safeText(diagnostic?.core_constraint?.summary, "No qualifying answer recorded.")}</p>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Scale readiness</p>
+                <p className="mt-2 text-sm font-extrabold text-white">{safeText(diagnostic?.scale_readiness_signal?.label || diagnostic?.scale_readiness_level, `${Math.round(readiness)}%`)}</p>
+                <p className="mt-2 text-xs leading-5 text-white/70">{safeText(diagnostic?.scale_readiness_signal?.summary, "Current readiness signal from the Growth Engine Diagnostic.")}</p>
+              </article>
+              <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Strategic self-diagnosis</p>
+                <p className="mt-2 text-xs leading-5 text-white/80">{safeText(diagnostic?.self_diagnosis, "No self-diagnosis was recorded.")}</p>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -928,3 +1040,4 @@ export default function GedPredictiveSellingPlaybookPage({
     </div>
   );
 }
+
