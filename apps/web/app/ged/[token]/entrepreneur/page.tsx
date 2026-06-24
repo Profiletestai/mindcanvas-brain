@@ -2647,7 +2647,7 @@ export default function GedEntrepreneurStrategicReportPage({
                     <div className="mt-7 space-y-3 text-left">
                       {[
                         {
-                          label: "Growth Profile",
+                          label: "Growth Engine",
                           value: diagnostic.scores.growth_engine,
                           dot: "#34d399",
                         },
@@ -2721,10 +2721,10 @@ export default function GedEntrepreneurStrategicReportPage({
                             )}
                           />
                           <Meter
-                            label="Founder Dependency"
+                            label="Founder Independence"
                             score={100 - diagnostic.scores.founder_dependency}
                             accent="#dc2626"
-                            caption="Higher dependency reduces the readiness score."
+                            caption="Lower independence means the business still relies heavily on founder involvement."
                           />
                         </div>
                       </div>
