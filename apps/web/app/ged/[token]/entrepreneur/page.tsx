@@ -1,7 +1,14 @@
 // apps/web/app/ged/[token]/entrepreneur/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -143,12 +150,30 @@ const SECTION_ICON_PATHS = {
   recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
 } as const;
 
-const UNDERSTAND_QUANTUM_PROFILE_GRAPH =
-  `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
-const MINDSET_LAYER_INFOGRAPHIC =
-  `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
-const QUANTUM_PROFILE_MIX_ICON_BASE =
-  `${REPORT_ICON_BASE}/quantum-profile-matrix`;
+const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
+const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
+const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
+
+const BUSINESS_CONTEXT_ICON_PATHS = {
+  businessStage: `${REPORT_ICON_BASE}/business-context/business-stage.png`,
+  coreConstraint: `${REPORT_ICON_BASE}/business-context/core-constraint.png`,
+  scaleReadiness: `${REPORT_ICON_BASE}/business-context/scale-readiness.png`,
+  strategicSelfDiagnosis: `${REPORT_ICON_BASE}/business-context/strategic-self-diagnosis.png`,
+} as const;
+
+const BUSINESS_STAGE_LADDER = [
+  { code: "FOUNDER_LED", label: "Founder-led", height: 30 },
+  { code: "SMALL_TEAM_BOTTLENECK", label: "Small team", height: 48 },
+  { code: "DELEGATED_PARTIAL", label: "Delegated", height: 70 },
+  { code: "INCONSISTENT_TEAM", label: "Inconsistent", height: 88 },
+] as const;
+
+const CONSTRAINT_SIGNAL_CHIPS = [
+  { code: "SALES_CONSISTENCY", label: "Sales consistency" },
+  { code: "DELIVERY_CONSISTENCY", label: "Delivery consistency" },
+  { code: "FOUNDER_DEPENDENCY", label: "Founder dependency" },
+  { code: "UNCLEAR", label: "Clarity gap" },
+] as const;
 
 type MindsetStageCopy = {
   intro: string;
@@ -166,25 +191,29 @@ const MINDSET_STAGE_COPY: Record<MindsetKey, MindsetStageCopy> = {
   ORBIT: {
     intro:
       "You have established direction and are expanding your influence. The next focus is optimising operations, deepening leadership capacity and growing impact without creating unnecessary complexity.",
-    description: "Expanding influence. Optimizing operations and growing impact.",
+    description:
+      "Expanding influence. Optimizing operations and growing impact.",
     accent: "#77c3fc",
   },
   VECTOR: {
     intro:
       "You've built momentum and proven your offer. Now the focus is on scaling systems, building team and creating lasting impact.",
-    description: "Clear direction established. Scaling systems and strengthening positioning.",
+    description:
+      "Clear direction established. Scaling systems and strengthening positioning.",
     accent: "#00cac3",
   },
   MOMENTUM: {
     intro:
       "You are moving beyond the starting point and beginning to create repeatable traction. The next focus is building consistency, proving direction and protecting the habits that sustain momentum.",
-    description: "Early traction phase. Building consistency and proving direction.",
+    description:
+      "Early traction phase. Building consistency and proving direction.",
     accent: "#56a8e2",
   },
   ORIGIN: {
     intro:
       "You are laying the first foundations for sustainable growth. The next focus is clarifying direction, validating the path forward and creating enough structure for momentum to build.",
-    description: "The starting point. Laying the foundation for what's possible.",
+    description:
+      "The starting point. Laying the foundation for what's possible.",
     accent: "#899dc0",
   },
 };
@@ -259,7 +288,7 @@ function getFullName(taker: QscTakerRow | null): string | null {
 
 function derivePrimary<K extends string>(
   values: Partial<Record<K, number>>,
-  keys: readonly K[]
+  keys: readonly K[],
 ): K | null {
   const winner = [...keys]
     .map((key) => ({ key, value: normalisePercent(values[key] ?? 0) }))
@@ -278,10 +307,18 @@ function scoreTone(score: number): string {
   return "text-rose-600";
 }
 
+function scoreAccent(score: number): string {
+  if (score >= 72) return "#16a34a";
+  if (score >= 48) return "#d97706";
+  return "#dc2626";
+}
+
 function impactTone(level: GedImpactLevel): string {
   if (level === "critical") return "border-rose-200 bg-rose-50 text-rose-700";
-  if (level === "significant") return "border-orange-200 bg-orange-50 text-orange-700";
-  if (level === "moderate") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (level === "significant")
+    return "border-orange-200 bg-orange-50 text-orange-700";
+  if (level === "moderate")
+    return "border-amber-200 bg-amber-50 text-amber-700";
   return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
@@ -292,7 +329,9 @@ function impactLabel(level: GedImpactLevel): string {
   return "Low";
 }
 
-function priorityTheme(priority: GedEngineDiagnostic["primary_priority"] | undefined) {
+function priorityTheme(
+  priority: GedEngineDiagnostic["primary_priority"] | undefined,
+) {
   switch (priority) {
     case "SALES_ENGINE_PRIORITY":
       return {
@@ -365,7 +404,9 @@ function SectionMarker({
         <AssetIcon src={icon} className="h-7 w-7 object-contain" />
       </div>
       <div className="min-w-0">
-        <p className={`text-[0.67rem] font-bold uppercase tracking-[0.22em] ${dark ? "text-emerald-300" : "text-cyan-700"}`}>
+        <p
+          className={`text-[0.67rem] font-bold uppercase tracking-[0.22em] ${dark ? "text-emerald-300" : "text-cyan-700"}`}
+        >
           {eyebrow}
         </p>
         <h2
@@ -403,7 +444,9 @@ function ContentCard({
   className?: string;
 }) {
   return (
-    <article className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
+    <article
+      className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}
+    >
       <h3 className="text-sm font-bold text-slate-950">{title}</h3>
       <div className="mt-3 text-sm leading-6 text-slate-600">{children}</div>
     </article>
@@ -420,7 +463,9 @@ function DarkContentCard({
   className?: string;
 }) {
   return (
-    <article className={`rounded-xl border border-white/10 bg-white/[0.035] p-5 ${className}`}>
+    <article
+      className={`rounded-xl border border-white/10 bg-white/[0.035] p-5 ${className}`}
+    >
       <h3 className="text-sm font-bold text-white">{title}</h3>
       <div className="mt-3 text-sm leading-6 text-slate-300">{children}</div>
     </article>
@@ -447,14 +492,23 @@ function Meter({
         </p>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full rounded-full" style={{ width: `${clampPercent(score)}%`, backgroundColor: accent }} />
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${clampPercent(score)}%`, backgroundColor: accent }}
+        />
       </div>
-      {caption ? <p className="mt-2 text-xs leading-5 text-slate-500">{caption}</p> : null}
+      {caption ? (
+        <p className="mt-2 text-xs leading-5 text-slate-500">{caption}</p>
+      ) : null}
     </div>
   );
 }
 
-function FrequencyDonut({ data }: { data: { key: PersonalityKey; value: number }[] }) {
+function FrequencyDonut({
+  data,
+}: {
+  data: { key: PersonalityKey; value: number }[];
+}) {
   const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
   const radius = 55;
   const stroke = 17;
@@ -463,8 +517,19 @@ function FrequencyDonut({ data }: { data: { key: PersonalityKey; value: number }
   let offset = 0;
 
   return (
-    <svg viewBox="0 0 144 144" className="h-40 w-40 shrink-0" aria-label="Personality distribution">
-      <circle cx={center} cy={center} r={radius} stroke="rgba(148,163,184,0.18)" strokeWidth={stroke} fill="transparent" />
+    <svg
+      viewBox="0 0 144 144"
+      className="h-40 w-40 shrink-0"
+      aria-label="Personality distribution"
+    >
+      <circle
+        cx={center}
+        cy={center}
+        r={radius}
+        stroke="rgba(148,163,184,0.18)"
+        strokeWidth={stroke}
+        fill="transparent"
+      />
       {data.map((item) => {
         const dash = (item.value / total) * circumference;
         const node = (
@@ -486,16 +551,29 @@ function FrequencyDonut({ data }: { data: { key: PersonalityKey; value: number }
         return node;
       })}
       <circle cx={center} cy={center} r={35} fill="#0c1d1a" />
-      <text x={center} y={68} textAnchor="middle" fill="#e2e8f0" fontSize="8" letterSpacing="1.4">
+      <text
+        x={center}
+        y={68}
+        textAnchor="middle"
+        fill="#e2e8f0"
+        fontSize="8"
+        letterSpacing="1.4"
+      >
         PERSONALITY
       </text>
-      <text x={center} y={79} textAnchor="middle" fill="#e2e8f0" fontSize="8" letterSpacing="1.4">
+      <text
+        x={center}
+        y={79}
+        textAnchor="middle"
+        fill="#e2e8f0"
+        fontSize="8"
+        letterSpacing="1.4"
+      >
         LAYER
       </text>
     </svg>
   );
 }
-
 
 function LightFrequencyDonut({
   data,
@@ -537,21 +615,22 @@ function LightFrequencyDonut({
       />
       {data.map((item) => {
         const dash = (item.value / total) * circumference;
-        const node = dash > 0 ? (
-          <circle
-            key={item.key}
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke={displayColors[item.key]}
-            strokeWidth={stroke}
-            fill="transparent"
-            strokeDasharray={`${dash} ${circumference}`}
-            strokeDashoffset={offset}
-            strokeLinecap="butt"
-            transform={`rotate(-90 ${center} ${center})`}
-          />
-        ) : null;
+        const node =
+          dash > 0 ? (
+            <circle
+              key={item.key}
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke={displayColors[item.key]}
+              strokeWidth={stroke}
+              fill="transparent"
+              strokeDasharray={`${dash} ${circumference}`}
+              strokeDashoffset={offset}
+              strokeLinecap="butt"
+              transform={`rotate(-90 ${center} ${center})`}
+            />
+          ) : null;
         offset -= dash;
         return node;
       })}
@@ -623,7 +702,10 @@ function PersonalityFrequencyPanel({
 
       <div className="mt-6 space-y-3.5">
         {data.map((item) => (
-          <div key={item.key} className="grid grid-cols-[42px_minmax(0,1fr)_30px] items-center gap-3 text-xs">
+          <div
+            key={item.key}
+            className="grid grid-cols-[42px_minmax(0,1fr)_30px] items-center gap-3 text-xs"
+          >
             <span className="font-semibold text-[#1a1a1a]">
               {PERSONALITY_LABELS[item.key]}
             </span>
@@ -652,8 +734,19 @@ function ScoreRing({ score }: { score: number }) {
   const dash = (clampPercent(score) / 100) * circumference;
 
   return (
-    <svg viewBox="0 0 132 132" className="h-36 w-36" aria-label={`Overall engine score: ${score}%`}>
-      <circle cx="66" cy="66" r={radius} stroke="rgba(148,163,184,0.20)" strokeWidth="10" fill="transparent" />
+    <svg
+      viewBox="0 0 132 132"
+      className="h-36 w-36"
+      aria-label={`Overall engine score: ${score}%`}
+    >
+      <circle
+        cx="66"
+        cy="66"
+        r={radius}
+        stroke="rgba(148,163,184,0.20)"
+        strokeWidth="10"
+        fill="transparent"
+      />
       <circle
         cx="66"
         cy="66"
@@ -665,10 +758,24 @@ function ScoreRing({ score }: { score: number }) {
         strokeDasharray={`${dash} ${circumference}`}
         transform="rotate(-90 66 66)"
       />
-      <text x="66" y="66" textAnchor="middle" fill="#f8fafc" fontSize="23" fontWeight="800">
+      <text
+        x="66"
+        y="66"
+        textAnchor="middle"
+        fill="#f8fafc"
+        fontSize="23"
+        fontWeight="800"
+      >
         {clampPercent(score)}
       </text>
-      <text x="66" y="82" textAnchor="middle" fill="#94a3b8" fontSize="8" letterSpacing="1.2">
+      <text
+        x="66"
+        y="82"
+        textAnchor="middle"
+        fill="#94a3b8"
+        fontSize="8"
+        letterSpacing="1.2"
+      >
         ENGINE SCORE
       </text>
     </svg>
@@ -678,8 +785,20 @@ function ScoreRing({ score }: { score: number }) {
 function RocketGlyph({ color = "#45e0d1" }: { color?: string }) {
   return (
     <svg viewBox="0 0 48 48" aria-hidden="true" className="h-7 w-7" fill="none">
-      <path d="M29.9 6.2c4.8 1.5 8.4 5.1 9.9 9.9-2.5 7.3-7.2 13.9-13.5 18.8l-6.4-6.4c4.9-6.3 11.5-11 18.8-13.5Z" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m19.9 28.5-5.7 5.7m9.9-1.8-3 7.5m-5.7-11.4-7.5 3" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M29.9 6.2c4.8 1.5 8.4 5.1 9.9 9.9-2.5 7.3-7.2 13.9-13.5 18.8l-6.4-6.4c4.9-6.3 11.5-11 18.8-13.5Z"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m19.9 28.5-5.7 5.7m9.9-1.8-3 7.5m-5.7-11.4-7.5 3"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <circle cx="31.1" cy="14.9" r="2.2" fill={color} />
     </svg>
   );
@@ -712,13 +831,22 @@ function QuantumProfileVisual({
       </p>
 
       <div className="mt-4 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-        <div className="relative h-28 w-[196px] shrink-0" aria-label={`${personalityLabel} and ${mindsetLabel}`}>
+        <div
+          className="relative h-28 w-[196px] shrink-0"
+          aria-label={`${personalityLabel} and ${mindsetLabel}`}
+        >
           <div
             className="absolute left-0 top-0 flex h-28 w-28 flex-col items-center justify-center rounded-full border-[1.5px] bg-[#0c1d1a]"
             style={{ borderColor: personalityColor }}
           >
-            <AssetIcon src={personalityIcon} className="h-7 w-7 object-contain" />
-            <span className="mt-1 text-lg font-extrabold" style={{ color: personalityColor }}>
+            <AssetIcon
+              src={personalityIcon}
+              className="h-7 w-7 object-contain"
+            />
+            <span
+              className="mt-1 text-lg font-extrabold"
+              style={{ color: personalityColor }}
+            >
               {personalityLabel}
             </span>
           </div>
@@ -728,14 +856,25 @@ function QuantumProfileVisual({
             style={{ borderColor: mindsetColor }}
           >
             <AssetIcon src={mindsetIcon} className="h-7 w-7 object-contain" />
-            <span className="mt-1 text-lg font-extrabold" style={{ color: mindsetColor }}>
+            <span
+              className="mt-1 text-lg font-extrabold"
+              style={{ color: mindsetColor }}
+            >
               {mindsetLabel}
             </span>
           </div>
         </div>
 
-        <div className="hidden h-px flex-1 bg-white/35 xl:block" aria-hidden="true" />
-        <span className="hidden text-2xl text-slate-300 xl:block" aria-hidden="true">→</span>
+        <div
+          className="hidden h-px flex-1 bg-white/35 xl:block"
+          aria-hidden="true"
+        />
+        <span
+          className="hidden text-2xl text-slate-300 xl:block"
+          aria-hidden="true"
+        >
+          →
+        </span>
 
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-emerald-300/60 bg-emerald-300/5">
@@ -744,17 +883,20 @@ function QuantumProfileVisual({
           <div className="min-w-0">
             <p className="text-sm text-slate-200">Your Result</p>
             <p className="mt-0.5 text-lg font-extrabold leading-tight md:text-xl">
-              <span style={{ color: personalityColor }}>{personalityLabel}</span>{" "}
+              <span style={{ color: personalityColor }}>
+                {personalityLabel}
+              </span>{" "}
               <span style={{ color: mindsetColor }}>{mindsetLabel}</span>
             </p>
-            <p className="mt-1 truncate text-xs text-slate-400">{profileLabel}</p>
+            <p className="mt-1 truncate text-xs text-slate-400">
+              {profileLabel}
+            </p>
           </div>
         </div>
       </div>
     </section>
   );
 }
-
 
 function QuantumProfileDiagram() {
   const nodes = [
@@ -802,8 +944,12 @@ function QuantumProfileDiagram() {
         {nodes.map((node) => {
           const position = [
             "absolute z-20 flex items-center gap-3 md:gap-4",
-            node.vertical === "top" ? "top-6 md:top-10" : "bottom-6 md:bottom-10",
-            node.side === "left" ? "left-2 md:left-[14%]" : "right-2 md:right-[14%]",
+            node.vertical === "top"
+              ? "top-6 md:top-10"
+              : "bottom-6 md:bottom-10",
+            node.side === "left"
+              ? "left-2 md:left-[14%]"
+              : "right-2 md:right-[14%]",
             node.side === "left" ? "flex-row-reverse text-right" : "text-left",
           ].join(" ");
 
@@ -888,7 +1034,7 @@ function ReportIndex({
 }) {
   function handleInReportNavigation(
     event: ReactMouseEvent<HTMLAnchorElement>,
-    href: string
+    href: string,
   ) {
     if (!href.startsWith("#")) return;
 
@@ -940,7 +1086,9 @@ function ReportIndex({
             href={resolvedNextStepsHref}
             target={nextStepsIsExternal ? "_blank" : undefined}
             rel={nextStepsIsExternal ? "noopener noreferrer" : undefined}
-            onClick={(event) => handleInReportNavigation(event, resolvedNextStepsHref)}
+            onClick={(event) =>
+              handleInReportNavigation(event, resolvedNextStepsHref)
+            }
             className="flex h-7 w-[95px] items-center justify-center rounded-[5.62px] bg-gradient-to-r from-[#FFB347] via-[#34D399] to-[#34D399] px-3 text-[12px] font-semibold leading-[13.69px] text-white transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-emerald-300/70"
           >
             Next steps
@@ -979,13 +1127,15 @@ export default function GedEntrepreneurStrategicReportPage({
 
         const response = await fetch(
           `/api/public/ged/${encodeURIComponent(token)}/result?${query.toString()}`,
-          { cache: "no-store" }
+          { cache: "no-store" },
         );
 
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("application/json")) {
           const text = await response.text();
-          throw new Error(`Non-JSON response (${response.status}): ${text.slice(0, 180)}`);
+          throw new Error(
+            `Non-JSON response (${response.status}): ${text.slice(0, 180)}`,
+          );
         }
 
         const json = (await response.json()) as {
@@ -1031,7 +1181,9 @@ export default function GedEntrepreneurStrategicReportPage({
     try {
       setDownloading(true);
       const report = reportRef.current;
-      const units = Array.from(report.querySelectorAll<HTMLElement>("[data-ged-pdf-page]"));
+      const units = Array.from(
+        report.querySelectorAll<HTMLElement>("[data-ged-pdf-page]"),
+      );
       const pages = units.length ? units : [report];
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfPageWidth = pdf.internal.pageSize.getWidth();
@@ -1055,7 +1207,14 @@ export default function GedEntrepreneurStrategicReportPage({
 
         while (renderedHeight < imageHeight) {
           if (!isFirstPdfPage) pdf.addPage();
-          pdf.addImage(imageData, "PNG", 0, -renderedHeight, imageWidth, imageHeight);
+          pdf.addImage(
+            imageData,
+            "PNG",
+            0,
+            -renderedHeight,
+            imageWidth,
+            imageHeight,
+          );
           renderedHeight += pdfPageHeight;
           isFirstPdfPage = false;
         }
@@ -1072,7 +1231,9 @@ export default function GedEntrepreneurStrategicReportPage({
   const taker = payload?.taker ?? null;
   const diagnostic = payload?.ged?.engine_diagnostic ?? null;
 
-  const personalityPercentages = useMemo<Partial<Record<PersonalityKey, number>>>(() => {
+  const personalityPercentages = useMemo<
+    Partial<Record<PersonalityKey, number>>
+  >(() => {
     const raw = result?.personality_percentages || {};
     return {
       FIRE: normalisePercent(raw.FIRE),
@@ -1082,7 +1243,9 @@ export default function GedEntrepreneurStrategicReportPage({
     };
   }, [result]);
 
-  const mindsetPercentages = useMemo<Partial<Record<MindsetKey, number>>>(() => {
+  const mindsetPercentages = useMemo<
+    Partial<Record<MindsetKey, number>>
+  >(() => {
     const raw = result?.mindset_percentages || {};
     return {
       ORIGIN: normalisePercent(raw.ORIGIN),
@@ -1098,8 +1261,12 @@ export default function GedEntrepreneurStrategicReportPage({
       <div className="relative min-h-screen bg-[#09141d] text-white">
         <AppBackground />
         <main className="relative mx-auto max-w-5xl px-5 py-16">
-          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">Growth Engine Diagnostic</p>
-          <h1 className="mt-3 text-3xl font-semibold">Preparing your Strategic Client Report…</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">
+            Growth Engine Diagnostic
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold">
+            Preparing your Strategic Client Report…
+          </h1>
         </main>
       </div>
     );
@@ -1110,10 +1277,16 @@ export default function GedEntrepreneurStrategicReportPage({
       <div className="relative min-h-screen bg-[#09141d] text-white">
         <AppBackground />
         <main className="relative mx-auto max-w-4xl px-5 py-16">
-          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">Growth Engine Diagnostic</p>
-          <h1 className="mt-3 text-3xl font-semibold">We could not prepare this report</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-300">
+            Growth Engine Diagnostic
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold">
+            We could not prepare this report
+          </h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
-            The Strategic Client Report needs the GED qualification answers as well as the QSC result. Please complete the diagnostic again or contact the person who sent you this link.
+            The Strategic Client Report needs the GED qualification answers as
+            well as the QSC result. Please complete the diagnostic again or
+            contact the person who sent you this link.
           </p>
           <pre className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-xs text-slate-300">
             {error || "GED diagnostic data was not available for this report."}
@@ -1123,30 +1296,55 @@ export default function GedEntrepreneurStrategicReportPage({
     );
   }
 
-  const derivedPersonality = derivePrimary(personalityPercentages, ["FIRE", "FLOW", "FORM", "FIELD"]);
-  const derivedMindset = derivePrimary(mindsetPercentages, ["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"]);
+  const derivedPersonality = derivePrimary(personalityPercentages, [
+    "FIRE",
+    "FLOW",
+    "FORM",
+    "FIELD",
+  ]);
+  const derivedMindset = derivePrimary(mindsetPercentages, [
+    "ORIGIN",
+    "MOMENTUM",
+    "VECTOR",
+    "ORBIT",
+    "QUANTUM",
+  ]);
 
   // Stored QSC result is the source of truth; percentages are only a compatibility fallback.
   const primaryPersonality = result.primary_personality || derivedPersonality;
   const primaryMindset = result.primary_mindset || derivedMindset;
-  const primaryPersonalityLabel = primaryPersonality ? PERSONALITY_LABELS[primaryPersonality] : "—";
-  const primaryMindsetLabel = primaryMindset ? MINDSET_LABELS[primaryMindset] : "—";
-  const canonicalProfile = `${primaryPersonalityLabel} ${primaryMindsetLabel}`.trim();
+  const primaryPersonalityLabel = primaryPersonality
+    ? PERSONALITY_LABELS[primaryPersonality]
+    : "—";
+  const primaryMindsetLabel = primaryMindset
+    ? MINDSET_LABELS[primaryMindset]
+    : "—";
+  const canonicalProfile =
+    `${primaryPersonalityLabel} ${primaryMindsetLabel}`.trim();
   const secondaryProfile =
     result.secondary_personality || result.secondary_mindset
       ? `${result.secondary_personality ? PERSONALITY_LABELS[result.secondary_personality] : ""} ${
-          result.secondary_mindset ? MINDSET_LABELS[result.secondary_mindset] : ""
+          result.secondary_mindset
+            ? MINDSET_LABELS[result.secondary_mindset]
+            : ""
         }`.trim()
       : null;
 
   const name = getFullName(taker);
   const company = taker?.company?.trim() || null;
   const role = taker?.role_title?.trim() || null;
-  const nextStepsHref = (payload?.link?.next_steps_url || payload?.link?.redirect_url || "").trim() || null;
+  const nextStepsHref =
+    (
+      payload?.link?.next_steps_url ||
+      payload?.link?.redirect_url ||
+      ""
+    ).trim() || null;
   const createdAt = humanDate(result.created_at);
   const theme = priorityTheme(diagnostic.primary_priority);
 
-  const frequencyData = (['FIRE', 'FLOW', 'FORM', 'FIELD'] as PersonalityKey[]).map((key) => ({
+  const frequencyData = (
+    ["FIRE", "FLOW", "FORM", "FIELD"] as PersonalityKey[]
+  ).map((key) => ({
     key,
     value: personalityPercentages[key] || 0,
   }));
@@ -1160,13 +1358,22 @@ export default function GedEntrepreneurStrategicReportPage({
   const indexItems: ReportIndexItem[] = [
     { href: "#quantum-profile-matrix", label: "Buyers Persona Matrix" },
     { href: "#personality-layer", label: "Your Personality layer" },
-    { href: "#understand-quantum-profile", label: "Understand the quantum profile" },
+    {
+      href: "#understand-quantum-profile",
+      label: "Understand the quantum profile",
+    },
     { href: "#mindset-layer", label: "Your mindset layer" },
     { href: "#combined-pattern", label: "Your combined quantum pattern" },
-    { href: "#one-page-quantum-profile", label: "Your strategic growth priorities" },
+    {
+      href: "#one-page-quantum-profile",
+      label: "Your strategic growth priorities",
+    },
     { href: "#focus-plan", label: "Your 30-day action plan" },
     { href: "#growth-roadmap", label: "Your growth roadmap" },
-    { href: "#communication-decision-style", label: "Your communication and decision style" },
+    {
+      href: "#communication-decision-style",
+      label: "Your communication and decision style",
+    },
     { href: "#reflection-prompts", label: "Your reflection prompts" },
     { href: "#executive-summary", label: "Your one-page quantum summary" },
     { href: "#executive-summary", label: "Executive summary" },
@@ -1251,27 +1458,82 @@ export default function GedEntrepreneurStrategicReportPage({
         : 4;
 
   const engineJourney = [
-    { step: 5, title: "Scale & Systemize", detail: "Predictable growth engine" },
-    { step: 4, title: "Optimise & Expand", detail: "Increase efficiency & margin" },
-    { step: 3, title: "Build & Convert", detail: "Strong pipeline & a sales system" },
-    { step: 2, title: "Validate & Offer", detail: "Market fit & offer clarity" },
-    { step: 1, title: "Foundation", detail: "Clarity, positioning & early traction" },
+    {
+      step: 5,
+      title: "Scale & Systemize",
+      detail: "Predictable growth engine",
+    },
+    {
+      step: 4,
+      title: "Optimise & Expand",
+      detail: "Increase efficiency & margin",
+    },
+    {
+      step: 3,
+      title: "Build & Convert",
+      detail: "Strong pipeline & a sales system",
+    },
+    {
+      step: 2,
+      title: "Validate & Offer",
+      detail: "Market fit & offer clarity",
+    },
+    {
+      step: 1,
+      title: "Foundation",
+      detail: "Clarity, positioning & early traction",
+    },
   ];
+
+  const currentBusinessStageIndex = BUSINESS_STAGE_LADDER.findIndex(
+    (stage) => stage.code === diagnostic.business_stage.code,
+  );
+
+  const readinessBreakdown = [
+    {
+      label: "Sales engine",
+      value: diagnostic.scores.sales_engine,
+    },
+    {
+      label: "Delivery & operations",
+      value: diagnostic.scores.delivery_engine,
+    },
+    {
+      label: "Founder independence",
+      value: 100 - diagnostic.scores.founder_dependency,
+    },
+  ];
+
+  const selfDiagnosisCopy = diagnostic.self_diagnosis
+    ? `“${diagnostic.self_diagnosis}”`
+    : "You did not add a written self-diagnosis. The scorecard still identifies the most likely operating pressure point from your answers.";
 
   return (
     <div className="min-h-screen bg-[#09141d] text-slate-900">
       <AppBackground />
-      <main ref={reportRef} className="relative mx-auto max-w-[1440px] px-3 py-4 md:px-5 md:py-6">
-        <header data-ged-pdf-page className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7">
+      <main
+        ref={reportRef}
+        className="relative mx-auto max-w-[1440px] px-3 py-4 md:px-5 md:py-6"
+      >
+        <header
+          data-ged-pdf-page
+          className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7"
+        >
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,190px))] xl:items-center">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-xs font-black tracking-[0.12em]">
                 PT
               </div>
               <div>
-                <h1 className="text-2xl font-extrabold uppercase tracking-[0.12em] md:text-[2rem]">Strategic Growth Report</h1>
-                <p className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-emerald-300">Growth Engine Diagnostic</p>
-                <p className="mt-1 text-xs text-white/80">Strategic Client Report · Powered by ProfileTest.ai</p>
+                <h1 className="text-2xl font-extrabold uppercase tracking-[0.12em] md:text-[2rem]">
+                  Strategic Growth Report
+                </h1>
+                <p className="mt-2 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-emerald-300">
+                  Growth Engine Diagnostic
+                </p>
+                <p className="mt-1 text-xs text-white/80">
+                  Strategic Client Report · Powered by ProfileTest.ai
+                </p>
               </div>
             </div>
 
@@ -1292,14 +1554,27 @@ export default function GedEntrepreneurStrategicReportPage({
           </div>
         </header>
 
-        <section data-ged-pdf-page className={`mt-5 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br ${theme.hero} bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9`}>
+        <section
+          data-ged-pdf-page
+          className={`mt-5 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br ${theme.hero} bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9`}
+        >
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
             <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">Quantum profile</p>
-              <h2 className="mt-3 text-4xl font-extrabold tracking-tight md:text-5xl">{name || "Your Growth Engine"}</h2>
-              {company || role ? <p className="mt-2 text-base text-slate-300">{[role, company].filter(Boolean).join(" · ")}</p> : null}
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                Quantum profile
+              </p>
+              <h2 className="mt-3 text-4xl font-extrabold tracking-tight md:text-5xl">
+                {name || "Your Growth Engine"}
+              </h2>
+              {company || role ? (
+                <p className="mt-2 text-base text-slate-300">
+                  {[role, company].filter(Boolean).join(" · ")}
+                </p>
+              ) : null}
               <p className="mt-6 border-l-4 border-emerald-400 pl-4 text-base leading-7 text-slate-200">
-                A practical view of where your business is relying too heavily on you, what needs attention first and how to build more dependable growth.
+                A practical view of where your business is relying too heavily
+                on you, what needs attention first and how to build more
+                dependable growth.
               </p>
             </div>
 
@@ -1337,7 +1612,10 @@ export default function GedEntrepreneurStrategicReportPage({
             />
             <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
               <p className="text-sm leading-6 text-slate-300">
-                The Growth Engine Diagnostic combines your behavioural pattern with your current operating signals, helping you see how you naturally create momentum and where the operating system needs to become more dependable.
+                The Growth Engine Diagnostic combines your behavioural pattern
+                with your current operating signals, helping you see how you
+                naturally create momentum and where the operating system needs
+                to become more dependable.
               </p>
             </div>
           </div>
@@ -1357,15 +1635,24 @@ export default function GedEntrepreneurStrategicReportPage({
 
           <div className="mt-5 grid gap-4 xl:grid-cols-[0.94fr_1.08fr_1.08fr]">
             <article className="min-h-[206px] rounded-2xl border-2 border-emerald-400 bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
-              <p className="text-sm font-bold text-emerald-300">Your Quantum Profile</p>
-              <p className="mt-3 text-2xl font-extrabold tracking-tight md:text-3xl">{canonicalProfile}</p>
+              <p className="text-sm font-bold text-emerald-300">
+                Your Quantum Profile
+              </p>
+              <p className="mt-3 text-2xl font-extrabold tracking-tight md:text-3xl">
+                {canonicalProfile}
+              </p>
 
               <div className="mt-5 space-y-2.5">
                 <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-3 py-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-400/10">
-                    <AssetIcon src={onePageIcons.personality} className="h-4 w-4 object-contain" />
+                    <AssetIcon
+                      src={onePageIcons.personality}
+                      className="h-4 w-4 object-contain"
+                    />
                   </span>
-                  <span className="flex-1 text-xs font-medium text-slate-300">Personality</span>
+                  <span className="flex-1 text-xs font-medium text-slate-300">
+                    Personality
+                  </span>
                   <span
                     className="text-xs font-bold"
                     style={{ color: primaryPersonalityColor }}
@@ -1376,9 +1663,14 @@ export default function GedEntrepreneurStrategicReportPage({
 
                 <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.055] px-3 py-2">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-cyan-400/10">
-                    <AssetIcon src={onePageIcons.mindsetStage} className="h-4 w-4 object-contain" />
+                    <AssetIcon
+                      src={onePageIcons.mindsetStage}
+                      className="h-4 w-4 object-contain"
+                    />
                   </span>
-                  <span className="flex-1 text-xs font-medium text-slate-300">Mindset Stage</span>
+                  <span className="flex-1 text-xs font-medium text-slate-300">
+                    Mindset Stage
+                  </span>
                   <span
                     className="text-xs font-bold"
                     style={{ color: primaryMindsetColor }}
@@ -1392,9 +1684,14 @@ export default function GedEntrepreneurStrategicReportPage({
             <article className="min-h-[206px] rounded-2xl border border-white/10 bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-cyan-300/60 bg-cyan-400/10">
-                  <AssetIcon src={onePageIcons.strengths} className="h-4 w-4 object-contain" />
+                  <AssetIcon
+                    src={onePageIcons.strengths}
+                    className="h-4 w-4 object-contain"
+                  />
                 </span>
-                <p className="text-sm font-bold text-cyan-300">Your Strengths</p>
+                <p className="text-sm font-bold text-cyan-300">
+                  Your Strengths
+                </p>
               </div>
               <p className="mt-3 text-sm leading-5 text-slate-200">
                 {persona?.combined_strengths ||
@@ -1411,9 +1708,14 @@ export default function GedEntrepreneurStrategicReportPage({
             <article className="min-h-[206px] rounded-2xl border border-[#168bd2] bg-[#09211c] p-5 text-white shadow-inner shadow-black/20">
               <div className="flex items-center gap-3">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#168bd2]/70 bg-[#168bd2]/10">
-                  <AssetIcon src={onePageIcons.priorities} className="h-4 w-4 object-contain" />
+                  <AssetIcon
+                    src={onePageIcons.priorities}
+                    className="h-4 w-4 object-contain"
+                  />
                 </span>
-                <p className="text-sm font-bold text-sky-300">Top strategic priorities</p>
+                <p className="text-sm font-bold text-sky-300">
+                  Top strategic priorities
+                </p>
               </div>
 
               <ol className="mt-4 space-y-3 text-sm leading-5 text-slate-200">
@@ -1443,11 +1745,14 @@ export default function GedEntrepreneurStrategicReportPage({
               <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-slate-300">
                 Scale Readiness Gap
               </p>
-              <p className={`mt-3 text-2xl font-extrabold ${readinessStyle.text}`}>
+              <p
+                className={`mt-3 text-2xl font-extrabold ${readinessStyle.text}`}
+              >
                 {displayReadinessLevel}
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-200">
-                {diagnostic.scale_readiness_level} readiness for growth without adding more founder load.
+                {diagnostic.scale_readiness_level} readiness for growth without
+                adding more founder load.
               </p>
               <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/15">
                 <div
@@ -1469,12 +1774,18 @@ export default function GedEntrepreneurStrategicReportPage({
               <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-slate-300">
                 Urgency Level
               </p>
-              <p className={`mt-3 text-2xl font-extrabold ${urgencyStyle.text}`}>
+              <p
+                className={`mt-3 text-2xl font-extrabold ${urgencyStyle.text}`}
+              >
                 {diagnostic.urgency.label}
               </p>
-              <p className="mt-2 text-xs font-medium text-slate-100">{diagnostic.urgency.window}</p>
+              <p className="mt-2 text-xs font-medium text-slate-100">
+                {diagnostic.urgency.window}
+              </p>
               <div className="mt-3 flex gap-2 text-xs leading-5 text-slate-300">
-                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${urgencyStyle.dot}`} />
+                <span
+                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${urgencyStyle.dot}`}
+                />
                 <span>{diagnostic.urgency.summary}</span>
               </div>
             </article>
@@ -1501,16 +1812,22 @@ export default function GedEntrepreneurStrategicReportPage({
                       <span
                         className={[
                           "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.55rem] font-black",
-                          active ? "bg-[#0a7d5f] text-white" : "bg-emerald-400/20 text-emerald-200",
+                          active
+                            ? "bg-[#0a7d5f] text-white"
+                            : "bg-emerald-400/20 text-emerald-200",
                         ].join(" ")}
                       >
                         {item.step}
                       </span>
                       <div className="min-w-0">
-                        <p className={`text-[0.68rem] font-bold leading-4 ${active ? "text-[#09211c]" : "text-slate-100"}`}>
+                        <p
+                          className={`text-[0.68rem] font-bold leading-4 ${active ? "text-[#09211c]" : "text-slate-100"}`}
+                        >
                           {item.title}
                         </p>
-                        <p className={`text-[0.56rem] leading-3 ${active ? "text-[#09211c] opacity-75" : "text-slate-400"}`}>
+                        <p
+                          className={`text-[0.56rem] leading-3 ${active ? "text-[#09211c] opacity-75" : "text-slate-400"}`}
+                        >
                           {item.detail}
                         </p>
                       </div>
@@ -1519,7 +1836,9 @@ export default function GedEntrepreneurStrategicReportPage({
                 })}
               </div>
 
-              <p className="mt-3 text-xs leading-5 text-slate-300">{diagnostic.priority_summary}</p>
+              <p className="mt-3 text-xs leading-5 text-slate-300">
+                {diagnostic.priority_summary}
+              </p>
             </article>
 
             <article className="flex min-h-[188px] flex-col items-center justify-center rounded-2xl border border-emerald-300/50 bg-[#1b5148] p-4 text-center text-white shadow-inner shadow-black/20">
@@ -1527,7 +1846,9 @@ export default function GedEntrepreneurStrategicReportPage({
                 Progress Circle
               </p>
               <ScoreRing score={diagnostic.scores.overall_engine} />
-              <p className="-mt-2 text-sm font-bold text-white">Overall Engine Score</p>
+              <p className="-mt-2 text-sm font-bold text-white">
+                Overall Engine Score
+              </p>
               <p className="mt-2 text-xs leading-5 text-emerald-50/85">
                 Overall engine health
               </p>
@@ -1541,9 +1862,12 @@ export default function GedEntrepreneurStrategicReportPage({
           className="mt-5 grid gap-4 lg:grid-cols-2"
         >
           <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20 md:p-6">
-            <h2 className="text-base font-bold text-white md:text-lg">Your Personality Layer</h2>
+            <h2 className="text-base font-bold text-white md:text-lg">
+              Your Personality Layer
+            </h2>
             <p className="mt-3 max-w-xl text-xs leading-5 text-slate-300 md:text-sm">
-              Your emotional &amp; energetic style across Fire, Flow, Form and Field in the way you buy and build.
+              Your emotional &amp; energetic style across Fire, Flow, Form and
+              Field in the way you buy and build.
             </p>
 
             <div className="mt-5 flex flex-col items-center gap-5 sm:flex-row sm:items-center">
@@ -1551,7 +1875,10 @@ export default function GedEntrepreneurStrategicReportPage({
 
               <div className="w-full space-y-3">
                 {frequencyData.map((item) => (
-                  <div key={item.key} className="flex items-center gap-3 text-xs md:text-sm">
+                  <div
+                    key={item.key}
+                    className="flex items-center gap-3 text-xs md:text-sm"
+                  >
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: FREQUENCY_COLORS[item.key] }}
@@ -1569,20 +1896,35 @@ export default function GedEntrepreneurStrategicReportPage({
           </article>
 
           <article className="rounded-2xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20 md:p-6">
-            <h2 className="text-base font-bold text-white md:text-lg">Your Mindset Layer</h2>
+            <h2 className="text-base font-bold text-white md:text-lg">
+              Your Mindset Layer
+            </h2>
             <p className="mt-3 max-w-xl text-xs leading-5 text-slate-300 md:text-sm">
-              Where your focus and energy are distributed across the five Quantum growth stages.
+              Where your focus and energy are distributed across the five
+              Quantum growth stages.
             </p>
 
             <div className="mt-5 space-y-3">
-              {(["ORIGIN", "MOMENTUM", "VECTOR", "ORBIT", "QUANTUM"] as MindsetKey[]).map((key) => {
+              {(
+                [
+                  "ORIGIN",
+                  "MOMENTUM",
+                  "VECTOR",
+                  "ORBIT",
+                  "QUANTUM",
+                ] as MindsetKey[]
+              ).map((key) => {
                 const value = clampPercent(mindsetPercentages[key] || 0);
 
                 return (
                   <div key={key}>
                     <div className="flex items-center justify-between gap-4 text-xs md:text-sm">
-                      <span className="text-slate-200">{MINDSET_LABELS[key]}</span>
-                      <span className="tabular-nums text-slate-200">{value}%</span>
+                      <span className="text-slate-200">
+                        {MINDSET_LABELS[key]}
+                      </span>
+                      <span className="tabular-nums text-slate-200">
+                        {value}%
+                      </span>
                     </div>
                     <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/10">
                       <div
@@ -1697,7 +2039,8 @@ export default function GedEntrepreneurStrategicReportPage({
                         {primaryPersonalityLabel} operating pattern
                       </h3>
                       <p className="mt-3 text-sm leading-5 text-[#4b5563]">
-                        {persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
+                        {persona?.combined_strengths ||
+                          "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
                       </p>
                     </article>
 
@@ -1706,7 +2049,8 @@ export default function GedEntrepreneurStrategicReportPage({
                         What energises you
                       </p>
                       <p className="mt-3 text-sm leading-5 text-[#4b5563]">
-                        {persona?.energisers || "You operate best when your strengths are directed toward work that creates strategic momentum."}
+                        {persona?.energisers ||
+                          "You operate best when your strengths are directed toward work that creates strategic momentum."}
                       </p>
                     </article>
 
@@ -1715,7 +2059,8 @@ export default function GedEntrepreneurStrategicReportPage({
                         What drains you
                       </p>
                       <p className="mt-3 text-sm leading-5 text-[#4b5563]">
-                        {persona?.drains || "Repeated escalation, unclear ownership and work that should be carried by the operating system can drain your highest-value energy."}
+                        {persona?.drains ||
+                          "Repeated escalation, unclear ownership and work that should be carried by the operating system can drain your highest-value energy."}
                       </p>
                     </article>
                   </div>
@@ -1748,16 +2093,24 @@ export default function GedEntrepreneurStrategicReportPage({
 
                     <div className="mt-7 space-y-3.5">
                       {MINDSET_STAGE_ORDER.map((key) => {
-                        const value = clampPercent(mindsetPercentages[key] || 0);
+                        const value = clampPercent(
+                          mindsetPercentages[key] || 0,
+                        );
                         const isPrimary = key === primaryMindset;
 
                         return (
                           <div key={key}>
                             <div className="flex items-center justify-between gap-4 text-xs text-[#0c1d1a]">
-                              <span className={isPrimary ? "font-bold" : "font-medium"}>
+                              <span
+                                className={
+                                  isPrimary ? "font-bold" : "font-medium"
+                                }
+                              >
                                 {MINDSET_LABELS[key]}
                               </span>
-                              <span className="tabular-nums font-medium">{value}%</span>
+                              <span className="tabular-nums font-medium">
+                                {value}%
+                              </span>
                             </div>
                             <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e3e3e3]">
                               <div
@@ -1821,28 +2174,71 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="combined-pattern" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="combined-pattern"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.combined_pattern}
-                eyebrow="Your Combined Quantum Pattern"
-                title="How your behaviour and mindset interact"
-                body="Your combined profile is more than the sum of its parts. It shows how your emotional wiring and current growth stage create a distinct operating pattern, with specific strengths, risks and levers."
+                eyebrow="Your Combined Pattern"
+                title={`${canonicalProfile} — What Happens When Your Style Meets Your Stage`}
+                body="Your combined profile is more than the sum of its parts. This is where your emotional wiring and current growth stage create a distinct operating pattern — with specific strengths, risks and levers."
                 dark
               />
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <DarkContentCard title="Strategic strengths">
-                  <p>{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
-                </DarkContentCard>
-                <DarkContentCard title="Growth risks & loops">
-                  <p>{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
-                </DarkContentCard>
-                <DarkContentCard title="Biggest lever">
-                  <p>{persona?.combined_big_lever || "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}</p>
-                </DarkContentCard>
+
+              <div className="mt-6 rounded-2xl bg-white p-4 md:p-6">
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <article className="relative min-h-[218px] overflow-hidden rounded-[13px] border border-[#fddcbf] bg-[#fff8f4] p-6">
+                    <span className="absolute inset-x-4 top-0 h-1 bg-[#34d399]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#34a77c]">
+                      Strategic strengths
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      Your natural advantage
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[#4b5563]">
+                      {persona?.combined_strengths ||
+                        "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[218px] overflow-hidden rounded-[13px] border border-[#fecaca] bg-[#fef2f2] p-6">
+                    <span className="absolute inset-x-4 top-0 h-1 bg-[#dc2626]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#dc2626]">
+                      Growth risks & loops
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      What can hold you back
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[#4b5563]">
+                      {persona?.combined_risks ||
+                        "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}
+                    </p>
+                  </article>
+
+                  <article className="relative min-h-[218px] overflow-hidden rounded-[13px] border border-[#bbf7d0] bg-[#f0fdf4] p-6">
+                    <span className="absolute inset-x-4 top-0 h-1 bg-[#22c55e]" />
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.13em] text-[#16a34a]">
+                      Biggest lever
+                    </p>
+                    <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+                      The move that changes the system
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[#4b5563]">
+                      {persona?.combined_big_lever ||
+                        "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}
+                    </p>
+                  </article>
+                </div>
               </div>
             </section>
 
-            <section data-ged-pdf-page id="communication-decision-style" className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="communication-decision-style"
+              className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.emotional_alignment}
                 eyebrow="Your Emotional & Operational Alignment"
@@ -1852,18 +2248,31 @@ export default function GedEntrepreneurStrategicReportPage({
               />
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 <DarkContentCard title="What stabilises you">
-                  <p>{persona?.emotional_stabilises || "Clear ownership, visible progress and a small number of priorities help you stay out of reactive founder mode."}</p>
+                  <p>
+                    {persona?.emotional_stabilises ||
+                      "Clear ownership, visible progress and a small number of priorities help you stay out of reactive founder mode."}
+                  </p>
                 </DarkContentCard>
                 <DarkContentCard title="What destabilises you">
-                  <p>{persona?.emotional_destabilises || "Unclear ownership, repeated escalation and too many decisions returning to you can increase pressure and reduce follow-through."}</p>
+                  <p>
+                    {persona?.emotional_destabilises ||
+                      "Unclear ownership, repeated escalation and too many decisions returning to you can increase pressure and reduce follow-through."}
+                  </p>
                 </DarkContentCard>
                 <DarkContentCard title="Support yourself better">
-                  <p>{persona?.support_yourself || "Protect time for strategic work, use simple decision rules and review whether the team is truly owning the work you have delegated."}</p>
+                  <p>
+                    {persona?.support_yourself ||
+                      "Protect time for strategic work, use simple decision rules and review whether the team is truly owning the work you have delegated."}
+                  </p>
                 </DarkContentCard>
               </div>
             </section>
 
-            <section data-ged-pdf-page id="business-context" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="business-context"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.business_context}
                 eyebrow="Your Business Context"
@@ -1871,32 +2280,193 @@ export default function GedEntrepreneurStrategicReportPage({
                 body="Your qualifying responses translated into business intelligence. These four signals shape the diagnostic priorities throughout this report."
                 dark
               />
-              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <ContentCard title="Business stage">
-                    <p className="text-lg font-extrabold text-slate-950">{diagnostic.business_stage.label}</p>
-                    <p className="mt-2">{diagnostic.business_stage.summary}</p>
-                  </ContentCard>
-                  <ContentCard title="Core constraint">
-                    <p className="text-lg font-extrabold text-slate-950">{diagnostic.core_constraint.label}</p>
-                    <p className="mt-2">{diagnostic.core_constraint.summary}</p>
-                  </ContentCard>
-                  <ContentCard title="Scale readiness">
-                    <p className={`text-2xl font-extrabold ${scoreTone(diagnostic.scores.scale_readiness)}`}>{diagnostic.scores.scale_readiness}% Ready</p>
-                    <p className="mt-2">{diagnostic.scale_readiness_signal.summary}</p>
-                  </ContentCard>
-                  <ContentCard title="Strategic self-diagnosis">
-                    <p className="text-sm leading-6 text-slate-700">
-                      {diagnostic.self_diagnosis
-                        ? `“${diagnostic.self_diagnosis}”`
-                        : "You did not add a written self-diagnosis. The scorecard still identifies the most likely operating pressure point from your answers."}
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-[#f9f8f6] p-4 shadow-sm md:p-7">
+                <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+                  <article className="flex min-h-[300px] flex-col rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#fee8d6]">
+                      <AssetIcon
+                        src={BUSINESS_CONTEXT_ICON_PATHS.businessStage}
+                        alt=""
+                        className="h-5 w-5 object-contain"
+                      />
+                    </div>
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#4b5563]">
+                      Business stage
                     </p>
-                  </ContentCard>
+                    <h3 className="mt-1 text-lg font-extrabold leading-6 text-[#1a1a1a]">
+                      {diagnostic.business_stage.label}
+                    </h3>
+                    <p className="mt-2 text-xs leading-[1.45] text-[#4b5563] sm:text-sm sm:leading-5">
+                      {diagnostic.business_stage.summary}
+                    </p>
+
+                    <div className="mt-auto grid grid-cols-4 items-end gap-2 pt-5 sm:gap-3">
+                      {BUSINESS_STAGE_LADDER.map((stage, index) => {
+                        const active = index === currentBusinessStageIndex;
+                        const passed =
+                          currentBusinessStageIndex >= 0 &&
+                          index < currentBusinessStageIndex;
+                        const barColor = active
+                          ? "#34d399"
+                          : passed
+                            ? "#ffb347"
+                            : "#e5e7eb";
+
+                        return (
+                          <div
+                            key={stage.code}
+                            className="flex min-w-0 flex-col items-center gap-1.5"
+                          >
+                            <div className="flex h-[90px] items-end">
+                              <div
+                                className="w-full min-w-[38px] rounded-t-md transition-colors"
+                                style={{
+                                  height: `${stage.height}%`,
+                                  backgroundColor: barColor,
+                                }}
+                              />
+                            </div>
+                            <p
+                              className={`w-full text-center text-[0.58rem] font-semibold leading-3 sm:text-[0.64rem] ${
+                                active ? "text-emerald-700" : "text-[#4b5563]"
+                              }`}
+                            >
+                              {stage.label}
+                              {active ? " ★" : ""}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+
+                  <article className="flex min-h-[300px] flex-col rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#fee8d6]">
+                      <AssetIcon
+                        src={BUSINESS_CONTEXT_ICON_PATHS.coreConstraint}
+                        alt=""
+                        className="h-5 w-5 object-contain"
+                      />
+                    </div>
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#4b5563]">
+                      Core constraint
+                    </p>
+                    <h3 className="mt-1 text-lg font-extrabold leading-6 text-[#1a1a1a]">
+                      {diagnostic.core_constraint.label}
+                    </h3>
+                    <p className="mt-2 text-xs leading-[1.45] text-[#4b5563] sm:text-sm sm:leading-5">
+                      {diagnostic.core_constraint.summary}
+                    </p>
+
+                    <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                      {CONSTRAINT_SIGNAL_CHIPS.map((signal) => {
+                        const selected =
+                          signal.code === diagnostic.core_constraint.code;
+                        return (
+                          <span
+                            key={signal.code}
+                            className={[
+                              "rounded-full px-3 py-1.5 text-xs font-bold",
+                              selected
+                                ? "bg-rose-100 text-rose-700"
+                                : signal.code === "UNCLEAR"
+                                  ? "bg-slate-100 text-slate-600"
+                                  : "bg-amber-100 text-amber-800",
+                            ].join(" ")}
+                          >
+                            {signal.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </article>
+
+                  <article className="flex min-h-[300px] flex-col rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#fee8d6]">
+                      <AssetIcon
+                        src={BUSINESS_CONTEXT_ICON_PATHS.scaleReadiness}
+                        alt=""
+                        className="h-5 w-5 object-contain"
+                      />
+                    </div>
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#4b5563]">
+                      Scale readiness
+                    </p>
+                    <h3
+                      className={`mt-1 text-lg font-extrabold leading-6 ${scoreTone(diagnostic.scores.scale_readiness)}`}
+                    >
+                      {diagnostic.scores.scale_readiness}% Ready
+                    </h3>
+                    <p className="mt-2 text-xs leading-[1.45] text-[#4b5563] sm:text-sm sm:leading-5">
+                      {diagnostic.scale_readiness_signal.summary}
+                    </p>
+
+                    <div className="mt-auto space-y-3.5 pt-5">
+                      {readinessBreakdown.map((item) => (
+                        <div key={item.label}>
+                          <div className="flex items-center justify-between gap-3 text-[0.68rem]">
+                            <span className="font-medium text-[#1a1a1a]">
+                              {item.label}
+                            </span>
+                            <span
+                              className="font-bold tabular-nums"
+                              style={{ color: scoreAccent(item.value) }}
+                            >
+                              {clampPercent(item.value)}%
+                            </span>
+                          </div>
+                          <div className="mt-1.5 h-2 overflow-hidden rounded bg-[#e5e7eb]">
+                            <div
+                              className="h-full rounded"
+                              style={{
+                                width: `${clampPercent(item.value)}%`,
+                                backgroundColor: scoreAccent(item.value),
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+
+                  <article className="flex min-h-[300px] flex-col rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#fee8d6]">
+                      <AssetIcon
+                        src={BUSINESS_CONTEXT_ICON_PATHS.strategicSelfDiagnosis}
+                        alt=""
+                        className="h-5 w-5 object-contain"
+                      />
+                    </div>
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.15em] text-[#4b5563]">
+                      Strategic self-diagnosis
+                    </p>
+                    <h3 className="mt-1 text-lg font-extrabold leading-6 text-[#1a1a1a]">
+                      {diagnostic.scale_readiness_signal.label}
+                    </h3>
+                    <p className="mt-2 text-xs leading-[1.45] text-[#4b5563] sm:text-sm sm:leading-5">
+                      {selfDiagnosisCopy}
+                    </p>
+
+                    <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                      <span className="rounded-full bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700">
+                        Founder dependency{" "}
+                        {clampPercent(diagnostic.scores.founder_dependency)}%
+                      </span>
+                      <span className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800">
+                        {diagnostic.response_alignment.label}
+                      </span>
+                    </div>
+                  </article>
                 </div>
               </div>
             </section>
 
-            <section data-ged-pdf-page id="engine-scorecard" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="engine-scorecard"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.engine_scorecard}
                 eyebrow="Your Engine Scorecard"
@@ -1908,28 +2478,72 @@ export default function GedEntrepreneurStrategicReportPage({
                 <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
                     <ScoreRing score={diagnostic.scores.overall_engine} />
-                    <p className="mt-1 text-sm font-bold text-slate-950">Overall Engine Score</p>
+                    <p className="mt-1 text-sm font-bold text-slate-950">
+                      Overall Engine Score
+                    </p>
                     <div className="mt-5 w-full space-y-3 text-left text-sm">
-                      <div className="flex items-center justify-between"><span className="text-slate-600">Growth Profile</span><strong className="text-slate-950">{diagnostic.scores.growth_engine}%</strong></div>
-                      <div className="flex items-center justify-between"><span className="text-slate-600">Scale Readiness</span><strong className="text-slate-950">{diagnostic.scores.scale_readiness}%</strong></div>
-                      <div className="flex items-center justify-between"><span className="text-slate-600">Founder Dependency</span><strong className="text-slate-950">{diagnostic.scores.founder_dependency}%</strong></div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Growth Profile</span>
+                        <strong className="text-slate-950">
+                          {diagnostic.scores.growth_engine}%
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Scale Readiness</span>
+                        <strong className="text-slate-950">
+                          {diagnostic.scores.scale_readiness}%
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">
+                          Founder Dependency
+                        </span>
+                        <strong className="text-slate-950">
+                          {diagnostic.scores.founder_dependency}%
+                        </strong>
+                      </div>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 p-5">
-                    <p className="text-base font-bold text-slate-950">Diagnostic Score Breakdown</p>
+                    <p className="text-base font-bold text-slate-950">
+                      Diagnostic Score Breakdown
+                    </p>
                     <div className="mt-5 space-y-5">
                       <div>
-                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">Operational Layer</p>
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                          Operational Layer
+                        </p>
                         <div className="mt-4 space-y-4">
-                          <Meter label="Growth Engine" score={diagnostic.scores.growth_engine} accent="#16a34a" caption="Delivery capacity, team execution and operating structure." />
-                          <Meter label="Sales Engine" score={diagnostic.scores.sales_engine} accent="#d97706" caption="Conversion, follow-up and consistent revenue without founder-led closing." />
+                          <Meter
+                            label="Growth Engine"
+                            score={diagnostic.scores.growth_engine}
+                            accent="#16a34a"
+                            caption="Delivery capacity, team execution and operating structure."
+                          />
+                          <Meter
+                            label="Sales Engine"
+                            score={diagnostic.scores.sales_engine}
+                            accent="#d97706"
+                            caption="Conversion, follow-up and consistent revenue without founder-led closing."
+                          />
                         </div>
                       </div>
                       <div>
-                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">Readiness Layer</p>
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                          Readiness Layer
+                        </p>
                         <div className="mt-4 space-y-4">
-                          <Meter label="Scale Readiness" score={diagnostic.scores.scale_readiness} accent="#d97706" />
-                          <Meter label="Founder Dependency" score={100 - diagnostic.scores.founder_dependency} accent="#dc2626" caption="Higher dependency reduces the readiness score." />
+                          <Meter
+                            label="Scale Readiness"
+                            score={diagnostic.scores.scale_readiness}
+                            accent="#d97706"
+                          />
+                          <Meter
+                            label="Founder Dependency"
+                            score={100 - diagnostic.scores.founder_dependency}
+                            accent="#dc2626"
+                            caption="Higher dependency reduces the readiness score."
+                          />
                         </div>
                       </div>
                     </div>
@@ -1938,7 +2552,11 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="primary-bottleneck" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="primary-bottleneck"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.primary_bottleneck}
                 eyebrow="Your Primary Bottleneck"
@@ -1948,22 +2566,38 @@ export default function GedEntrepreneurStrategicReportPage({
               />
               <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-6">
                 <div className="rounded-2xl border border-emerald-300 bg-emerald-100/60 p-5">
-                  <p className="text-sm font-extrabold text-emerald-800">{diagnostic.primary_bottleneck.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{diagnostic.primary_bottleneck.summary}</p>
+                  <p className="text-sm font-extrabold text-emerald-800">
+                    {diagnostic.primary_bottleneck.label}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    {diagnostic.primary_bottleneck.summary}
+                  </p>
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <ContentCard title="Why it matters"><p>{diagnostic.primary_bottleneck.why_it_matters}</p></ContentCard>
-                  <ContentCard title="The first practical fix"><p>{diagnostic.primary_bottleneck.first_fix}</p></ContentCard>
+                  <ContentCard title="Why it matters">
+                    <p>{diagnostic.primary_bottleneck.why_it_matters}</p>
+                  </ContentCard>
+                  <ContentCard title="The first practical fix">
+                    <p>{diagnostic.primary_bottleneck.first_fix}</p>
+                  </ContentCard>
                   <ContentCard title="Urgency window">
-                    <p className="text-lg font-extrabold text-slate-950">{diagnostic.urgency.label}</p>
-                    <p className="mt-2 font-semibold text-slate-800">{diagnostic.urgency.window}</p>
+                    <p className="text-lg font-extrabold text-slate-950">
+                      {diagnostic.urgency.label}
+                    </p>
+                    <p className="mt-2 font-semibold text-slate-800">
+                      {diagnostic.urgency.window}
+                    </p>
                     <p className="mt-3">{diagnostic.urgency.summary}</p>
                   </ContentCard>
                 </div>
               </div>
             </section>
 
-            <section data-ged-pdf-page id="reflection-prompts" className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="reflection-prompts"
+              className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.what_this_means}
                 eyebrow="What This Means"
@@ -1972,19 +2606,41 @@ export default function GedEntrepreneurStrategicReportPage({
                 dark
               />
               <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <ContentCard title="Strategic Strength" className="border-emerald-200 bg-emerald-50/60">
-                  <p className="font-semibold text-slate-950">{persona?.combined_strengths || "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}</p>
+                <ContentCard
+                  title="Strategic Strength"
+                  className="border-emerald-200 bg-emerald-50/60"
+                >
+                  <p className="font-semibold text-slate-950">
+                    {persona?.combined_strengths ||
+                      "Your profile highlights the strengths you naturally bring to decisions, relationships and momentum in the business."}
+                  </p>
                 </ContentCard>
-                <ContentCard title="Growth Risk" className="border-rose-200 bg-rose-50/60">
-                  <p className="font-semibold text-slate-950">{persona?.combined_risks || "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}</p>
+                <ContentCard
+                  title="Growth Risk"
+                  className="border-rose-200 bg-rose-50/60"
+                >
+                  <p className="font-semibold text-slate-950">
+                    {persona?.combined_risks ||
+                      "Under pressure, your natural style can make it easier to return to old habits instead of letting the new operating system do its work."}
+                  </p>
                 </ContentCard>
-                <ContentCard title="Biggest Lever" className="border-emerald-200 bg-emerald-50/60">
-                  <p className="font-semibold text-slate-950">{persona?.combined_big_lever || "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}</p>
+                <ContentCard
+                  title="Biggest Lever"
+                  className="border-emerald-200 bg-emerald-50/60"
+                >
+                  <p className="font-semibold text-slate-950">
+                    {persona?.combined_big_lever ||
+                      "Use your natural strengths to set direction, then protect the routines and ownership that allow the team to execute without you."}
+                  </p>
                 </ContentCard>
               </div>
             </section>
 
-            <section data-ged-pdf-page id="revenue-impact" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="revenue-impact"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.revenue_impact}
                 eyebrow="Your Revenue Impact"
@@ -1993,28 +2649,66 @@ export default function GedEntrepreneurStrategicReportPage({
                 dark
               />
               <div className="mt-6 rounded-2xl bg-white p-5 md:p-6">
-                <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-cyan-700">Operational impact analysis</p>
-                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Where the bottleneck is likely to show up</h3>
+                <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-cyan-700">
+                  Operational impact analysis
+                </p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">
+                  Where the bottleneck is likely to show up
+                </h3>
                 <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-                  This is not a revenue forecast. It is a practical view of where the current constraint is most likely to create drag, inconsistency or founder overload.
+                  This is not a revenue forecast. It is a practical view of
+                  where the current constraint is most likely to create drag,
+                  inconsistency or founder overload.
                 </p>
                 <div className="mt-5 space-y-3">
                   {diagnostic.operational_impact.map((impact) => {
-                    const severity = impact.level === "critical" ? 92 : impact.level === "significant" ? 72 : impact.level === "moderate" ? 52 : 28;
+                    const severity =
+                      impact.level === "critical"
+                        ? 92
+                        : impact.level === "significant"
+                          ? 72
+                          : impact.level === "moderate"
+                            ? 52
+                            : 28;
                     return (
-                      <article key={impact.key} className={`rounded-xl border p-4 ${impactTone(impact.level)}`}>
+                      <article
+                        key={impact.key}
+                        className={`rounded-xl border p-4 ${impactTone(impact.level)}`}
+                      >
                         <div className="grid gap-4 md:grid-cols-[minmax(0,0.9fr)_minmax(260px,1.1fr)_auto] md:items-center">
                           <div>
-                            <h3 className="text-sm font-bold text-slate-950">{impact.label}</h3>
-                            <p className="mt-1 text-xs leading-5 text-slate-600">{impact.explanation}</p>
+                            <h3 className="text-sm font-bold text-slate-950">
+                              {impact.label}
+                            </h3>
+                            <p className="mt-1 text-xs leading-5 text-slate-600">
+                              {impact.explanation}
+                            </p>
                           </div>
                           <div>
                             <div className="h-2 overflow-hidden rounded-full bg-white/80">
-                              <div className="h-full rounded-full" style={{ width: `${severity}%`, backgroundColor: impact.level === "critical" ? "#e11d48" : impact.level === "significant" ? "#f97316" : impact.level === "moderate" ? "#d97706" : "#10b981" }} />
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${severity}%`,
+                                  backgroundColor:
+                                    impact.level === "critical"
+                                      ? "#e11d48"
+                                      : impact.level === "significant"
+                                        ? "#f97316"
+                                        : impact.level === "moderate"
+                                          ? "#d97706"
+                                          : "#10b981",
+                                }}
+                              />
                             </div>
-                            <div className="mt-1 flex justify-between text-[0.65rem] text-slate-400"><span>Low impact</span><span>Critical impact</span></div>
+                            <div className="mt-1 flex justify-between text-[0.65rem] text-slate-400">
+                              <span>Low impact</span>
+                              <span>Critical impact</span>
+                            </div>
                           </div>
-                          <span className="rounded-lg bg-white/80 px-3 py-2 text-[0.68rem] font-bold uppercase tracking-[0.14em]">{impactLabel(impact.level)}</span>
+                          <span className="rounded-lg bg-white/80 px-3 py-2 text-[0.68rem] font-bold uppercase tracking-[0.14em]">
+                            {impactLabel(impact.level)}
+                          </span>
                         </div>
                       </article>
                     );
@@ -2023,7 +2717,11 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="focus-plan" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="focus-plan"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.focus_plan}
                 eyebrow="Your 30-Day Focus Plan"
@@ -2033,9 +2731,16 @@ export default function GedEntrepreneurStrategicReportPage({
               />
               <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {diagnostic.action_plan.map((step) => (
-                  <article key={step.week} className="rounded-xl border border-white/10 bg-white/[0.035] p-5 text-white">
-                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-300">{step.week}</p>
-                    <h3 className="mt-3 text-lg font-extrabold">{step.title}</h3>
+                  <article
+                    key={step.week}
+                    className="rounded-xl border border-white/10 bg-white/[0.035] p-5 text-white"
+                  >
+                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-300">
+                      {step.week}
+                    </p>
+                    <h3 className="mt-3 text-lg font-extrabold">
+                      {step.title}
+                    </h3>
                     <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
                       {step.actions.map((action) => (
                         <li key={action} className="flex gap-2">
@@ -2049,7 +2754,11 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="executive-summary" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="executive-summary"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.executive_summary}
                 eyebrow="Your One-Page Executive Summary"
@@ -2059,47 +2768,92 @@ export default function GedEntrepreneurStrategicReportPage({
               />
               <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <ContentCard title="Growth Engine Profile">
-                  <p className="text-lg font-extrabold text-slate-950">{canonicalProfile}</p>
-                  <p className="mt-2">Personality: {primaryPersonalityLabel}. Mindset stage: {primaryMindsetLabel}.</p>
+                  <p className="text-lg font-extrabold text-slate-950">
+                    {canonicalProfile}
+                  </p>
+                  <p className="mt-2">
+                    Personality: {primaryPersonalityLabel}. Mindset stage:{" "}
+                    {primaryMindsetLabel}.
+                  </p>
                 </ContentCard>
                 <ContentCard title="Primary Bottleneck">
-                  <p className="text-lg font-extrabold text-slate-950">{diagnostic.primary_bottleneck.label}</p>
+                  <p className="text-lg font-extrabold text-slate-950">
+                    {diagnostic.primary_bottleneck.label}
+                  </p>
                   <p className="mt-2">{diagnostic.urgency.window}</p>
                 </ContentCard>
                 <ContentCard title="Engine Scorecard">
-                  <p>Growth Engine: <span className="font-bold text-slate-950">{diagnostic.scores.growth_engine}%</span></p>
-                  <p>Sales Engine: <span className="font-bold text-slate-950">{diagnostic.scores.sales_engine}%</span></p>
-                  <p>Scale readiness: <span className="font-bold text-slate-950">{diagnostic.scores.scale_readiness}%</span></p>
+                  <p>
+                    Growth Engine:{" "}
+                    <span className="font-bold text-slate-950">
+                      {diagnostic.scores.growth_engine}%
+                    </span>
+                  </p>
+                  <p>
+                    Sales Engine:{" "}
+                    <span className="font-bold text-slate-950">
+                      {diagnostic.scores.sales_engine}%
+                    </span>
+                  </p>
+                  <p>
+                    Scale readiness:{" "}
+                    <span className="font-bold text-slate-950">
+                      {diagnostic.scores.scale_readiness}%
+                    </span>
+                  </p>
                 </ContentCard>
                 <ContentCard title="Business Context">
                   <p>{diagnostic.business_stage.label}</p>
-                  <p className="mt-2">Constraint: {diagnostic.core_constraint.label}</p>
+                  <p className="mt-2">
+                    Constraint: {diagnostic.core_constraint.label}
+                  </p>
                 </ContentCard>
                 <div id="growth-roadmap" className="scroll-mt-6">
                   <ContentCard title="Next 90 Days">
                     {strategicPriorities.length ? (
                       <ul className="space-y-2">
                         {strategicPriorities.map((priority) => (
-                          <li key={priority} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-700" />{priority}</li>
+                          <li key={priority} className="flex gap-2">
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-700" />
+                            {priority}
+                          </li>
                         ))}
                       </ul>
                     ) : (
-                      <p>Protect the new operating rhythm, strengthen ownership and remove the next founder dependency once the first change is working.</p>
+                      <p>
+                        Protect the new operating rhythm, strengthen ownership
+                        and remove the next founder dependency once the first
+                        change is working.
+                      </p>
                     )}
                   </ContentCard>
                 </div>
                 <ContentCard title="Recommended Next Step">
-                  <p className="font-bold text-slate-950">{diagnostic.recommended_next_step.title}</p>
-                  <p className="mt-2">{diagnostic.recommended_next_step.summary}</p>
+                  <p className="font-bold text-slate-950">
+                    {diagnostic.recommended_next_step.title}
+                  </p>
+                  <p className="mt-2">
+                    {diagnostic.recommended_next_step.summary}
+                  </p>
                 </ContentCard>
               </div>
             </section>
 
-            <section data-ged-pdf-page id="recommended-next-steps" className="scroll-mt-6 overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-br from-[#45e0d1] via-[#b3f5ed] to-[#d9f99d] p-7 shadow-2xl shadow-black/20 md:p-10">
-              <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-slate-700">Your Recommended Next Step</p>
-              <h2 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 md:text-5xl">Turn the diagnostic into a live execution plan.</h2>
+            <section
+              data-ged-pdf-page
+              id="recommended-next-steps"
+              className="scroll-mt-6 overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-br from-[#45e0d1] via-[#b3f5ed] to-[#d9f99d] p-7 shadow-2xl shadow-black/20 md:p-10"
+            >
+              <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-slate-700">
+                Your Recommended Next Step
+              </p>
+              <h2 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 md:text-5xl">
+                Turn the diagnostic into a live execution plan.
+              </h2>
               <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
-                You now have a clear view of the pressure point. The next move is to translate it into ownership, an operating rhythm and a focused 90-day plan.
+                You now have a clear view of the pressure point. The next move
+                is to translate it into ownership, an operating rhythm and a
+                focused 90-day plan.
               </p>
               {nextStepsHref ? (
                 <a
@@ -2116,7 +2870,8 @@ export default function GedEntrepreneurStrategicReportPage({
         </div>
 
         <footer className="py-7 text-center text-xs text-slate-400">
-          © {new Date().getFullYear()} ProfileTest.ai · Growth Engine Diagnostic · Confidential Strategic Client Report
+          © {new Date().getFullYear()} ProfileTest.ai · Growth Engine
+          Diagnostic · Confidential Strategic Client Report
         </footer>
       </main>
     </div>
