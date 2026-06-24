@@ -1365,14 +1365,98 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="quantum-profile">
-              <SectionHeader icon="understand-quantum-profile.png" eyebrow="Understand the quantum profile" title="The behavioural pattern beneath the sales conversation" description="Use this as a visual cue for the level of pace, complexity and strategic altitude the buyer expects from you." />
-              <div className="mt-6 overflow-hidden rounded-2xl bg-white p-4 md:p-6">
-                <div className="grid items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                  <img src={`${ASSET_BASE}/quantum-profile-graphic.png`} alt="Quantum profile framework" className="mx-auto w-full max-w-2xl object-contain" />
-                  <div className="space-y-3">
-                    <InfoCard label="Quantum profile" value={profile} detail={`Personality: ${personality ? PERSONALITY_LABELS[personality] : "—"} · Mindset: ${mindset ? MINDSET_LABELS[mindset] : "—"}`} tone="emerald" />
-                    <NarrativeCard title="The signal to listen for" content={extended.combined_quantum_pattern} tone="cyan" />
-                  </div>
+              <header className="flex items-center gap-3">
+                <SectionIcon file="understand-quantum-profile.png" alt="" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                    Understand the quantum profile
+                  </p>
+                  <h2 className="mt-1 text-base font-extrabold text-white md:text-lg">
+                    Your Quantum Profile
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 overflow-hidden rounded-2xl bg-white p-4 md:p-6">
+                <div className="flex min-h-[260px] items-center justify-center md:min-h-[300px]">
+                  <img
+                    src={`${ASSET_BASE}/quantum-profile-graphic.png`}
+                    alt="Quantum profile framework showing Fire Origin, Flow Momentum, Form Vector and Field Orbit"
+                    className="mx-auto h-auto w-full max-w-[760px] object-contain"
+                  />
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      code: "FIRE_ORIGIN",
+                      profile: "Fire Origin",
+                      title: "Activation Entrepreneur",
+                      description:
+                        "Drives through energy, urgency and visible action. Creates momentum where none exists.",
+                      tone: "border-t-orange-500",
+                      iconClass: "bg-orange-500",
+                      icon: "✦",
+                    },
+                    {
+                      code: "FLOW_MOMENTUM",
+                      profile: "Flow Momentum",
+                      title: "Adaptive Entrepreneur",
+                      description:
+                        "Moves with market signals, pivots intelligently and builds through relationships and trust.",
+                      tone: "border-t-sky-400",
+                      iconClass: "bg-sky-400",
+                      icon: "≈",
+                    },
+                    {
+                      code: "FORM_VECTOR",
+                      profile: "Form Vector",
+                      title: "Structural Entrepreneur",
+                      description:
+                        "Builds with precision and systems. Creates the operational foundations that scale requires.",
+                      tone: "border-t-emerald-500",
+                      iconClass: "bg-emerald-500",
+                      icon: "◇",
+                    },
+                    {
+                      code: "FIELD_ORBIT",
+                      profile: "Field Orbit",
+                      title: "Ecosystem Entrepreneur",
+                      description:
+                        "Creates through networks, positioning and strategic ecosystem building at scale.",
+                      tone: "border-t-violet-500",
+                      iconClass: "bg-violet-500",
+                      icon: "✧",
+                    },
+                  ].map((card) => {
+                    const isPrimary = card.code === `${personality || ""}_${mindset || ""}`;
+
+                    return (
+                      <article
+                        key={card.code}
+                        className={`relative rounded-xl border border-slate-200 border-t-4 ${card.tone} bg-white p-4 shadow-sm`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`grid h-10 w-10 place-items-center rounded-lg ${card.iconClass} text-lg font-bold text-white`}
+                        >
+                          {card.icon}
+                        </span>
+                        <p className="mt-3 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                          {card.profile}
+                        </p>
+                        <h3 className="mt-1 text-base font-extrabold leading-5 text-slate-950">
+                          {card.title}
+                        </h3>
+                        <p className="mt-3 text-xs leading-5 text-slate-500">{card.description}</p>
+                        {isPrimary ? (
+                          <span className="mt-3 inline-flex rounded-full bg-emerald-500 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white">
+                            Your primary
+                          </span>
+                        ) : null}
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
             </PageSection>
