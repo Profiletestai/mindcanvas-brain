@@ -74,6 +74,15 @@ type GedOperationalImpact = {
   score?: number;
 };
 
+type PersonalityLayerView = {
+  overview: string;
+  traits: string[];
+  keyInsights: string[];
+  exampleBehaviours: string[];
+  listenFor: string[];
+  role: string;
+};
+
 type GedEngineDiagnostic = {
   primary_priority?: string;
   priority_label?: string;
@@ -341,6 +350,107 @@ function splitFlags(value: unknown): { green: string[]; red: string[] } {
   }
 
   return { green, red };
+}
+
+function cleanPlaybookCopy(value: unknown): string {
+  return safeText(value, "")
+    .replace(/\r/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*[-–—]\s*/g, " - ")
+    .trim();
+}
+
+function splitPlaybookBullets(value: string, limit = 8): string[] {
+  const items = value
+    .replace(/\r/g, "")
+    .split(/(?:\n+|\s+[•✓✔➜▸]\s*|\s+-\s+)/)
+    .map((item) => item.replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "").trim())
+    .filter(Boolean)
+    .filter((item) => !/^(key insights|example behaviours|when you hear this|if you hear this,? it means|your role)\b/i.test(item));
+
+  return uniqueStrings(items).slice(0, limit);
+}
+
+function sliceBetweenHeadings(raw: string, start: RegExp, endings: RegExp[]): string {
+  const startMatch = start.exec(raw);
+  if (!startMatch || startMatch.index == null) return "";
+
+  const contentStart = startMatch.index + startMatch[0].length;
+  let contentEnd = raw.length;
+
+  for (const ending of endings) {
+    const tail = raw.slice(contentStart);
+    const endingMatch = ending.exec(tail);
+    if (endingMatch?.index != null) {
+      contentEnd = Math.min(contentEnd, contentStart + endingMatch.index);
+    }
+  }
+
+  return raw.slice(contentStart, contentEnd).trim();
+}
+
+function parsePersonalityLayer(value: unknown): PersonalityLayerView {
+  const raw = cleanPlaybookCopy(value)
+    .replace(/^how they think,? behave and decide\s*/i, "")
+    .trim();
+
+  if (!raw) {
+    return {
+      overview: "Not recorded for this profile.",
+      traits: [],
+      keyInsights: [],
+      exampleBehaviours: [],
+      listenFor: [],
+      role: "",
+    };
+  }
+
+  const keyHeading = /\bkey\s+insights\s*[:\-–—]?/i;
+  const exampleHeading = /\bexample\s+behaviou?rs?\s*[:\-–—]?/i;
+  const listenHeading = /\b(?:when you hear this|if you hear this,? it means)\s*[:\-–—]?/i;
+  const roleHeading = /\byour role\s*[:\-–—]?/i;
+
+  const headingPositions = [keyHeading, exampleHeading, listenHeading, roleHeading]
+    .map((pattern) => {
+      const match = pattern.exec(raw);
+      return match?.index ?? -1;
+    })
+    .filter((index) => index >= 0);
+
+  const firstHeading = headingPositions.length ? Math.min(...headingPositions) : raw.length;
+  const introductoryBlock = raw.slice(0, firstHeading).trim();
+
+  const traitsMarker = /(?:they are|they tend to be|they are often|key traits)\s*:/i;
+  const traitsMatch = traitsMarker.exec(introductoryBlock);
+  const overview = traitsMatch?.index != null
+    ? introductoryBlock.slice(0, traitsMatch.index).trim()
+    : sentence(introductoryBlock, 330);
+  const traits = traitsMatch
+    ? splitPlaybookBullets(introductoryBlock.slice(traitsMatch.index + traitsMatch[0].length), 6)
+    : [];
+
+  const keyInsights = splitPlaybookBullets(
+    sliceBetweenHeadings(raw, keyHeading, [exampleHeading, listenHeading, roleHeading]),
+    5
+  );
+  const exampleBehaviours = splitPlaybookBullets(
+    sliceBetweenHeadings(raw, exampleHeading, [listenHeading, roleHeading]),
+    6
+  );
+  const listenFor = splitPlaybookBullets(
+    sliceBetweenHeadings(raw, listenHeading, [roleHeading]),
+    3
+  );
+  const role = sliceBetweenHeadings(raw, roleHeading, []);
+
+  return {
+    overview: overview || sentence(raw, 330),
+    traits,
+    keyInsights,
+    exampleBehaviours,
+    listenFor,
+    role,
+  };
 }
 
 function SectionIcon({ file, alt }: { file: string; alt: string }) {
@@ -927,15 +1037,81 @@ export default function GedPredictiveSellingPlaybookPage({
 
           <div className="space-y-7">
             <PageSection id="personality">
-              <SectionHeader icon="personality-layer.png" eyebrow="Their personality layer" title="How they think, behave and decide" description="The emotional wiring and energetic pattern shaping their pace, attention and buyer behaviour." />
-              <div className="mt-6 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-                <article className="rounded-2xl bg-white p-6">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Personality layer</p>
-                  <p className={`mt-3 text-3xl font-extrabold ${personality ? PERSONALITY_TONES[personality] : "text-slate-950"}`}>{personality ? PERSONALITY_LABELS[personality] : safeText(extended.personality_label)}</p>
-                  <p className="mt-4 text-sm leading-6 text-slate-600">{safeText(extended.personality_layer)}</p>
-                </article>
-                <NarrativeCard eyebrow="Key insights" title="What this means for the call" content={extended.personality_layer} tone="cyan" bullets />
-              </div>
+              {(() => {
+                const personalityView = parsePersonalityLayer(extended.personality_layer);
+                const insightItems = personalityView.keyInsights.length
+                  ? personalityView.keyInsights
+                  : textItems(extended.personality_layer, 4);
+                const exampleItems = personalityView.exampleBehaviours.length
+                  ? personalityView.exampleBehaviours
+                  : textItems(extended.personality_layer, 5).slice(-5);
+
+                return (
+                  <>
+                    <header className="flex gap-3">
+                      <SectionIcon file="personality-layer.png" alt="" />
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">Their personality layer</p>
+                        <h2 className="mt-1 text-base font-extrabold text-white md:text-lg">How they think, behave and decide</h2>
+                      </div>
+                    </header>
+
+                    <div className="mt-5 rounded-2xl bg-white p-5 md:p-7">
+                      <div className="max-w-5xl text-sm leading-6 text-slate-800">
+                        <p>{personalityView.overview}</p>
+                        {personalityView.traits.length ? (
+                          <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-800">
+                            {personalityView.traits.map((trait, index) => (
+                              <li key={`personality-trait-${index}`} className="flex gap-2">
+                                <span className="mt-1.5 text-emerald-500">›</span>
+                                <span>{trait}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                        {personalityView.role ? (
+                          <p className="mt-2 text-slate-700">{personalityView.role}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                        <article className="rounded-xl bg-slate-100 p-5">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-500">Key insights</p>
+                          <div className="mt-3 space-y-3">
+                            {insightItems.slice(0, 3).map((item, index) => (
+                              <div key={`personality-insight-${index}`} className="flex gap-2.5">
+                                <span className="mt-1 inline-flex h-3 w-3 shrink-0 rounded-full bg-emerald-300" />
+                                <p className="text-sm leading-5 text-slate-700">{item}</p>
+                              </div>
+                            ))}
+                            {personalityView.listenFor.length ? (
+                              <div className="flex gap-2.5">
+                                <span className="mt-1 inline-flex h-3 w-3 shrink-0 rounded-full bg-emerald-300" />
+                                <div>
+                                  <p className="text-sm font-bold text-slate-950">When you hear this</p>
+                                  <p className="mt-1 text-sm leading-5 text-slate-700">{personalityView.listenFor.join(" ")}</p>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </article>
+
+                        <article className="rounded-xl bg-[#0c2a22] p-5 text-white">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Example behaviours</p>
+                          <ul className="mt-4 space-y-3">
+                            {exampleItems.slice(0, 6).map((item, index) => (
+                              <li key={`personality-behaviour-${index}`} className="flex gap-2.5 text-sm leading-5 text-slate-100/90">
+                                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </article>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </PageSection>
 
             <PageSection id="mindset">
@@ -1109,4 +1285,3 @@ export default function GedPredictiveSellingPlaybookPage({
     </div>
   );
 }
-
