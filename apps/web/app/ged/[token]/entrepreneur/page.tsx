@@ -248,12 +248,14 @@ function SectionMarker({
   title,
   body,
   dark = false,
+  compact = false,
 }: {
   icon: string;
   eyebrow: string;
   title: string;
   body?: string;
   dark?: boolean;
+  compact?: boolean;
 }) {
   return (
     <div className="flex gap-4">
@@ -264,11 +266,25 @@ function SectionMarker({
         <p className={`text-[0.67rem] font-bold uppercase tracking-[0.22em] ${dark ? "text-emerald-300" : "text-cyan-700"}`}>
           {eyebrow}
         </p>
-        <h2 className={`mt-1 text-2xl font-extrabold tracking-tight md:text-[2rem] ${dark ? "text-white" : "text-[#111827]"}`}>
+        <h2
+          className={[
+            "mt-1 font-extrabold tracking-tight",
+            compact ? "text-xl leading-7" : "text-2xl md:text-[2rem]",
+            dark ? "text-white" : "text-[#111827]",
+          ].join(" ")}
+        >
           {title}
         </h2>
         {body ? (
-          <p className={`mt-2 max-w-4xl text-sm leading-6 ${dark ? "text-slate-300" : "text-slate-600"}`}>{body}</p>
+          <p
+            className={[
+              "mt-2 max-w-4xl",
+              compact ? "text-sm leading-5" : "text-sm leading-6",
+              dark ? "text-slate-300" : "text-slate-600",
+            ].join(" ")}
+          >
+            {body}
+          </p>
         ) : null}
       </div>
     </div>
@@ -1220,16 +1236,23 @@ export default function GedEntrepreneurStrategicReportPage({
           />
 
           <div className="space-y-5">
-            <section data-ged-pdf-page id="quantum-profile-matrix" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section
+              data-ged-pdf-page
+              id="quantum-profile-matrix"
+              className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+            >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.quantum_profile_matrix}
                 eyebrow="Quantum Profile Matrix"
                 title="Where your buyer frequency meets your mindset level"
                 body="Each cell represents a different Quantum buyer persona. Your primary pattern is highlighted — this is where your emotional wiring and current growth stage meet."
                 dark
+                compact
               />
-              <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 md:p-5">
+
+              <div className="mt-6">
                 <QscMatrix
+                  variant="ged"
                   primaryPersonality={primaryPersonality}
                   secondaryPersonality={result.secondary_personality}
                   primaryMindset={primaryMindset}
