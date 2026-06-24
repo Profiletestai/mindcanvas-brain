@@ -663,26 +663,40 @@ export default function GedPredictiveSellingPlaybookPage({
     extended?.core_business_problems ||
     extended?.what_offer_ready_for;
 
+  // The signed-off Playbook index begins with the detailed intelligence
+  // sections. Fast Read is intentionally not repeated here because it sits
+  // immediately above this navigation panel.
   const reportIndex = [
-    ["fast-read", "Fast Read Sales Summary"],
     ["personality", "Their Personality Layer"],
     ["mindset", "Their Mindset Layer"],
-    ["quantum-profile", "Understand the Quantum Profile"],
+    ["quantum-profile", "Understand The Quantum Profile"],
     ["combined-pattern", "Combined Quantum Pattern"],
-    ["communicate", "How to Communicate"],
+    ["communicate", "How To Communicate"],
     ["decisions", "How They Make Decisions"],
     ["problems", "Their Core Business Problems"],
     ["trust", "What Builds Trust"],
     ["offer", "What Offer They Are Ready For"],
-    ["blockers", "What Blocks the Sale"],
-    ["pre-call", "Pre-Call Questions"],
+    ["blockers", "What Blocks The Sale"],
+    ["pre-call", "Pre Call Questions"],
     ["scripts", "Micro Scripts"],
-    ["flags", "Green & Red Flags"],
-    ["example", "Real-Life Example"],
-    ["next-step", "Recommended Next Step"],
-    ["follow-up", "Follow-Up Guidance"],
+    ["flags", "Green Flag & Red Flag"],
+    ["example", "Real Life Examples"],
+    ["next-step", "Recommended Next Steps"],
+    ["follow-up", "Follow Up Guidance"],
     ["final-summary", "Final Sale Summary"],
   ] as const;
+
+  const handleReportIndexNextSteps = () => {
+    if (nextStepsHref) {
+      window.location.assign(nextStepsHref);
+      return;
+    }
+
+    document.getElementById("next-step")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   if (loading) {
     return (
@@ -875,19 +889,40 @@ export default function GedPredictiveSellingPlaybookPage({
         </PageSection>
 
         <div className="grid gap-7 xl:grid-cols-[250px_minmax(0,1fr)]">
-          <aside className="h-fit rounded-2xl border border-white/10 bg-[#0c1d1a] p-4 text-white xl:sticky xl:top-5">
-            <p className="px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-white/70">Report index</p>
-            <nav className="mt-3 space-y-2" aria-label="Playbook report index">
+          <aside className="h-fit w-full max-w-[240px] rounded-[24px] border border-white/10 bg-[#0c1d1a] p-[15px] text-white xl:sticky xl:top-5">
+            <p className="px-1 text-[10px] font-medium uppercase tracking-[0.24em] text-white/80">
+              Report Index
+            </p>
+
+            <nav className="mt-3 space-y-1.5" aria-label="Playbook report index">
               {reportIndex.map(([id, label]) => (
-                <a key={id} href={`#${id}`} className="block rounded-lg border border-white/50 px-3 py-2 text-xs font-medium text-white transition hover:border-emerald-300 hover:bg-white/10">
+                <a
+                  key={id}
+                  href={`#${id}`}
+                  className="block rounded-[9px] border border-white/80 px-3 py-1.5 text-[11px] font-medium leading-4 text-white transition hover:border-emerald-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-300/70"
+                >
                   {label}
                 </a>
               ))}
             </nav>
-            <button type="button" onClick={handleDownloadPdf} className="mt-4 w-full rounded-lg bg-emerald-400 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-emerald-300">
-              Download PDF
-            </button>
-            {nextStepsHref ? <a href={nextStepsHref} className="mt-2 block rounded-lg bg-gradient-to-r from-orange-300 to-emerald-400 px-3 py-2 text-center text-xs font-bold text-slate-950">Next steps</a> : null}
+
+            <div className="mt-4 flex flex-col items-start gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                className="w-[122px] rounded-[6px] border border-white/10 bg-emerald-400 px-3 py-2 text-[11px] font-bold leading-none text-slate-950 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-70"
+              >
+                {downloading ? "Preparing…" : "Download PDF"}
+              </button>
+              <button
+                type="button"
+                onClick={handleReportIndexNextSteps}
+                className="w-[95px] rounded-[6px] bg-gradient-to-r from-orange-300 via-emerald-400 to-emerald-400 px-3 py-2 text-[11px] font-bold leading-none text-slate-950 transition hover:brightness-105"
+              >
+                Next steps
+              </button>
+            </div>
           </aside>
 
           <div className="space-y-7">
