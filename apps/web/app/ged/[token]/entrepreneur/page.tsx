@@ -1438,6 +1438,16 @@ export default function GedEntrepreneurStrategicReportPage({
     persona?.strategic_priority_3,
   ].filter((value): value is string => Boolean(value && value.trim()));
 
+  // The four summary cards below reuse the existing scored 30-day plan. They are
+  // intentionally a visual digest only; no additional recommendations are created here.
+  const focusActionCards = diagnostic.action_plan.map((step, index) => ({
+    actionLabel: `Action ${String(index + 1).padStart(2, "0")}`,
+    title: step.title,
+    summary:
+      step.actions[0] ||
+      "Complete the next practical action that removes pressure from the current bottleneck.",
+  }));
+
   const indexItems: ReportIndexItem[] = [
     { href: "#quantum-profile-matrix", label: "Buyers Persona Matrix" },
     { href: "#personality-layer", label: "Your Personality layer" },
@@ -3023,32 +3033,62 @@ export default function GedEntrepreneurStrategicReportPage({
               <SectionMarker
                 icon={SECTION_ICON_PATHS.focus_plan}
                 eyebrow="Your 30-Day Focus Plan"
-                title="Your first month, week by week"
+                title="Your First Month — Week by Week"
                 body="Concrete actions mapped across four weeks to start resolving your primary bottleneck immediately."
                 dark
               />
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {diagnostic.action_plan.map((step) => (
-                  <article
-                    key={step.week}
-                    className="rounded-xl border border-white/10 bg-white/[0.035] p-5 text-white"
-                  >
-                    <p className="text-[0.68rem] font-bold uppercase tracking-[0.2em] text-emerald-300">
-                      {step.week}
-                    </p>
-                    <h3 className="mt-3 text-lg font-extrabold">
-                      {step.title}
-                    </h3>
-                    <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-                      {step.actions.map((action) => (
-                        <li key={action} className="flex gap-2">
-                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-                          <span>{action}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </article>
-                ))}
+
+              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-5">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {diagnostic.action_plan.map((step) => (
+                    <article
+                      key={step.week}
+                      className="min-h-[330px] rounded-xl border border-[#fddcbf] border-t-4 border-t-[#e56a1f] bg-white p-5 shadow-sm"
+                    >
+                      <p className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-[#34d399]">
+                        {step.week}
+                      </p>
+                      <h3 className="mt-3 text-base font-bold leading-6 text-[#1a1a1a]">
+                        {step.title}
+                      </h3>
+
+                      <ul className="mt-4 space-y-3 text-sm leading-5 text-[#4b5563]">
+                        {step.actions.map((action) => (
+                          <li key={action} className="flex gap-2.5">
+                            <span
+                              aria-hidden="true"
+                              className="mt-0.5 h-4 w-4 shrink-0 rounded-[4px] border-2 border-[#e5e7eb] bg-white"
+                            />
+                            <span>{action}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-white p-5 md:p-7">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {focusActionCards.map((action) => (
+                    <article
+                      key={action.actionLabel}
+                      className="relative min-h-[162px] overflow-hidden rounded-[14px] border border-emerald-100 bg-emerald-50/70 p-5 pt-6"
+                    >
+                      <span className="absolute inset-x-1 top-1 h-1 rounded-full bg-[#34d399]" />
+                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.13em] text-[#34d399]">
+                        {action.actionLabel}
+                      </p>
+                      <h3 className="mt-4 text-base font-bold leading-5 text-[#1a1a1a]">
+                        {action.title}
+                      </h3>
+                      <p className="mt-3 flex gap-2 text-sm leading-5 text-[#4b5563]">
+                        <span className="font-bold text-[#34d399]">›</span>
+                        <span>{action.summary}</span>
+                      </p>
+                    </article>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -3140,29 +3180,71 @@ export default function GedEntrepreneurStrategicReportPage({
             <section
               data-ged-pdf-page
               id="recommended-next-steps"
-              className="scroll-mt-6 overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-br from-[#45e0d1] via-[#b3f5ed] to-[#d9f99d] p-7 shadow-2xl shadow-black/20 md:p-10"
+              className="scroll-mt-6 overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#0C1D1A] px-6 py-10 text-center shadow-2xl shadow-black/25 md:px-10 md:py-12"
             >
-              <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-slate-700">
-                Your Recommended Next Step
-              </p>
-              <h2 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 md:text-5xl">
-                Turn the diagnostic into a live execution plan.
-              </h2>
-              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
-                You now have a clear view of the pressure point. The next move
-                is to translate it into ownership, an operating rhythm and a
-                focused 90-day plan.
-              </p>
-              {nextStepsHref ? (
-                <a
-                  href={nextStepsHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-7 inline-flex rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  Book your strategy session
-                </a>
-              ) : null}
+              <div className="mx-auto flex max-w-3xl flex-col items-center">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[12px] bg-[#39c1d6] ring-1 ring-white/20">
+                  <img
+                    src={SECTION_ICON_PATHS.recommended_next_steps}
+                    alt=""
+                    className="h-8 w-8 object-contain"
+                  />
+                </div>
+
+                <p className="mt-5 text-[0.68rem] font-extrabold uppercase tracking-[0.22em] text-[#34D399]">
+                  Your Recommended Next Step
+                </p>
+                <h2 className="mt-3 max-w-4xl text-3xl font-extrabold tracking-tight text-white md:text-[2.2rem] md:leading-[1.12]">
+                  {diagnostic.recommended_next_step.title ||
+                    "Your Growth Engine Is Ready to Scale."}
+                </h2>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 md:text-[0.95rem]">
+                  {diagnostic.recommended_next_step.summary ||
+                    "You have the profile, the diagnostic and the roadmap. The next move is a strategy session to turn this into a live execution plan with clear accountability and a focused 90-day sprint."}
+                </p>
+
+                <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                  {nextStepsHref ? (
+                    <a
+                      href={nextStepsHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-10 items-center justify-center rounded-[8px] bg-[#34D399] px-5 text-sm font-bold text-slate-950 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    >
+                      Book your strategy session <span className="ml-1.5">→</span>
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={downloading}
+                    className="inline-flex min-h-10 items-center justify-center rounded-[8px] border border-white/35 bg-transparent px-5 text-sm font-bold text-white transition hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/60 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {downloading ? "Preparing PDF…" : "Download PDF Report"}
+                  </button>
+                </div>
+
+                <ol className="mt-8 flex w-full max-w-2xl flex-col items-center justify-center gap-5 text-center text-[0.68rem] text-slate-300 sm:flex-row sm:items-start sm:gap-0">
+                  {[
+                    "Book a call with your advisor",
+                    "Review your 30-day plan live",
+                    "Activate your growth engine",
+                  ].map((step, index) => (
+                    <li
+                      key={step}
+                      className="flex items-center gap-3 sm:flex-1 sm:flex-col sm:gap-2"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#137d60] text-[0.66rem] font-bold text-[#a7f3d0]">
+                        {index + 1}
+                      </span>
+                      <span className="max-w-[9.5rem] leading-4">{step}</span>
+                      {index < 2 ? (
+                        <span className="hidden text-base text-[#77c9b8] sm:block">→</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </section>
           </div>
         </div>
