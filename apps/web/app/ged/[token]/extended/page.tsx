@@ -1318,6 +1318,35 @@ export default function GedPredictiveSellingPlaybookPage({
     [extended?.what_blocks_sale]
   );
 
+  const fitFlags = useMemo(
+    () => splitFlags(extended?.green_red_flags),
+    [extended?.green_red_flags]
+  );
+
+  /**
+   * The signed-off Playbook uses a qualitative fit indicator rather than a
+   * separate assessment score. Keep this display-only and derive it from the
+   * profile's recorded green/red flag lists, so it never changes GED scoring.
+   */
+  const fitSignal = useMemo(() => {
+    const greenCount = fitFlags.green.length;
+    const redCount = fitFlags.red.length;
+    const evidenceCount = greenCount + redCount;
+
+    if (!evidenceCount) {
+      return { label: "Qualify the fit", position: 50 };
+    }
+
+    const balance = (greenCount - redCount) / evidenceCount;
+    const position = Math.max(32, Math.min(78, Math.round(58 + balance * 20)));
+
+    if (greenCount >= redCount) {
+      return { label: "Strong fit signal", position };
+    }
+
+    return { label: "Pause or reframe", position };
+  }, [fitFlags.green.length, fitFlags.red.length]);
+
   // The signed-off Playbook index begins with the detailed intelligence
   // sections. Fast Read is intentionally not repeated here because it sits
   // immediately above this navigation panel.
@@ -2421,10 +2450,82 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="flags">
-              <SectionHeader icon="green-red-flag.png" eyebrow="Green & red flags" title="What signals fit, and what signals a need to pause or reframe" />
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <NarrativeCard eyebrow="Green flags" title="Signals of stronger fit" content={splitFlags(extended.green_red_flags).green.join("\n")} tone="emerald" bullets />
-                <NarrativeCard eyebrow="Red flags" title="Pause, qualify or reframe" content={splitFlags(extended.green_red_flags).red.join("\n") || extended.what_blocks_sale} tone="rose" bullets />
+              <SectionHeader
+                icon="green-red-flag.png"
+                eyebrow="Green & red flags"
+                title="What tells you they are a strong fit — and what tells you to pause or refocus"
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="mx-auto max-w-5xl">
+                  <div className="flex items-center justify-between gap-4 text-[10px] font-medium text-slate-500">
+                    <span>Weaker Fit</span>
+                    <span>Stronger Fit</span>
+                  </div>
+
+                  <div className="relative mt-2 h-2 rounded-full bg-gradient-to-r from-rose-400 via-orange-400 via-amber-300 to-emerald-500">
+                    <span
+                      className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-slate-800 bg-white shadow-sm"
+                      style={{ left: `${fitSignal.position}%` }}
+                      aria-label={fitSignal.label}
+                      title={fitSignal.label}
+                    />
+                  </div>
+
+                  <p className="mt-3 text-center text-xs font-bold text-emerald-500">
+                    {fitSignal.label}
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100/90 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">
+                      Green flags — strong fit signals
+                    </p>
+                    {fitFlags.green.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {fitFlags.green.map((item, index) => (
+                          <li
+                            key={`green-flag-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600 md:text-sm">
+                        No profile-specific strong-fit signals have been recorded.
+                      </p>
+                    )}
+                  </article>
+
+                  <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100/90 p-4 md:p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-rose-500" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">
+                      Red flags — pause or reframe
+                    </p>
+                    {fitFlags.red.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {fitFlags.red.map((item, index) => (
+                          <li
+                            key={`red-flag-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 text-xs leading-5 text-slate-600 md:text-sm">
+                        {safeText(extended.what_blocks_sale, "No profile-specific pause signals have been recorded.")}
+                      </p>
+                    )}
+                  </article>
+                </div>
               </div>
             </PageSection>
 
