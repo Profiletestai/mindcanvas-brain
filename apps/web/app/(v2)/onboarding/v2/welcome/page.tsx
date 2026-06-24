@@ -3,15 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, isErr } from "../_lib/api";
+import { getPlan, type PlanTier } from "../_lib/plans";
 import { StepCard } from "../_components/StepCard";
 import type { PortalOrg } from "@/types/database.types";
 
-type OrgStatus = "pending_activation" | "active" | "past_due" | "suspended" | "archived";
+type OrgStatus = "pending_activation" | "active" | "suspended" | "archived";
 
 const STATUS_LABEL: Record<OrgStatus, string> = {
   pending_activation: "PENDING_ACTIVATION",
   active: "ACTIVE",
-  past_due: "PAST_DUE",
   suspended: "SUSPENDED",
   archived: "ARCHIVED",
 };
@@ -29,11 +29,6 @@ const STATUS_STYLE: Record<
     bg: "rgb(220,247,232)",
     text: "rgb(28,128,72)",
     dot: "rgb(46,168,96)",
-  },
-  past_due: {
-    bg: "rgb(255,236,214)",
-    text: "rgb(168,82,12)",
-    dot: "rgb(214,118,46)",
   },
   suspended: {
     bg: "rgb(255,224,228)",
@@ -57,24 +52,22 @@ export default function WelcomePage() {
     (async () => {
       const orgRes = await api.getOrg();
       if (cancelled) return;
-      if (!isErr(orgRes) && orgRes.org) {
-        if (orgRes.org.status !== "pending_activation") {
-          router.replace("/portal/billing");
-          return;
-        }
-        setOrg(orgRes.org);
-      }
+      if (!isErr(orgRes)) setOrg(orgRes.org);
       setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   if (!ready) {
     return <div className="py-8 text-center text-white/70">Loading…</div>;
   }
 
+  const tierStr =
+    typeof window !== "undefined" ? sessionStorage.getItem("onb_tier") : null;
+  const tier = tierStr ? (Number(tierStr) as PlanTier) : null;
+  const plan = getPlan(tier);
   const status = (org?.status as OrgStatus) ?? "pending_activation";
   const statusStyle = STATUS_STYLE[status] ?? STATUS_STYLE.pending_activation;
   const statusLabel = STATUS_LABEL[status] ?? status;
@@ -156,11 +149,13 @@ export default function WelcomePage() {
             }
           />
           <Divider />
+          <Row label="Selected plan" value={plan ? plan.name : "—"} />
+          <Divider />
           <Row
             label="Billing"
             value={
               <span style={{ color: "rgb(120,144,176)", fontWeight: 500 }}>
-                Subscription billed at activation
+                Visible · disabled until activation
               </span>
             }
           />
@@ -168,7 +163,7 @@ export default function WelcomePage() {
 
         <button
           type="button"
-          onClick={() => router.push("/choose-plan")}
+          onClick={() => router.push("/portal/login")}
           className="mt-6 w-full h-[60px] rounded-[14px] text-white font-bold tracking-wide cursor-pointer"
           style={{
             background:
@@ -178,7 +173,7 @@ export default function WelcomePage() {
             boxShadow: "0px 6px 20px 0px rgba(37,99,200,0.30)",
           }}
         >
-          Choose your plan
+          Continue to setup
         </button>
       </div>
     </StepCard>

@@ -52,26 +52,6 @@ const PERSONALITY_COLUMNS: {
  * Origin appears first, followed by Momentum, Vector, Orbit and Quantum.
  */
 const MINDSET_ROWS: { key: MindsetKey; label: string; level: number }[] = [
-  // Optional copy overrides (default to the Buyer Persona Matrix literals so
-  // existing leader/entrepreneur callers are unaffected).
-  title?: string;
-  eyebrow?: string;
-  description?: string;
-};
-
-type PersonalityColumn = { key: PersonalityKey; label: string; code: string };
-
-const PERSONALITY_COLUMNS: PersonalityColumn[] =
-  [
-    { key: "FIRE", label: "Fire", code: "A" },
-    { key: "FLOW", label: "Flow", code: "B" },
-    { key: "FORM", label: "Form", code: "C" },
-    { key: "FIELD", label: "Field", code: "D" },
-  ];
-
-type MindsetRow = { key: MindsetKey; label: string; level: number };
-
-const MINDSET_ROWS: MindsetRow[] = [
   { key: "ORIGIN", level: 1, label: "Origin" },
   { key: "MOMENTUM", level: 2, label: "Momentum" },
   { key: "VECTOR", level: 3, label: "Vector" },
@@ -134,13 +114,6 @@ export function QscMatrix({
   showLegend = true,
   ...props
 }: QscMatrixProps) {
-export function QscMatrix(props: QscMatrixProps) {
-  const eyebrow = props.eyebrow ?? "Quantum Source Code";
-  const title = props.title ?? "Buyer Persona Matrix";
-  const description =
-    props.description ??
-    "This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection.";
-
   return (
     <section
       aria-labelledby="qsc-matrix-heading"
@@ -148,8 +121,6 @@ export function QscMatrix(props: QscMatrixProps) {
     >
       <header className="mb-5 flex flex-col gap-2 md:mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300/80">
-      <header className="flex flex-col gap-2 mb-5 md:mb-6">
-        <p className="text-xs font-semibold tracking-[0.22em] uppercase text-sky-300/80">
           {eyebrow}
         </p>
         <h2
@@ -159,7 +130,6 @@ export function QscMatrix(props: QscMatrixProps) {
           {title}
         </h2>
         <p className="max-w-2xl text-xs text-slate-300 md:text-sm">
-        <p className="text-xs md:text-sm text-slate-300 max-w-2xl">
           {description}
         </p>
       </header>

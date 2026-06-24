@@ -1,7 +1,6 @@
 // apps/web/app/api/public/test/[token]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getSubmissionUsage, isSubmissionQuotaEnforced } from "@/app/_lib/billing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +10,6 @@ type PortalClient = ReturnType<typeof createClient>;
 type LinkRow = {
   token: string;
   test_id: string;
-  org_id: string;
   max_uses: number | null;
   use_count: number | null;
 };
@@ -61,7 +59,7 @@ export async function GET(
     // 1) resolve link -> test_id
     const { data: linkRow, error: linkErr } = (await sb
       .from("test_links")
-      .select("token, test_id, org_id, max_uses, use_count")
+      .select("token, test_id, max_uses, use_count")
       .eq("token", token)
       .maybeSingle()) as { data: LinkRow | null; error: any };
 
@@ -97,17 +95,7 @@ export async function GET(
 
     const maxUses = linkRow.max_uses;
     const useCount = linkRow.use_count ?? 0;
-    const perLinkLimitReached = maxUses != null && useCount >= maxUses;
-
-    // Org-wide monthly cap (included_trials_per_month + extras) counted across
-    // ALL links for the org. Exhausted => block opening/starting, not just submit.
-    let orgLimitReached = false;
-    if (isSubmissionQuotaEnforced()) {
-      const usage = await getSubmissionUsage(linkRow.org_id);
-      orgLimitReached = usage.remaining <= 0;
-    }
-
-    const limitReached = perLinkLimitReached || orgLimitReached;
+    const limitReached = maxUses != null && useCount >= maxUses;
 
     return NextResponse.json({
       ok: true,
@@ -189,9 +177,9 @@ export async function POST(
     // resolve link -> test_id
     const { data: link } = (await sb
       .from("test_links")
-      .select("test_id, token, org_id")
+      .select("test_id, token")
       .eq("token", token)
-      .maybeSingle()) as { data: { test_id: string; token: string; org_id: string } | null; error: any };
+      .maybeSingle()) as { data: { test_id: string; token: string } | null; error: any };
 
     if (!link) {
       return NextResponse.json(
@@ -216,26 +204,8 @@ export async function POST(
 
     const effectiveTestId = resolveEffectiveTestId(testRow);
 
-    // Block starting a test once the org's monthly submission cap is reached,
-    // counted across all links (not just this one).
-    if (isSubmissionQuotaEnforced()) {
-      const usage = await getSubmissionUsage(link.org_id);
-      if (usage.remaining <= 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Submission limit reached for your plan",
-            reason: "limit_reached",
-          },
-          { status: 403 }
-        );
-      }
-    }
-
     const insertRow: any = {
-      // Test rows live in a template org; the taker belongs to the link's
-      // customer org (the org that was granted access via billing).
-      org_id: link.org_id,
+      org_id: testRow.org_id,
       test_id: link.test_id,
       link_token: link.token,
       first_name: fn,

@@ -21,37 +21,23 @@ export async function GET(req: Request) {
 
     const sb = createClient().schema("portal");
 
-    // Tests granted to this org via billing (portal.org_test_access).
-    // Tests live in template orgs; access is the source of truth per-org.
+    // Try org-scoped view first
     let rows: any[] = [];
     {
-      const { data: accessRows, error: accessErr } = await sb
-        .from("org_test_access")
-        .select("test_id")
+      const { data, error } = await sb
+        .from("v_org_tests")
+        .select("*")
         .eq("org_id", orgId)
-        .eq("status", "active");
+        .order("created_at", { ascending: false });
 
-      if (accessErr) return NextResponse.json({ error: accessErr.message }, { status: 500 });
-
-      const ids = (accessRows ?? []).map((r: any) => r.test_id).filter(Boolean);
-
-      if (ids.length) {
-        const { data: testRows, error: testsErr } = await sb
-          .from("tests")
-          .select("id, name, mode, status, org_id, created_at")
-          .in("id", ids)
-          .order("created_at", { ascending: false });
-
-        if (testsErr) return NextResponse.json({ error: testsErr.message }, { status: 500 });
-        rows = testRows ?? [];
-      }
+      if (!error && Array.isArray(data) && data.length) rows = data;
     }
 
-    // Legacy fallback: org owns its own test rows (pre-billing-access model).
+    // Fallback to base table
     if (!rows.length) {
       const { data, error } = await sb
         .from("tests")
-        .select("id, name, mode, status, org_id, created_at")
+        .select("id, name, test_type, is_active, org_id, created_at")
         .eq("org_id", orgId)
         .order("created_at", { ascending: false });
 
@@ -66,11 +52,8 @@ export async function GET(req: Request) {
         return {
           id,
           name: pickName(r),
-          test_type: r?.test_type ?? r?.type ?? r?.mode ?? null,
-          is_active:
-            r?.is_active ??
-            r?.active ??
-            (typeof r?.status === "string" ? r.status === "active" : null),
+          test_type: r?.test_type ?? r?.mode ?? null,
+          is_active: r?.is_active ?? r?.active ?? null,
         };
       })
       .filter(Boolean) as Out[];

@@ -4,7 +4,6 @@ import { createClient } from "@supabase/supabase-js";
 import { calculateQscScores } from "@/lib/qsc-scoring";
 import { sendTemplatedEmail } from "@/lib/server/emailTemplates";
 import { getBaseUrl } from "@/lib/baseUrl";
-import { reserveSubmission } from "@/app/_lib/billing";
 
 type AB = "A" | "B" | "C" | "D";
 type AnswerCode = "A" | "B" | "C" | "D" | "E";
@@ -1570,46 +1569,6 @@ export async function POST(
       return NextResponse.json(
         { ok: false, error: "Test not found for taker" },
         { status: 500 }
-      );
-    }
-
-    const { data: accessRow, error: accessErr } = await sb
-      .from("org_test_access")
-      .select("status")
-      .eq("org_id", taker.org_id)
-      .eq("test_id", taker.test_id)
-      .maybeSingle();
-
-    if (accessErr) {
-      return NextResponse.json(
-        { ok: false, error: `Org test access lookup failed: ${accessErr.message}` },
-        { status: 500 }
-      );
-    }
-
-    if (!accessRow || accessRow.status !== "active") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "This test is not available on your current plan",
-          reason: "test_access_revoked",
-        },
-        { status: 403 }
-      );
-    }
-
-    const reservation = await reserveSubmission(taker.org_id, taker.id);
-    if (!reservation.ok) {
-      const status = reservation.reason === "no_subscription" ? 403 : 402;
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            reservation.reason === "limit_reached"
-              ? "Submission limit reached for your plan"
-              : "No active subscription",
-        },
-        { status }
       );
     }
 
