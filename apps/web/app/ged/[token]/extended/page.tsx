@@ -98,6 +98,12 @@ type CombinedPatternView = {
   positioningLine: string;
 };
 
+type CommunicationView = {
+  doItems: string[];
+  dontItems: string[];
+  effectiveLines: string[];
+};
+
 type GedEngineDiagnostic = {
   primary_priority?: string;
   priority_label?: string;
@@ -606,6 +612,47 @@ function parseCombinedQuantumPattern(
   };
 }
 
+function parseCommunicationPlan(
+  communicationValue: unknown,
+  blockerValue: unknown,
+  microScriptsValue: unknown
+): CommunicationView {
+  const raw = cleanStructuredPlaybookCopy(communicationValue);
+
+  const doHeading = /(?:^|\n)\s*do\s*[:\-–—]?/im;
+  const dontHeading = /(?:^|\n)\s*(?:don['’]?t|do\s+not|avoid)\s*[:\-–—]?/im;
+  const effectiveHeading = /(?:^|\n)\s*(?:effective\s+lines?|lines?\s+that\s+work)\s*[:\-–—]?/im;
+
+  const doRaw = sliceBetweenHeadings(raw, doHeading, [dontHeading, effectiveHeading]);
+  const dontRaw = sliceBetweenHeadings(raw, dontHeading, [effectiveHeading]);
+  const effectiveRaw = sliceBetweenHeadings(raw, effectiveHeading, []);
+
+  let doItems = structuredListItems(doRaw, 6);
+  if (!doItems.length) {
+    const firstHeadingPositions = [dontHeading, effectiveHeading]
+      .map((pattern) => pattern.exec(raw)?.index ?? -1)
+      .filter((index) => index >= 0);
+    const beforeOtherHeadings = firstHeadingPositions.length
+      ? raw.slice(0, Math.min(...firstHeadingPositions))
+      : raw;
+    doItems = structuredListItems(beforeOtherHeadings, 6);
+  }
+
+  const dontItems = structuredListItems(dontRaw, 6).length
+    ? structuredListItems(dontRaw, 6)
+    : structuredListItems(blockerValue, 6);
+
+  const effectiveLines = structuredListItems(effectiveRaw, 3).length
+    ? structuredListItems(effectiveRaw, 3)
+    : structuredListItems(microScriptsValue, 3);
+
+  return {
+    doItems: uniqueStrings(doItems).slice(0, 6),
+    dontItems: uniqueStrings(dontItems).slice(0, 6),
+    effectiveLines: uniqueStrings(effectiveLines).slice(0, 3),
+  };
+}
+
 function SectionIcon({ file, alt }: { file: string; alt: string }) {
   return (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/20 p-2 shadow-inner shadow-cyan-950/20">
@@ -950,6 +997,16 @@ export default function GedPredictiveSellingPlaybookPage({
     diagnostic?.recommended_next_step?.summary ||
     extended?.core_business_problems ||
     extended?.what_offer_ready_for;
+
+  const communication = useMemo(
+    () =>
+      parseCommunicationPlan(
+        extended?.how_to_communicate,
+        extended?.what_blocks_sale,
+        extended?.micro_scripts
+      ),
+    [extended?.how_to_communicate, extended?.micro_scripts, extended?.what_blocks_sale]
+  );
 
   // The signed-off Playbook index begins with the detailed intelligence
   // sections. Fast Read is intentionally not repeated here because it sits
@@ -1611,10 +1668,69 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="communicate">
-              <SectionHeader icon="how-to-communicate.png" eyebrow="How to communicate" title="Tone, language and delivery style that makes them feel understood" description="The role is not to mirror every preference; it is to show strategic relevance at the speed and altitude they trust." />
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <NarrativeCard eyebrow="Use" title="What to lean into" content={extended.how_to_communicate} tone="emerald" bullets />
-                <NarrativeCard eyebrow="Avoid" title="What will reduce trust" content={extended.what_blocks_sale} tone="rose" bullets />
+              <header className="flex gap-3">
+                <SectionIcon file="how-to-communicate.png" alt="" />
+                <div className="min-w-0 pt-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-emerald-300">
+                    How to communicate
+                  </p>
+                  <h2 className="mt-1 text-sm font-extrabold leading-5 text-white md:text-base">
+                    Tone, language and delivery style that makes them feel understood and safe.
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100/75 p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-emerald-400" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">Do</p>
+                    <ul className="mt-3 space-y-2.5">
+                      {(communication.doItems.length
+                        ? communication.doItems
+                        : ["No profile-specific communication guidance is recorded."]
+                      ).map((item, index) => (
+                        <li key={`communication-do-${index}`} className="flex gap-2 text-sm leading-5 text-slate-700">
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-emerald-500">✓</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+
+                  <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100/80 p-5">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-rose-400" />
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-500">Don&apos;t</p>
+                    <ul className="mt-3 space-y-2.5">
+                      {(communication.dontItems.length
+                        ? communication.dontItems
+                        : ["No profile-specific communication risks are recorded."]
+                      ).map((item, index) => (
+                        <li key={`communication-dont-${index}`} className="flex gap-2 text-sm leading-5 text-slate-700">
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-rose-400">×</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xs font-extrabold text-slate-950">Effective Lines</p>
+                  <div className="mt-2 space-y-2">
+                    {(communication.effectiveLines.length
+                      ? communication.effectiveLines
+                      : ["Use the buyer&apos;s own language to frame the next strategic conversation."]
+                    ).map((line, index) => (
+                      <blockquote
+                        key={`communication-line-${index}`}
+                        className="rounded-r-md border-l-2 border-cyan-400 bg-cyan-50 px-4 py-3 text-sm italic leading-6 text-slate-700"
+                      >
+                        “{line.replace(/^['“]|['”]$/g, "")}”
+                      </blockquote>
+                    ))}
+                  </div>
+                </div>
               </div>
             </PageSection>
 
