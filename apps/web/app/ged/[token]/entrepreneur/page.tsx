@@ -135,7 +135,7 @@ const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
   quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
-  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile-graphic.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
   personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
   mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
   combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
@@ -159,6 +159,13 @@ const BUSINESS_CONTEXT_ICON_PATHS = {
   coreConstraint: `${REPORT_ICON_BASE}/business-context/core-constraint.png`,
   scaleReadiness: `${REPORT_ICON_BASE}/business-context/scale-readiness.png`,
   strategicSelfDiagnosis: `${REPORT_ICON_BASE}/business-context/strategic-self-diagnosis.png`,
+} as const;
+
+const PRIMARY_BOTTLENECK_ICON_PATHS = {
+  bottleneck: `${REPORT_ICON_BASE}/primary-bottle-neck-section/executive-layer-gap.png`,
+  revenueImpact: `${REPORT_ICON_BASE}/primary-bottle-neck-section/revenue-impact.png`,
+  urgencyWindow: `${REPORT_ICON_BASE}/primary-bottle-neck-section/urgency-window.png`,
+  solvability: `${REPORT_ICON_BASE}/primary-bottle-neck-section/solvability.png`,
 } as const;
 
 const BUSINESS_STAGE_LADDER = [
@@ -311,6 +318,41 @@ function scoreAccent(score: number): string {
   if (score >= 72) return "#16a34a";
   if (score >= 48) return "#d97706";
   return "#dc2626";
+}
+
+function scoreFunnelState(score: number): { status: string; color: string } {
+  const safeScore = clampPercent(score);
+  if (safeScore >= 72) return { status: "Strong ✓", color: "#16a34a" };
+  if (safeScore >= 48) return { status: "Moderate", color: "#d97706" };
+  if (safeScore >= 32) return { status: "Weak", color: "#ea580c" };
+  return { status: "⚠ Critical gap", color: "#dc2626" };
+}
+
+function dependencyFunnelState(dependency: number): {
+  status: string;
+  color: string;
+} {
+  const safeDependency = clampPercent(dependency);
+  if (safeDependency >= 75)
+    return { status: "⚠ Critical gap", color: "#dc2626" };
+  if (safeDependency >= 58)
+    return { status: "High dependency", color: "#dc2626" };
+  if (safeDependency >= 40)
+    return { status: "Moderate dependency", color: "#d97706" };
+  return { status: "Low dependency", color: "#16a34a" };
+}
+
+function impactAccent(level: GedImpactLevel): string {
+  if (level === "critical") return "#dc2626";
+  if (level === "significant") return "#ea580c";
+  if (level === "moderate") return "#d97706";
+  return "#16a34a";
+}
+
+function urgencyAccent(level: GedEngineDiagnostic["urgency"]["level"]): string {
+  if (level === "high") return "#d97706";
+  if (level === "moderate") return "#ea580c";
+  return "#16a34a";
 }
 
 function impactTone(level: GedImpactLevel): string {
@@ -907,78 +949,14 @@ function QuantumProfileVisual({
 }
 
 function QuantumProfileDiagram() {
-  const nodes = [
-    {
-      label: "Fire Origin",
-      personality: "FIRE" as PersonalityKey,
-      side: "left" as const,
-      vertical: "top" as const,
-      color: "#f97316",
-    },
-    {
-      label: "Flow Momentum",
-      personality: "FLOW" as PersonalityKey,
-      side: "right" as const,
-      vertical: "top" as const,
-      color: "#0ea5e9",
-    },
-    {
-      label: "Form Vector",
-      personality: "FORM" as PersonalityKey,
-      side: "left" as const,
-      vertical: "bottom" as const,
-      color: "#22c55e",
-    },
-    {
-      label: "Field Orbit",
-      personality: "FIELD" as PersonalityKey,
-      side: "right" as const,
-      vertical: "bottom" as const,
-      color: "#a855f7",
-    },
-  ];
-
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm md:p-6">
-      <div className="relative mx-auto min-h-[360px] max-w-[1000px] overflow-hidden rounded-xl bg-white md:min-h-[430px]">
-        <div className="absolute left-1/2 top-1/2 z-10 h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2 md:h-[330px] md:w-[330px]">
-          <AssetIcon
-            src={UNDERSTAND_QUANTUM_PROFILE_GRAPH}
-            alt="Quantum Profile diagram"
-            className="h-full w-full object-contain"
-          />
-        </div>
-
-        {nodes.map((node) => {
-          const position = [
-            "absolute z-20 flex items-center gap-3 md:gap-4",
-            node.vertical === "top"
-              ? "top-6 md:top-10"
-              : "bottom-6 md:bottom-10",
-            node.side === "left"
-              ? "left-2 md:left-[14%]"
-              : "right-2 md:right-[14%]",
-            node.side === "left" ? "flex-row-reverse text-right" : "text-left",
-          ].join(" ");
-
-          return (
-            <div key={node.label} className={position}>
-              <p className="max-w-[88px] text-[0.68rem] font-extrabold uppercase leading-4 tracking-[0.05em] text-[#0c1d1a] sm:max-w-[112px] sm:text-xs md:max-w-[138px] md:text-sm md:leading-5">
-                {node.label}
-              </p>
-              <span
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full md:h-[78px] md:w-[78px]"
-                style={{ backgroundColor: node.color }}
-              >
-                <AssetIcon
-                  src={`${QUANTUM_PROFILE_MIX_ICON_BASE}/${node.personality.toLowerCase()}.png`}
-                  alt=""
-                  className="h-8 w-8 object-contain md:h-11 md:w-11"
-                />
-              </span>
-            </div>
-          );
-        })}
+    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:p-5 md:p-7">
+      <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-white sm:min-h-[360px] md:min-h-[460px]">
+        <AssetIcon
+          src={UNDERSTAND_QUANTUM_PROFILE_GRAPH}
+          alt="Quantum Profile diagram"
+          className="h-auto w-full max-w-[980px] object-contain"
+        />
       </div>
     </div>
   );
@@ -1515,6 +1493,51 @@ export default function GedEntrepreneurStrategicReportPage({
   const selfDiagnosisCopy = diagnostic.self_diagnosis
     ? `“${diagnostic.self_diagnosis}”`
     : "You did not add a written self-diagnosis. The scorecard still identifies the most likely operating pressure point from your answers.";
+
+  const primaryImpactKey =
+    diagnostic.primary_bottleneck.code === "sales_consistency_gap"
+      ? "conversion"
+      : diagnostic.primary_bottleneck.code === "delivery_consistency_gap"
+        ? "delivery_capacity"
+        : diagnostic.primary_bottleneck.code === "founder_dependency_gap"
+          ? "founder_dependency"
+          : diagnostic.primary_bottleneck.code === "balanced_execution_gap"
+            ? "team_consistency"
+            : "new_business_continuity";
+
+  const primaryOperationalImpact =
+    diagnostic.operational_impact.find(
+      (impact) => impact.key === primaryImpactKey,
+    ) ??
+    diagnostic.operational_impact[0] ??
+    null;
+
+  const primaryImpactAccent = primaryOperationalImpact
+    ? impactAccent(primaryOperationalImpact.level)
+    : "#d97706";
+
+  const bottleneckFunnel = [
+    {
+      label: "Growth Engine",
+      value: diagnostic.scores.growth_engine,
+      ...scoreFunnelState(diagnostic.scores.growth_engine),
+    },
+    {
+      label: "Sales Engine",
+      value: diagnostic.scores.sales_engine,
+      ...scoreFunnelState(diagnostic.scores.sales_engine),
+    },
+    {
+      label: "Scale Readiness",
+      value: diagnostic.scores.scale_readiness,
+      ...scoreFunnelState(diagnostic.scores.scale_readiness),
+    },
+    {
+      label: "Founder Dependency",
+      value: diagnostic.scores.founder_dependency,
+      ...dependencyFunnelState(diagnostic.scores.founder_dependency),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#09141d] text-slate-900">
@@ -2488,7 +2511,8 @@ export default function GedEntrepreneurStrategicReportPage({
                 <div className="grid gap-5 lg:grid-cols-[310px_minmax(0,1fr)]">
                   <article className="rounded-2xl border border-[#e5e7eb] bg-white px-6 py-7 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                     <p className="text-[0.7rem] font-bold uppercase tracking-[0.13em] text-[#4b5563]">
-                      Overall Engine<br />
+                      Overall Engine
+                      <br />
                       Score
                     </p>
 
@@ -2499,7 +2523,9 @@ export default function GedEntrepreneurStrategicReportPage({
                       />
                     </div>
 
-                    <p className="-mt-1 text-sm text-[#4b5563]">Engine Health</p>
+                    <p className="-mt-1 text-sm text-[#4b5563]">
+                      Engine Health
+                    </p>
 
                     <div className="mt-7 space-y-3 text-left">
                       {[
@@ -2551,7 +2577,9 @@ export default function GedEntrepreneurStrategicReportPage({
                           <Meter
                             label="Growth Engine"
                             score={diagnostic.scores.growth_engine}
-                            accent={scoreAccent(diagnostic.scores.growth_engine)}
+                            accent={scoreAccent(
+                              diagnostic.scores.growth_engine,
+                            )}
                             caption="Delivery capacity, team execution and operating structure."
                           />
                           <Meter
@@ -2571,7 +2599,9 @@ export default function GedEntrepreneurStrategicReportPage({
                           <Meter
                             label="Scale Readiness"
                             score={diagnostic.scores.scale_readiness}
-                            accent={scoreAccent(diagnostic.scores.scale_readiness)}
+                            accent={scoreAccent(
+                              diagnostic.scores.scale_readiness,
+                            )}
                           />
                           <Meter
                             label="Founder Dependency"
@@ -2595,36 +2625,126 @@ export default function GedEntrepreneurStrategicReportPage({
               <SectionMarker
                 icon={SECTION_ICON_PATHS.primary_bottleneck}
                 eyebrow="Your Primary Bottleneck"
-                title="What is capping your growth"
+                title="What's Capping Your Growth"
                 body="Your diagnostic identifies one primary constraint preventing sustainable scale right now."
                 dark
+                compact
               />
-              <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 md:p-6">
-                <div className="rounded-2xl border border-emerald-300 bg-emerald-100/60 p-5">
-                  <p className="text-sm font-extrabold text-emerald-800">
-                    {diagnostic.primary_bottleneck.label}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
-                    {diagnostic.primary_bottleneck.summary}
-                  </p>
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-[#f9f8f6] p-4 md:p-7">
+                <div className="rounded-xl border border-[#34d399] bg-[#d1fae5]/80 p-5 md:p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#34d399] bg-white/35">
+                      <AssetIcon
+                        src={PRIMARY_BOTTLENECK_ICON_PATHS.bottleneck}
+                        alt=""
+                        className="h-10 w-10 object-contain"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-extrabold text-[#16a34a] md:text-xl">
+                        {diagnostic.primary_bottleneck.label}
+                      </h3>
+                      <p className="mt-2 max-w-5xl text-sm font-medium leading-6 text-[#1a1a1a]">
+                        {diagnostic.primary_bottleneck.summary}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <ContentCard title="Why it matters">
-                    <p>{diagnostic.primary_bottleneck.why_it_matters}</p>
-                  </ContentCard>
-                  <ContentCard title="The first practical fix">
-                    <p>{diagnostic.primary_bottleneck.first_fix}</p>
-                  </ContentCard>
-                  <ContentCard title="Urgency window">
-                    <p className="text-lg font-extrabold text-slate-950">
-                      {diagnostic.urgency.label}
+
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <article className="min-h-[132px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <AssetIcon
+                      src={PRIMARY_BOTTLENECK_ICON_PATHS.revenueImpact}
+                      alt=""
+                      className="h-6 w-6 object-contain"
+                    />
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.13em] text-[#4b5563]">
+                      Revenue impact
                     </p>
-                    <p className="mt-2 font-semibold text-slate-800">
+                    <p
+                      className="mt-1 text-sm font-extrabold"
+                      style={{ color: primaryImpactAccent }}
+                    >
+                      {primaryOperationalImpact
+                        ? impactLabel(primaryOperationalImpact.level)
+                        : "Not scored"}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[#4b5563]">
+                      {primaryOperationalImpact?.explanation ??
+                        diagnostic.primary_bottleneck.why_it_matters}
+                    </p>
+                  </article>
+
+                  <article className="min-h-[132px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <AssetIcon
+                      src={PRIMARY_BOTTLENECK_ICON_PATHS.urgencyWindow}
+                      alt=""
+                      className="h-6 w-6 object-contain"
+                    />
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.13em] text-[#4b5563]">
+                      Urgency window
+                    </p>
+                    <p
+                      className="mt-1 text-sm font-extrabold"
+                      style={{ color: urgencyAccent(diagnostic.urgency.level) }}
+                    >
                       {diagnostic.urgency.window}
                     </p>
-                    <p className="mt-3">{diagnostic.urgency.summary}</p>
-                  </ContentCard>
+                    <p className="mt-2 text-xs leading-5 text-[#4b5563]">
+                      {diagnostic.urgency.summary}
+                    </p>
+                  </article>
+
+                  <article className="min-h-[132px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <AssetIcon
+                      src={PRIMARY_BOTTLENECK_ICON_PATHS.solvability}
+                      alt=""
+                      className="h-6 w-6 object-contain"
+                    />
+                    <p className="mt-3 text-[0.62rem] font-bold uppercase tracking-[0.13em] text-[#4b5563]">
+                      Solvability
+                    </p>
+                    <p className="mt-1 text-sm font-extrabold text-[#16a34a]">
+                      First practical fix
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-[#4b5563]">
+                      {diagnostic.primary_bottleneck.first_fix}
+                    </p>
+                  </article>
                 </div>
+
+                <article className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                  <h3 className="text-sm font-bold text-[#1a1a1a]">
+                    Growth Constraint Funnel — Where the Bottleneck Lives
+                  </h3>
+                  <div className="mt-5 space-y-3">
+                    {bottleneckFunnel.map((metric) => (
+                      <div
+                        key={metric.label}
+                        className="grid grid-cols-[minmax(104px,1fr)_minmax(0,4fr)_42px] items-center gap-3"
+                      >
+                        <p className="text-[0.67rem] font-semibold leading-4 text-[#1a1a1a] md:text-xs">
+                          {metric.label}
+                        </p>
+                        <div className="h-7 overflow-hidden rounded bg-[#e5e7eb]">
+                          <div
+                            className="flex h-full min-w-[66px] items-center rounded px-2 text-[0.62rem] font-bold text-white"
+                            style={{
+                              width: `${Math.max(8, clampPercent(metric.value))}%`,
+                              backgroundColor: metric.color,
+                            }}
+                          >
+                            <span className="truncate">{metric.status}</span>
+                          </div>
+                        </div>
+                        <p className="text-right text-xs font-bold tabular-nums text-[#4b5563]">
+                          {clampPercent(metric.value)}%
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
               </div>
             </section>
 
