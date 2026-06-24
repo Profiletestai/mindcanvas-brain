@@ -1,7 +1,7 @@
 // apps/web/app/ged/[token]/entrepreneur/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -487,22 +487,82 @@ function QuantumProfileVisual({
   );
 }
 
-function ReportIndex({ items }: { items: { href: string; label: string }[] }) {
+type ReportIndexItem = {
+  href: string;
+  label: string;
+};
+
+function ReportIndex({
+  items,
+  onDownloadPdf,
+  downloading,
+  nextStepsHref,
+}: {
+  items: ReportIndexItem[];
+  onDownloadPdf: () => void;
+  downloading: boolean;
+  nextStepsHref: string | null;
+}) {
+  function handleInReportNavigation(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    href: string
+  ) {
+    if (!href.startsWith("#")) return;
+
+    const target = document.getElementById(href.slice(1));
+    if (!target) return;
+
+    event.preventDefault();
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      window.history.replaceState(null, "", href);
+    }
+  }
+
+  const nextStepsIsExternal = Boolean(nextStepsHref);
+  const resolvedNextStepsHref = nextStepsHref || "#recommended-next-steps";
+
   return (
-    <aside className="hidden xl:block">
-      <div className="sticky top-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-300">Report Index</p>
-        <nav className="mt-4 space-y-2">
+    <aside className="hidden self-start xl:block">
+      <div className="sticky top-6 w-[240px] rounded-[24px] border border-white/[0.12] bg-[#0C1D1A] p-[14px] text-white shadow-2xl shadow-black/25">
+        <p className="px-1 text-[10px] font-normal uppercase leading-[15px] tracking-[0.24em] text-white">
+          Report Index
+        </p>
+
+        <nav aria-label="Report Index" className="mt-3 space-y-[6px]">
           {items.map((item) => (
             <a
-              key={item.href}
+              key={item.label}
               href={item.href}
-              className="block rounded-xl border border-white/15 px-3 py-2.5 text-sm text-slate-100 transition hover:border-emerald-300/70 hover:bg-white/5"
+              onClick={(event) => handleInReportNavigation(event, item.href)}
+              className="flex min-h-[40px] items-center rounded-[12px] border border-white px-[12px] py-2 text-[12px] leading-5 text-white transition hover:border-emerald-300 hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-emerald-300/70"
             >
               {item.label}
             </a>
           ))}
         </nav>
+
+        <div className="mt-5 space-y-[7px]">
+          <button
+            type="button"
+            onClick={onDownloadPdf}
+            disabled={downloading}
+            className="flex h-8 w-[122px] items-center justify-center rounded-[6px] border border-white/[0.12] bg-[#34D399] px-3 text-[12px] font-semibold leading-[14.72px] text-slate-50 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {downloading ? "Preparing…" : "Download PDF"}
+          </button>
+
+          <a
+            href={resolvedNextStepsHref}
+            target={nextStepsIsExternal ? "_blank" : undefined}
+            rel={nextStepsIsExternal ? "noopener noreferrer" : undefined}
+            onClick={(event) => handleInReportNavigation(event, resolvedNextStepsHref)}
+            className="flex h-7 w-[95px] items-center justify-center rounded-[5.62px] bg-gradient-to-r from-[#FFB347] via-[#34D399] to-[#34D399] px-3 text-[12px] font-semibold leading-[13.69px] text-white transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-emerald-300/70"
+          >
+            Next steps
+          </a>
+        </div>
       </div>
     </aside>
   );
@@ -714,20 +774,19 @@ export default function GedEntrepreneurStrategicReportPage({
     persona?.strategic_priority_3,
   ].filter((value): value is string => Boolean(value && value.trim()));
 
-  const indexItems = [
-    { href: "#quantum-profile-matrix", label: "Quantum Profile Matrix" },
-    { href: "#understand-quantum-profile", label: "Understand the Quantum Profile" },
-    { href: "#personality-layer", label: "Your Personality Layer" },
-    { href: "#mindset-layer", label: "Your Mindset Layer" },
-    { href: "#combined-pattern", label: "Your Combined Quantum Pattern" },
-    { href: "#emotional-alignment", label: "Emotional & Operational Alignment" },
-    { href: "#business-context", label: "Your Business Context" },
-    { href: "#engine-scorecard", label: "Your Engine Scorecard" },
-    { href: "#primary-bottleneck", label: "Your Primary Bottleneck" },
-    { href: "#what-this-means", label: "What This Means" },
-    { href: "#revenue-impact", label: "Your Revenue Impact" },
-    { href: "#focus-plan", label: "Your 30-Day Focus Plan" },
-    { href: "#executive-summary", label: "One-Page Executive Summary" },
+  const indexItems: ReportIndexItem[] = [
+    { href: "#quantum-profile-matrix", label: "Buyers Persona Matrix" },
+    { href: "#personality-layer", label: "Your Personality layer" },
+    { href: "#understand-quantum-profile", label: "Understand the quantum profile" },
+    { href: "#mindset-layer", label: "Your mindset layer" },
+    { href: "#combined-pattern", label: "Your combined quantum pattern" },
+    { href: "#one-page-quantum-profile", label: "Your strategic growth priorities" },
+    { href: "#focus-plan", label: "Your 30-day action plan" },
+    { href: "#growth-roadmap", label: "Your growth roadmap" },
+    { href: "#communication-decision-style", label: "Your communication and decision style" },
+    { href: "#reflection-prompts", label: "Your reflection prompts" },
+    { href: "#executive-summary", label: "Your one-page quantum summary" },
+    { href: "#executive-summary", label: "Executive summary" },
   ];
 
   const personaIcon = primaryPersonality
@@ -900,7 +959,8 @@ export default function GedEntrepreneurStrategicReportPage({
 
         <section
           data-ged-pdf-page
-          className="mt-5 overflow-hidden rounded-3xl border border-white/15 bg-[radial-gradient(circle_at_top_right,rgba(20,107,105,0.28),transparent_42%),linear-gradient(120deg,#14282a_0%,#08201f_52%,#113638_100%)] p-5 shadow-2xl shadow-black/20 md:p-7"
+          id="one-page-quantum-profile"
+          className="mt-5 scroll-mt-6 overflow-hidden rounded-3xl border border-white/15 bg-[radial-gradient(circle_at_top_right,rgba(20,107,105,0.28),transparent_42%),linear-gradient(120deg,#14282a_0%,#08201f_52%,#113638_100%)] p-5 shadow-2xl shadow-black/20 md:p-7"
         >
           <p className="text-[0.66rem] font-bold uppercase tracking-[0.22em] text-emerald-300">
             One-Page Quantum Profile
@@ -1152,7 +1212,12 @@ export default function GedEntrepreneurStrategicReportPage({
         </section>
 
         <div className="mt-5 grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
-          <ReportIndex items={indexItems} />
+          <ReportIndex
+            items={indexItems}
+            onDownloadPdf={handleDownloadPdf}
+            downloading={downloading}
+            nextStepsHref={nextStepsHref}
+          />
 
           <div className="space-y-5">
             <section data-ged-pdf-page id="quantum-profile-matrix" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
@@ -1301,7 +1366,7 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="emotional-alignment" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section data-ged-pdf-page id="communication-decision-style" className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
               <SectionMarker
                 icon={SECTION_ICON_PATHS.emotional_alignment}
                 eyebrow="Your Emotional & Operational Alignment"
@@ -1422,7 +1487,7 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page id="what-this-means" className="rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
+            <section data-ged-pdf-page id="reflection-prompts" className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7">
               <SectionMarker
                 icon={SECTION_ICON_PATHS.what_this_means}
                 eyebrow="What This Means"
@@ -1534,17 +1599,19 @@ export default function GedEntrepreneurStrategicReportPage({
                   <p>{diagnostic.business_stage.label}</p>
                   <p className="mt-2">Constraint: {diagnostic.core_constraint.label}</p>
                 </ContentCard>
-                <ContentCard title="Next 90 Days">
-                  {strategicPriorities.length ? (
-                    <ul className="space-y-2">
-                      {strategicPriorities.map((priority) => (
-                        <li key={priority} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-700" />{priority}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>Protect the new operating rhythm, strengthen ownership and remove the next founder dependency once the first change is working.</p>
-                  )}
-                </ContentCard>
+                <div id="growth-roadmap" className="scroll-mt-6">
+                  <ContentCard title="Next 90 Days">
+                    {strategicPriorities.length ? (
+                      <ul className="space-y-2">
+                        {strategicPriorities.map((priority) => (
+                          <li key={priority} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-700" />{priority}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>Protect the new operating rhythm, strengthen ownership and remove the next founder dependency once the first change is working.</p>
+                    )}
+                  </ContentCard>
+                </div>
                 <ContentCard title="Recommended Next Step">
                   <p className="font-bold text-slate-950">{diagnostic.recommended_next_step.title}</p>
                   <p className="mt-2">{diagnostic.recommended_next_step.summary}</p>
@@ -1552,7 +1619,7 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </section>
 
-            <section data-ged-pdf-page className="overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-br from-[#45e0d1] via-[#b3f5ed] to-[#d9f99d] p-7 shadow-2xl shadow-black/20 md:p-10">
+            <section data-ged-pdf-page id="recommended-next-steps" className="scroll-mt-6 overflow-hidden rounded-3xl border border-cyan-300/35 bg-gradient-to-br from-[#45e0d1] via-[#b3f5ed] to-[#d9f99d] p-7 shadow-2xl shadow-black/20 md:p-10">
               <p className="text-[0.68rem] font-bold uppercase tracking-[0.22em] text-slate-700">Your Recommended Next Step</p>
               <h2 className="mt-3 max-w-3xl text-4xl font-extrabold tracking-tight text-slate-950 md:text-5xl">Turn the diagnostic into a live execution plan.</h2>
               <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
