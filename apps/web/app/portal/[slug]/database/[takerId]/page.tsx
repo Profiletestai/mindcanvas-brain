@@ -509,7 +509,6 @@ export default async function TakerDetail({
     qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
-  let gedSnapshotUrl: string | null = null;
   let gedExtendedUrl: string | null = null;
   let gedStrategicUrl: string | null = null;
 
@@ -517,7 +516,6 @@ export default async function TakerDetail({
     const base = `/ged/${encodeURIComponent(taker.link_token)}`;
     const query = `?tid=${encodeURIComponent(taker.id)}`;
 
-    gedSnapshotUrl = `${base}${query}`;
     gedExtendedUrl = `${base}/extended${query}`;
     gedStrategicUrl = `${base}/entrepreneur${query}`;
   }
@@ -727,7 +725,7 @@ export default async function TakerDetail({
                 </Link>
               ) : null}
 
-              {reportUrl && (
+              {reportUrl && !isGed && (
                 <Link
                   href={reportUrl}
                   target="_blank"
@@ -743,16 +741,16 @@ export default async function TakerDetail({
           </div>
         </div>
 
-        {isGed && (gedSnapshotUrl || gedExtendedUrl || gedStrategicUrl) && (
+        {isGed && (gedExtendedUrl || gedStrategicUrl) && (
           <div className="flex flex-wrap gap-2 pt-2">
-            {gedSnapshotUrl && (
+            {gedStrategicUrl && (
               <Link
-                href={gedSnapshotUrl}
+                href={gedStrategicUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                className="rounded-md border border-emerald-600 bg-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-400"
               >
-                GED Snapshot
+                Strategic Growth Report
               </Link>
             )}
 
@@ -763,18 +761,7 @@ export default async function TakerDetail({
                 rel="noopener noreferrer"
                 className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
               >
-                GED Extended Snapshot
-              </Link>
-            )}
-
-            {gedStrategicUrl && (
-              <Link
-                href={gedStrategicUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md border border-emerald-600 bg-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-400"
-              >
-                GED — Strategic Growth Report
+                Predictive Selling Playbook
               </Link>
             )}
           </div>
@@ -817,7 +804,7 @@ export default async function TakerDetail({
           </div>
         )}
 
-        {!isVisibility && (
+        {!isVisibility && !isGed && (
           <>
             <div className="space-y-2 pt-4">
               <h3 className="font-medium">Frequency mix</h3>

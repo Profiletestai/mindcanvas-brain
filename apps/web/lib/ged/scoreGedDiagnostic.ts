@@ -1,4 +1,5 @@
-//apps/web/lib/ged/scoreGedDiagnostic.ts
+// apps/web/lib/ged/scoreGedDiagnostic.ts
+
 export type GedChoiceAnswer = {
   question_id: string;
   question_text: string | null;
@@ -13,11 +14,19 @@ export type GedDiagnostics = {
   self_diagnosis: string | null;
 };
 
+/**
+ * Important scope note:
+ * GED v2 currently diagnoses sales reliability, delivery / operating reliability
+ * and founder dependency. It does not claim to measure demand generation,
+ * positioning, revenue, team size or commercial targets because those inputs
+ * are not collected in the present assessment.
+ */
 export type GedPriorityKey =
-  | "GROWTH_ENGINE_PRIORITY"
   | "SALES_ENGINE_PRIORITY"
+  | "DELIVERY_ENGINE_PRIORITY"
   | "BALANCED_ENGINE_PRIORITY"
-  | "SCALE_READINESS_GAP";
+  | "SCALE_READINESS_GAP"
+  | "DIAGNOSTIC_CLARITY_GAP";
 
 export type GedImpactLevel = "low" | "moderate" | "significant" | "critical";
 export type GedUrgencyLevel = "low" | "moderate" | "high";
@@ -41,8 +50,15 @@ export type GedActionPlanItem = {
   actions: string[];
 };
 
+export type GedRoadmapPhase = {
+  phase: string;
+  title: string;
+  summary: string;
+  actions: string[];
+};
+
 export type GedEngineDiagnostic = {
-  scoring_version: "ged_engine_v1";
+  scoring_version: "ged_engine_v2";
   primary_priority: GedPriorityKey;
   priority_label: string;
   priority_summary: string;
@@ -68,6 +84,11 @@ export type GedEngineDiagnostic = {
   self_diagnosis: string | null;
 
   scores: {
+    /**
+     * Delivery and operating reliability. `growth_engine` is retained as an
+     * alias so any legacy report code can continue to read the old field.
+     */
+    delivery_engine: number;
     growth_engine: number;
     sales_engine: number;
     overall_engine: number;
@@ -98,15 +119,27 @@ export type GedEngineDiagnostic = {
     summary: string;
   };
 
+  response_alignment: {
+    level: "high" | "moderate" | "low";
+    label: string;
+    summary: string;
+  };
+
+  /**
+   * Kept for backwards compatibility with the initial Strategic Client Report.
+   * New presentation copy should use response_alignment instead.
+   */
+  confidence: "high" | "moderate" | "low";
+
+  scope_note: string;
   operational_impact: GedOperationalImpact[];
   action_plan: GedActionPlanItem[];
+  ninety_day_roadmap: GedRoadmapPhase[];
 
   recommended_next_step: {
     title: string;
     summary: string;
   };
-
-  confidence: "high" | "moderate" | "low";
 };
 
 type StageCode =
@@ -130,6 +163,15 @@ type ReadinessSignalCode =
   | "RESILIENT"
   | "UNKNOWN";
 
+type StageProfile = {
+  code: StageCode;
+  label: string;
+  summary: string;
+  deliveryBase: number;
+  salesBase: number;
+  founderBase: number;
+};
+
 function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
@@ -151,14 +193,7 @@ function includesAny(text: string, candidates: string[]): boolean {
   return candidates.some((candidate) => text.includes(normalise(candidate)));
 }
 
-function resolveStage(choice: GedChoiceAnswer | null): {
-  code: StageCode;
-  label: string;
-  summary: string;
-  growthBase: number;
-  salesBase: number;
-  founderBase: number;
-} {
+function resolveStage(choice: GedChoiceAnswer | null): StageProfile {
   const text = choiceText(choice);
 
   if (includesAny(text, ["still mostly delivering and selling myself"])) {
@@ -166,8 +201,8 @@ function resolveStage(choice: GedChoiceAnswer | null): {
       code: "FOUNDER_LED",
       label: "Founder-led delivery and sales",
       summary:
-        "You are still carrying the majority of selling and delivery yourself, which limits how much the business can grow without increasing pressure on you.",
-      growthBase: 35,
+        "You are still carrying most of the selling and delivery yourself. The immediate opportunity is to create dependable hand-offs before adding more load.",
+      deliveryBase: 35,
       salesBase: 35,
       founderBase: 85,
     };
@@ -178,8 +213,8 @@ function resolveStage(choice: GedChoiceAnswer | null): {
       code: "SMALL_TEAM_BOTTLENECK",
       label: "Small team, founder bottleneck",
       summary:
-        "You have started to build support around you, but too many key decisions, sales moments or delivery escalations still return to you.",
-      growthBase: 48,
+        "You have support around you, but key decisions, sales moments or delivery escalations still return to you too often.",
+      deliveryBase: 48,
       salesBase: 48,
       founderBase: 72,
     };
@@ -195,8 +230,8 @@ function resolveStage(choice: GedChoiceAnswer | null): {
       code: "DELEGATED_PARTIAL",
       label: "Delegated early scale",
       summary:
-        "Some parts of sales or delivery can operate without you. The opportunity now is to make that independence reliable and repeatable.",
-      growthBase: 78,
+        "Some parts of sales or delivery can operate without you. The next job is to make that independence reliable and repeatable.",
+      deliveryBase: 78,
       salesBase: 76,
       founderBase: 28,
     };
@@ -208,7 +243,7 @@ function resolveStage(choice: GedChoiceAnswer | null): {
       label: "Team performance inconsistency",
       summary:
         "You have team capacity, but the business is not yet producing dependable sales or delivery outcomes without your intervention.",
-      growthBase: 55,
+      deliveryBase: 55,
       salesBase: 55,
       founderBase: 58,
     };
@@ -219,7 +254,7 @@ function resolveStage(choice: GedChoiceAnswer | null): {
     label: choice?.label || choice?.value || "Business stage not captured",
     summary:
       "Your current operating stage could not be classified from the submitted response.",
-    growthBase: 50,
+    deliveryBase: 50,
     salesBase: 50,
     founderBase: 55,
   };
@@ -237,7 +272,7 @@ function resolveConstraint(choice: GedChoiceAnswer | null): {
       code: "SALES_CONSISTENCY",
       label: "Sales consistency",
       summary:
-        "Your sales outcome still depends too heavily on founder-level closing skill, judgement or follow-up discipline.",
+        "Sales outcomes still depend too heavily on founder-level closing skill, judgement or follow-up discipline.",
     };
   }
 
@@ -264,7 +299,7 @@ function resolveConstraint(choice: GedChoiceAnswer | null): {
       code: "UNCLEAR",
       label: "Diagnostic clarity gap",
       summary:
-        "The bottleneck is not yet visible enough to solve confidently. The first job is to identify where growth is actually leaking.",
+        "The bottleneck is not visible enough yet to solve confidently. The first job is to identify where progress is actually leaking.",
     };
   }
 
@@ -306,7 +341,7 @@ function resolveReadinessSignal(choice: GedChoiceAnswer | null): {
       code: "BALANCED_DEPENDENCY",
       label: "Balanced founder dependency",
       summary:
-        "Both revenue generation and delivery quality would weaken without you, signalling a broad operating-system dependency.",
+        "Both revenue generation and delivery quality would weaken without you, signalling a broader operating-system dependency.",
     };
   }
 
@@ -315,7 +350,7 @@ function resolveReadinessSignal(choice: GedChoiceAnswer | null): {
       code: "RESILIENT",
       label: "Early operating resilience",
       summary:
-        "The business can continue operating for a period without you, which is a strong signal of emerging scale readiness.",
+        "The business can continue operating for a period without you, which is a positive signal of emerging scale readiness.",
     };
   }
 
@@ -383,14 +418,14 @@ function makeUrgency(args: {
     label: "Low",
     window: "Optimise over the next 90 days",
     summary:
-      "There is no immediate operational failure signal. The focus is to strengthen the weakest part of the engine before the next expansion phase.",
+      "There is no immediate failure signal. Strengthen the weakest part of the operating model before the next expansion phase.",
   };
 }
 
 function buildPriority(args: {
   constraint: ConstraintCode;
   readinessSignal: ReadinessSignalCode;
-  growthScore: number;
+  deliveryScore: number;
   salesScore: number;
   founderDependency: number;
 }): {
@@ -398,15 +433,32 @@ function buildPriority(args: {
   label: string;
   summary: string;
 } {
-  const { constraint, readinessSignal, growthScore, salesScore, founderDependency } =
-    args;
+  const {
+    constraint,
+    readinessSignal,
+    deliveryScore,
+    salesScore,
+    founderDependency,
+  } = args;
+
+  if (
+    constraint === "UNCLEAR" &&
+    readinessSignal === "UNKNOWN"
+  ) {
+    return {
+      key: "DIAGNOSTIC_CLARITY_GAP",
+      label: "Diagnostic Clarity Gap",
+      summary:
+        "The business has a performance issue, but the real constraint is not visible enough yet to solve with confidence.",
+    };
+  }
 
   if (readinessSignal === "BALANCED_DEPENDENCY") {
     return {
       key: "BALANCED_ENGINE_PRIORITY",
       label: "Balanced Engine Priority",
       summary:
-        "Both selling and delivery are vulnerable without you. The first priority is to create an operating rhythm that protects revenue and client outcomes at the same time.",
+        "Both sales and delivery are vulnerable without you. Build one operating rhythm that protects revenue and client outcomes together.",
     };
   }
 
@@ -425,7 +477,7 @@ function buildPriority(args: {
   if (
     constraint === "SALES_CONSISTENCY" ||
     readinessSignal === "SALES_DEPENDENCY" ||
-    salesScore + 8 < growthScore
+    salesScore + 8 < deliveryScore
   ) {
     return {
       key: "SALES_ENGINE_PRIORITY",
@@ -438,13 +490,13 @@ function buildPriority(args: {
   if (
     constraint === "DELIVERY_CONSISTENCY" ||
     readinessSignal === "DELIVERY_DEPENDENCY" ||
-    growthScore + 8 < salesScore
+    deliveryScore + 8 < salesScore
   ) {
     return {
-      key: "GROWTH_ENGINE_PRIORITY",
-      label: "Growth Engine Priority",
+      key: "DELIVERY_ENGINE_PRIORITY",
+      label: "Delivery Engine Priority",
       summary:
-        "The business needs more dependable delivery capacity and execution structure before it can add growth without creating service strain.",
+        "The immediate risk sits in delivery reliability, team execution or operating ownership. Client outcomes need a system that holds without founder correction.",
     };
   }
 
@@ -452,16 +504,14 @@ function buildPriority(args: {
     key: "BALANCED_ENGINE_PRIORITY",
     label: "Balanced Engine Priority",
     summary:
-      "No single engine is clearly weaker than the other. The opportunity is to strengthen the shared operating rhythm that keeps sales and delivery moving together.",
+      "No single engine is clearly weaker than the other. Strengthen the shared operating rhythm that keeps sales and delivery moving together.",
   };
 }
 
 function buildBottleneck(args: {
   priority: GedPriorityKey;
-  constraint: ConstraintCode;
-  readinessSignal: ReadinessSignalCode;
 }): GedEngineDiagnostic["primary_bottleneck"] {
-  const { priority, constraint, readinessSignal } = args;
+  const { priority } = args;
 
   if (priority === "SALES_ENGINE_PRIORITY") {
     return {
@@ -476,7 +526,7 @@ function buildBottleneck(args: {
     };
   }
 
-  if (priority === "GROWTH_ENGINE_PRIORITY") {
+  if (priority === "DELIVERY_ENGINE_PRIORITY") {
     return {
       code: "delivery_consistency_gap",
       label: "Delivery consistency gap",
@@ -502,12 +552,12 @@ function buildBottleneck(args: {
     };
   }
 
-  if (constraint === "UNCLEAR" && readinessSignal === "UNKNOWN") {
+  if (priority === "DIAGNOSTIC_CLARITY_GAP") {
     return {
       code: "diagnostic_clarity_gap",
       label: "Diagnostic clarity gap",
       summary:
-        "The business has a performance issue, but the true source is not yet clear enough to solve with confidence.",
+        "The business has a performance issue, but the true source is not clear enough yet to solve with confidence.",
       why_it_matters:
         "Trying to fix the wrong problem creates more activity without removing the real constraint.",
       first_fix:
@@ -527,9 +577,7 @@ function buildBottleneck(args: {
   };
 }
 
-function buildActionPlan(
-  priority: GedPriorityKey
-): GedActionPlanItem[] {
+function buildActionPlan(priority: GedPriorityKey): GedActionPlanItem[] {
   switch (priority) {
     case "SALES_ENGINE_PRIORITY":
       return [
@@ -567,7 +615,7 @@ function buildActionPlan(
         },
       ];
 
-    case "GROWTH_ENGINE_PRIORITY":
+    case "DELIVERY_ENGINE_PRIORITY":
       return [
         {
           week: "Week 1",
@@ -579,7 +627,7 @@ function buildActionPlan(
         },
         {
           week: "Week 2",
-          title: "Build operational ownership",
+          title: "Build operating ownership",
           actions: [
             "Assign an accountable owner for the most fragile delivery hand-off.",
             "Write the minimum standard, decision rights and escalation path.",
@@ -639,6 +687,42 @@ function buildActionPlan(
         },
       ];
 
+    case "DIAGNOSTIC_CLARITY_GAP":
+      return [
+        {
+          week: "Week 1",
+          title: "Map the current flow",
+          actions: [
+            "Write the journey from lead to delivery in the order it actually happens.",
+            "Mark every delay, rework point and founder escalation.",
+          ],
+        },
+        {
+          week: "Week 2",
+          title: "Find the repeated leak",
+          actions: [
+            "Review the same flow with the people closest to the work.",
+            "Choose one recurring issue that is visible across more than one client or opportunity.",
+          ],
+        },
+        {
+          week: "Week 3",
+          title: "Test one correction",
+          actions: [
+            "Assign an owner and a simple measure for the selected problem.",
+            "Run the change for a week before expanding it.",
+          ],
+        },
+        {
+          week: "Week 4",
+          title: "Name the true priority",
+          actions: [
+            "Review what changed and where the founder was still required.",
+            "Use the evidence to choose the next 30-day operating priority.",
+          ],
+        },
+      ];
+
     case "BALANCED_ENGINE_PRIORITY":
     default:
       return [
@@ -678,12 +762,142 @@ function buildActionPlan(
   }
 }
 
+function buildNinetyDayRoadmap(priority: GedPriorityKey): GedRoadmapPhase[] {
+  switch (priority) {
+    case "SALES_ENGINE_PRIORITY":
+      return [
+        {
+          phase: "Days 1–30",
+          title: "Make the sales path visible",
+          summary:
+            "Create one shared definition of qualification, follow-up and progression so sales movement is no longer held in the founder’s head.",
+          actions: ["Map the path", "Assign visible ownership"],
+        },
+        {
+          phase: "Days 31–60",
+          title: "Coach the operating rhythm",
+          summary:
+            "Review live opportunities weekly, support the owners through real decisions and improve the hand-offs that keep deals moving.",
+          actions: ["Run a deal-review rhythm", "Track follow-up quality"],
+        },
+        {
+          phase: "Days 61–90",
+          title: "Reduce founder-only closing",
+          summary:
+            "Use evidence from conversion, next actions and stalled deals to remove the next point of founder dependency.",
+          actions: ["Improve the close process", "Set the next sales ownership target"],
+        },
+      ];
+
+    case "DELIVERY_ENGINE_PRIORITY":
+      return [
+        {
+          phase: "Days 1–30",
+          title: "Protect the client standard",
+          summary:
+            "Define what good delivery must look like and make the most fragile hand-off visible to the team.",
+          actions: ["Set delivery standards", "Assign the first owner"],
+        },
+        {
+          phase: "Days 31–60",
+          title: "Build repeatability",
+          summary:
+            "Use checklists, escalation routes and simple review points to reduce variation across clients and team members.",
+          actions: ["Test the operating playbook", "Review client outcomes"],
+        },
+        {
+          phase: "Days 61–90",
+          title: "Create capacity without quality loss",
+          summary:
+            "Strengthen the roles, measures and decision rights that allow the business to carry more work without founder firefighting.",
+          actions: ["Track capacity signals", "Remove the next founder escalation"],
+        },
+      ];
+
+    case "SCALE_READINESS_GAP":
+      return [
+        {
+          phase: "Days 1–30",
+          title: "Make dependency visible",
+          summary:
+            "Identify the work, decisions and relationships that still depend on you to create movement.",
+          actions: ["Choose one dependency", "Define the new authority"],
+        },
+        {
+          phase: "Days 31–60",
+          title: "Transfer ownership safely",
+          summary:
+            "Support the first owner with clear boundaries, a simple success measure and a review rhythm instead of taking the work back.",
+          actions: ["Run the hand-off", "Review exceptions only"],
+        },
+        {
+          phase: "Days 61–90",
+          title: "Design the next layer",
+          summary:
+            "Use what you learned from the first hand-off to define the next role, process or decision stream that must move out of founder hands.",
+          actions: ["Set the next delegation target", "Protect strategic time"],
+        },
+      ];
+
+    case "DIAGNOSTIC_CLARITY_GAP":
+      return [
+        {
+          phase: "Days 1–30",
+          title: "Get to the source",
+          summary:
+            "Create visibility across the real sales and delivery flow before investing in a bigger fix.",
+          actions: ["Map the flow", "Collect repeated evidence"],
+        },
+        {
+          phase: "Days 31–60",
+          title: "Test the first intervention",
+          summary:
+            "Make one targeted operating change and measure whether it removes friction at the point where work is actually breaking.",
+          actions: ["Assign one owner", "Measure the correction"],
+        },
+        {
+          phase: "Days 61–90",
+          title: "Commit to the true priority",
+          summary:
+            "Use evidence rather than instinct to decide whether sales, delivery or founder dependency needs the next investment.",
+          actions: ["Choose the engine priority", "Build the next 30-day plan"],
+        },
+      ];
+
+    case "BALANCED_ENGINE_PRIORITY":
+    default:
+      return [
+        {
+          phase: "Days 1–30",
+          title: "Create one shared view",
+          summary:
+            "Bring sales promises, client outcomes and founder escalation points into one weekly operating conversation.",
+          actions: ["Set shared measures", "Name the weakest hand-off"],
+        },
+        {
+          phase: "Days 31–60",
+          title: "Strengthen the two engines together",
+          summary:
+            "Standardise one sales responsibility and one delivery responsibility so growth does not create a quality gap.",
+          actions: ["Delegate two responsibilities", "Review the shared rhythm"],
+        },
+        {
+          phase: "Days 61–90",
+          title: "Protect the new operating model",
+          summary:
+            "Use the weekly rhythm to improve the system rather than returning to founder-led rescue mode.",
+          actions: ["Track ownership", "Choose the next shared constraint"],
+        },
+      ];
+  }
+}
+
 function buildOperationalImpact(args: {
-  growthScore: number;
+  deliveryScore: number;
   salesScore: number;
   founderDependency: number;
 }): GedOperationalImpact[] {
-  const { growthScore, salesScore, founderDependency } = args;
+  const { deliveryScore, salesScore, founderDependency } = args;
 
   return [
     {
@@ -710,18 +924,61 @@ function buildOperationalImpact(args: {
     {
       key: "delivery_capacity",
       label: "Delivery capacity",
-      level: impactFromScore(growthScore),
+      level: impactFromScore(deliveryScore),
       explanation:
         "How well the business can maintain client outcomes as delivery volume increases.",
     },
     {
       key: "team_consistency",
       label: "Team consistency",
-      level: impactFromScore(growthScore),
+      level: impactFromScore(deliveryScore),
       explanation:
         "How consistently the team can execute the agreed standard without founder correction.",
     },
   ];
+}
+
+function buildResponseAlignment(args: {
+  constraint: ConstraintCode;
+  readinessSignal: ReadinessSignalCode;
+}): GedEngineDiagnostic["response_alignment"] {
+  const { constraint, readinessSignal } = args;
+
+  if (
+    (constraint === "SALES_CONSISTENCY" &&
+      readinessSignal === "SALES_DEPENDENCY") ||
+    (constraint === "DELIVERY_CONSISTENCY" &&
+      readinessSignal === "DELIVERY_DEPENDENCY") ||
+    (constraint === "FOUNDER_DEPENDENCY" &&
+      readinessSignal === "BALANCED_DEPENDENCY")
+  ) {
+    return {
+      level: "high",
+      label: "High response alignment",
+      summary:
+        "Your selected answers point clearly to the same immediate operating priority.",
+    };
+  }
+
+  if (
+    constraint === "UNKNOWN" ||
+    readinessSignal === "UNKNOWN" ||
+    constraint === "UNCLEAR"
+  ) {
+    return {
+      level: "low",
+      label: "Low response alignment",
+      summary:
+        "Your answers show an operating concern, but more detail is needed before treating one issue as the clear priority.",
+    };
+  }
+
+  return {
+    level: "moderate",
+    label: "Moderate response alignment",
+    summary:
+      "Your answers identify a credible priority, with some overlap across sales, delivery or founder dependency to examine in the next review.",
+  };
 }
 
 export function scoreGedDiagnostic(
@@ -733,7 +990,7 @@ export function scoreGedDiagnostic(
   const constraint = resolveConstraint(diagnostics.core_constraint);
   const readinessSignal = resolveReadinessSignal(diagnostics.scale_readiness);
 
-  let growthScore = stage.growthBase;
+  let deliveryScore = stage.deliveryBase;
   let salesScore = stage.salesBase;
   let founderDependency = stage.founderBase;
 
@@ -743,16 +1000,16 @@ export function scoreGedDiagnostic(
       founderDependency += 12;
       break;
     case "DELIVERY_CONSISTENCY":
-      growthScore -= 30;
+      deliveryScore -= 30;
       founderDependency += 12;
       break;
     case "FOUNDER_DEPENDENCY":
-      growthScore -= 20;
+      deliveryScore -= 20;
       salesScore -= 20;
       founderDependency += 22;
       break;
     case "UNCLEAR":
-      growthScore -= 10;
+      deliveryScore -= 10;
       salesScore -= 10;
       founderDependency += 8;
       break;
@@ -766,16 +1023,16 @@ export function scoreGedDiagnostic(
       founderDependency += 24;
       break;
     case "DELIVERY_DEPENDENCY":
-      growthScore -= 28;
+      deliveryScore -= 28;
       founderDependency += 22;
       break;
     case "BALANCED_DEPENDENCY":
-      growthScore -= 25;
+      deliveryScore -= 25;
       salesScore -= 25;
       founderDependency += 28;
       break;
     case "RESILIENT":
-      growthScore += 6;
+      deliveryScore += 6;
       salesScore += 6;
       founderDependency -= 22;
       break;
@@ -783,44 +1040,36 @@ export function scoreGedDiagnostic(
       break;
   }
 
-  growthScore = clamp(growthScore);
+  deliveryScore = clamp(deliveryScore);
   salesScore = clamp(salesScore);
   founderDependency = clamp(founderDependency);
 
-  const overallEngine = clamp((growthScore + salesScore) / 2);
+  const overallEngine = clamp((deliveryScore + salesScore) / 2);
   const scaleReadiness = clamp(
-    (growthScore + salesScore + (100 - founderDependency)) / 3
+    (deliveryScore + salesScore + (100 - founderDependency)) / 3
   );
 
   const priority = buildPriority({
     constraint: constraint.code,
     readinessSignal: readinessSignal.code,
-    growthScore,
+    deliveryScore,
     salesScore,
     founderDependency,
   });
 
-  const bottleneck = buildBottleneck({
-    priority: priority.key,
-    constraint: constraint.code,
-    readinessSignal: readinessSignal.code,
-  });
-
+  const bottleneck = buildBottleneck({ priority: priority.key });
   const urgency = makeUrgency({
     scaleReadiness,
     founderDependency,
     primaryPriority: priority.key,
   });
-
-  const confidence: GedEngineDiagnostic["confidence"] =
-    constraint.code === "UNCLEAR" ||
-    stage.code === "UNKNOWN" ||
-    readinessSignal.code === "UNKNOWN"
-      ? "moderate"
-      : "high";
+  const responseAlignment = buildResponseAlignment({
+    constraint: constraint.code,
+    readinessSignal: readinessSignal.code,
+  });
 
   return {
-    scoring_version: "ged_engine_v1",
+    scoring_version: "ged_engine_v2",
     primary_priority: priority.key,
     priority_label: priority.label,
     priority_summary: priority.summary,
@@ -843,10 +1092,11 @@ export function scoreGedDiagnostic(
       summary: readinessSignal.summary,
     },
 
-    self_diagnosis: diagnostics.self_diagnosis?.trim() || null,
+    self_diagnosis: diagnostics.self_diagnosis || null,
 
     scores: {
-      growth_engine: growthScore,
+      delivery_engine: deliveryScore,
+      growth_engine: deliveryScore,
       sales_engine: salesScore,
       overall_engine: overallEngine,
       scale_readiness: scaleReadiness,
@@ -858,19 +1108,25 @@ export function scoreGedDiagnostic(
 
     primary_bottleneck: bottleneck,
     urgency,
+    response_alignment: responseAlignment,
+    confidence: responseAlignment.level,
+
+    scope_note:
+      "This focused diagnostic assesses sales reliability, delivery and operating capacity, and founder dependency. It does not estimate revenue, demand generation, positioning, team size or commercial targets.",
+
     operational_impact: buildOperationalImpact({
-      growthScore,
+      deliveryScore,
       salesScore,
       founderDependency,
     }),
+
     action_plan: buildActionPlan(priority.key),
+    ninety_day_roadmap: buildNinetyDayRoadmap(priority.key),
 
     recommended_next_step: {
       title: "Book your Growth Engine review",
       summary:
-        "Use a focused strategy session to turn this diagnostic into clear ownership, a 90-day operating plan and the next practical scale move.",
+        "Use a focused strategy session to turn this diagnosis into clear ownership, a 90-day operating plan and the next practical move.",
     },
-
-    confidence,
   };
 }
