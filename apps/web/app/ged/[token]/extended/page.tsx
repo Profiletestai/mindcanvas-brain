@@ -451,6 +451,21 @@ function NarrativeCard({
   );
 }
 
+function FastReadCard({
+  title,
+  content,
+}: {
+  title: string;
+  content: unknown;
+}) {
+  return (
+    <article className="min-h-[106px] rounded-xl border border-emerald-300/10 bg-[#062c23] px-4 py-3 shadow-inner shadow-black/20">
+      <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-300">{title}</h3>
+      <p className="mt-2 text-[12px] leading-5 text-slate-200/85">{sentence(content, 190)}</p>
+    </article>
+  );
+}
+
 function ProgressBar({ label, value, tone = "emerald", description }: { label: string; value: number; tone?: Tone; description?: string }) {
   const safe = normalisePercent(value);
   const style = TONE_STYLE[tone];
@@ -642,6 +657,12 @@ export default function GedPredictiveSellingPlaybookPage({
     diagnostic?.recommended_next_step?.title || "",
   ]).slice(0, 3);
 
+  const fastReadWhatTheyNeed =
+    diagnostic?.primary_bottleneck?.first_fix ||
+    diagnostic?.recommended_next_step?.summary ||
+    extended?.core_business_problems ||
+    extended?.what_offer_ready_for;
+
   const reportIndex = [
     ["fast-read", "Fast Read Sales Summary"],
     ["personality", "Their Personality Layer"],
@@ -821,22 +842,35 @@ export default function GedPredictiveSellingPlaybookPage({
           </div>
         </section>
 
-        <PageSection id="fast-read">
-          <SectionHeader
-            icon="key-insights.png"
-            eyebrow="Read this before you dial in"
-            title="Fast Read Sales Summary"
-            description="An advisor-only guide to how this buyer thinks, communicates, decides and buys — built to be read before the call, not during it."
-          />
-          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <NarrativeCard title="Who they are" content={extended.combined_quantum_pattern || extended.personality_layer} tone="emerald" />
-            <NarrativeCard title="How they think" content={extended.personality_layer} tone="cyan" />
-            <NarrativeCard title="Where they are now" content={diagnostic?.business_stage?.summary || diagnostic?.scale_readiness_signal?.summary} tone="sky" />
-            <NarrativeCard title="Combined pattern" content={extended.combined_quantum_pattern} tone="violet" />
-            <NarrativeCard title="How to communicate" content={extended.how_to_communicate} tone="emerald" />
-            <NarrativeCard title="How they decide" content={extended.how_they_make_decisions} tone="orange" />
-            <NarrativeCard title="What they need" content={extended.what_offer_ready_for} tone="cyan" />
-            <NarrativeCard title="What blocks the sale" content={extended.what_blocks_sale} tone="rose" />
+        <PageSection
+          id="fast-read"
+          className="border-emerald-300/10 bg-[linear-gradient(135deg,rgba(255,138,61,0.12),rgba(45,212,191,0.12))]"
+        >
+          <header>
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-orange-300">
+              Read this before you dial in
+            </p>
+            <h2 className="mt-1 text-lg font-extrabold tracking-tight text-white md:text-xl">
+              Fast-Read Sales Summary
+            </h2>
+          </header>
+
+          <div className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+            <FastReadCard
+              title="Who they are"
+              content={extended.combined_quantum_pattern || extended.personality_layer}
+            />
+            <FastReadCard title="How they think" content={extended.personality_layer} />
+            <FastReadCard
+              title="Where they are now"
+              content={diagnostic?.business_stage?.summary || extended.mindset_layer || diagnostic?.scale_readiness_signal?.summary}
+            />
+            <FastReadCard title="Combined pattern" content={extended.combined_quantum_pattern} />
+            <FastReadCard title="How to communicate" content={extended.how_to_communicate} />
+            <FastReadCard title="How they decide" content={extended.how_they_make_decisions} />
+            <FastReadCard title="What they need" content={fastReadWhatTheyNeed} />
+            <FastReadCard title="What blocks the sale" content={extended.what_blocks_sale} />
+            <FastReadCard title="Best offer fit" content={extended.what_offer_ready_for} />
           </div>
         </PageSection>
 
