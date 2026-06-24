@@ -2341,14 +2341,42 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="pre-call">
-              <SectionHeader icon="pre-call-questions.png" eyebrow="Pre-call questions" title="Conversation starters that unlock the real strategic gap" />
-              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {textItems(extended.pre_call_questions, 5).map((item, index) => (
-                  <article key={`question-${index}`} className="rounded-xl bg-white p-5 shadow-sm">
-                    <p className="text-xs font-extrabold text-emerald-600">{String(index + 1).padStart(2, "0")}</p>
-                    <p className="mt-3 text-sm font-bold leading-6 text-slate-950">{item}</p>
-                  </article>
-                ))}
+              <SectionHeader
+                icon="pre-call-questions.png"
+                eyebrow="Pre-call questions"
+                title="Conversation starters that reveal both the emotional and structural gaps"
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
+                <div className="space-y-2.5">
+                  {textItems(extended.pre_call_questions, 5).map((item, index) => {
+                    const question = item.replace(/^[“"][\s]*|[\s]*[”"]$/g, "").trim();
+
+                    return (
+                      <article
+                        key={`question-${index}`}
+                        className="flex items-center gap-3 rounded-lg border-l-2 border-cyan-400 bg-cyan-50 px-3 py-3 md:px-4"
+                      >
+                        <span
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-100 bg-white text-[10px] font-extrabold text-cyan-500"
+                          aria-hidden="true"
+                        >
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <p className="text-xs italic leading-5 text-slate-700 md:text-sm">
+                          “{question}”
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 border-t border-slate-100 pt-4">
+                  <p className="text-xs font-extrabold text-slate-950">Why these questions work</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-600 md:text-sm">
+                    These questions surface the emotional and structural gap behind the stated problem. They position the host as a strategic peer diagnosing the architecture of the buyer’s growth, not a vendor running a generic discovery call.
+                  </p>
+                </div>
               </div>
             </PageSection>
 
