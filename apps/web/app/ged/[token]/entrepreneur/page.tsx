@@ -728,10 +728,18 @@ function PersonalityFrequencyPanel({
   );
 }
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreRing({
+  score,
+  light = false,
+}: {
+  score: number;
+  light?: boolean;
+}) {
   const radius = 49;
   const circumference = 2 * Math.PI * radius;
   const dash = (clampPercent(score) / 100) * circumference;
+  const scoreColor = light ? "#1a1a1a" : "#f8fafc";
+  const labelColor = light ? "#4b5563" : "#94a3b8";
 
   return (
     <svg
@@ -743,7 +751,7 @@ function ScoreRing({ score }: { score: number }) {
         cx="66"
         cy="66"
         r={radius}
-        stroke="rgba(148,163,184,0.20)"
+        stroke={light ? "#e5e7eb" : "rgba(148,163,184,0.20)"}
         strokeWidth="10"
         fill="transparent"
       />
@@ -751,7 +759,7 @@ function ScoreRing({ score }: { score: number }) {
         cx="66"
         cy="66"
         r={radius}
-        stroke="#2dd4bf"
+        stroke="#34d399"
         strokeWidth="10"
         fill="transparent"
         strokeLinecap="round"
@@ -762,21 +770,21 @@ function ScoreRing({ score }: { score: number }) {
         x="66"
         y="66"
         textAnchor="middle"
-        fill="#f8fafc"
+        fill={scoreColor}
         fontSize="23"
         fontWeight="800"
       >
-        {clampPercent(score)}
+        {clampPercent(score)}%
       </text>
       <text
         x="66"
         y="82"
         textAnchor="middle"
-        fill="#94a3b8"
+        fill={labelColor}
         fontSize="8"
         letterSpacing="1.2"
       >
-        ENGINE SCORE
+        ENGINE HEALTH
       </text>
     </svg>
   );
@@ -2473,70 +2481,97 @@ export default function GedEntrepreneurStrategicReportPage({
                 title="Growth Engine Health Check"
                 body="A diagnostic view across the core dimensions that determine your ability to scale sustainably."
                 dark
+                compact
               />
-              <div className="mt-6 rounded-2xl bg-white p-5 md:p-6">
-                <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-5 text-center">
-                    <ScoreRing score={diagnostic.scores.overall_engine} />
-                    <p className="mt-1 text-sm font-bold text-slate-950">
-                      Overall Engine Score
+
+              <div className="mt-6 rounded-2xl bg-white p-5 md:p-7">
+                <div className="grid gap-5 lg:grid-cols-[310px_minmax(0,1fr)]">
+                  <article className="rounded-2xl border border-[#e5e7eb] bg-white px-6 py-7 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                    <p className="text-[0.7rem] font-bold uppercase tracking-[0.13em] text-[#4b5563]">
+                      Overall Engine<br />
+                      Score
                     </p>
-                    <div className="mt-5 w-full space-y-3 text-left text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Growth Profile</span>
-                        <strong className="text-slate-950">
-                          {diagnostic.scores.growth_engine}%
-                        </strong>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Scale Readiness</span>
-                        <strong className="text-slate-950">
-                          {diagnostic.scores.scale_readiness}%
-                        </strong>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">
-                          Founder Dependency
-                        </span>
-                        <strong className="text-slate-950">
-                          {diagnostic.scores.founder_dependency}%
-                        </strong>
-                      </div>
+
+                    <div className="mt-4 flex justify-center">
+                      <ScoreRing
+                        score={diagnostic.scores.overall_engine}
+                        light
+                      />
                     </div>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 p-5">
-                    <p className="text-base font-bold text-slate-950">
+
+                    <p className="-mt-1 text-sm text-[#4b5563]">Engine Health</p>
+
+                    <div className="mt-7 space-y-3 text-left">
+                      {[
+                        {
+                          label: "Growth Profile",
+                          value: diagnostic.scores.growth_engine,
+                          dot: "#34d399",
+                        },
+                        {
+                          label: "Scale Readiness",
+                          value: diagnostic.scores.scale_readiness,
+                          dot: "#d97706",
+                        },
+                        {
+                          label: "Founder Dependency",
+                          value: diagnostic.scores.founder_dependency,
+                          dot: "#dc2626",
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          className="grid grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-3 text-sm"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: item.dot }}
+                          />
+                          <span className="text-[#4b5563]">{item.label}</span>
+                          <strong className="tabular-nums text-[#1a1a1a]">
+                            {clampPercent(item.value)}%
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+
+                  <article className="rounded-2xl border border-[#e5e7eb] bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                    <p className="text-base font-bold text-[#1a1a1a]">
                       Diagnostic Score Breakdown
                     </p>
-                    <div className="mt-5 space-y-5">
+
+                    <div className="mt-6 space-y-5">
                       <div>
-                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.15em] text-[#9ca3af]">
                           Operational Layer
                         </p>
                         <div className="mt-4 space-y-4">
                           <Meter
                             label="Growth Engine"
                             score={diagnostic.scores.growth_engine}
-                            accent="#16a34a"
+                            accent={scoreAccent(diagnostic.scores.growth_engine)}
                             caption="Delivery capacity, team execution and operating structure."
                           />
                           <Meter
                             label="Sales Engine"
                             score={diagnostic.scores.sales_engine}
-                            accent="#d97706"
+                            accent={scoreAccent(diagnostic.scores.sales_engine)}
                             caption="Conversion, follow-up and consistent revenue without founder-led closing."
                           />
                         </div>
                       </div>
+
                       <div>
-                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.15em] text-[#9ca3af]">
                           Readiness Layer
                         </p>
                         <div className="mt-4 space-y-4">
                           <Meter
                             label="Scale Readiness"
                             score={diagnostic.scores.scale_readiness}
-                            accent="#d97706"
+                            accent={scoreAccent(diagnostic.scores.scale_readiness)}
                           />
                           <Meter
                             label="Founder Dependency"
@@ -2547,7 +2582,7 @@ export default function GedEntrepreneurStrategicReportPage({
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </article>
                 </div>
               </div>
             </section>
