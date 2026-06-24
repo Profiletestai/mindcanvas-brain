@@ -91,6 +91,13 @@ type MindsetLayerView = {
   realProblems: string[];
 };
 
+type CombinedPatternView = {
+  overview: string;
+  realWorldExamples: string[];
+  vulnerabilities: string[];
+  positioningLine: string;
+};
+
 type GedEngineDiagnostic = {
   primary_priority?: string;
   priority_label?: string;
@@ -545,6 +552,60 @@ function parseMindsetLayer(value: unknown): MindsetLayerView {
   };
 }
 
+function parseCombinedQuantumPattern(
+  value: unknown,
+  fallback: {
+    realWorldExample?: unknown;
+    vulnerability?: unknown;
+    positioningLine?: unknown;
+  } = {}
+): CombinedPatternView {
+  const raw = cleanStructuredPlaybookCopy(value);
+
+  if (!raw) {
+    return {
+      overview: "No combined-pattern narrative is recorded for this profile.",
+      realWorldExamples: structuredListItems(fallback.realWorldExample, 6),
+      vulnerabilities: structuredListItems(fallback.vulnerability, 6),
+      positioningLine: safeText(fallback.positioningLine, "Use the diagnostic evidence to position the next conversation with clarity."),
+    };
+  }
+
+  const realWorldHeading = /\breal\s*world\s*example\b\s*[:\-–—]?/i;
+  const vulnerabilityHeading = /\b(?:their\s+)?vulnerabilit(?:y|ies)\b\s*[:\-–—]?/i;
+  const positioningHeading = /\bpositioning\s+line\s+that\s+works\b\s*[:\-–—]?/i;
+
+  const markerPositions = [realWorldHeading, vulnerabilityHeading, positioningHeading]
+    .map((pattern) => {
+      const match = pattern.exec(raw);
+      return match?.index ?? -1;
+    })
+    .filter((index) => index >= 0);
+
+  const introEnd = markerPositions.length ? Math.min(...markerPositions) : raw.length;
+  const overview = raw.slice(0, introEnd).trim() || sentence(raw, 520);
+
+  const realWorldRaw = sliceBetweenHeadings(raw, realWorldHeading, [vulnerabilityHeading, positioningHeading]);
+  const vulnerabilityRaw = sliceBetweenHeadings(raw, vulnerabilityHeading, [positioningHeading]);
+  const positioningRaw = sliceBetweenHeadings(raw, positioningHeading, []);
+
+  const realWorldExamples = structuredListItems(realWorldRaw, 6);
+  const vulnerabilities = structuredListItems(vulnerabilityRaw, 6);
+
+  const fallbackExamples = structuredListItems(fallback.realWorldExample, 6);
+  const fallbackVulnerabilities = structuredListItems(fallback.vulnerability, 6);
+
+  return {
+    overview,
+    realWorldExamples: realWorldExamples.length ? realWorldExamples : fallbackExamples,
+    vulnerabilities: vulnerabilities.length ? vulnerabilities : fallbackVulnerabilities,
+    positioningLine: safeText(
+      positioningRaw,
+      safeText(fallback.positioningLine, "Use the diagnostic evidence to position the next conversation with clarity.")
+    ),
+  };
+}
+
 function SectionIcon({ file, alt }: { file: string; alt: string }) {
   return (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/20 p-2 shadow-inner shadow-cyan-950/20">
@@ -858,6 +919,31 @@ export default function GedPredictiveSellingPlaybookPage({
     diagnostic?.primary_bottleneck?.first_fix || "",
     diagnostic?.recommended_next_step?.title || "",
   ]).slice(0, 3);
+
+  const combinedPattern = useMemo(
+    () =>
+      parseCombinedQuantumPattern(extended?.combined_quantum_pattern, {
+        realWorldExample: extended?.real_life_example,
+        vulnerability:
+          diagnostic?.primary_bottleneck?.summary ||
+          diagnostic?.core_constraint?.summary ||
+          extended?.core_business_problems,
+        positioningLine:
+          diagnostic?.recommended_next_step?.summary ||
+          diagnostic?.primary_bottleneck?.first_fix ||
+          extended?.how_to_communicate,
+      }),
+    [
+      diagnostic?.core_constraint?.summary,
+      diagnostic?.primary_bottleneck?.first_fix,
+      diagnostic?.primary_bottleneck?.summary,
+      diagnostic?.recommended_next_step?.summary,
+      extended?.combined_quantum_pattern,
+      extended?.core_business_problems,
+      extended?.how_to_communicate,
+      extended?.real_life_example,
+    ]
+  );
 
   const fastReadWhatTheyNeed =
     diagnostic?.primary_bottleneck?.first_fix ||
@@ -1462,10 +1548,65 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="combined-pattern">
-              <SectionHeader icon="combined-quantum-pattern.png" eyebrow="Their combined quantum pattern" title="How their behaviour and mindset interact" description="This is the commercial pattern behind the buyer's urgency, ambition and likely friction." />
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                <NarrativeCard title="Combined pattern" content={extended.combined_quantum_pattern} tone="emerald" />
-                <NarrativeCard title="Real commercial gap" content={diagnostic?.primary_bottleneck?.summary || diagnostic?.core_constraint?.summary} tone="rose" />
+              <SectionHeader
+                icon="combined-quantum-pattern.png"
+                eyebrow="Their combined quantum pattern"
+                title="How their behaviour and mindset interact to create specific patterns."
+              />
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-6">
+                <p className="max-w-6xl text-sm leading-6 text-slate-700">
+                  {combinedPattern.overview}
+                </p>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <article className="rounded-xl bg-[#0c1d1a] p-5 text-white shadow-inner shadow-black/10">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300">
+                      Real-world example
+                    </p>
+                    <ul className="mt-3 space-y-2.5">
+                      {(combinedPattern.realWorldExamples.length
+                        ? combinedPattern.realWorldExamples
+                        : ["No profile-specific example is recorded."]
+                      ).map((item, index) => (
+                        <li
+                          key={`combined-example-${index}`}
+                          className="flex gap-2 text-sm leading-5 text-white/90"
+                        >
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+
+                  <article className="rounded-xl border border-slate-200 bg-slate-100 p-5">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-500">
+                      Their vulnerability
+                    </p>
+                    <ul className="mt-3 space-y-2.5">
+                      {(combinedPattern.vulnerabilities.length
+                        ? combinedPattern.vulnerabilities
+                        : ["No profile-specific vulnerability is recorded."]
+                      ).map((item, index) => (
+                        <li
+                          key={`combined-vulnerability-${index}`}
+                          className="flex gap-2 text-sm leading-5 text-slate-700"
+                        >
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xs font-extrabold text-slate-950">Positioning Line That Works</p>
+                  <blockquote className="mt-2 rounded-r-md border-l-2 border-cyan-400 bg-cyan-50 px-4 py-3 text-sm italic leading-6 text-slate-700">
+                    {combinedPattern.positioningLine}
+                  </blockquote>
+                </div>
               </div>
             </PageSection>
 
