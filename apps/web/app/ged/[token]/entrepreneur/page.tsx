@@ -135,7 +135,7 @@ const REPORT_ICON_BASE = "/ged/report-icons";
 
 const SECTION_ICON_PATHS = {
   quantum_profile_matrix: `${REPORT_ICON_BASE}/section-icons/quantum-profile-matrix.png`,
-  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile-graphic.png`,
+  understand_quantum_profile: `${REPORT_ICON_BASE}/section-icons/understand-quantum-profile.png`,
   personality_layer: `${REPORT_ICON_BASE}/section-icons/personality-layer.png`,
   mindset_layer: `${REPORT_ICON_BASE}/section-icons/mindset-layer.png`,
   combined_pattern: `${REPORT_ICON_BASE}/section-icons/combined-pattern.png`,
@@ -150,7 +150,7 @@ const SECTION_ICON_PATHS = {
   recommended_next_steps: `${REPORT_ICON_BASE}/section-icons/recommended-next-steps.png`,
 } as const;
 
-const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graph.png`;
+const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
 const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
 
@@ -501,6 +501,112 @@ function DarkContentCard({
     >
       <h3 className="text-sm font-bold text-white">{title}</h3>
       <div className="mt-3 text-sm leading-6 text-slate-300">{children}</div>
+    </article>
+  );
+}
+
+function splitOperationalBullets(
+  value: string | null | undefined,
+  fallback: readonly string[],
+): string[] {
+  const raw = String(value || "")
+    .replace(/\r/g, "")
+    .trim();
+
+  if (!raw) return [...fallback];
+
+  const fromExplicitBullets = raw
+    .split(/\n+|[•●▪◦]+/)
+    .map((item) => item.replace(/^[-–—]\s*/, "").trim())
+    .filter(Boolean);
+
+  if (fromExplicitBullets.length > 1) return fromExplicitBullets.slice(0, 4);
+
+  const fromSentences = (raw.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [])
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (fromSentences.length > 1) return fromSentences.slice(0, 4);
+
+  const fromClauses = raw
+    .split(/\s*;\s*/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return (fromClauses.length ? fromClauses : [raw]).slice(0, 4);
+}
+
+type AlignmentCardTone = "stabilise" | "destabilise" | "support";
+
+function AlignmentBulletCard({
+  eyebrow,
+  title,
+  items,
+  tone,
+}: {
+  eyebrow: string;
+  title: string;
+  items: string[];
+  tone: AlignmentCardTone;
+}) {
+  const styles: Record<
+    AlignmentCardTone,
+    { background: string; border: string; accent: string; eyebrow: string }
+  > = {
+    stabilise: {
+      background: "#f0fdf4",
+      border: "#bbf7d0",
+      accent: "#22c55e",
+      eyebrow: "#16a34a",
+    },
+    destabilise: {
+      background: "#fef2f2",
+      border: "#fecaca",
+      accent: "#ff5c5c",
+      eyebrow: "#dc2626",
+    },
+    support: {
+      background: "#fff8f4",
+      border: "#fddcbf",
+      accent: "#34d399",
+      eyebrow: "#16a34a",
+    },
+  };
+
+  const style = styles[tone];
+
+  return (
+    <article
+      className="relative min-h-[290px] overflow-hidden rounded-[13px] border p-6 pt-7"
+      style={{ backgroundColor: style.background, borderColor: style.border }}
+    >
+      <span
+        className="absolute inset-x-1 top-1 h-1 rounded-full"
+        style={{ backgroundColor: style.accent }}
+      />
+      <p
+        className="text-[0.64rem] font-bold uppercase tracking-[0.15em]"
+        style={{ color: style.eyebrow }}
+      >
+        {eyebrow}
+      </p>
+      <h3 className="mt-2 text-base font-bold leading-6 text-[#1a1a1a]">
+        {title}
+      </h3>
+      <ul className="mt-4 space-y-3 text-sm leading-5 text-[#4b5563]">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="flex gap-2">
+            <span
+              aria-hidden="true"
+              className="mt-[1px] shrink-0 font-bold"
+              style={{ color: style.accent }}
+            >
+              ▸
+            </span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </article>
   );
 }
@@ -2264,29 +2370,57 @@ export default function GedEntrepreneurStrategicReportPage({
               <SectionMarker
                 icon={SECTION_ICON_PATHS.emotional_alignment}
                 eyebrow="Your Emotional & Operational Alignment"
-                title="How to support yourself inside this pattern"
-                body="Your behavioural result does not replace the operational diagnosis. It explains the conditions that help you implement the right fix and the patterns that may pull you back into the bottleneck."
+                title="How to Support Yourself Inside This Pattern"
+                body={`${canonicalProfile} has a specific set of environmental conditions that allow it to perform at its highest level — and a set of conditions that erode it. Design your operating environment accordingly.`}
                 dark
+                compact
               />
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <DarkContentCard title="What stabilises you">
-                  <p>
-                    {persona?.emotional_stabilises ||
-                      "Clear ownership, visible progress and a small number of priorities help you stay out of reactive founder mode."}
-                  </p>
-                </DarkContentCard>
-                <DarkContentCard title="What destabilises you">
-                  <p>
-                    {persona?.emotional_destabilises ||
-                      "Unclear ownership, repeated escalation and too many decisions returning to you can increase pressure and reduce follow-through."}
-                  </p>
-                </DarkContentCard>
-                <DarkContentCard title="Support yourself better">
-                  <p>
-                    {persona?.support_yourself ||
-                      "Protect time for strategic work, use simple decision rules and review whether the team is truly owning the work you have delegated."}
-                  </p>
-                </DarkContentCard>
+
+              <div className="mt-6 rounded-2xl bg-white p-4 md:p-7">
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <AlignmentBulletCard
+                    eyebrow="What Stabilises You"
+                    title="Your Operating Conditions"
+                    tone="stabilise"
+                    items={splitOperationalBullets(
+                      persona?.emotional_stabilises,
+                      [
+                        "Clear ownership and decision rights.",
+                        "Visible progress against a small number of priorities.",
+                        "Protected time for strategic thinking.",
+                        "A team that can act without escalating every decision.",
+                      ],
+                    )}
+                  />
+                  <AlignmentBulletCard
+                    eyebrow="What Destabilises You"
+                    title="Your Performance Risks"
+                    tone="destabilise"
+                    items={splitOperationalBullets(
+                      persona?.emotional_destabilises,
+                      [
+                        "Unclear ownership and recurring escalation.",
+                        "Inconsistent execution that pulls you back into delivery.",
+                        "Too many decisions returning to you.",
+                        "Reactive work that crowds out strategic focus.",
+                      ],
+                    )}
+                  />
+                  <AlignmentBulletCard
+                    eyebrow="Support Yourself Better"
+                    title="The Structural Fix"
+                    tone="support"
+                    items={splitOperationalBullets(
+                      persona?.support_yourself,
+                      [
+                        "Protect time for strategic work.",
+                        "Use simple decision rules and clear operating rhythms.",
+                        "Strengthen ownership beneath you before adding more complexity.",
+                        "Review whether delegated work is truly leaving your desk.",
+                      ],
+                    )}
+                  />
+                </div>
               </div>
             </section>
 
@@ -3041,4 +3175,3 @@ export default function GedEntrepreneurStrategicReportPage({
     </div>
   );
 }
-
