@@ -3,7 +3,7 @@ import Link from "next/link";
 
 const P = { c1: "#64bae2", c2: "#2d8fc4", c3: "#015a8b" }; // your palette
 
-const CREATE_ACCOUNT_URL = "/onboarding/v2";
+const CREATE_ACCOUNT_URL = "https://profiletest.ai/invite-only-pilot-register-from-profiletestapp";
 
 export default function Landing() {
   return (
