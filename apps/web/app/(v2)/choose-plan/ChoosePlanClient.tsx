@@ -13,6 +13,23 @@ export type PlanCardData = PlanCardContent & {
   selectable: boolean;
 };
 
+// Runtime pilot signal: an active tier-0 entitlement (billing summary derives
+// `is_pilot` from it). Pilot orgs are 'active' yet unpaid, so they must reach
+// the choose-plan page instead of being bounced to the billing portal.
+async function fetchIsPilot(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/billing/summary", {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data?.billing?.is_pilot);
+  } catch {
+    return false;
+  }
+}
+
 export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -23,7 +40,11 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [prog, orgRes] = await Promise.all([api.progress(), api.getOrg()]);
+      const [prog, orgRes, isPilot] = await Promise.all([
+        api.progress(),
+        api.getOrg(),
+        fetchIsPilot(),
+      ]);
       if (cancelled) return;
       if (isErr(prog)) {
         router.replace("/onboarding/v2/account");
@@ -33,10 +54,14 @@ export function ChoosePlanClient({ cards }: { cards: PlanCardData[] }) {
         router.replace(pathForStep(prog.step));
         return;
       }
+      // Pilot orgs are 'active' but unpaid — they still pick a real (paid) plan
+      // here. Only non-pilot active orgs already have a live subscription and
+      // belong in the billing portal. Pilot is the active tier-0 entitlement.
       if (
         !isErr(orgRes) &&
         orgRes.org &&
-        orgRes.org.status !== "pending_activation"
+        orgRes.org.status !== "pending_activation" &&
+        !isPilot
       ) {
         router.replace("/portal/billing");
         return;

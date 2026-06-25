@@ -9,9 +9,11 @@ import { stripe } from "@/lib/stripe";
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
 import {
   ensureStripeCustomer,
+  getActiveEntitlement,
   getOrgRow,
   getOwnerBillingAccount,
   getOwnerPricesForTier,
+  PILOT_TIER,
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
@@ -47,8 +49,14 @@ export async function POST(req: Request) {
   const org = await getOrgRow(orgId);
   if (!org) return jerr("Org not found", "org_not_found", 404);
   if (org.status === "archived") return jerr("Org archived", "org_archived", 409);
-  if (org.status === "active") return jerr("Org already active", "org_already_active", 409);
   if (org.status === "suspended") return jerr("Org suspended", "org_suspended", 409);
+  // Pilot orgs are 'active' but haven't paid — let them upgrade to a paid plan.
+  // Non-pilot active orgs already have a live subscription. The active tier-0
+  // entitlement is the runtime signal that the org is still on the pilot.
+  if (org.status === "active") {
+    const ent = await getActiveEntitlement(orgId);
+    if (ent?.tier !== PILOT_TIER) return jerr("Org already active", "org_already_active", 409);
+  }
 
   if (body.tier !== undefined) {
     const admin = portalAdmin();

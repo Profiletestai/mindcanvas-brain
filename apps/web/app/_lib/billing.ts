@@ -18,6 +18,36 @@ export type OwnerBillingAccount = {
   past_due_since: string | null;
 };
 
+// Fixed product policy: a pilot gets 48h after pilot_end to subscribe before
+// suspension. The pilot entitlement's period_end already = pilot_end + grace,
+// so pilot_end is derived as period_end - PILOT_GRACE_HOURS.
+export const PILOT_GRACE_HOURS = 48;
+
+// The pilot tier sentinel (operator-seeded tier_definitions.tier = 0).
+export const PILOT_TIER = 0;
+
+export type ActiveEntitlement = {
+  tier: number;
+  status: string;
+  period_start: string | null;
+  period_end: string | null;
+};
+
+/** Resolve the org's current active entitlement (runtime source of truth for
+ *  tier + billing period; tier === PILOT_TIER means the org is on the pilot). */
+export async function getActiveEntitlement(orgId: string): Promise<ActiveEntitlement | null> {
+  const { data, error } = await portalAdmin()
+    .from("entitlements")
+    .select("tier, status, period_start, period_end")
+    .eq("org_id", orgId)
+    .eq("status", "active")
+    .order("period_start", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ActiveEntitlement) ?? null;
+}
+
 export type TierPriceRow = {
   id: string;
   billing_type: "owner" | "licensee";

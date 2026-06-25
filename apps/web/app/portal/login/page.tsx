@@ -41,9 +41,16 @@ function handleLoginResponse(json: LoginResponse) {
       ? `/portal/${json.org_slug}/dashboard`
       : "/portal";
 
+  try {
+    sessionStorage.setItem("mc_just_logged_in", "1");
+  } catch {}
+
   let target = safeNextPath(nextFromUrl || nextFromServer, computedFallback);
 
-  if (!isSuper && (target === "/dashboard" || target.startsWith("/dashboard/"))) {
+  if (
+    !isSuper &&
+    (target === "/dashboard" || target.startsWith("/dashboard/"))
+  ) {
     target = computedFallback;
   }
   if (!isSuper && (target === "/admin" || target.startsWith("/admin/"))) {
