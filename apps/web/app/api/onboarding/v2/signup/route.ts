@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin, portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { signupSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";
 import { findUserByEmail } from "@/app/_lib/findUserByEmail";
+import { sendSignupNotification } from "@/lib/server/signupNotification";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ export async function POST(req: Request) {
     }
     const { first_name, last_name, email } = parsed.data;
     const acceptedAt = new Date().toISOString();
+    const source = new URL(req.url).pathname.includes("/pilot/")
+      ? "pilot"
+      : "default";
 
     const admin = supabaseAdmin();
 
@@ -61,6 +65,22 @@ export async function POST(req: Request) {
         return NextResponse.json(
           { ok: false, error: createError.message },
           { status: 400 }
+        );
+      }
+
+      if (!createError) {
+        const notifyResult = await sendSignupNotification({
+          firstName: first_name,
+          lastName: last_name,
+          email,
+          source,
+        });
+        console.log(
+          `[signup] notification fired source=${source} email=${email} ok=${notifyResult.ok}`
+        );
+      } else {
+        console.log(
+          `[signup] notification skipped (existing unverified user) email=${email}`
         );
       }
     }
