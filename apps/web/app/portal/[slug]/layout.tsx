@@ -4,7 +4,10 @@ import { ReactNode } from "react";
 import { createClient } from "@supabase/supabase-js";
 import BackgroundGrid from "@/components/ui/BackgroundGrid";
 import PortalChrome from "@/components/portal/PortalChrome";
+import PortalSidebar from "@/components/portal/PortalSidebar";
+import PortalHeader from "@/components/portal/PortalHeader";
 import PilotGracePopup from "./PilotGracePopup";
+import { getServerSupabase } from "@/app/_lib/portal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +58,27 @@ export default async function OrgLayout({
 }) {
   const org = await loadOrg(params.slug);
 
+  // Logged-in user (for the welcome header) — always the current user, never the org owner
+  let firstName: string | null = null;
+  let fullName: string | null = null;
+  try {
+    const sb = await getServerSupabase();
+    const { data } = await sb.auth.getUser();
+    const user = data?.user ?? null;
+    const meta = (user?.user_metadata ?? {}) as Record<string, any>;
+
+    const metaFull =
+      [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim() ||
+      meta.full_name ||
+      meta.name ||
+      null;
+
+    firstName = meta.first_name || (metaFull ? metaFull.split(/\s+/)[0] : null);
+    fullName = metaFull;
+  } catch {
+    // ignore — header falls back to a generic greeting
+  }
+
   // ✅ Put your brand variables on a wrapping div (NOT <html>)
   const vars: Record<string, string> = {
     "--brand-primary": org?.brand_primary ?? "#2d8fc4",
@@ -75,15 +99,28 @@ export default async function OrgLayout({
 
       {/* Portal nav + content */}
       <div
-        className="relative z-10"
+        className="relative z-10 flex min-h-screen"
         style={{ fontFamily: "var(--report-font-family)" }}
       >
-        <PortalChrome
-          orgSlug={params.slug}
-          orgName={org?.brand_name ?? org?.name ?? params.slug}
-        >
-          {children}
-        </PortalChrome>
+        {/* Left sidebar (full-height, light theme) */}
+        <div className="hidden md:block">
+          <PortalSidebar orgSlug={params.slug} />
+        </div>
+
+        {/* Main column: welcome header + top tabs + page body */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <PortalHeader
+            orgSlug={params.slug}
+            firstName={firstName}
+            fullName={fullName}
+          />
+          <PortalChrome
+            orgSlug={params.slug}
+            orgName={org?.brand_name ?? org?.name ?? params.slug}
+          >
+            {children}
+          </PortalChrome>
+        </div>
       </div>
 
       <PilotGracePopup />
