@@ -1587,7 +1587,32 @@ export async function POST(
       );
     }
 
-    if (!accessRow || accessRow.status !== "active") {
+    let hasAccess = accessRow?.status === "active";
+
+    // Wrapper tests inherit access from their source (default) test:
+    // if the org has active access to the underlying source test, allow submit.
+    if (!hasAccess) {
+      const sourceTestId = await resolveEffectiveTestId(sb, test);
+      if (sourceTestId && sourceTestId !== taker.test_id) {
+        const { data: srcAccess, error: srcErr } = await sb
+          .from("org_test_access")
+          .select("status")
+          .eq("org_id", taker.org_id)
+          .eq("test_id", sourceTestId)
+          .maybeSingle();
+
+        if (srcErr) {
+          return NextResponse.json(
+            { ok: false, error: `Org test access lookup failed: ${srcErr.message}` },
+            { status: 500 }
+          );
+        }
+
+        hasAccess = srcAccess?.status === "active";
+      }
+    }
+
+    if (!hasAccess) {
       return NextResponse.json(
         {
           ok: false,
