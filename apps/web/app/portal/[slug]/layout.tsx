@@ -97,6 +97,16 @@ export default async function OrgLayout({
       {/* 🔵 MindCanvas dark grid background */}
       <BackgroundGrid />
 
+      {/* Rotated brand gradient cover (per Figma: -12.49deg, opacity .35, blur 18px) */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed left-1/2 top-1/2 -z-10 h-[180%] w-[180%] -translate-x-1/2 -translate-y-1/2 rotate-[-12.49deg] opacity-[0.65] [filter:blur(18px)]"
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(1,90,139,0) 0%, rgba(1,90,139,0.4) 25%, rgba(45,143,196,0.533) 50%, rgba(100,186,226,0.4) 75%, rgba(100,186,226,0) 100%)",
+        }}
+      />
+
       {/* Portal nav + content */}
       <div
         className="relative z-10 flex min-h-screen"

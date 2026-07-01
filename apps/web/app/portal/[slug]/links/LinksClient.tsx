@@ -41,8 +41,9 @@ export default function LinksClient(props: {
   orgId: string;
   orgSlug: string;
   orgName: string;
+  hideRecentLinks?: boolean;
 }) {
-  const { orgId, orgSlug, orgName } = props;
+  const { orgId, orgSlug, orgName, hideRecentLinks = false } = props;
 
   const [tests, setTests] = useState<Test[]>([]);
   const [links, setLinks] = useState<LinkRow[]>([]);
@@ -82,7 +83,22 @@ export default function LinksClient(props: {
 
   useEffect(() => {
     fetchJSON(`/api/admin/tests?orgId=${orgId}`)
-      .then((d) => setTests(Array.isArray(d) ? d : []))
+      .then((d) => {
+        const list: Test[] = Array.isArray(d) ? d : [];
+        setTests(list);
+
+        // Preselect a test when arriving from a model card (?testId=...).
+        try {
+          const preselect = new URLSearchParams(window.location.search).get(
+            "testId"
+          );
+          if (preselect && list.some((t) => t.id === preselect)) {
+            setTestId(preselect);
+          }
+        } catch {
+          // ignore — no URL access
+        }
+      })
       .catch((e: any) => {
         setTests([]);
         setStatus(`Tests load error: ${e.message}`);
@@ -295,6 +311,12 @@ export default function LinksClient(props: {
       await new Promise((r) => setTimeout(r, 500));
       refreshLinks();
       resetForm();
+      // Notify sibling views (e.g. the Created test links table) to refresh.
+      try {
+        window.dispatchEvent(new CustomEvent("links:changed"));
+      } catch {
+        // ignore
+      }
     } catch (e: any) {
       setStatus(e?.message || "Error creating link");
       console.error("create-link error", e);
@@ -323,6 +345,11 @@ export default function LinksClient(props: {
       setLinks((prev) => prev.filter((l) => l.id !== linkId));
       setStatus("Link deleted");
       setTimeout(() => setStatus(null), 2000);
+      try {
+        window.dispatchEvent(new CustomEvent("links:changed"));
+      } catch {
+        // ignore
+      }
     } catch (e: any) {
       console.error("delete-link error", e);
       setStatus(e?.message || "Failed to delete link");
@@ -332,7 +359,13 @@ export default function LinksClient(props: {
   const showHiddenMessageField = !showResults;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+    <div
+      className={
+        hideRecentLinks
+          ? "max-w-[560px]"
+          : "grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]"
+      }
+    >
       <div>
         <div className="mb-3">
           <h2 className="text-lg font-semibold">Generate Test Link</h2>
@@ -617,6 +650,7 @@ export default function LinksClient(props: {
         </div>
       </div>
 
+      {!hideRecentLinks && (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Recent links — {orgName}</h2>
@@ -830,6 +864,7 @@ export default function LinksClient(props: {
 
         {status && <p className="mt-2 text-xs text-gray-500">{status}</p>}
       </div>
+      )}
     </div>
   );
 }
