@@ -104,44 +104,48 @@ export default async function TestsPage({
         />
 
         <div>
-          <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#647789]">
+          <div className="mb-4 text-[12px] font-bold uppercase tracking-[0.14em] text-white/[0.36]">
             Available models
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid gap-x-2 gap-y-3.5 lg:grid-cols-2">
             {tests.map((t) => {
               const meta = metaFor(t.name);
               return (
                 <div
                   key={t.id}
-                  className="flex flex-col rounded-[20px] border border-white/[0.08] bg-[#0e2a45] p-7 backdrop-blur-[24px]"
+                  className="flex min-h-[254px] flex-col rounded-[20px] border border-white/[0.08] bg-[#0e2a45] p-5 backdrop-blur-[24px]"
                 >
-                  <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#54AFE0]">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#54AFE0]">
                     {meta.category}
                   </div>
-                  <h2 className="mt-3 text-[20px] font-extrabold leading-[28px] tracking-[-0.3px] text-white">
+                  <h2 className="mt-2 text-[15px] font-extrabold leading-[20px] tracking-[-0.2px] text-white">
                     {t.name}
                   </h2>
-                  <p className="mt-3 text-[13.5px] font-light leading-[21px] text-white/55">
+                  <p className="mt-2.5 text-[12px] font-light leading-[18px] text-white/[0.62]">
                     {meta.description}
                   </p>
 
-                  <div className="mt-6 space-y-2.5 border-t border-white/[0.07] pt-5">
-                    <div className="flex gap-4 text-[13px]">
-                      <span className="w-[64px] shrink-0 text-white/40">
+                  <div className="mt-3 space-y-2 border-t border-white/[0.05] pt-3.5">
+                    <div className="flex text-[11px]">
+                      <span className="w-[73px] shrink-0 font-semibold text-white/[0.36]">
                         Best for
                       </span>
-                      <span className="text-white/70">{meta.bestFor}</span>
+                      <span className="font-light text-white/[0.62]">
+                        {meta.bestFor}
+                      </span>
                     </div>
-                    <div className="flex gap-4 text-[13px]">
-                      <span className="w-[64px] shrink-0 text-white/40">
+                    <div className="flex text-[11px]">
+                      <span className="w-[73px] shrink-0 font-semibold text-white/[0.36]">
                         Output
                       </span>
-                      <span className="text-white/70">{meta.output}</span>
+                      <span className="font-light text-white/[0.62]">
+                        {meta.output}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-auto flex justify-end pt-6">
                     <CreateTestLinkButton
                       orgId={org.id}
                       orgSlug={slug}
@@ -155,12 +159,13 @@ export default async function TestsPage({
             })}
 
             {/* "More models coming soon" placeholder — mirrors the empty cell
-                in the design; also covers the no-tests case gracefully. */}
-            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-[20px] border border-dashed border-white/[0.09] p-7 text-center">
-              <p className="text-[13.5px] text-white/35">
+                in the design: same solid card treatment, muted centered copy.
+                Also covers the no-tests case gracefully. */}
+            <div className="flex min-h-[254px] flex-col items-center justify-center rounded-[20px] border border-white/[0.08] bg-[#0e2a45] p-5 text-center backdrop-blur-[24px]">
+              <p className="text-[11px] font-light leading-[16px] text-white/[0.36]">
                 More models coming soon.
               </p>
-              <p className="text-[13.5px] text-white/35">
+              <p className="text-[11px] font-light leading-[16px] text-white/[0.36]">
                 Speak to us about custom systems.
               </p>
             </div>

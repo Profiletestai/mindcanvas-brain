@@ -29,15 +29,19 @@ export default function CreateTestLinkButton({
 }: Props) {
   const [open, setOpen] = useState(false);
 
-  const gradient =
-    "bg-[linear-gradient(101.83deg,#54AFE0_0%,#54AFE0_100%)] text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90";
+  const shadow =
+    "text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90";
+  // Header buttons use the two-stop gradient from the design; card buttons use
+  // the flat #54AFE0 fill.
+  const headerFill = `bg-[linear-gradient(101.83deg,#3A96C7_0%,#54AFE0_100%)] ${shadow}`;
+  const cardFill = `bg-[#54AFE0] ${shadow}`;
 
   const cls =
     variant === "link"
       ? "text-[13px] font-medium text-[#54AFE0] transition hover:text-white"
       : variant === "card"
-      ? `inline-flex h-[32px] items-center rounded-md px-4 text-[12px] font-bold leading-none tracking-[0.1px] ${gradient}`
-      : `inline-flex h-[30px] items-center gap-[7px] rounded-md px-4 text-[12px] font-bold leading-none tracking-[0.1px] ${gradient}`;
+      ? `inline-flex h-[24px] items-center rounded-md px-[11px] text-[11px] font-semibold leading-none tracking-[0.1px] ${cardFill}`
+      : `inline-flex h-[31px] items-center gap-[5px] rounded-md pl-[9px] pr-[7px] text-[12px] font-bold leading-none tracking-[0.1px] ${headerFill}`;
 
   return (
     <>
@@ -49,8 +53,8 @@ export default function CreateTestLinkButton({
       >
         {variant === "header" && (
           <svg
-            width="16"
-            height="16"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

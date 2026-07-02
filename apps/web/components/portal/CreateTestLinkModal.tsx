@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { getBaseUrl } from "@/lib/baseUrl";
@@ -52,7 +53,9 @@ export default function CreateTestLinkModal({
       },
     });
 
-  const [step, setStep] = useState(0);
+  // When a model is preselected (e.g. the card "Create test link" button),
+  // skip the choose-model step and open straight on the name step.
+  const [step, setStep] = useState(initialModelId ? 1 : 0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
@@ -71,6 +74,18 @@ export default function CreateTestLinkModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Portal target + body scroll lock. Rendering into <body> escapes the card's
+  // backdrop-blur containing block so the overlay is truly full-screen.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   const selectedModel = useMemo(
     () => models.find((m) => m.id === modelId) || null,
@@ -166,9 +181,11 @@ export default function CreateTestLinkModal({
 
   const isSuccess = step === 4;
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -301,6 +318,7 @@ export default function CreateTestLinkModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
