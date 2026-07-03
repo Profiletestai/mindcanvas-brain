@@ -7,6 +7,7 @@
 import { createClient } from "@/lib/server/supabaseAdmin";
 import PortalPageHeader from "@/components/portal/PortalPageHeader";
 import CreateTestLinkButton from "@/components/portal/CreateTestLinkButton";
+import { cardClass } from "@/components/portal/ui";
 import { metaFor } from "@/lib/testModels";
 
 export const dynamic = "force-dynamic";
@@ -114,7 +115,7 @@ export default async function TestsPage({
               return (
                 <div
                   key={t.id}
-                  className="flex min-h-[254px] flex-col rounded-[20px] border border-white/[0.08] bg-[#0e2a45] p-5 backdrop-blur-[24px]"
+                  className={`flex min-h-[254px] flex-col p-5 ${cardClass}`}
                 >
                   <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#54AFE0]">
                     {meta.category}
@@ -161,7 +162,7 @@ export default async function TestsPage({
             {/* "More models coming soon" placeholder — mirrors the empty cell
                 in the design: same solid card treatment, muted centered copy.
                 Also covers the no-tests case gracefully. */}
-            <div className="flex min-h-[254px] flex-col items-center justify-center rounded-[20px] border border-white/[0.08] bg-[#0e2a45] p-5 text-center backdrop-blur-[24px]">
+            <div className={`flex min-h-[254px] flex-col items-center justify-center p-5 text-center ${cardClass}`}>
               <p className="text-[11px] font-light leading-[16px] text-white/[0.36]">
                 More models coming soon.
               </p>
