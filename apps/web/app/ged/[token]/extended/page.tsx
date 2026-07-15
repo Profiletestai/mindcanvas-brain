@@ -201,6 +201,10 @@ type Tone = "emerald" | "cyan" | "sky" | "orange" | "rose" | "amber" | "violet";
 
 const ASSET_BASE = "/ged/predictive-selling-icons";
 const SECTION_ICON_BASE = `${ASSET_BASE}/section-icons`;
+const GED_REPORT_ICON_BASE = "/ged/report-icons";
+const GED_FRAMEWORK_GRAPHIC = `${GED_REPORT_ICON_BASE}/section-icons/ged-framework.png`;
+const GED_PERSONALITY_ICON_BASE = `${GED_REPORT_ICON_BASE}/4-profile-icons`;
+const GED_MINDSET_ICON_BASE = `${GED_REPORT_ICON_BASE}/quantum-profile-matrix`;
 
 const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
   FIRE: "Fire",
@@ -216,6 +220,86 @@ const MINDSET_LABELS: Record<MindsetKey, string> = {
   ORBIT: "Orbit",
   QUANTUM: "Quantum",
 };
+
+const GED_PERSONALITY_STYLE_CARDS: Array<{
+  key: PersonalityKey;
+  label: string;
+  description: string;
+  iconFile: string;
+  accentClass: string;
+  backgroundClass: string;
+}> = [
+  {
+    key: "FIRE",
+    label: "Fire",
+    description: "Fast, bold, decisive, driven",
+    iconFile: "fire.png",
+    accentClass: "bg-orange-500",
+    backgroundClass: "bg-orange-50",
+  },
+  {
+    key: "FLOW",
+    label: "Flow",
+    description: "Relational, intuitive, collaborative",
+    iconFile: "flow.png",
+    accentClass: "bg-sky-400",
+    backgroundClass: "bg-sky-50",
+  },
+  {
+    key: "FORM",
+    label: "Form",
+    description: "Structured, organised, consistent",
+    iconFile: "form.png",
+    accentClass: "bg-emerald-500",
+    backgroundClass: "bg-emerald-50",
+  },
+  {
+    key: "FIELD",
+    label: "Field",
+    description: "Analytical, precise, strategic",
+    iconFile: "field.png",
+    accentClass: "bg-violet-500",
+    backgroundClass: "bg-violet-50",
+  },
+];
+
+const GED_MINDSET_STAGE_CARDS: Array<{
+  key: MindsetKey;
+  label: string;
+  description: string;
+  iconFile: string;
+}> = [
+  {
+    key: "ORIGIN",
+    label: "Origin (L1)",
+    description: "Early stage, inconsistent, unclear.",
+    iconFile: "origin.png",
+  },
+  {
+    key: "MOMENTUM",
+    label: "Momentum (L2)",
+    description: "Some traction, inconsistent growth.",
+    iconFile: "momentum.png",
+  },
+  {
+    key: "VECTOR",
+    label: "Vector (L3)",
+    description: "Clear direction, building systems.",
+    iconFile: "vector.png",
+  },
+  {
+    key: "ORBIT",
+    label: "Orbit (L4)",
+    description: "Stable business, leverage and team.",
+    iconFile: "orbit.png",
+  },
+  {
+    key: "QUANTUM",
+    label: "Quantum (L5)",
+    description: "Scaled strategy, partnerships, expansion.",
+    iconFile: "quantum.png",
+  },
+];
 
 const PERSONALITY_TONES: Record<PersonalityKey, string> = {
   FIRE: "text-orange-400",
@@ -303,6 +387,21 @@ function formatProfilePart(value: unknown): string {
   return raw
     .split(/[\s_-]+/)
     .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function cleanProfileLabel(value: unknown): string {
+  const text = safeText(value, "");
+  if (!text) return "";
+
+  return text
+    .replace(/_/g, " ")
+    .replace(/(?:level|lvl)\s*\d+/gi, "")
+    .replace(/\s+\d+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/\s+/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
 }
@@ -1305,7 +1404,7 @@ export default function GedPredictiveSellingPlaybookPage({
   const profile = useMemo(() => {
     const personality = formatProfilePart(result?.primary_personality || extended?.personality_label);
     const mindset = formatProfilePart(result?.primary_mindset || extended?.mindset_label);
-    const stored = safeText(extended?.persona_label || extended?.profile_code || "", "");
+    const stored = cleanProfileLabel(extended?.persona_label || extended?.profile_code || "");
     return stored || [personality, mindset].filter(Boolean).join(" ") || "Quantum Profile";
   }, [extended?.mindset_label, extended?.persona_label, extended?.personality_label, extended?.profile_code, result?.primary_mindset, result?.primary_personality]);
 
@@ -1500,6 +1599,7 @@ export default function GedPredictiveSellingPlaybookPage({
   // sections. Fast Read is intentionally not repeated here because it sits
   // immediately above this navigation panel.
   const reportIndex = [
+    ["ged-framework", "Introducing the GED Framework"],
     ["personality", "Their Personality Layer"],
     ["mindset", "Their Mindset Layer"],
     ["quantum-profile", "Understand The Quantum Profile"],
@@ -1759,6 +1859,153 @@ export default function GedPredictiveSellingPlaybookPage({
           </aside>
 
           <div className="space-y-7">
+            <PageSection id="ged-framework">
+              <header className="flex items-start gap-3">
+                <SectionIcon file="understand-quantum-profile.png" alt="" />
+                <div className="pt-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                    Introducing the GED Framework
+                  </p>
+                  <h2 className="mt-1 max-w-4xl text-lg font-extrabold leading-6 text-white md:text-xl md:leading-7">
+                    What the Growth Engine Diagnostic measures, before you read this buyer&apos;s result
+                  </h2>
+                </div>
+              </header>
+
+              <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-6">
+                <p className="max-w-6xl text-sm leading-6 text-slate-800">
+                  The GED — the Growth Engine Diagnostic — connects two layers of this buyer&apos;s operating pattern into one combined result. Rather than reducing them to a single label, it shows the personality wiring they naturally lead with, the stage their business has actually reached, and the specific pattern that emerges when the two meet. Read all three together — not the headline result alone — before you get on the call.
+                </p>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:items-center">
+                  <div className="flex min-h-[270px] items-center justify-center rounded-2xl bg-[#f7fbf8] p-4">
+                    <img
+                      src={GED_FRAMEWORK_GRAPHIC}
+                      alt="GED framework graphic showing Personality Layer, Mindset Layer and Quantum Profile"
+                      className="h-auto w-full max-w-[460px] object-contain"
+                    />
+                  </div>
+
+                  <div className="grid gap-3">
+                    {[
+                      {
+                        number: "01",
+                        title: "Personality Layer",
+                        description:
+                          "Which of the four operating styles — Fire, Flow, Form or Field — this buyer naturally leads with in how they communicate and decide.",
+                      },
+                      {
+                        number: "02",
+                        title: "Mindset Layer",
+                        description:
+                          "Places their business against five stages of growth capability, from early Origin through to peak Quantum.",
+                      },
+                      {
+                        number: "03",
+                        title: "Quantum Profile",
+                        description:
+                          "Combines both into the buyer profile — the lens this entire playbook is built from.",
+                      },
+                    ].map((item) => (
+                      <article
+                        key={item.number}
+                        className="rounded-xl border border-slate-100 bg-emerald-50/70 px-5 py-4"
+                      >
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400 text-[10px] font-extrabold text-[#062c23]">
+                          {item.number}
+                        </span>
+                        <h3 className="mt-3 text-sm font-extrabold text-slate-950">
+                          {item.title}
+                        </h3>
+                        <p className="mt-2 text-xs leading-5 text-slate-600 md:text-sm">
+                          {item.description}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-7">
+                  <h3 className="text-sm font-extrabold text-slate-950 md:text-base">
+                    What the Personality Layer stands for
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    This layer predicts how quickly they buy, what motivates them, what overwhelms them, and what sales approach will actually land.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {GED_PERSONALITY_STYLE_CARDS.map((card) => (
+                      <article
+                        key={card.key}
+                        className={`rounded-xl ${card.backgroundClass} p-4 text-center`}
+                      >
+                        <span
+                          className={`mx-auto flex h-9 w-9 items-center justify-center rounded-lg ${card.accentClass} p-2`}
+                        >
+                          <img
+                            src={`${GED_PERSONALITY_ICON_BASE}/${card.iconFile}`}
+                            alt=""
+                            className="h-full w-full object-contain"
+                          />
+                        </span>
+                        <h4 className="mt-3 text-sm font-extrabold text-slate-950">
+                          {card.label}
+                        </h4>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">
+                          {card.description}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-7 border-t border-slate-200 pt-6">
+                  <h3 className="text-sm font-extrabold text-slate-950 md:text-base">
+                    The 5 Mindset Stages
+                  </h3>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {GED_MINDSET_STAGE_CARDS.map((card) => (
+                      <article key={card.key} className="rounded-xl bg-emerald-50/70 p-4">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-md border border-emerald-700/30 bg-[#0c1d1a] p-1.5">
+                          <img
+                            src={`${GED_MINDSET_ICON_BASE}/${card.iconFile}`}
+                            alt=""
+                            className="h-full w-full object-contain"
+                          />
+                        </span>
+                        <h4 className="mt-3 text-sm font-extrabold text-slate-950">
+                          {card.label}
+                        </h4>
+                        <p className="mt-2 text-xs leading-5 text-slate-600">
+                          {card.description}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+
+                  <p className="mt-4 text-sm leading-6 text-slate-600">
+                    This layer reveals their readiness to invest, level of business sophistication, capability to implement, and current strategic gaps and bottlenecks.
+                  </p>
+                </div>
+
+                <aside className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+                  <p className="text-sm leading-6 text-slate-700">
+                    Reading the percentages below: the number next to each layer shows how the buyer&apos;s answers are distributed across all options, not a score out of 100. Their highest share is their primary result even at a modest percentage.
+                  </p>
+                  <p className="mt-4 text-sm font-extrabold text-slate-950">
+                    Their Quantum Profile = Personality + Mindset
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    There are 20 possible combinations across the 4×5 matrix. This buyer&apos;s combined result is {profile} — the core predictive profile this entire playbook is built from.
+                  </p>
+                  <p className="mt-4 text-xs leading-5 text-slate-500">
+                    Methodology: results are derived from the buyer&apos;s responses to the Growth Engine Diagnostic and reflect observable work patterns, not fixed personality traits. Use alongside your own judgement and discovery conversation — never as a standalone sales decision.
+                  </p>
+                </aside>
+              </div>
+            </PageSection>
+
             <PageSection id="personality">
               {(() => {
                 const personalityView = parsePersonalityLayer(extended.personality_layer);
@@ -2003,13 +2250,17 @@ export default function GedPredictiveSellingPlaybookPage({
                     Understand the quantum profile
                   </p>
                   <h2 className="mt-1 text-base font-extrabold text-white md:text-lg">
-                    Your Quantum Profile
+                    Their Quantum Profile
                   </h2>
                 </div>
               </header>
 
               <div className="mt-5 overflow-hidden rounded-2xl bg-white p-4 md:p-6">
-                <div className="flex min-h-[260px] items-center justify-center md:min-h-[300px]">
+                <p className="max-w-6xl text-sm leading-6 text-slate-800">
+                  Their Quantum Profile is the single combined result this entire playbook is built around — their Personality Layer and Mindset Layer working together. What it shows: the four archetypes that make up every Quantum Profile, and where this buyer sits among them. How to use it: treat it as your starting read on them, not the whole picture — the sections that follow unpack what it actually means for how you sell to them.
+                </p>
+
+                <div className="mt-5 flex min-h-[260px] items-center justify-center md:min-h-[300px]">
                   <img
                     src={`${ASSET_BASE}/quantum-profile-graphic.png`}
                     alt="Quantum profile framework showing Fire Origin, Flow Momentum, Form Vector and Field Orbit"
@@ -2512,7 +2763,7 @@ export default function GedPredictiveSellingPlaybookPage({
                   </p>
                   <p className="mt-3 text-sm leading-6 text-slate-700">
                     {saleBlockerPlan.practice ||
-                      "No additional practice note is stored for this profile."}
+                      `If the pitch feels smaller than ${profile}, this buyer will disengage without needing to explain why. Keep the conversation specific, commercially relevant and matched to the level of the constraint they are trying to solve.`}
                   </p>
                 </article>
               </div>
