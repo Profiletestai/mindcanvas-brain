@@ -1192,22 +1192,27 @@ function GedFrameworkSection({
 
   const mindsetStages = [
     {
+      key: "origin",
       label: "Origin (L1)",
       description: "Early stage, inconsistent, unclear.",
     },
     {
+      key: "momentum",
       label: "Momentum (L2)",
       description: "Some traction, inconsistent growth.",
     },
     {
+      key: "vector",
       label: "Vector (L3)",
       description: "Clear direction, building systems.",
     },
     {
+      key: "orbit",
       label: "Orbit (L4)",
       description: "Stable business, leverage and team.",
     },
     {
+      key: "quantum",
       label: "Quantum (L5)",
       description: "Scaled strategy, partnerships, expansion.",
     },
@@ -1324,26 +1329,35 @@ function GedFrameworkSection({
           <h3 className="text-base font-extrabold text-[#0c1d1a] md:text-lg">
             The 5 Mindset Stages
           </h3>
-          <p className="mt-2 text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
-            This layer reveals your readiness to invest, your level of business
-            sophistication, your capability to implement, and your current
-            strategic gaps and bottlenecks.
-          </p>
+
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {mindsetStages.map((stage) => (
               <article
                 key={stage.label}
-                className="min-h-[118px] rounded-xl border border-slate-200 bg-[#f9f8f6] p-4 text-center"
+                className="min-h-[132px] rounded-xl bg-[#f3faf6] p-4 text-left"
               >
-                <h4 className="text-sm font-extrabold text-[#0c1d1a]">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#05231f]">
+                  <AssetIcon
+                    src={`${REPORT_ICON_BASE}/quantum-profile-matrix/${stage.key}.png`}
+                    alt=""
+                    className="h-5 w-5 object-contain"
+                  />
+                </div>
+                <h4 className="mt-3 text-sm font-extrabold text-[#31554a]">
                   {stage.label}
                 </h4>
-                <p className="mt-2 text-xs leading-5 text-[#4b5563]">
+                <p className="mt-2 text-xs leading-5 text-[#31554a]">
                   {stage.description}
                 </p>
               </article>
             ))}
           </div>
+
+          <p className="mt-4 text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
+            This layer reveals your readiness to invest, your level of business
+            sophistication, your capability to implement, and your current
+            strategic gaps and bottlenecks.
+          </p>
         </div>
 
         <div className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
