@@ -1146,6 +1146,293 @@ function ReportIndex({
   );
 }
 
+
+
+function FullReportIndexPage({
+  items,
+  onDownloadPdf,
+  downloading,
+  nextStepsHref,
+}: {
+  items: ReportIndexItem[];
+  onDownloadPdf: () => void;
+  downloading: boolean;
+  nextStepsHref: string | null;
+}) {
+  function handleInReportNavigation(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    href: string,
+  ) {
+    if (!href.startsWith("#")) return;
+
+    const target = document.getElementById(href.slice(1));
+    if (!target) return;
+
+    event.preventDefault();
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      window.history.replaceState(null, "", href);
+    }
+  }
+
+  const nextStepsIsExternal = Boolean(nextStepsHref);
+  const resolvedNextStepsHref = nextStepsHref || "#recommended-next-steps";
+
+  return (
+    <section
+      data-ged-pdf-page
+      id="report-index"
+      className="mt-5 scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 text-white shadow-2xl shadow-black/20 md:p-7"
+    >
+      <p className="text-[0.66rem] font-bold uppercase tracking-[0.26em] text-emerald-300">
+        Report Index
+      </p>
+      <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-white md:text-3xl">
+        Use this report as a working growth map
+      </h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+        Each section builds from your Quantum Profile into the business diagnosis,
+        the bottleneck, the operating plan and the next practical move.
+      </p>
+
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-4 md:p-5">
+        <nav
+          aria-label="Report Index"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        >
+          {items.map((item, index) => (
+            <a
+              key={`${item.label}-${index}`}
+              href={item.href}
+              onClick={(event) => handleInReportNavigation(event, item.href)}
+              className="group flex min-h-[54px] items-center gap-3 rounded-xl border border-white/15 bg-[#071713] px-4 py-3 text-sm font-semibold leading-5 text-white transition hover:border-emerald-300 hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-emerald-300/70"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-[0.68rem] font-black text-emerald-200 group-hover:bg-emerald-300 group-hover:text-[#071713]">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span>{item.label}</span>
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onDownloadPdf}
+          disabled={downloading}
+          className="inline-flex min-h-10 items-center justify-center rounded-[8px] bg-[#34D399] px-5 text-sm font-bold text-slate-950 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {downloading ? "Preparing PDF…" : "Download PDF"}
+        </button>
+        <a
+          href={resolvedNextStepsHref}
+          target={nextStepsIsExternal ? "_blank" : undefined}
+          rel={nextStepsIsExternal ? "noopener noreferrer" : undefined}
+          onClick={(event) =>
+            handleInReportNavigation(event, resolvedNextStepsHref)
+          }
+          className="inline-flex min-h-10 items-center justify-center rounded-[8px] border border-white/35 bg-transparent px-5 text-sm font-bold text-white transition hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/60"
+        >
+          Next step
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function GedFrameworkSection({
+  canonicalProfile,
+  primaryPersonalityLabel,
+  primaryMindsetLabel,
+}: {
+  canonicalProfile: string;
+  primaryPersonalityLabel: string;
+  primaryMindsetLabel: string;
+}) {
+  const personalityStyles = [
+    {
+      label: "Fire",
+      description: "Fast, bold, decisive, driven",
+      color: "#f97316",
+    },
+    {
+      label: "Flow",
+      description: "Relational, intuitive, collaborative",
+      color: "#0ea5e9",
+    },
+    {
+      label: "Form",
+      description: "Structured, organised, consistent",
+      color: "#22c55e",
+    },
+    {
+      label: "Field",
+      description: "Analytical, precise, strategic",
+      color: "#a855f7",
+    },
+  ];
+
+  const mindsetStages = [
+    {
+      label: "Origin (L1)",
+      description: "Early stage, inconsistent, unclear.",
+    },
+    {
+      label: "Momentum (L2)",
+      description: "Some traction, inconsistent growth.",
+    },
+    {
+      label: "Vector (L3)",
+      description: "Clear direction, building systems.",
+    },
+    {
+      label: "Orbit (L4)",
+      description: "Stable business, leverage and team.",
+    },
+    {
+      label: "Quantum (L5)",
+      description: "Scaled strategy, partnerships, expansion.",
+    },
+  ];
+
+  return (
+    <section
+      data-ged-pdf-page
+      id="ged-framework"
+      className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+    >
+      <SectionMarker
+        icon={SECTION_ICON_PATHS.understand_quantum_profile}
+        eyebrow="Introducing the GED Framework"
+        title="What the Growth Engine Diagnostic measures, before you read your result"
+        body="The GED connects two layers of your operating pattern into one combined result. Rather than reducing you to a single label, it shows the personality wiring you naturally lead with, the stage your business has actually reached, and the specific pattern that emerges when the two meet."
+        dark
+      />
+
+      <div className="mt-6 rounded-2xl bg-white p-4 md:p-7">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              number: "01",
+              title: "Personality Layer",
+              body: "Shows which of the four operating styles — Fire, Flow, Form or Field — you naturally lead with in how you work and decide.",
+            },
+            {
+              number: "02",
+              title: "Mindset Layer",
+              body: "Places your business against five stages of growth capability, from early Origin through to peak Quantum.",
+            },
+            {
+              number: "03",
+              title: "Quantum Profile",
+              body: "Combines both into your result — the lens the rest of this report is built from.",
+            },
+          ].map((item) => (
+            <article
+              key={item.number}
+              className="min-h-[176px] rounded-xl border border-slate-200 bg-[#f9f8f6] p-5"
+            >
+              <p className="text-[0.72rem] font-black uppercase tracking-[0.18em] text-emerald-500">
+                {item.number}
+              </p>
+              <h3 className="mt-4 text-base font-extrabold text-[#0c1d1a]">
+                {item.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-[#4b5563]">
+                {item.body}
+              </p>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-7">
+          <h3 className="text-lg font-extrabold text-[#0c1d1a]">
+            What the Personality Layer stands for
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+            This layer predicts your communication style, decision-making pattern,
+            what motivates you, what overwhelms you, and what you trust or distrust.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {personalityStyles.map((style) => (
+              <article
+                key={style.label}
+                className="rounded-xl border border-slate-200 bg-white p-4"
+              >
+                <div
+                  className="mb-3 h-1.5 rounded-full"
+                  style={{ backgroundColor: style.color }}
+                />
+                <h4 className="text-base font-extrabold text-[#0c1d1a]">
+                  {style.label}
+                </h4>
+                <p className="mt-2 text-sm leading-5 text-[#4b5563]">
+                  {style.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-7">
+          <h3 className="text-lg font-extrabold text-[#0c1d1a]">
+            The 5 Mindset Stages
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+            This layer reveals your readiness to invest, your level of business
+            sophistication, your capability to implement, and your current strategic
+            gaps and bottlenecks.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {mindsetStages.map((stage) => (
+              <article
+                key={stage.label}
+                className="min-h-[132px] rounded-xl border border-slate-200 bg-[#f9f8f6] p-4"
+              >
+                <h4 className="text-sm font-extrabold text-[#0c1d1a]">
+                  {stage.label}
+                </h4>
+                <p className="mt-2 text-xs leading-5 text-[#4b5563]">
+                  {stage.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-sm leading-6 text-[#14532d]">
+            Reading the percentages in this report: the number next to each layer
+            shows how your answers are distributed across all options, not a score
+            out of 100. Your highest share is your primary result even at a modest
+            percentage — a low percentage elsewhere means that style or stage shows
+            up less often for you, not that it is absent.
+          </p>
+          <p className="mt-4 text-sm font-bold text-[#0c1d1a]">
+            Your Quantum Profile = Personality + Mindset
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+            There are 20 possible combinations across the 4×5 matrix. Yours is
+            {" "}
+            <strong>{canonicalProfile}</strong> — the combination created by your
+            {" "}
+            <strong>{primaryPersonalityLabel}</strong> operating style and your
+            {" "}
+            <strong>{primaryMindsetLabel}</strong> growth stage.
+          </p>
+          <p className="mt-4 text-xs leading-5 text-[#6b7280]">
+            Methodology: results are derived from responses to the Growth Engine
+            Diagnostic and reflect observable work patterns, not fixed personality
+            traits. Use this report alongside your own business context and
+            professional advice — never as a standalone strategic decision.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
 export default function GedEntrepreneurStrategicReportPage({
   params,
 }: {
@@ -1413,6 +1700,7 @@ export default function GedEntrepreneurStrategicReportPage({
 
   const indexItems: ReportIndexItem[] = [
     { href: "#quantum-profile-matrix", label: "Buyers Persona Matrix" },
+    { href: "#ged-framework", label: "Introducing the GED Framework" },
     { href: "#personality-layer", label: "Your Personality layer" },
     {
       href: "#understand-quantum-profile",
@@ -1632,11 +1920,11 @@ export default function GedEntrepreneurStrategicReportPage({
         ref={reportRef}
         className="relative mx-auto max-w-[1440px] px-3 py-4 md:px-5 md:py-6"
       >
-        <header
-          data-ged-pdf-page
-          className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7"
-        >
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,190px))] xl:items-center">
+        <div data-ged-pdf-page className="space-y-5">
+          <header
+            className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7"
+          >
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,190px))] xl:items-center">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-1.5">
                 <img
@@ -1658,7 +1946,7 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 xl:contents">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:contents">
               <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
                 <p className="text-[0.65rem] text-white/55">Prepared for</p>
                 <p className="mt-1 truncate text-sm font-bold">{name || "—"}</p>
@@ -1671,14 +1959,34 @@ export default function GedEntrepreneurStrategicReportPage({
                 <p className="text-[0.65rem] text-white/55">Framework</p>
                 <p className="mt-1 text-sm font-bold">{canonicalProfile}</p>
               </div>
+              <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
+                <p className="text-[0.65rem] text-white/55">Report actions</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={downloading}
+                    className="inline-flex h-8 items-center justify-center rounded-md bg-[#34D399] px-3 text-xs font-bold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {downloading ? "Preparing…" : "Download PDF"}
+                  </button>
+                  <a
+                    href={nextStepsHref || "#recommended-next-steps"}
+                    target={nextStepsHref ? "_blank" : undefined}
+                    rel={nextStepsHref ? "noopener noreferrer" : undefined}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-white/30 px-3 text-xs font-bold text-white transition hover:bg-white/10"
+                  >
+                    Next steps
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
-        </header>
+          </header>
 
-        <section
-          data-ged-pdf-page
-          className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9"
-        >
+          <section
+            className="overflow-hidden rounded-3xl border border-white/10 bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9"
+          >
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:gap-10">
             <div>
               <h2 className="text-4xl font-extrabold tracking-tight text-white md:text-5xl">
@@ -1735,7 +2043,8 @@ export default function GedEntrepreneurStrategicReportPage({
               </p>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
 
         <section
           data-ged-pdf-page
@@ -2059,6 +2368,13 @@ export default function GedEntrepreneurStrategicReportPage({
           </article>
         </section>
 
+        <FullReportIndexPage
+          items={indexItems}
+          onDownloadPdf={handleDownloadPdf}
+          downloading={downloading}
+          nextStepsHref={nextStepsHref}
+        />
+
         <div className="mt-5 grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
           <ReportIndex
             items={indexItems}
@@ -2097,6 +2413,12 @@ export default function GedEntrepreneurStrategicReportPage({
                 />
               </div>
             </section>
+
+            <GedFrameworkSection
+              canonicalProfile={canonicalProfile}
+              primaryPersonalityLabel={primaryPersonalityLabel}
+              primaryMindsetLabel={primaryMindsetLabel}
+            />
 
             <section
               data-ged-pdf-page
