@@ -1252,12 +1252,6 @@ function GedFrameworkSection({
 
       <div className="mt-5 rounded-2xl bg-white p-4 text-[#0c1d1a] md:p-6">
         <p className="text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
-          The GED — the Growth Engine Diagnostic — connects two layers of your
-          operating pattern into one combined result. Rather than reducing you to
-          a single label, it shows the personality wiring you naturally lead
-          with, the stage your business has actually reached, and the specific
-          pattern that emerges when the two meet. Read all three together — not
-          the headline result alone — before acting on anything in this report.
         </p>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)] lg:items-center">
