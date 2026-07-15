@@ -196,15 +196,15 @@ function ReportHeader({
   pdfFilename: string;
 }) {
   return (
-    <header className="rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+    <header className="mcas-full-report-header rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
+      <div className="mcas-full-report-header-layout flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-5">
           <div className="mt-2 h-10 w-12 rounded-2xl border border-white/20 bg-[#6F5CFF]/30" />
           <div>
-            <p className="max-w-xl text-2xl font-semibold uppercase leading-tight tracking-[0.14em] text-[#6F5CFF] md:text-[32px] md:leading-[35px]">
+            <p className="mcas-full-report-header-title max-w-xl text-2xl font-semibold uppercase leading-tight tracking-[0.14em] text-[#6F5CFF] md:text-[32px] md:leading-[35px]">
               Candidate Extensive Career Report
             </p>
-            <p className="mt-3 text-[13px] font-bold uppercase tracking-[0.28em] text-[#201E41]">
+            <p className="mcas-full-report-header-subtitle mt-3 text-[13px] font-bold uppercase tracking-[0.28em] text-[#201E41]">
               MindCanvas CORE Alignment System
             </p>
           </div>
@@ -217,7 +217,7 @@ function ReportHeader({
             nextStepsUrl={nextStepsUrl}
           />
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="mcas-full-report-header-meta grid gap-3 md:grid-cols-3">
             <MetaCard label="Prepared for" value={payload.candidate.fullName} />
             <MetaCard label="Date" value={formatDate(payload.assessment.completedAt)} />
             <MetaCard label="Framework" value="Candidate Extensive Career Report" />
@@ -240,7 +240,7 @@ function HeroMetric({ label, value, caption }: { label: string; value: string; c
 
 function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasDistributionItem<McasOperatingStyleCode>[]; title?: string }) {
   return (
-    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
+    <div className="mcas-full-report-os-card self-start rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[12px] font-bold uppercase tracking-[0.25em] text-[#4A5568]">{title}</h3>
         <span className="rounded-full bg-[#6F5CFF]/10 px-3 py-1 text-xs font-bold text-[#6F5CFF]">Distribution</span>
@@ -291,7 +291,7 @@ function WorkCycleCoverage({
   ];
 
   return (
-    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white px-4 pb-4 pt-4 text-[#0D1B2A]">
+    <div className="mcas-full-report-core-chart self-start rounded-xl border border-[#E2E8F0] bg-white px-4 pb-4 pt-4 text-[#0D1B2A]">
       <p className="mb-2 text-[10px] font-bold uppercase leading-4 tracking-[0.18em] text-[#8892A4]">
         {title}
       </p>
@@ -376,15 +376,15 @@ function Hero({ payload }: { payload: McasReportPayload }) {
   const readiness = payload.result.careerVertical.readinessPercentage;
 
   return (
-    <section className="overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-6 text-white md:px-8">
-      <div className="grid items-start gap-6 xl:grid-cols-[500px_minmax(500px,1fr)_254px]">
-        <div>
+    <section className="mcas-full-report-hero overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-6 text-white md:px-8">
+      <div className="mcas-full-report-hero-grid grid items-start gap-6 xl:grid-cols-[500px_minmax(500px,1fr)_254px]">
+        <div className="mcas-full-report-hero-copy">
           <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#8E7BFF]">Candidate Extensive Career Report</p>
           <h1 className="mt-3 text-[36px] font-black leading-none tracking-[-0.04em] md:text-[42px]">{payload.candidate.fullName}</h1>
           <p className="mt-5 max-w-lg text-sm leading-7 text-white/55 md:text-[14px]">
             A practical career guide — grounded, honest, and actionable. This report explains how you naturally execute work and where you are most likely to thrive.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="mcas-full-report-hero-metrics mt-8 grid gap-4 sm:grid-cols-2">
             <HeroMetric label="Operating Style" value={operatingStyleLabel(primaryOs.code)} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
             <HeroMetric label="Vertical Fit" value={primaryVertical.code} caption={primaryVertical.label} />
@@ -415,7 +415,7 @@ function HeroSummaryCard({ label, value, caption }: { label: string; value: stri
 
 function TopStyleStrip({ items }: { items: McasDistributionItem<McasOperatingStyleCode>[] }) {
   return (
-    <div className="grid gap-4 bg-white px-6 py-5 md:grid-cols-4 md:px-8">
+    <div className="mcas-full-report-top-strip grid gap-4 bg-white px-6 py-5 md:grid-cols-4 md:px-8">
       {items.slice(0, 4).map((item) => (
         <div key={item.code} className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -463,7 +463,7 @@ function AfterHeroSummary({ payload }: { payload: McasReportPayload }) {
         ];
 
   return (
-    <section className="bg-[#07111E] px-6 py-8 md:px-8">
+    <section className="mcas-full-report-after-hero bg-[#07111E] px-6 py-8 md:px-8">
       <div className="grid gap-7 lg:grid-cols-[460px_1fr] lg:items-center">
         <div className="grid gap-5 sm:grid-cols-2">
           <AfterHeroInfoCard
@@ -541,6 +541,18 @@ function AfterHeroInfoCard({
   );
 }
 
+const REPORT_INDEX_LINKS = [
+  ["orientation", "Welcome and Orientation"],
+  ["plain-language", "Your Work Pattern in Plain Language"],
+  ["style-deep-dive", "Your Operating Style Deep Dive"],
+  ["pressure-strengths", "Your Strength Advantages Under Pressure"],
+  ["blind-spots", "Your Blind Spots and How to Manage Them"],
+  ["roles", "Your Best Fit Work and Roles"],
+  ["vertical", "Your Career Vertical Fit Today"],
+  ["success-guide", "Your 30 / 60 / 90 Day Success Guide"],
+  ["pathway", "Your Next Step Pathway"],
+] as const;
+
 function SidebarIndex({
   pdfFilename,
   nextStepsUrl,
@@ -548,24 +560,12 @@ function SidebarIndex({
   pdfFilename: string;
   nextStepsUrl: string | null;
 }) {
-  const links = [
-    ["orientation", "Welcome and Orientation"],
-    ["plain-language", "Your Work Pattern in Plain Language"],
-    ["style-deep-dive", "Your Operating Style Deep Dive"],
-    ["pressure-strengths", "Your Strength Advantages Under Pressure"],
-    ["blind-spots", "Your Blind Spots and How to Manage Them"],
-    ["roles", "Your Best Fit Work and Roles"],
-    ["vertical", "Your Career Vertical Fit Today"],
-    ["success-guide", "Your 30 / 60 / 90 Day Success Guide"],
-    ["pathway", "Your Next Step Pathway"],
-  ];
-
   return (
     <aside className="mcas-full-report-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
 
       <nav className="space-y-2">
-        {links.map(([href, label], index) => (
+        {REPORT_INDEX_LINKS.map(([href, label], index) => (
           <a
             key={href}
             href={`#${href}`}
@@ -585,9 +585,33 @@ function SidebarIndex({
   );
 }
 
+function PrintableReportIndex() {
+  return (
+    <section className="mcas-full-report-print-only mcas-full-report-print-index">
+      <div className="rounded-xl border border-[#D9E2F1] bg-[#F8FAFC] p-4">
+        <p className="mb-3 text-[9px] font-black uppercase tracking-[0.22em] text-[#6F5CFF]">
+          Report Index
+        </p>
+
+        <div className="mcas-full-report-print-index-grid">
+          {REPORT_INDEX_LINKS.map(([, label], index) => (
+            <p
+              key={label}
+              className="text-[8px] leading-4 text-[#334155]"
+            >
+              <span className="font-black text-[#6F5CFF]">{index + 1}.</span>{" "}
+              {label}
+            </p>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SectionShell({ id, title, icon, children }: { id: string; title: string; icon: string; children: ReactNode }) {
   return (
-    <section id={id} className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
+    <section id={id} className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
       <div className="rounded-[18px] bg-white p-6 md:p-8">
         <div className="mb-7 flex items-center gap-4">
           <img src={icon} alt="" className="h-11 w-11 rounded-xl object-cover ring-1 ring-[#3B82F6]/20" />
@@ -644,7 +668,7 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
   return (
     <section
       id="style-deep-dive"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -719,7 +743,7 @@ function CoreBalanceSection({ payload }: { payload: McasReportPayload }) {
   return (
     <section
       id="core-balance"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -817,7 +841,7 @@ function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) 
   return (
     <section
       id="pressure-strengths"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -843,7 +867,7 @@ function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) 
 
 function StrengthCompactCard({ strength }: { strength: McasStrength }) {
   return (
-    <div className="min-h-[108px] rounded-xl border border-[#45E0D1] bg-[#F8FAFC] p-4">
+    <div className="mcas-print-avoid min-h-[108px] rounded-xl border border-[#45E0D1] bg-[#F8FAFC] p-4">
       <img
         src={strengthIcon(strength)}
         alt=""
@@ -898,7 +922,7 @@ function BlindSpotsSection({
   return (
     <section
       id="blind-spots"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -925,7 +949,7 @@ function BlindSpotsSection({
             return (
               <div
                 key={`${blindSpot.title}-${index}`}
-                className="rounded-xl border bg-white px-5 py-4"
+                className="mcas-print-avoid rounded-xl border bg-white px-5 py-4"
                 style={{ borderColor: accent.border }}
               >
                 <p
@@ -986,7 +1010,7 @@ function RolesSection({
   return (
     <section
       id="roles"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -1067,7 +1091,7 @@ function RoleDiagramCard({
   role: McasRoleRecommendation;
 }) {
   return (
-    <div className="flex min-h-[118px] w-full flex-col justify-center rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]">
+    <div className="mcas-print-avoid flex min-h-[118px] w-full flex-col justify-center rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]">
       <p className="text-[10px] font-black uppercase leading-4 tracking-[0.22em] text-[#2F6FB8]">
         {role.category}
       </p>
@@ -1242,7 +1266,7 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
               <div
                 key={item.code}
                 className={[
-                  "grid items-center gap-3 rounded-2xl border px-4 py-3 md:grid-cols-[auto_1.5fr_1fr_auto]",
+                  "mcas-print-row grid items-center gap-3 rounded-2xl border px-4 py-3 md:grid-cols-[auto_1.5fr_1fr_auto]",
                   level === primaryLevel
                     ? "border-[#5B5CFF] bg-[#F5F3FF]"
                     : "border-transparent bg-white",
@@ -1353,7 +1377,7 @@ function SuccessGuideSection({
   return (
     <section
       id="success-guide"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -1390,7 +1414,7 @@ function SuccessGuideSection({
             return (
               <div
                 key={item.period}
-                className="min-h-[224px] p-6"
+                className="mcas-print-avoid min-h-[224px] p-6"
                 style={{ backgroundColor: tone.bg }}
               >
                 <p
@@ -1545,7 +1569,7 @@ function NextStepPathwaySection({ payload }: { payload: McasReportPayload }) {
   return (
     <section
       id="pathway"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -1736,6 +1760,7 @@ export default async function McasFullReportPage({ params }: PageProps) {
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
         <AfterHeroSummary payload={payload} />
+        <PrintableReportIndex />
 
         <div className="mcas-full-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
           <SidebarIndex pdfFilename={pdfFilename} nextStepsUrl={nextStepsUrl} />
