@@ -116,6 +116,14 @@ const MINDSET_LABELS: Record<MindsetKey, string> = {
   QUANTUM: "Quantum",
 };
 
+const MINDSET_LEVELS: Record<MindsetKey, number> = {
+  ORIGIN: 1,
+  MOMENTUM: 2,
+  VECTOR: 3,
+  ORBIT: 4,
+  QUANTUM: 5,
+};
+
 const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
   FIRE: "#f97316",
   FLOW: "#0ea5e9",
@@ -1012,8 +1020,17 @@ function QuantumProfileVisual({
 
 function QuantumProfileDiagram() {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:p-5 md:p-7">
-      <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-white sm:min-h-[360px] md:min-h-[460px]">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 md:p-7">
+      <p className="max-w-6xl text-sm leading-6 text-[#1f2937] md:text-[0.95rem] md:leading-7">
+        Your Quantum Profile is the single combined result this whole report is
+        built around — your Personality Layer and Mindset Layer working
+        together. What it shows: the four archetypes that make up every Quantum
+        Profile, and where you currently sit among them. How to use it: treat it
+        as your starting frame of reference, not a fixed label — the sections
+        that follow unpack what it actually means in practice.
+      </p>
+
+      <div className="mt-6 flex min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-white sm:min-h-[360px] md:min-h-[460px]">
         <AssetIcon
           src={UNDERSTAND_QUANTUM_PROFILE_GRAPH}
           alt="Quantum Profile diagram"
@@ -2409,12 +2426,21 @@ export default function GedEntrepreneurStrategicReportPage({
                 icon={SECTION_ICON_PATHS.personality_layer}
                 eyebrow="Your Personality Layer"
                 title="How you show up emotionally & behaviourally"
-                body="Your personality layer is your emotional wiring and energetic pattern. It does not change overnight, which is why it is such a powerful anchor for business design."
                 dark
                 compact
               />
 
               <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 sm:p-5 md:p-6">
+                <p className="mb-5 max-w-6xl text-sm leading-6 text-[#1f2937] md:text-[0.95rem] md:leading-7">
+                  Your Personality Layer is your emotional wiring — the way you
+                  naturally think, communicate and make decisions. It&apos;s largely
+                  stable over time, which is why it&apos;s such a reliable anchor.
+                  What it shows: your dominant style, what energises you, and
+                  what quietly drains your effectiveness. How to use it: read it
+                  as a mirror on your instincts, not a constraint — it explains
+                  your default mode, not your ceiling.
+                </p>
+
                 <div className="grid gap-5 lg:grid-cols-[0.9fr_1fr] lg:items-stretch">
                   <PersonalityFrequencyPanel
                     data={frequencyData}
@@ -2468,6 +2494,7 @@ export default function GedEntrepreneurStrategicReportPage({
                 icon={SECTION_ICON_PATHS.mindset_layer}
                 eyebrow="Your Mindset Layer"
                 title="Where you are in your growth journey"
+                body="Your Mindset Layer reflects where your business actually stands today — not your ambition for it, but your current operating reality. What it shows: your growth stage, and how your focus and energy are currently distributed across all five stages. How to use it: this layer shifts as you grow, so it is worth revisiting periodically — it is a snapshot of now, not a permanent stage."
                 dark
                 compact
               />
@@ -2497,7 +2524,7 @@ export default function GedEntrepreneurStrategicReportPage({
                                   isPrimary ? "font-bold" : "font-medium"
                                 }
                               >
-                                {MINDSET_LABELS[key]}
+                                {MINDSET_LABELS[key]} (L{MINDSET_LEVELS[key]})
                               </span>
                               <span className="tabular-nums font-medium">
                                 {value}%
