@@ -6,6 +6,13 @@ import {
   type McasAnswers,
   type McasQuestion,
 } from "@/lib/mcas/scoreMcasV2";
+import {
+  buildAtumaphireExternalPayload,
+  buildAtumaphireRoleSections,
+  buildAtumaphireScoringPayload,
+  formatAtumaphireNarrative,
+  normaliseAtumaphireOutputMode,
+} from "@/lib/mcas/atumaphireOutput";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +22,7 @@ function supa() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { db: { schema: "mcas" } }
+    { db: { schema: "mcas" } },
   );
 }
 
@@ -42,7 +49,7 @@ async function getWordMappings(
   frameworkSlug: string,
   frameworkVersion: string,
   mappingType: string,
-  mappingCode: string
+  mappingCode: string,
 ): Promise<string[]> {
   const { data, error } = await sb
     .from("word_mappings")
@@ -202,11 +209,12 @@ export async function POST(req: Request) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { ok: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const body = await req.json();
+    const outputMode = normaliseAtumaphireOutputMode(body?.output_mode);
 
     const partner_key = String(body?.partner_key || "").trim();
     const job_id = String(body?.job_id || "").trim();
@@ -225,21 +233,21 @@ export async function POST(req: Request) {
     if (!partner_key) {
       return NextResponse.json(
         { ok: false, error: "partner_key is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!job_id) {
       return NextResponse.json(
         { ok: false, error: "job_id is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!title) {
       return NextResponse.json(
         { ok: false, error: "title is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -248,7 +256,7 @@ export async function POST(req: Request) {
       if (!answers[qCode]) {
         return NextResponse.json(
           { ok: false, error: `Missing answer for ${qCode}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -264,14 +272,14 @@ export async function POST(req: Request) {
     if (partnerErr) {
       return NextResponse.json(
         { ok: false, error: partnerErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!partner || !partner.is_active) {
       return NextResponse.json(
         { ok: false, error: "Invalid or inactive partner_key" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -285,14 +293,14 @@ export async function POST(req: Request) {
     if (fwErr) {
       return NextResponse.json(
         { ok: false, error: fwErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!fw) {
       return NextResponse.json(
         { ok: false, error: "Framework not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -307,7 +315,7 @@ export async function POST(req: Request) {
           ok: false,
           error: `Framework must contain 25 questions. Found ${questions.length}.`,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -351,7 +359,7 @@ export async function POST(req: Request) {
           ok: false,
           error: createErr?.message || "Failed to create reverse profile run",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -380,7 +388,7 @@ export async function POST(req: Request) {
           framework_slug,
           framework_version,
           "operating_style",
-          topOperatingStyle.code
+          topOperatingStyle.code,
         )
       : [];
 
@@ -390,7 +398,7 @@ export async function POST(req: Request) {
           framework_slug,
           framework_version,
           "career_vertical",
-          legacyVerticalMappingCode(careerVertical.code)
+          legacyVerticalMappingCode(careerVertical.code),
         )
       : [];
 
@@ -444,12 +452,17 @@ export async function POST(req: Request) {
       careerVertical,
     });
 
+    const externalScoring = buildAtumaphireScoringPayload({
+      scoring,
+      modelVersion: scoring.model_version,
+      careerVertical,
+    });
+
     const resultPayload = {
       scoring,
       wording,
       ideal_candidate_profile: idealCandidateProfile,
       report: {
-        ideal_candidate_profile: idealCandidateProfile,
         operating_style_summary: reportSections.operating_style_summary,
         role_fit_summary: reportSections.role_fit_summary,
         career_vertical_summary: reportSections.career_vertical_summary,
@@ -500,15 +513,35 @@ export async function POST(req: Request) {
     if (updateErr) {
       return NextResponse.json(
         { ok: false, error: updateErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    return NextResponse.json(exportPayload);
+    const threeSectionNarrative = buildAtumaphireRoleSections({
+      scoring: externalScoring,
+      operatingStyleSummary: reportSections.operating_style_summary,
+      roleFitSummary: reportSections.role_fit_summary,
+      careerVerticalSummary: reportSections.career_vertical_summary,
+      idealCandidateProfile,
+    });
+
+    const narrative = formatAtumaphireNarrative(
+      threeSectionNarrative,
+      outputMode,
+    );
+
+    const responsePayload = buildAtumaphireExternalPayload({
+      sourcePayload: exportPayload,
+      scoring: externalScoring,
+      narrative,
+      outputMode,
+    });
+
+    return NextResponse.json(responsePayload);
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: String(error?.message || error) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

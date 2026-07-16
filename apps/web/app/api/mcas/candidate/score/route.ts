@@ -6,6 +6,12 @@ import {
   type McasAnswers,
   type McasQuestion,
 } from "@/lib/mcas/scoreMcasV2";
+import {
+  buildAtumaphireCandidateSections,
+  buildAtumaphireExternalPayload,
+  formatAtumaphireNarrative,
+  normaliseAtumaphireOutputMode,
+} from "@/lib/mcas/atumaphireOutput";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +20,7 @@ function mcasSupa() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { db: { schema: "mcas" } }
+    { db: { schema: "mcas" } },
   );
 }
 
@@ -69,12 +75,13 @@ export async function POST(req: Request) {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { ok: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const sb = mcasSupa();
     const body = await req.json();
+    const outputMode = normaliseAtumaphireOutputMode(body?.output_mode);
 
     const partner_key = String(body?.partner_key || "").trim();
     const org_id = body?.org_id ? String(body.org_id).trim() : "";
@@ -96,7 +103,9 @@ export async function POST(req: Request) {
 
     const first_name = String(candidate.first_name || "").trim();
     const last_name = String(candidate.last_name || "").trim();
-    const email = String(candidate.email || "").trim().toLowerCase();
+    const email = String(candidate.email || "")
+      .trim()
+      .toLowerCase();
     const phone = String(candidate.phone || "").trim();
     const consent = Boolean(candidate.consent);
 
@@ -105,21 +114,21 @@ export async function POST(req: Request) {
     if (!partner_key) {
       return NextResponse.json(
         { ok: false, error: "partner_key is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!org_id) {
       return NextResponse.json(
         { ok: false, error: "org_id is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!application_id) {
       return NextResponse.json(
         { ok: false, error: "application_id is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -130,7 +139,7 @@ export async function POST(req: Request) {
           error:
             "candidate fields required: first_name, last_name, email, phone, consent=true",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -139,7 +148,7 @@ export async function POST(req: Request) {
       if (!answers[qCode]) {
         return NextResponse.json(
           { ok: false, error: `Missing answer for ${qCode}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -153,14 +162,14 @@ export async function POST(req: Request) {
     if (partnerErr) {
       return NextResponse.json(
         { ok: false, error: partnerErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!partner || !partner.is_active) {
       return NextResponse.json(
         { ok: false, error: "Invalid or inactive partner_key" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -170,7 +179,7 @@ export async function POST(req: Request) {
           ok: false,
           error: "Partner is not authorised for this org_id",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -184,14 +193,14 @@ export async function POST(req: Request) {
     if (fwErr) {
       return NextResponse.json(
         { ok: false, error: fwErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!fw) {
       return NextResponse.json(
         { ok: false, error: "Framework not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -207,7 +216,7 @@ export async function POST(req: Request) {
           ok: false,
           error: `Framework must contain 25 questions. Found ${questions.length}.`,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -231,7 +240,7 @@ export async function POST(req: Request) {
     if (findAppErr) {
       return NextResponse.json(
         { ok: false, error: findAppErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -264,7 +273,7 @@ export async function POST(req: Request) {
             error:
               createAppErr?.message || "Failed to create partner application",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -295,7 +304,7 @@ export async function POST(req: Request) {
             error:
               updateAppErr?.message || "Failed to update partner application",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -333,7 +342,7 @@ export async function POST(req: Request) {
       if (indErr) {
         return NextResponse.json(
           { ok: false, error: "Failed to create individual" },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -351,7 +360,7 @@ export async function POST(req: Request) {
     if (findAssessmentErr) {
       return NextResponse.json(
         { ok: false, error: findAssessmentErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -377,14 +386,17 @@ export async function POST(req: Request) {
             error:
               createAssessmentErr?.message || "Failed to create assessment",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
       assessmentId = createdAssessment.id;
     }
 
-    await sb.from("assessment_answers").delete().eq("assessment_id", assessmentId);
+    await sb
+      .from("assessment_answers")
+      .delete()
+      .eq("assessment_id", assessmentId);
 
     const answerRows = Object.entries(answers).map(
       ([question_code, option_code]) => ({
@@ -392,7 +404,7 @@ export async function POST(req: Request) {
         question_code,
         option_code,
         response_time_ms: null,
-      })
+      }),
     );
 
     const { error: ansErr } = await sb
@@ -402,7 +414,7 @@ export async function POST(req: Request) {
     if (ansErr) {
       return NextResponse.json(
         { ok: false, error: "Failed to save answers" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -448,7 +460,7 @@ export async function POST(req: Request) {
       assessment_id: assessmentId,
       scoring_model: scoring_model_version,
       core_distribution: scoring.behavioural_approach_distribution,
-      os_distribution: scoring.operating_style_ranking.map((x) => ({
+      os_distribution: scoring.operating_style_ranking.map((x: any) => ({
         code: x.code,
         pct: x.pct,
       })),
@@ -463,7 +475,7 @@ export async function POST(req: Request) {
     if (resErr) {
       return NextResponse.json(
         { ok: false, error: "Failed to save result" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -498,7 +510,7 @@ export async function POST(req: Request) {
       if (reportErr) {
         return NextResponse.json(
           { ok: false, error: reportErr.message },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -536,7 +548,76 @@ export async function POST(req: Request) {
     const careerVerticalSummaryContent =
       reportContentBySection.cvs || fallbackCareerVerticalSummary;
 
-    const responsePayload = {
+    const scoringPayload = {
+      model_version: scoring_model_version,
+
+      operating_style_counts: scoring.operating_style_counts,
+      operating_style_distribution: scoring.operating_style_distribution,
+      operating_style_ranking: scoring.operating_style_ranking,
+
+      primary_operating_style: scoring.primary_operating_style,
+      secondary_operating_style: scoring.secondary_operating_style,
+      tertiary_operating_style: scoring.tertiary_operating_style,
+
+      behavioural_approach_counts: scoring.behavioural_approach_counts,
+      behavioural_approach_distribution:
+        scoring.behavioural_approach_distribution,
+      behavioural_approach_ranking: scoring.behavioural_approach_ranking,
+
+      core_distribution: scoring.core_distribution,
+
+      career_vertical_counts: scoring.career_vertical_counts,
+      career_vertical_distribution: scoring.career_vertical_distribution,
+      career_vertical_ranking: scoring.career_vertical_ranking,
+
+      primary_career_vertical: scoring.primary_career_vertical,
+      secondary_career_vertical: scoring.secondary_career_vertical,
+
+      career_vertical: {
+        code: careerVerticalCode,
+        display_code: careerVerticalDisplayCode,
+        label: careerVerticalLabel,
+        pct: primaryCareerVertical?.pct ?? null,
+      },
+
+      readiness_signal: scoring.readiness_signal,
+      flags,
+      confidence: scoring.confidence,
+    };
+
+    const operatingStyleSummary =
+      reportContentBySection.oss || fallbackOperatingStyleSummary;
+    const roleFitSummary = reportContentBySection.rfs || fallbackRoleFitSummary;
+    const careerVerticalSummary = {
+      ...careerVerticalSummaryContent,
+      current_vertical: {
+        code: careerVerticalCode,
+        display_code: careerVerticalDisplayCode,
+        label: careerVerticalLabel,
+        pct: primaryCareerVertical?.pct ?? null,
+        summary:
+          careerVerticalSummaryContent?.levels?.[careerVerticalCode || ""] ||
+          careerVerticalSummaryContent?.levels?.[
+            displayCvCode(careerVerticalCode) || ""
+          ] ||
+          null,
+      },
+      readiness_signal: scoring.readiness_signal,
+    };
+
+    const threeSectionNarrative = buildAtumaphireCandidateSections({
+      scoring: scoringPayload,
+      operatingStyleSummary,
+      roleFitSummary,
+      careerVerticalSummary,
+    });
+
+    const narrative = formatAtumaphireNarrative(
+      threeSectionNarrative,
+      outputMode,
+    );
+
+    const internalPayload = {
       ok: true,
       type: "candidate_profile_result",
       meta: {
@@ -567,75 +648,28 @@ export async function POST(req: Request) {
         version: framework_version,
       },
       result: {
-        scoring: {
-          model_version: scoring_model_version,
-
-          operating_style_counts: scoring.operating_style_counts,
-          operating_style_distribution: scoring.operating_style_distribution,
-          operating_style_ranking: scoring.operating_style_ranking,
-
-          primary_operating_style: scoring.primary_operating_style,
-          secondary_operating_style: scoring.secondary_operating_style,
-          tertiary_operating_style: scoring.tertiary_operating_style,
-
-          behavioural_approach_counts: scoring.behavioural_approach_counts,
-          behavioural_approach_distribution:
-            scoring.behavioural_approach_distribution,
-          behavioural_approach_ranking: scoring.behavioural_approach_ranking,
-
-          core_distribution: scoring.core_distribution,
-
-          career_vertical_counts: scoring.career_vertical_counts,
-          career_vertical_distribution: scoring.career_vertical_distribution,
-          career_vertical_ranking: scoring.career_vertical_ranking,
-
-          primary_career_vertical: scoring.primary_career_vertical,
-          secondary_career_vertical: scoring.secondary_career_vertical,
-
-          career_vertical: {
-            code: careerVerticalCode,
-            display_code: careerVerticalDisplayCode,
-            label: careerVerticalLabel,
-            pct: primaryCareerVertical?.pct ?? null,
-          },
-
-          readiness_signal: scoring.readiness_signal,
-          flags,
-          confidence: scoring.confidence,
-        },
+        scoring: scoringPayload,
         report: {
-          operating_style_summary:
-            reportContentBySection.oss || fallbackOperatingStyleSummary,
-
-          role_fit_summary:
-            reportContentBySection.rfs || fallbackRoleFitSummary,
-
-          career_vertical_summary: {
-            ...careerVerticalSummaryContent,
-            current_vertical: {
-              code: careerVerticalCode,
-              display_code: careerVerticalDisplayCode,
-              label: careerVerticalLabel,
-              pct: primaryCareerVertical?.pct ?? null,
-              summary:
-                careerVerticalSummaryContent?.levels?.[careerVerticalCode || ""] ||
-                careerVerticalSummaryContent?.levels?.[
-                  displayCvCode(careerVerticalCode) || ""
-                ] ||
-                null,
-            },
-            readiness_signal: scoring.readiness_signal,
-          },
+          operating_style_summary: operatingStyleSummary,
+          role_fit_summary: roleFitSummary,
+          career_vertical_summary: careerVerticalSummary,
         },
         audit: scoring.audit,
       },
     };
 
+    const responsePayload = buildAtumaphireExternalPayload({
+      sourcePayload: internalPayload,
+      scoring: scoringPayload,
+      narrative,
+      outputMode,
+    });
+
     return NextResponse.json(responsePayload);
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
