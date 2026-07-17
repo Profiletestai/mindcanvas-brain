@@ -1044,7 +1044,7 @@ function McasModelSection() {
       title="MCAS connects three layers of sustainable performance"
     >
       <div className="space-y-8">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl bg-[#F7F8FA] p-4 sm:p-6">
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
           <img
             src="/mcas/graphics/mcas-model.png"
             alt="MCAS model showing Career Vertical, Operating Style and CORE Behaviour"
@@ -1093,7 +1093,7 @@ function OperatingStyleIdentitySection({
         the role and environment.
       </p>
 
-      <div className="mt-6 flex min-h-[300px] items-center justify-center overflow-hidden rounded-2xl bg-[#F7F8FA] p-4 sm:min-h-[360px] sm:p-6">
+      <div className="mt-6 flex min-h-[300px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 sm:min-h-[360px] sm:p-6">
         <img
           src="/mcas/graphics/operating-style-system.png"
           alt="Operating Style Identity System showing all eight profiles"
@@ -1348,7 +1348,7 @@ function CoreBalanceSection({
           </p>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[255px_minmax(0,1fr)] lg:items-center">
-            <div className="flex min-h-[230px] items-center justify-center rounded-xl bg-[#F8F9FC] p-4">
+            <div className="flex min-h-[230px] items-center justify-center rounded-xl border border-slate-200 bg-white p-4">
               <img
                 src="/mcas/graphics/your-core-behaviour.png"
                 alt="CORE behavioural balance"
@@ -1496,7 +1496,7 @@ function CareerVerticalSection({
       title="Current scope fit and stretch horizon"
     >
       <div className="space-y-7">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[#F7F8FA] p-3 sm:p-5">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 sm:p-5">
           <img
             src="/mcas/graphics/career-vertical-fit.png"
             alt="Career Vertical progression from CV1 to CV6"
@@ -1689,48 +1689,58 @@ function RiskSection({
           </p>
         </div>
 
-        <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
-          <RiskSustainabilityCard
-            accent="strength"
-            icon="↗"
-            label="Strength"
-            title={strength.title}
-            copy={strength.detail}
-            footerLabel="Impact"
-            footerCopy={firstSentence(content.primary.systemFunction)}
-          />
+        <div className="p-5 md:p-7">
+          <p className="max-w-5xl text-[11px] leading-5 text-slate-600">
+            This section highlights the candidate&apos;s strongest sustainable
+            contribution, the conditions that may create performance risk, the
+            next development priority, and the environment most likely to
+            support consistent impact. Use it to guide validation questions,
+            role support, and practical development planning.
+          </p>
 
-          <RiskSustainabilityCard
-            accent="risk"
-            icon="△"
-            label="Risk"
-            title={primaryRisk.title}
-            copy={firstSentence(primaryRisk.detail)}
-            footerLabel="Mitigation"
-            footerCopy={riskResponse.mitigation}
-            secondaryFooterLabel="Trigger"
-            secondaryFooterCopy={riskResponse.trigger}
-          />
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <RiskSustainabilityCard
+              accent="strength"
+              icon="↗"
+              label="Strength"
+              title={strength.title}
+              copy={strength.detail}
+              footerLabel="Impact"
+              footerCopy={firstSentence(content.primary.systemFunction)}
+            />
 
-          <RiskSustainabilityCard
-            accent="growth"
-            icon="⌁"
-            label="Growth"
-            title={growth.title}
-            copy={growth.copy}
-            footerLabel="Action"
-            footerCopy={growth.action}
-          />
+            <RiskSustainabilityCard
+              accent="risk"
+              icon="△"
+              label="Risk"
+              title={primaryRisk.title}
+              copy={firstSentence(primaryRisk.detail)}
+              footerLabel="Mitigation"
+              footerCopy={riskResponse.mitigation}
+              secondaryFooterLabel="Trigger"
+              secondaryFooterCopy={riskResponse.trigger}
+            />
 
-          <RiskSustainabilityCard
-            accent="recommendation"
-            icon="◎"
-            label="Recommendation"
-            title="Best Fit Environment"
-            copy={firstSentence(content.primary.environmentSummary)}
-            footerLabel="Why"
-            footerCopy={`Creates the conditions for ${primaryLabel} to deliver impact while protecting sustainable execution.`}
-          />
+            <RiskSustainabilityCard
+              accent="growth"
+              icon="⌁"
+              label="Growth"
+              title={growth.title}
+              copy={growth.copy}
+              footerLabel="Action"
+              footerCopy={growth.action}
+            />
+
+            <RiskSustainabilityCard
+              accent="recommendation"
+              icon="◎"
+              label="Recommendation"
+              title="Best Fit Environment"
+              copy={firstSentence(content.primary.environmentSummary)}
+              footerLabel="Why"
+              footerCopy={`Creates the conditions for ${primaryLabel} to deliver impact while protecting sustainable execution.`}
+            />
+          </div>
         </div>
       </div>
     </section>
