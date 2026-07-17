@@ -41,6 +41,20 @@ type StyleBlueprint = {
   influence: string;
 };
 
+type BlendAnalysis = {
+  ranking: any[];
+  top: any | null;
+  exactTop: any[];
+  nearTop: any[];
+  supporting: any | null;
+  mode: "single" | "near" | "tie";
+};
+
+const EXACT_TIE_EPSILON = 0.05;
+const OPERATING_NEAR_TIE_POINTS = 6.8;
+const CORE_NEAR_TIE_POINTS = 6.8;
+const VERTICAL_NEAR_TIE_POINTS = 11.2;
+
 const STYLE_BLUEPRINTS: Record<string, StyleBlueprint> = {
   OS1: {
     contribution:
@@ -54,7 +68,7 @@ const STYLE_BLUEPRINTS: Record<string, StyleBlueprint> = {
   },
   OS2: {
     contribution:
-      "creates momentum by communicating with energy, engaging people and turning ideas into visible action",
+      "builds momentum by communicating with energy, engaging people and turning ideas into visible action",
     decision:
       "They are likely to decide quickly and favour movement, participation and practical traction over prolonged analysis.",
     team:
@@ -124,6 +138,28 @@ const STYLE_BLUEPRINTS: Record<string, StyleBlueprint> = {
   },
 };
 
+const STYLE_BLEND_CONTRIBUTION: Record<string, string> = {
+  OS1: "spotting future possibilities and framing direction",
+  OS2: "building momentum through communication and engagement",
+  OS3: "strengthening commitment, morale and human sustainability",
+  OS4: "connecting people, information and dependencies",
+  OS5: "protecting delivery and resolving practical obstacles",
+  OS6: "turning complexity into structure, ownership and operating rhythm",
+  OS7: "testing evidence, identifying risk and protecting quality",
+  OS8: "refining systems, removing friction and improving efficiency",
+};
+
+const STYLE_BLEND_VALUE: Record<string, string> = {
+  OS1: "future focus, opportunity sensing and strategic direction",
+  OS2: "energy, communication and visible momentum",
+  OS3: "empathy, commitment and human sustainability",
+  OS4: "cross-functional alignment and relationship bridging",
+  OS5: "delivery stability and practical problem-solving",
+  OS6: "structure, sequencing and operational discipline",
+  OS7: "evidence, risk judgement and quality protection",
+  OS8: "refinement, efficiency and continuous improvement",
+};
+
 const VERTICAL_SCOPE: Record<string, string> = {
   CV1_2:
     "foundational-to-developing scope, where reliable individual ownership and growing independence matter most",
@@ -141,6 +177,17 @@ const VERTICAL_SCOPE: Record<string, string> = {
   V6: "enterprise scope, involving long-horizon direction, renewal and organisational stewardship",
 };
 
+const STYLE_ENVIRONMENT_CONTEXT: Record<string, string> = {
+  OS1: "where possibility, direction and strategic opportunity matter",
+  OS2: "where communication, visibility and momentum matter",
+  OS3: "where trust, commitment and human sustainability matter",
+  OS4: "where cross-functional alignment and shared understanding matter",
+  OS5: "where dependable delivery, continuity and practical problem-solving matter",
+  OS6: "where structure, sequencing and operational discipline matter",
+  OS7: "where evidence, risk awareness and quality protection matter",
+  OS8: "where refinement, efficiency and continuous improvement matter",
+};
+
 const STYLE_VERIFICATION: Record<string, string> = {
   OS1: "translate vision into clear priorities, ownership and sustained delivery; narrow multiple possibilities into defensible choices; and test assumptions before committing the organisation to a direction",
   OS2: "sustain performance in repetitive, detail-heavy or low-visibility work; maintain effectiveness when autonomy or communication is limited; and balance momentum with structure and follow-through",
@@ -150,6 +197,37 @@ const STYLE_VERIFICATION: Record<string, string> = {
   OS6: "adapt structure when circumstances change, keep process connected to purpose and use judgement rather than adding control automatically",
   OS7: "make timely decisions with incomplete information, balance risk with opportunity and communicate safeguards without suppressing useful experimentation",
   OS8: "distinguish essential improvement from perfection, protect release momentum and assess whether local refinements improve the wider system",
+};
+
+const CORE_CAPABILITY: Record<string, string> = {
+  C: "generate viable options, initiate direction and adapt beyond established methods",
+  O: "plan and sequence work, clarify ownership and manage dependencies",
+  R: "remove obstacles, sustain effort and carry work through to completion",
+  E: "test assumptions, evaluate evidence, manage risk and protect quality",
+};
+
+const CORE_NOUN_PHRASE: Record<string, string> = {
+  C: "idea generation, initiative and adaptation",
+  O: "planning, sequencing, ownership and dependency management",
+  R: "persistence, obstacle removal and dependable completion",
+  E: "evidence testing, risk judgement and quality protection",
+};
+
+const READINESS_EVIDENCE: Record<string, string> = {
+  CV1_2:
+    "reliable ownership, growing independence and consistent performance when responsibility widens",
+  CV3:
+    "sustained accountability for broader outcomes and effective coordination beyond individual tasks",
+  CV4:
+    "cross-functional judgement, explicit trade-offs and influence across teams or functions",
+  CV5_6:
+    "strategic accountability, enterprise-level decisions and measurable outcomes delivered through others",
+  V1: "reliable individual ownership and consistent delivery",
+  V2: "growing independence and wider responsibility",
+  V3: "accountability for broader outcomes beyond individual tasks",
+  V4: "cross-functional judgement and trade-offs",
+  V5: "strategic accountability and outcomes delivered through others",
+  V6: "enterprise stewardship, long-horizon judgement and organisational renewal",
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -186,77 +264,6 @@ function lowercaseFirst(value: string): string {
   return `${value.charAt(0).toLowerCase()}${value.slice(1)}`;
 }
 
-function readinessNounPhrase(value: string): string {
-  const cleaned = stripTerminalPunctuation(value);
-  const readyMatch = cleaned.match(/^ready for\s+(.+)$/i);
-  if (readyMatch?.[1]) return `readiness for ${readyMatch[1]}`;
-  return lowercaseFirst(cleaned);
-}
-
-function normaliseSubjectSentence(value: string | null): string | null {
-  const cleaned = cleanText(value);
-  if (!cleaned) return null;
-
-  const subjectPatterns: Array<[RegExp, string]> = [
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+contributes\b/i, "They contribute"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+makes\b/i, "They make"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+creates\b/i, "They create"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+builds\b/i, "They build"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+drives\b/i, "They drive"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+supports\b/i, "They support"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+helps\b/i, "They help"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+operates\b/i, "They operate"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+works\b/i, "They work"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+is\b/i, "They are"],
-    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+has\b/i, "They have"],
-  ];
-
-  for (const [pattern, replacement] of subjectPatterns) {
-    if (pattern.test(cleaned)) return cleaned.replace(pattern, replacement);
-  }
-
-  return cleaned
-    .replace(/^(?:this|the)\s+(?:individual|applicant|candidate)\s+/i, "They ")
-    .replace(/^the person\s+/i, "They ");
-}
-
-function toGerundPhrase(value: string): string {
-  const cleaned = stripTerminalPunctuation(value);
-  const match = cleaned.match(/^(\S+)(.*)$/);
-  if (!match) return lowercaseFirst(cleaned);
-
-  const verb = match[1];
-  const rest = match[2] || "";
-  const lower = verb.toLowerCase();
-
-  const irregular: Record<string, string> = {
-    activates: "activating",
-    communicates: "communicating",
-    builds: "building",
-    creates: "creating",
-    strengthens: "strengthening",
-    protects: "protecting",
-    turns: "turning",
-    tests: "testing",
-    identifies: "identifying",
-    improves: "improving",
-    connects: "connecting",
-    translates: "translating",
-    aligns: "aligning",
-    supports: "supporting",
-    leads: "leading",
-    maintains: "maintaining",
-    spots: "spotting",
-    removes: "removing",
-    refines: "refining",
-    drives: "driving",
-    enables: "enabling",
-  };
-
-  const gerund = irregular[lower];
-  return gerund ? `${gerund}${rest}` : lowercaseFirst(cleaned);
-}
-
 function firstSentences(value: string | null, count = 1): string | null {
   const cleaned = cleanText(value);
   if (!cleaned) return null;
@@ -281,11 +288,6 @@ function isHeadingLike(value: string): boolean {
   return false;
 }
 
-/**
- * Extracts prose only. It intentionally does not fall back to title/label/name,
- * because report block headings such as "Career Vertical Expression for OS2"
- * are not usable narrative sentences.
- */
 function proseFromValue(value: unknown, depth = 0): string | null {
   if (depth > 4 || value == null) return null;
 
@@ -358,7 +360,7 @@ function naturalList(values: string[]): string | null {
   if (!cleaned.length) return null;
   if (cleaned.length === 1) return cleaned[0];
   if (cleaned.length === 2) return `${cleaned[0]} and ${cleaned[1]}`;
-  return `${cleaned.slice(0, -1).join(", ")}, and ${cleaned.at(-1)}`;
+  return `${cleaned.slice(0, -1).join(", ")}, and ${cleaned[cleaned.length - 1]}`;
 }
 
 function contentItems(value: unknown, limit = 4): ContentItem[] {
@@ -403,74 +405,6 @@ function contentItems(value: unknown, limit = 4): ContentItem[] {
   });
 }
 
-function getPrimaryOperatingStyle(scoring: any) {
-  return (
-    scoring?.primary_operating_style ||
-    scoring?.operating_style_ranking?.[0] ||
-    null
-  );
-}
-
-function getSecondaryOperatingStyle(scoring: any) {
-  return (
-    scoring?.secondary_operating_style ||
-    scoring?.operating_style_ranking?.[1] ||
-    null
-  );
-}
-
-function getTertiaryOperatingStyle(scoring: any) {
-  return (
-    scoring?.tertiary_operating_style ||
-    scoring?.operating_style_ranking?.[2] ||
-    null
-  );
-}
-
-function getCoreRanking(scoring: any): any[] {
-  if (Array.isArray(scoring?.behavioural_approach_ranking)) {
-    return scoring.behavioural_approach_ranking;
-  }
-
-  if (Array.isArray(scoring?.core_ranking)) return scoring.core_ranking;
-  return [];
-}
-
-function getPrimaryCore(scoring: any) {
-  return scoring?.primary_core || getCoreRanking(scoring)[0] || null;
-}
-
-function getLowestCores(scoring: any): any[] {
-  const ranking = getCoreRanking(scoring);
-  if (!ranking.length) return [];
-
-  const sorted = [...ranking].sort(
-    (a, b) => getPercentageValue(a) - getPercentageValue(b),
-  );
-  const minimum = getPercentageValue(sorted[0]);
-
-  return sorted
-    .filter((item) => Math.abs(getPercentageValue(item) - minimum) < 0.000001)
-    .slice(0, 2);
-}
-
-function getCareerVertical(scoring: any) {
-  return (
-    scoring?.career_vertical ||
-    scoring?.primary_career_vertical ||
-    scoring?.career_vertical_ranking?.[0] ||
-    null
-  );
-}
-
-function getLabel(value: any, fallback: string): string {
-  return cleanText(value?.label ?? value?.name ?? value?.code) || fallback;
-}
-
-function getCode(value: any): string | null {
-  return cleanText(value?.code) || null;
-}
-
 function getPercentageValue(value: any): number {
   const raw = value?.pct ?? value?.percentage ?? value?.value;
   const parsed = Number(raw);
@@ -488,6 +422,14 @@ function formatPercentage(value: any): string | null {
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
 }
 
+function getLabel(value: any, fallback: string): string {
+  return cleanText(value?.label ?? value?.name ?? value?.code) || fallback;
+}
+
+function getCode(value: any): string | null {
+  return cleanText(value?.code) || null;
+}
+
 function styleName(value: any, fallback = "defined operating style"): string {
   return stripLeadingArticle(getLabel(value, fallback));
 }
@@ -500,6 +442,139 @@ function styleBlueprint(value: any): StyleBlueprint | null {
 function verticalScope(value: any): string | null {
   const code = getCode(value);
   return code ? VERTICAL_SCOPE[code] || null : null;
+}
+
+function getOperatingRanking(scoring: any): any[] {
+  if (Array.isArray(scoring?.operating_style_ranking)) {
+    return scoring.operating_style_ranking;
+  }
+  return [];
+}
+
+function getCoreRanking(scoring: any): any[] {
+  if (Array.isArray(scoring?.behavioural_approach_ranking)) {
+    return scoring.behavioural_approach_ranking;
+  }
+  if (Array.isArray(scoring?.core_ranking)) return scoring.core_ranking;
+  return [];
+}
+
+function getCareerRanking(scoring: any): any[] {
+  if (Array.isArray(scoring?.career_vertical_ranking)) {
+    return scoring.career_vertical_ranking;
+  }
+  return [];
+}
+
+function sortRanking(values: any[]): any[] {
+  return [...values].sort((a, b) => {
+    const difference = getPercentageValue(b) - getPercentageValue(a);
+    if (Math.abs(difference) > EXACT_TIE_EPSILON) return difference;
+    return Number(a?.rank ?? 999) - Number(b?.rank ?? 999);
+  });
+}
+
+function analyseBlend(values: any[], nearTiePoints: number): BlendAnalysis {
+  const ranking = sortRanking(values).filter((item) => getPercentageValue(item) > 0);
+  const top = ranking[0] || null;
+
+  if (!top) {
+    return {
+      ranking,
+      top: null,
+      exactTop: [],
+      nearTop: [],
+      supporting: null,
+      mode: "single",
+    };
+  }
+
+  const topPct = getPercentageValue(top);
+  const exactTop = ranking.filter(
+    (item) => Math.abs(getPercentageValue(item) - topPct) <= EXACT_TIE_EPSILON,
+  );
+
+  if (exactTop.length > 1) {
+    return {
+      ranking,
+      top,
+      exactTop: exactTop.slice(0, 4),
+      nearTop: exactTop.slice(0, 4),
+      supporting: ranking.find((item) => !exactTop.includes(item)) || null,
+      mode: "tie",
+    };
+  }
+
+  const nearTop = ranking.filter(
+    (item) => topPct - getPercentageValue(item) <= nearTiePoints,
+  );
+
+  if (nearTop.length > 1) {
+    return {
+      ranking,
+      top,
+      exactTop,
+      nearTop: nearTop.slice(0, 3),
+      supporting: ranking.find((item) => !nearTop.includes(item)) || null,
+      mode: "near",
+    };
+  }
+
+  return {
+    ranking,
+    top,
+    exactTop,
+    nearTop: [top],
+    supporting: ranking[1] || null,
+    mode: "single",
+  };
+}
+
+function getPrimaryOperatingStyle(scoring: any) {
+  return (
+    scoring?.primary_operating_style ||
+    getOperatingRanking(scoring)[0] ||
+    null
+  );
+}
+
+function getSecondaryOperatingStyle(scoring: any) {
+  return (
+    scoring?.secondary_operating_style ||
+    getOperatingRanking(scoring)[1] ||
+    null
+  );
+}
+
+function getTertiaryOperatingStyle(scoring: any) {
+  return (
+    scoring?.tertiary_operating_style ||
+    getOperatingRanking(scoring)[2] ||
+    null
+  );
+}
+
+function getPrimaryCore(scoring: any) {
+  return scoring?.primary_core || getCoreRanking(scoring)[0] || null;
+}
+
+function getLowestCores(scoring: any): any[] {
+  const ranking = sortRanking(getCoreRanking(scoring));
+  if (!ranking.length) return [];
+
+  const minimum = Math.min(...ranking.map(getPercentageValue));
+  return ranking.filter(
+    (item) => Math.abs(getPercentageValue(item) - minimum) <= EXACT_TIE_EPSILON,
+  );
+}
+
+function getCareerVertical(scoring: any) {
+  return (
+    scoring?.career_vertical ||
+    scoring?.primary_career_vertical ||
+    getCareerRanking(scoring)[0] ||
+    null
+  );
 }
 
 function getOperatingSummary(value: any): string | null {
@@ -538,10 +613,7 @@ function getFrictionPoints(value: any): ContentItem[] {
 }
 
 function getRoleRisks(value: any): ContentItem[] {
-  return contentItems(
-    value?.role_risks ?? value?.roleRisks ?? value?.risks,
-    4,
-  );
+  return contentItems(value?.role_risks ?? value?.roleRisks ?? value?.risks, 4);
 }
 
 function getDecisionStyle(value: any): string | null {
@@ -564,7 +636,308 @@ function getReadinessSignal(scoring: any): any {
   return scoring?.readiness_signal || null;
 }
 
-function readinessSentence(
+function normaliseSubjectSentence(value: string | null): string | null {
+  const cleaned = cleanText(value);
+  if (!cleaned) return null;
+
+  const patterns: Array<[RegExp, string]> = [
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+contributes\b/i, "They contribute"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+makes\b/i, "They make"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+creates\b/i, "They create"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+builds\b/i, "They build"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+drives\b/i, "They drive"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+supports\b/i, "They support"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+helps\b/i, "They help"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+operates\b/i, "They operate"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+works\b/i, "They work"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+is\b/i, "They are"],
+    [/^(?:this|the)\s+(?:individual|applicant|candidate)\s+has\b/i, "They have"],
+  ];
+
+  for (const [pattern, replacement] of patterns) {
+    if (pattern.test(cleaned)) return cleaned.replace(pattern, replacement);
+  }
+
+  return cleaned
+    .replace(/^(?:this|the)\s+(?:individual|applicant|candidate)\s+/i, "They ")
+    .replace(/^the person\s+/i, "They ");
+}
+
+function toGerundPhrase(value: string): string {
+  let cleaned = stripTerminalPunctuation(value)
+    .replace(/^they\s+/i, "")
+    .replace(/^the candidate\s+/i, "")
+    .replace(/^the applicant\s+/i, "")
+    .trim();
+
+  const match = cleaned.match(/^(\S+)(.*)$/);
+  if (!match) return lowercaseFirst(cleaned);
+
+  const verb = match[1];
+  const rest = match[2] || "";
+  const lower = verb.toLowerCase();
+
+  if (/ing$/i.test(lower)) return lowercaseFirst(cleaned);
+
+  const irregular: Record<string, string> = {
+    activates: "activating",
+    applies: "applying",
+    balances: "balancing",
+    builds: "building",
+    challenges: "challenging",
+    communicates: "communicating",
+    connects: "connecting",
+    creates: "creating",
+    delivers: "delivering",
+    drives: "driving",
+    enables: "enabling",
+    evaluates: "evaluating",
+    identifies: "identifying",
+    improves: "improving",
+    initiates: "initiating",
+    leads: "leading",
+    maintains: "maintaining",
+    manages: "managing",
+    protects: "protecting",
+    reduces: "reducing",
+    refines: "refining",
+    removes: "removing",
+    resolves: "resolving",
+    spots: "spotting",
+    strengthens: "strengthening",
+    sustains: "sustaining",
+    tests: "testing",
+    translates: "translating",
+    turns: "turning",
+  };
+
+  const gerund = irregular[lower];
+  return gerund ? `${gerund}${rest}` : lowercaseFirst(cleaned);
+}
+
+function candidateCapacitySentence(
+  value: string | null,
+  primaryCode: string | null,
+): string | null {
+  const cleaned = firstSentences(value, 1);
+  const context = primaryCode ? STYLE_ENVIRONMENT_CONTEXT[primaryCode] || null : null;
+
+  if (!cleaned) {
+    return context
+      ? `They are likely to perform most naturally in environments ${context}.`
+      : null;
+  }
+
+  const normalised = normaliseSubjectSentence(cleaned) || cleaned;
+  const highCapacityMatch = normalised.match(
+    /^They have high capacity in\s+(.+?)[.!?]?$/i,
+  );
+
+  if (highCapacityMatch?.[1]) {
+    return `They are likely to perform most naturally in ${stripTerminalPunctuation(
+      highCapacityMatch[1],
+    )}.`;
+  }
+
+  if (/^They are likely\b/i.test(normalised)) return normalised;
+  if (/^They\b/i.test(normalised)) {
+    return `The results suggest ${lowercaseFirst(normalised)}`;
+  }
+
+  return `The results suggest that ${lowercaseFirst(normalised)}`;
+}
+
+function roleCapacitySentence(
+  value: string | null,
+  primaryCode: string | null,
+): string | null {
+  const cleaned = firstSentences(value, 1);
+  const context = primaryCode ? STYLE_ENVIRONMENT_CONTEXT[primaryCode] || null : null;
+
+  if (!cleaned) {
+    return context
+      ? `The role is likely to favour candidates who perform naturally in environments ${context}.`
+      : null;
+  }
+
+  const normalised = normaliseSubjectSentence(cleaned) || cleaned;
+  const highCapacityMatch = normalised.match(
+    /^They have high capacity in\s+(.+?)[.!?]?$/i,
+  );
+
+  if (highCapacityMatch?.[1]) {
+    return `The role is likely to favour candidates who perform naturally in ${stripTerminalPunctuation(
+      highCapacityMatch[1],
+    )}.`;
+  }
+
+  const withoutSubject = normalised.replace(/^They\s+/i, "");
+  return `The role-fit evidence indicates that strong candidates should ${lowercaseFirst(
+    stripTerminalPunctuation(withoutSubject),
+  )}.`;
+}
+
+function operatingProfileSentence(
+  perspective: NarrativePerspective,
+  scoring: any,
+): string {
+  const analysis = analyseBlend(
+    getOperatingRanking(scoring),
+    OPERATING_NEAR_TIE_POINTS,
+  );
+
+  if (!analysis.top) {
+    return perspective === "role"
+      ? "The ideal role profile does not show a usable Operating Style result."
+      : "This applicant does not have a usable Operating Style result.";
+  }
+
+  if (analysis.mode === "tie") {
+    const names = analysis.exactTop.map((item) => styleName(item));
+    const list = naturalList(names) || styleName(analysis.top);
+    return perspective === "role"
+      ? `The ideal role profile shows a blended Operating Style requirement across ${list}, with no single dominant style in the response set.`
+      : `This applicant shows a blended Operating Style pattern across ${list}, with no single dominant style in the response set.`;
+  }
+
+  if (analysis.mode === "near") {
+    const leader = styleName(analysis.top);
+    const close = analysis.nearTop.slice(1).map((item) => styleName(item));
+    const closeList = naturalList(close);
+    const support = analysis.supporting ? styleName(analysis.supporting) : null;
+
+    return perspective === "role"
+      ? `The ideal role profile shows a blended Operating Style requirement led slightly by ${leader}${closeList ? `, with ${closeList} close behind` : ""}${support ? ` and ${support} as a supporting influence` : ""}.`
+      : `This applicant shows a blended Operating Style pattern led slightly by ${leader}${closeList ? `, with ${closeList} close behind` : ""}${support ? ` and ${support} as a supporting influence` : ""}.`;
+  }
+
+  const primary = getPrimaryOperatingStyle(scoring) || analysis.top;
+  const secondary = getSecondaryOperatingStyle(scoring);
+  const tertiary = getTertiaryOperatingStyle(scoring);
+  const primaryName = styleName(primary);
+  const secondaryName = secondary ? styleName(secondary) : null;
+  const tertiaryName = tertiary ? styleName(tertiary) : null;
+
+  return perspective === "role"
+    ? `The ideal role profile is led by a ${primaryName} operating style${secondaryName ? `, with ${secondaryName} as a secondary influence` : ""}${tertiaryName ? ` and ${tertiaryName} as a tertiary pattern` : ""}.`
+    : `This applicant is led by a ${primaryName} operating style${secondaryName ? `, with ${secondaryName} as a secondary influence` : ""}${tertiaryName ? ` and ${tertiaryName} as a tertiary pattern` : ""}.`;
+}
+
+function strongestCoreSentence(
+  perspective: NarrativePerspective,
+  scoring: any,
+): string | null {
+  const analysis = analyseBlend(getCoreRanking(scoring), CORE_NEAR_TIE_POINTS);
+  if (!analysis.top) return null;
+
+  if (analysis.mode === "tie") {
+    const labels = analysis.exactTop.map((item) => getLabel(item, "CORE"));
+    const pct = formatPercentage(analysis.top);
+    const list = naturalList(labels) || getLabel(analysis.top, "CORE");
+    return perspective === "role"
+      ? `The role's CORE requirement is evenly split across ${list}${pct ? ` (${pct} each)` : ""}, indicating a blended contribution requirement rather than one dominant route.`
+      : `The CORE result is evenly split across ${list}${pct ? ` (${pct} each)` : ""}, indicating a blended route for creating value rather than one dominant contribution.`;
+  }
+
+  if (analysis.mode === "near") {
+    const leader = analysis.top;
+    const close = analysis.nearTop[1];
+    const leaderLabel = getLabel(leader, "the leading CORE contribution");
+    const closeLabel = getLabel(close, "the next CORE contribution");
+    return perspective === "role"
+      ? `The role's CORE requirement is led slightly by ${leaderLabel}${formatPercentage(leader) ? ` (${formatPercentage(leader)})` : ""}, with ${closeLabel}${formatPercentage(close) ? ` (${formatPercentage(close)})` : ""} close behind.`
+      : `The CORE result is led slightly by ${leaderLabel}${formatPercentage(leader) ? ` (${formatPercentage(leader)})` : ""}, with ${closeLabel}${formatPercentage(close) ? ` (${formatPercentage(close)})` : ""} close behind.`;
+  }
+
+  const top = analysis.top;
+  const label = getLabel(top, "the leading CORE contribution");
+  const pct = formatPercentage(top);
+  const topPct = getPercentageValue(top);
+  const secondPct = analysis.ranking[1]
+    ? getPercentageValue(analysis.ranking[1])
+    : 0;
+  const lead = topPct - secondPct;
+
+  if (perspective === "role") {
+    if (topPct >= 50 && lead >= 13) {
+      return `The role's CORE requirement is strongly weighted toward ${label}${pct ? ` (${pct})` : ""}, making this the clearest contribution priority.`;
+    }
+    return `The role's leading CORE requirement is ${label}${pct ? ` (${pct})` : ""}.`;
+  }
+
+  if (topPct >= 50 && lead >= 13) {
+    return `The CORE result is strongly weighted toward ${label}${pct ? ` (${pct})` : ""}, indicating that this is the applicant's most natural route for creating value.`;
+  }
+
+  return `The CORE result is led by ${label}${pct ? ` (${pct})` : ""}, indicating that this is the applicant's most prominent route for creating value in this response set.`;
+}
+
+function careerVerticalSentence(
+  perspective: NarrativePerspective,
+  scoring: any,
+): string {
+  const ranking = getCareerRanking(scoring);
+  const analysis = analyseBlend(ranking, VERTICAL_NEAR_TIE_POINTS);
+  const fallback = getCareerVertical(scoring);
+
+  if (!analysis.top && !fallback) {
+    return perspective === "role"
+      ? "The role profile does not show a usable Career Vertical result."
+      : "The assessment does not show a usable Career Vertical result.";
+  }
+
+  const top = analysis.top || fallback;
+
+  if (analysis.mode === "tie") {
+    const items = analysis.exactTop;
+    const labels = items.map((item) => getLabel(item, "the indicated level"));
+    const pct = formatPercentage(top);
+    const scopes = items
+      .map((item) => verticalScope(item))
+      .filter((item): item is string => Boolean(item));
+    const scopeList = naturalList(scopes);
+    const transition = scopes.length === 2 && labels.length === 2
+      ? `This suggests a transition between two adjacent levels: ${labels[0]} reflects ${scopes[0]}, while ${labels[1]} reflects ${scopes[1]}. `
+      : scopeList
+        ? `This spans ${scopeList}. `
+        : "";
+
+    return perspective === "role"
+      ? `The role's Career Vertical requirement is evenly split between ${naturalList(labels) || getLabel(top, "the indicated levels")}${pct ? ` (${pct} each)` : ""}. ${transition}Candidate evidence should establish the level at which sustained performance is genuinely required.`
+      : `Career Vertical results are evenly split between ${naturalList(labels) || getLabel(top, "the indicated levels")}${pct ? ` (${pct} each)` : ""}. ${transition}Interview evidence should establish the level at which the applicant performs most consistently.`;
+  }
+
+  if (analysis.mode === "near") {
+    const topTwo = analysis.nearTop.slice(0, 2);
+    const first = topTwo[0];
+    const second = topTwo[1];
+    const firstLabel = getLabel(first, "the leading level");
+    const secondLabel = getLabel(second, "the adjacent level");
+    const firstScope = verticalScope(first);
+    const secondScope = verticalScope(second);
+
+    return perspective === "role"
+      ? `The role's Career Vertical requirement spans ${firstLabel}${formatPercentage(first) ? ` (${formatPercentage(first)})` : ""} and ${secondLabel}${formatPercentage(second) ? ` (${formatPercentage(second)})` : ""}. ${firstScope && secondScope ? `This covers ${firstScope} and ${secondScope}. ` : ""}Candidate evidence should clarify the scope that is consistently required.`
+      : `Career Vertical results span ${firstLabel}${formatPercentage(first) ? ` (${formatPercentage(first)})` : ""} and ${secondLabel}${formatPercentage(second) ? ` (${formatPercentage(second)})` : ""}. ${firstScope && secondScope ? `This covers ${firstScope} and ${secondScope}. ` : ""}Interview evidence should clarify the scope at which the applicant performs consistently.`;
+  }
+
+  const label = getLabel(top, "the indicated career vertical");
+  const pct = formatPercentage(top);
+  const scope = verticalScope(top);
+  const topPct = getPercentageValue(top);
+
+  if (perspective === "role") {
+    return topPct >= 55
+      ? `The role profile is concentrated at ${label}${pct ? ` (${pct})` : ""}${scope ? `, indicating ${scope}` : ""}.`
+      : `The leading Career Vertical requirement is ${label}${pct ? ` (${pct})` : ""}${scope ? `, indicating ${scope}` : ""}.`;
+  }
+
+  return topPct >= 55
+    ? `Career Vertical results are concentrated at ${label}${pct ? ` (${pct})` : ""}${scope ? `, pointing to ${scope}` : ""}.`
+    : `The leading Career Vertical result is ${label}${pct ? ` (${pct})` : ""}${scope ? `, pointing to ${scope}` : ""}.`;
+}
+
+function readinessTraitSentence(
   perspective: NarrativePerspective,
   scoring: any,
 ): string | null {
@@ -572,24 +945,9 @@ function readinessSentence(
   const label = cleanText(signal?.label);
   if (!label) return null;
 
-  const phrase = readinessNounPhrase(label);
   return perspective === "role"
-    ? `The ideal profile should also demonstrate ${phrase}.`
-    : `The assessment also signals ${phrase}.`;
-}
-
-function strongestCoreSentence(
-  perspective: NarrativePerspective,
-  core: any,
-): string | null {
-  if (!core) return null;
-
-  const label = getLabel(core, "the strongest CORE contribution");
-  const pct = formatPercentage(core);
-
-  return perspective === "role"
-    ? `The required CORE emphasis is ${label}${pct ? ` (${pct})` : ""}, so the person should naturally use this contribution to create value.`
-    : `The CORE result is strongly weighted toward ${label}${pct ? ` (${pct})` : ""}, indicating that this is the applicant's most natural route for creating value.`;
+    ? "The role profile also includes a broader-responsibility requirement that should be validated through candidate evidence."
+    : "The response set indicates a possible progression-readiness signal, which should be validated through evidence rather than treated as proof of readiness.";
 }
 
 function buildTraitSnapshot(
@@ -597,105 +955,175 @@ function buildTraitSnapshot(
   input: BuildSectionsInput,
 ): string {
   const primary = getPrimaryOperatingStyle(input.scoring);
-  const secondary = getSecondaryOperatingStyle(input.scoring);
-  const tertiary = getTertiaryOperatingStyle(input.scoring);
-  const core = getPrimaryCore(input.scoring);
-  const vertical = getCareerVertical(input.scoring);
-
-  const primaryName = styleName(primary);
-  const secondaryName = secondary ? styleName(secondary) : null;
-  const tertiaryName = tertiary ? styleName(tertiary) : null;
-  const verticalLabel = getLabel(vertical, "the indicated career vertical");
-  const verticalPct = formatPercentage(vertical);
-  const scope = verticalScope(vertical);
-
-  const profileSentence =
-    perspective === "role"
-      ? `The ideal profile is led by a ${primaryName} operating style${secondaryName ? `, with ${secondaryName} as a secondary influence` : ""}${tertiaryName ? ` and ${tertiaryName} as a tertiary pattern` : ""}.`
-      : `This applicant is led by a ${primaryName} operating style${secondaryName ? `, with ${secondaryName} as a secondary influence` : ""}${tertiaryName ? ` and ${tertiaryName} as a tertiary pattern` : ""}.`;
-
-  const verticalSentence =
-    perspective === "role"
-      ? `The role profile is concentrated at ${verticalLabel}${verticalPct ? ` (${verticalPct})` : ""}${scope ? `, indicating ${scope}` : ""}.`
-      : `Career Vertical results are concentrated at ${verticalLabel}${verticalPct ? ` (${verticalPct})` : ""}${scope ? `, pointing to ${scope}` : ""}.`;
-
-  const capacity = firstSentences(getCapacity(input.roleFitSummary), 1);
-  const capacitySentence = capacity
-    ? perspective === "role"
-      ? `The ideal person should be able to perform in the conditions described by the role-fit evidence: ${lowercaseFirst(capacity)}`
-      : capacity
-    : null;
+  const primaryCode = getCode(primary);
+  const capacity = getCapacity(input.roleFitSummary);
 
   return joinSentences([
-    profileSentence,
-    strongestCoreSentence(perspective, core),
-    verticalSentence,
-    readinessSentence(perspective, input.scoring),
-    capacitySentence,
+    operatingProfileSentence(perspective, input.scoring),
+    strongestCoreSentence(perspective, input.scoring),
+    careerVerticalSentence(perspective, input.scoring),
+    readinessTraitSentence(perspective, input.scoring),
+    perspective === "role"
+      ? roleCapacitySentence(capacity, primaryCode)
+      : candidateCapacitySentence(capacity, primaryCode),
   ]);
+}
+
+function blendValueSummary(styles: any[]): string | null {
+  const values = styles
+    .map((style) => {
+      const code = getCode(style);
+      return code ? STYLE_BLEND_VALUE[code] || null : null;
+    })
+    .filter((item): item is string => Boolean(item));
+  return naturalList(values);
 }
 
 function buildHowTheyWork(
   perspective: NarrativePerspective,
   input: BuildSectionsInput,
 ): string {
-  const primary = getPrimaryOperatingStyle(input.scoring);
-  const secondary = getSecondaryOperatingStyle(input.scoring);
-  const tertiary = getTertiaryOperatingStyle(input.scoring);
-  const primaryName = styleName(primary);
+  const analysis = analyseBlend(
+    getOperatingRanking(input.scoring),
+    OPERATING_NEAR_TIE_POINTS,
+  );
+  const primary = getPrimaryOperatingStyle(input.scoring) || analysis.top;
   const primaryBlueprint = styleBlueprint(primary);
-  const secondaryBlueprint = styleBlueprint(secondary);
-  const tertiaryBlueprint = styleBlueprint(tertiary);
 
-  const opening = primaryBlueprint
-    ? perspective === "role"
-      ? `The ideal candidate should create value through a ${primaryName} pattern that ${primaryBlueprint.contribution}.`
-      : `This applicant is likely to create value through a ${primaryName} pattern that ${primaryBlueprint.contribution}.`
-    : firstSentences(getOperatingSummary(input.operatingStyleSummary), 1);
-
+  let opening: string | null = null;
   let influenceSentence: string | null = null;
-  if (secondary && secondaryBlueprint && tertiary && tertiaryBlueprint) {
-    influenceSentence = `The ${styleName(secondary)} influence ${secondaryBlueprint.influence}, while the ${styleName(tertiary)} pattern ${tertiaryBlueprint.influence}.`;
-  } else if (secondary && secondaryBlueprint) {
-    influenceSentence = `The ${styleName(secondary)} influence ${secondaryBlueprint.influence}.`;
-  } else if (tertiary && tertiaryBlueprint) {
-    influenceSentence = `The ${styleName(tertiary)} pattern ${tertiaryBlueprint.influence}.`;
+
+  if (analysis.mode === "tie") {
+    const styles = analysis.exactTop;
+    const names = naturalList(styles.map((item) => styleName(item)));
+    const blendValue = blendValueSummary(styles);
+    opening = perspective === "role"
+      ? `The ideal candidate should be able to work through a blended ${names || "multi-style"} pattern.${blendValue ? ` This combination brings together ${blendValue}.` : ""}`
+      : `This applicant is likely to create value through a blended ${names || "multi-style"} pattern.${blendValue ? ` This combination brings together ${blendValue}.` : ""}`;
+
+    if (analysis.supporting) {
+      const blueprint = styleBlueprint(analysis.supporting);
+      if (blueprint) {
+        influenceSentence = `The ${styleName(analysis.supporting)} influence ${blueprint.influence}.`;
+      }
+    }
+  } else if (analysis.mode === "near") {
+    const styles = analysis.nearTop;
+    const names = naturalList(styles.map((item) => styleName(item)));
+    const blendValue = blendValueSummary(styles);
+    opening = perspective === "role"
+      ? `The ideal candidate should be able to work through a closely blended ${names || "multi-style"} pattern.${blendValue ? ` This combination brings together ${blendValue}.` : ""}`
+      : `This applicant is likely to create value through a closely blended ${names || "multi-style"} pattern.${blendValue ? ` This combination brings together ${blendValue}.` : ""}`;
+
+    if (analysis.supporting) {
+      const blueprint = styleBlueprint(analysis.supporting);
+      if (blueprint) {
+        influenceSentence = `The ${styleName(analysis.supporting)} pattern ${blueprint.influence}.`;
+      }
+    }
+  } else {
+    const primaryName = styleName(primary);
+    opening = primaryBlueprint
+      ? perspective === "role"
+        ? `The ideal candidate should create value through a ${primaryName} pattern that ${primaryBlueprint.contribution}.`
+        : `This applicant is likely to create value through a ${primaryName} pattern that ${primaryBlueprint.contribution}.`
+      : firstSentences(getOperatingSummary(input.operatingStyleSummary), 1);
+
+    const secondary = getSecondaryOperatingStyle(input.scoring);
+    const tertiary = getTertiaryOperatingStyle(input.scoring);
+    const secondaryBlueprint = styleBlueprint(secondary);
+    const tertiaryBlueprint = styleBlueprint(tertiary);
+
+    if (secondary && secondaryBlueprint && tertiary && tertiaryBlueprint) {
+      influenceSentence = `The ${styleName(secondary)} influence ${secondaryBlueprint.influence}, while the ${styleName(tertiary)} pattern ${tertiaryBlueprint.influence}.`;
+    } else if (secondary && secondaryBlueprint) {
+      influenceSentence = `The ${styleName(secondary)} influence ${secondaryBlueprint.influence}.`;
+    } else if (tertiary && tertiaryBlueprint) {
+      influenceSentence = `The ${styleName(tertiary)} pattern ${tertiaryBlueprint.influence}.`;
+    }
   }
 
   const strengths = getNaturalStrengths(input.operatingStyleSummary);
-  const strengthTitles = strengths
+  const strengthPhrases = strengths
     .map((item) => item.title || item.description)
     .filter((item): item is string => Boolean(item))
     .slice(0, 3)
     .map(toGerundPhrase);
 
-  const strengthSentence = strengthTitles.length
+  const strengthSentence = strengthPhrases.length
     ? perspective === "role"
-      ? `Evidence should show strengths in ${naturalList(strengthTitles)}.`
-      : `Likely strengths include ${naturalList(strengthTitles)}.`
+      ? `Evidence should demonstrate strengths in ${naturalList(strengthPhrases)}.`
+      : `Likely strengths include ${naturalList(strengthPhrases)}.`
     : null;
 
   const decision = normaliseSubjectSentence(
-    firstSentences(getDecisionStyle(input.operatingStyleSummary), 1) ||
-      primaryBlueprint?.decision ||
-      null,
+    perspective === "candidate"
+      ? primaryBlueprint?.decision ||
+          firstSentences(getDecisionStyle(input.operatingStyleSummary), 1) ||
+          null
+      : firstSentences(getDecisionStyle(input.operatingStyleSummary), 1) ||
+          primaryBlueprint?.decision ||
+          null,
   );
 
   const team = normaliseSubjectSentence(
-    firstSentences(getTeamContribution(input.operatingStyleSummary), 1) ||
-      primaryBlueprint?.team ||
-      null,
+    perspective === "candidate"
+      ? primaryBlueprint?.team ||
+          firstSentences(getTeamContribution(input.operatingStyleSummary), 1) ||
+          null
+      : firstSentences(getTeamContribution(input.operatingStyleSummary), 1) ||
+          primaryBlueprint?.team ||
+          null,
   );
 
-  return joinSentences([opening, influenceSentence, strengthSentence, decision, team]);
+  return joinSentences([
+    opening,
+    influenceSentence,
+    strengthSentence,
+    decision,
+    team,
+  ]);
 }
 
 function riskText(items: ContentItem[], limit = 3): string[] {
   return items
     .map((item) => item.description || item.title)
     .filter((item): item is string => Boolean(item))
-    .map((item) => stripTerminalPunctuation(item))
+    .map(stripTerminalPunctuation)
     .slice(0, limit);
+}
+
+function coreCapabilityList(items: any[]): string | null {
+  const phrases = items
+    .map((item) => {
+      const code = getCode(item);
+      return code ? CORE_CAPABILITY[code] || null : null;
+    })
+    .filter((item): item is string => Boolean(item));
+  return naturalList(phrases);
+}
+
+function coreNounList(items: any[]): string | null {
+  const phrases = items
+    .map((item) => {
+      const code = getCode(item);
+      return code ? CORE_NOUN_PHRASE[code] || null : null;
+    })
+    .filter((item): item is string => Boolean(item));
+  return naturalList(phrases);
+}
+
+function dominantCoreVerificationSentence(scoring: any): string | null {
+  const primary = getPrimaryCore(scoring);
+  if (!primary) return null;
+  const code = getCode(primary);
+  const capability = code ? CORE_CAPABILITY[code] || null : null;
+  const label = getLabel(primary, "the leading CORE requirement");
+  const pct = formatPercentage(primary);
+
+  return capability
+    ? `Prioritise evidence that candidates can ${capability}, because ${label}${pct ? ` (${pct})` : ""} is the role's leading CORE requirement.`
+    : null;
 }
 
 function lowestCoreSentence(
@@ -706,50 +1134,45 @@ function lowestCoreSentence(
   if (!lowest.length) return null;
 
   const labels = lowest.map((item) => getLabel(item, "a lower CORE area"));
+  const minimum = getPercentageValue(lowest[0]);
   const pct = formatPercentage(lowest[0]);
   const labelPhrase = naturalList(labels) || "the lowest CORE area";
-  const subject = perspective === "role" ? "the candidate" : "the applicant";
+  const capabilityList = coreCapabilityList(lowest);
+  const nounList = coreNounList(lowest);
 
-  if (lowest.length > 1) {
-    return `Because ${labelPhrase} are tied as the lowest CORE areas${pct ? ` (${pct} each)` : ""}, verify how ${subject} creates structure, tracks dependencies, tests assumptions and protects quality when these demands are central to the work.`;
+  if (perspective === "role") {
+    if (minimum === 0) {
+      return `${labelPhrase} ${lowest.length > 1 ? "were" : "was"} not selected as ${lowest.length > 1 ? "primary role requirements" : "a primary role requirement"} in this response set. Confirm candidates still have sufficient baseline capability in ${nounList || "these areas"} when the work demands it, without treating ${lowest.length > 1 ? "them" : "it"} as the main differentiator.`;
+    }
+
+    return `${labelPhrase} ${lowest.length > 1 ? "are lower-emphasis requirements" : "is a lower-emphasis requirement"} in this role profile${pct ? ` (${pct}${lowest.length > 1 ? " each" : ""})` : ""}. Confirm candidates still have sufficient baseline capability in ${lowest.length > 1 ? "both " : ""}${nounList || "this area"} when the work demands it, without treating ${lowest.length > 1 ? "these areas" : "this area"} as the primary differentiator.`;
   }
 
-  return `Because ${labelPhrase} is the lowest CORE area${pct ? ` (${pct})` : ""}, verify what systems, habits or complementary support ${subject} uses to protect this part of the work cycle.`;
+  if (minimum === 0) {
+    return `${labelPhrase} ${lowest.length > 1 ? "were" : "was"} not selected as ${lowest.length > 1 ? "natural contribution patterns" : "a natural contribution pattern"} in this response set. Verify how the applicant can ${capabilityList || "cover these demands"} when ${lowest.length > 1 ? "these contributions are" : "this contribution is"} central to the role.`;
+  }
+
+  return `${labelPhrase} ${lowest.length > 1 ? "carry" : "carries"} the lowest natural emphasis${pct ? ` (${pct}${lowest.length > 1 ? " each" : ""})` : ""}. Verify how the applicant can ${capabilityList || "cover this part of the work cycle"} when ${lowest.length > 1 ? "these contributions are" : "this contribution is"} central to the role.`;
 }
 
-function verticalEvidenceSentence(
+function operatingRiskSentence(
   perspective: NarrativePerspective,
   input: BuildSectionsInput,
 ): string {
-  const vertical = getCareerVertical(input.scoring);
-  const verticalLabel = getLabel(vertical, "the indicated scope");
-  const scope = verticalScope(vertical);
-  const subject = perspective === "role" ? "the candidate" : "the applicant";
-
-  return `Ask for a recent example showing ${subject}'s personal responsibility, decisions, trade-offs and measurable outcomes at ${verticalLabel}${scope ? ` — ${scope}` : ""}.`;
-}
-
-function readinessVerificationSentence(
-  perspective: NarrativePerspective,
-  input: BuildSectionsInput,
-): string | null {
-  const signal = getReadinessSignal(input.scoring);
-  const label = cleanText(signal?.label);
-  if (!label) return null;
-
-  const subject = perspective === "role" ? "the candidate" : "the applicant";
-  return `Although the result signals ${readinessNounPhrase(label)}, verify this through ${subject}'s evidence of sustained accountability and outcomes delivered through others rather than relying on aspiration or role title alone.`;
-}
-
-function buildWhatToVerify(
-  perspective: NarrativePerspective,
-  input: BuildSectionsInput,
-): string {
-  const primary = getPrimaryOperatingStyle(input.scoring);
-  const primaryCode = getCode(primary);
-  const verificationFocus = primaryCode
-    ? STYLE_VERIFICATION[primaryCode] || null
-    : null;
+  const analysis = analyseBlend(
+    getOperatingRanking(input.scoring),
+    OPERATING_NEAR_TIE_POINTS,
+  );
+  const styles =
+    analysis.mode === "single" ? [analysis.top] : analysis.nearTop;
+  const focuses = styles
+    .filter(Boolean)
+    .map((style) => {
+      const code = getCode(style);
+      return code ? STYLE_VERIFICATION[code] || null : null;
+    })
+    .filter((item): item is string => Boolean(item))
+    .slice(0, 2);
 
   const fallbackRisks = riskText(
     [
@@ -759,24 +1182,101 @@ function buildWhatToVerify(
     2,
   );
 
-  const riskSentence = verificationFocus
-    ? perspective === "role"
-      ? `Verify whether candidates can ${verificationFocus}.`
-      : `Use the interview to verify whether the applicant can ${verificationFocus}.`
-    : fallbackRisks.length
-      ? perspective === "role"
-        ? `Explore the documented friction and role risks directly: ${naturalList(fallbackRisks)}.`
-        : `Use the interview to explore the documented friction and role risks directly: ${naturalList(fallbackRisks)}.`
-      : perspective === "role"
-        ? "Verify how the candidate handles pressure, ambiguity, competing priorities and accountability at the required scope."
-        : "Use the interview to verify how the applicant handles pressure, ambiguity, competing priorities and accountability at the indicated scope.";
+  if (focuses.length === 1) {
+    return perspective === "role"
+      ? `Verify whether candidates can ${focuses[0]}.`
+      : `Use the interview to verify whether the applicant can ${focuses[0]}.`;
+  }
 
-  return joinSentences([
-    riskSentence,
+  if (focuses.length > 1) {
+    return perspective === "role"
+      ? `Verify whether candidates can ${focuses[0]}. Also test whether they can ${focuses[1]}.`
+      : `Use the interview to verify whether the applicant can ${focuses[0]}. Also test whether they can ${focuses[1]}.`;
+  }
+
+  if (fallbackRisks.length) {
+    return perspective === "role"
+      ? `Explore the documented friction and role risks directly: ${naturalList(fallbackRisks)}.`
+      : `Use the interview to explore the documented friction and role risks directly: ${naturalList(fallbackRisks)}.`;
+  }
+
+  return perspective === "role"
+    ? "Verify how the candidate handles pressure, ambiguity, competing priorities and accountability at the required scope."
+    : "Use the interview to verify how the applicant handles pressure, ambiguity, competing priorities and accountability at the indicated scope.";
+}
+
+function verticalEvidenceSentence(
+  perspective: NarrativePerspective,
+  scoring: any,
+): string {
+  const analysis = analyseBlend(
+    getCareerRanking(scoring),
+    VERTICAL_NEAR_TIE_POINTS,
+  );
+  const top = analysis.top || getCareerVertical(scoring);
+
+  if (analysis.mode === "tie") {
+    const labels = naturalList(
+      analysis.exactTop.map((item) => getLabel(item, "the indicated level")),
+    );
+    return perspective === "role"
+      ? `Ask for evidence that shows where the candidate can consistently operate across the role's split ${labels || "Career Vertical"} requirement, including personal accountability, decisions, trade-offs and measurable outcomes.`
+      : `Ask for evidence that distinguishes whether the applicant consistently operates at ${labels || "the indicated Career Vertical levels"}, including personal accountability, decisions, trade-offs and measurable outcomes.`;
+  }
+
+  if (analysis.mode === "near") {
+    const labels = naturalList(
+      analysis.nearTop
+        .slice(0, 2)
+        .map((item) => getLabel(item, "the indicated level")),
+    );
+    return perspective === "role"
+      ? `Ask for evidence of sustained performance across the role's ${labels || "adjacent Career Vertical"} requirement, including personal accountability, decisions, trade-offs and measurable outcomes.`
+      : `Ask for evidence showing where the applicant performs consistently across ${labels || "the adjacent Career Vertical levels"}, including personal accountability, decisions, trade-offs and measurable outcomes.`;
+  }
+
+  const label = getLabel(top, "the indicated scope");
+  const scope = verticalScope(top);
+  return perspective === "role"
+    ? `Ask for a recent example showing the candidate's personal accountability, decisions, trade-offs and measurable outcomes at ${label}${scope ? `: ${scope}` : ""}.`
+    : `Ask for a recent example showing the applicant's personal accountability, decisions, trade-offs and measurable outcomes at ${label}${scope ? `: ${scope}` : ""}.`;
+}
+
+function readinessVerificationSentence(
+  perspective: NarrativePerspective,
+  scoring: any,
+): string | null {
+  const signal = getReadinessSignal(scoring);
+  if (!cleanText(signal?.label)) return null;
+
+  const vertical = getCareerVertical(scoring);
+  const code = getCode(vertical);
+  const evidence = code ? READINESS_EVIDENCE[code] || null : null;
+
+  return perspective === "role"
+    ? `Confirm that candidate evidence demonstrates ${evidence || "sustained accountability at the required scope"}; treat broader responsibility as a role requirement rather than an inference from job title alone.`
+    : `Validate the progression-readiness signal through evidence of ${evidence || "sustained accountability at the next level"}, rather than relying on aspiration or role title alone.`;
+}
+
+function buildWhatToVerify(
+  perspective: NarrativePerspective,
+  input: BuildSectionsInput,
+): string {
+  const parts: Array<string | null> = [
+    operatingRiskSentence(perspective, input),
+  ];
+
+  if (perspective === "role") {
+    parts.push(dominantCoreVerificationSentence(input.scoring));
+  }
+
+  parts.push(
     lowestCoreSentence(perspective, input.scoring),
-    verticalEvidenceSentence(perspective, input),
-    readinessVerificationSentence(perspective, input),
-  ]);
+    verticalEvidenceSentence(perspective, input.scoring),
+    readinessVerificationSentence(perspective, input.scoring),
+  );
+
+  return joinSentences(parts);
 }
 
 function buildSections(
