@@ -153,33 +153,39 @@ type CareerVerticalRowState = {
 const CAREER_VERTICAL_STEPS: CareerVerticalStep[] = [
   {
     code: "V1",
-    title: "Entry / Foundational",
-    description: "Task-level execution and guided delivery.",
+    title: "Apprentice or Student",
+    description:
+      "An entry-level or learning stage where work is guided closely, responsibilities are clearly defined, and progress comes through structured practice, coaching, and dependable habit-building.",
   },
   {
     code: "V2",
-    title: "Developing",
-    description: "Growing ownership with structured guidance.",
+    title: "Workforce Contributor",
+    description:
+      "A reliable individual-contributor stage focused on consistent output, growing ownership, and delivering work independently within a defined role or function.",
   },
   {
     code: "V3",
-    title: "Established",
-    description: "Independent delivery and cross-team coordination.",
+    title: "Team Lead or Junior Management",
+    description:
+      "A first-line leadership stage where responsibility expands into leading projects, coordinating people or workflows, and balancing personal delivery with supervision of others.",
   },
   {
     code: "V4",
-    title: "Senior Scope",
-    description: "Strategic influence and broader accountability.",
+    title: "Middle Management",
+    description:
+      "A broader management stage that includes leading functions or teams, balancing multiple priorities, managing resources, and making decisions across a wider operational scope.",
   },
   {
     code: "V5",
-    title: "Strategic Leadership",
-    description: "Organisation-wide direction and system leadership.",
+    title: "Senior Management",
+    description:
+      "A senior leadership stage with accountability across larger functions or business units, requiring strategic judgement, cross-functional leadership, and responsibility for broader organisational outcomes.",
   },
   {
     code: "V6",
-    title: "Executive / Enterprise",
-    description: "Enterprise leadership and long-horizon strategy.",
+    title: "Executive Leadership",
+    description:
+      "An executive stage focused on enterprise direction, long-range decision-making, organisational stewardship, and leading at scale with the highest level of consequence and accountability.",
   },
 ];
 
@@ -187,6 +193,20 @@ function verticalNumber(code: string | null | undefined): number {
   const match = String(code ?? "").toUpperCase().match(/V([1-6])/);
 
   return match ? Number(match[1]) : 0;
+}
+
+function careerVerticalDisplayCode(code: string | null | undefined): string {
+  const level = verticalNumber(code);
+  return level ? `CV${level}` : String(code ?? "");
+}
+
+function careerVerticalDisplayText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\bV([1-6])\b/g, "CV$1")
+    .replace(/\bvertical readiness\b/gi, "Career Vertical Readiness")
+    .replace(/\bcurrent vertical\b/gi, "current Career Vertical")
+    .replace(/\bhigher verticals\b/gi, "higher Career Verticals")
+    .replace(/Career Vertical/gi, "Career Vertical");
 }
 
 function getCareerVerticalRowState({
@@ -387,7 +407,7 @@ function ReportUnavailable({
         </Link>
 
         <p className="mt-8 text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
-          Candidate Summary Report
+          Assessment Summary and Report
         </p>
 
         <h1 className="mt-3 text-3xl font-semibold">
@@ -419,7 +439,7 @@ function ReportHeader({
 
           <div>
             <h1 className="text-sm font-black uppercase tracking-[0.16em] text-[#6255E8] md:text-base">
-              Candidate Summary &amp; Report
+              Assessment Summary and Report
             </h1>
             <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.24em] text-[#2B2858]">
               MindCanvas MCAS
@@ -449,7 +469,7 @@ function ReportHeader({
           label="Date"
           value={formatMcasDateTime(payload.assessment.completedAt)}
         />
-        <CompactMetaCard label="Framework" value="Candidate Summary & Report" />
+        <CompactMetaCard label="Framework" value="Assessment Summary and Report" />
       </div>
     </header>
   );
@@ -494,7 +514,7 @@ function Hero({
         <div className="grid gap-4 xl:grid-cols-[250px_minmax(430px,1fr)_185px] xl:items-stretch">
           <div className="min-w-0">
             <p className="text-[8px] font-black uppercase tracking-[0.24em] text-[#8F88FF]">
-              Candidate Summary &amp; Report
+              Assessment Summary and Report
             </p>
 
             <h2 className="mt-2 text-2xl font-black tracking-[-0.045em] text-white md:text-[28px]">
@@ -502,7 +522,7 @@ function Hero({
             </h2>
 
             <p className="mt-2 text-[10px] leading-4 text-slate-300">
-              Structured decision support — operating style, vertical readiness
+              Structured decision support — Operating Style, Career Vertical Readiness
               and sustainability indicators.
             </p>
 
@@ -514,8 +534,8 @@ function Hero({
                 tone="violet"
               />
               <OverviewMetric
-                label="Vertical"
-                value={`${vertical.code} Ready`}
+                label="Career Vertical"
+                value={`${careerVerticalDisplayCode(vertical.code)} Ready`}
                 detail="Current Fit Range"
                 tone="cyan"
               />
@@ -540,8 +560,17 @@ function Hero({
             </div>
           </div>
 
-          <div className="h-full min-h-[236px] rounded-lg bg-white p-3 text-[#0D1B2A] shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
-            <div className="flex h-full flex-col justify-between gap-1.5">
+          <div className="flex h-full min-h-[236px] flex-col rounded-lg bg-white p-3 text-[#0D1B2A] shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
+            <div className="mb-2 flex items-center justify-between border-b border-slate-200 pb-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4A5568]">
+                Operating Style
+              </p>
+              <span className="rounded-full bg-[#6F5CFF]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-[#6F5CFF]">
+                Distribution
+              </span>
+            </div>
+
+            <div className="flex flex-1 flex-col justify-between gap-1.5">
               {payload.result.operatingStyle.distribution.map((item) => (
                 <OverviewDistributionRow key={item.code} item={item} />
               ))}
@@ -597,12 +626,16 @@ function Hero({
 
           <HeroSnapshotCard
             icon="↗"
-            label="Vertical Readiness"
-            title={`${vertical.code} Ready`}
-            copy={`Current vertical result indicates ${vertical.code} scope.${
+            label="Career Vertical Readiness"
+            title={`${careerVerticalDisplayCode(vertical.code)} Ready`}
+            copy={`Current Career Vertical result indicates ${careerVerticalDisplayCode(
+              vertical.code,
+            )} scope.${
               nextVertical
-                ? ` Stretch indicators toward ${nextVertical} with support.`
-                : " Enterprise-scope readiness indicated."
+                ? ` Stretch indicators toward ${careerVerticalDisplayCode(
+                    nextVertical,
+                  )} with support.`
+                : " Executive-scope readiness indicated."
             }`}
           />
         </div>
@@ -714,7 +747,7 @@ function OverviewDistributionRow({
       <ProfileIconBadge code={item.code} size="sm" />
 
       <span className="truncate text-[10px] font-semibold text-[#0D1B2A]">
-        {INTERNAL_OS_LABELS[item.code]}
+        {INTERNAL_OS_LABELS[item.code]} ({item.code})
       </span>
 
       <span className="h-[4px] overflow-hidden rounded-full bg-[#E2E8F0]">
@@ -795,7 +828,7 @@ function TopStyleStripItem({
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-[11px] font-semibold text-[#0D1B2A]">
-          {INTERNAL_OS_LABELS[item.code]}
+          {INTERNAL_OS_LABELS[item.code]} ({item.code})
         </p>
 
         <div className="mt-1.5 h-[4px] overflow-hidden rounded-full bg-[#E2E8F0]">
@@ -956,7 +989,7 @@ function WelcomeSection({
         This internal MCAS report is designed to support a structured hiring,
         placement or progression conversation. It explains the candidate&apos;s
         natural execution pattern, CORE work-cycle coverage and likely current
-        career-vertical fit. It should be read alongside role context,
+        Career Vertical fit. It should be read alongside role context,
         work-history evidence and a structured interview — never as a standalone
         judgement.
       </p>
@@ -990,7 +1023,7 @@ function HowToUseSection() {
         <InfoTile
           number="02"
           title="Check the role context"
-          copy="Compare the candidate against the role's required work cycle, operating environment and career-vertical scope."
+          copy="Compare the candidate against the role's required work cycle, operating environment and Career Vertical scope."
         />
         <InfoTile
           number="03"
@@ -1153,7 +1186,7 @@ function OperatingStyleDistributionSection({
             alt=""
             className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
           />
-          <p className="text-xs font-bold tracking-[0.02em]">
+          <p className="text-[16px] font-bold leading-5">
             Operating Style Distribution and Confidence
           </p>
         </div>
@@ -1245,7 +1278,7 @@ function OperatingDistributionRow({
 
       <div className="min-w-0">
         <p className="truncate text-sm font-bold text-[#201E41]">
-          {INTERNAL_OS_LABELS[item.code]}
+          {INTERNAL_OS_LABELS[item.code]} ({item.code})
         </p>
         <p className="mt-0.5 text-[10px] text-slate-500">
           {distributionBandLabel(item.band).toLowerCase()} pattern
@@ -1301,7 +1334,7 @@ function CoreBalanceSection({
             alt=""
             className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
           />
-          <p className="text-xs font-bold tracking-[0.02em]">
+          <p className="text-[16px] font-bold leading-5">
             CORE Behavioural Balance and Work Cycle Coverage
           </p>
         </div>
@@ -1466,7 +1499,7 @@ function CareerVerticalSection({
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-[#F7F8FA] p-3 sm:p-5">
           <img
             src="/mcas/graphics/career-vertical-fit.png"
-            alt="Career Vertical progression from V1 to V6"
+            alt="Career Vertical progression from CV1 to CV6"
             className="mx-auto h-auto w-full max-w-[1160px] object-contain"
           />
         </div>
@@ -1494,10 +1527,10 @@ function CareerVerticalSection({
             Current result
           </p>
           <p className="mt-2 text-lg font-black text-[#201E41]">
-            {readinessLabel ?? `${current} fit indicated`}
+            {careerVerticalDisplayText(readinessLabel ?? `${current} fit indicated`)}
           </p>
           <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            Progression changes work itself. Higher verticals increase ambiguity,
+            Progression changes work itself. Higher Career Verticals increase ambiguity,
             scope and accountability. The next level should be treated as a
             development horizon, not an automatic promotion recommendation.
           </p>
@@ -1513,7 +1546,7 @@ function CareerVerticalSection({
 
             return (
               <CareerVerticalRow
-                key={step.code}
+                key={careerVerticalDisplayCode(step.code)}
                 step={step}
                 state={state}
               />
@@ -1572,12 +1605,12 @@ function CareerVerticalRow({
           state.circleClass,
         ].join(" ")}
       >
-        {step.code}
+        {careerVerticalDisplayCode(step.code)}
       </span>
 
       <div>
         <p className="text-base font-bold text-[#201E41]">
-          {step.code} · {step.title}
+          {careerVerticalDisplayCode(step.code)} · {step.title}
         </p>
         <p className="mt-1 text-sm text-slate-600">{step.description}</p>
       </div>
@@ -1651,7 +1684,7 @@ function RiskSection({
             alt=""
             className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20"
           />
-          <p className="text-xs font-bold tracking-[0.02em]">
+          <p className="text-[16px] font-bold leading-5">
             08 · Risk Flags and Sustainability Notes
           </p>
         </div>
@@ -1940,8 +1973,10 @@ function getGrowthGuidance(
   };
 
   return {
-    title: `Build ${nextLabel} readiness`,
-    copy: `The current result indicates ${currentVertical} scope. Growth should focus on demonstrating sustainable contribution as responsibility, ambiguity and cross-system impact increase.`,
+    title: `Build ${careerVerticalDisplayCode(nextLabel)} readiness`,
+    copy: `The current result indicates ${careerVerticalDisplayCode(
+      currentVertical,
+    )} scope. Growth should focus on demonstrating sustainable contribution as responsibility, ambiguity and cross-system impact increase.`,
     action: actionByStyle[code],
   };
 }
@@ -1961,7 +1996,7 @@ function InterviewSection({
       <div className="grid gap-4 lg:grid-cols-2">
         {items.map((item, index) => (
           <div
-            key={item.title}
+            key={careerVerticalDisplayText(item.title)}
             className="rounded-2xl border border-[#6255E8]/20 bg-[#F7F6FF] p-5"
           >
             <div className="flex items-start gap-4">
@@ -1973,10 +2008,10 @@ function InterviewSection({
                   Validation area
                 </p>
                 <h3 className="mt-2 text-lg font-bold text-[#201E41]">
-                  {item.title}
+                  {careerVerticalDisplayText(item.title)}
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-700">
-                  {item.question}
+                  {careerVerticalDisplayText(item.question)}
                 </p>
               </div>
             </div>
@@ -2016,7 +2051,7 @@ function ReportSection({
             <p className="text-xs font-bold uppercase tracking-[0.19em] text-[#6255E8]">
               {eyebrow}
             </p>
-            <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#201E41] md:text-3xl">
+            <h2 className="mt-2 text-[16px] font-bold leading-5 text-[#201E41]">
               {title}
             </h2>
           </div>

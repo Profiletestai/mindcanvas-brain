@@ -113,6 +113,13 @@ function careerVerticalDisplayCode(code: string): string {
   return getCareerVerticalDisplayCode(code as McasCareerVerticalCode);
 }
 
+function careerVerticalDisplayText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\bV([1-6])\b/g, "CV$1")
+    .replace(/Career\s+Career\s+Vertical/gi, "Career Vertical")
+    .replace(/\bHigher Career Verticals\b/gi, "Higher Career Verticals");
+}
+
 type McasReportAccessWithNextSteps = McasReportPayload["access"] & {
   nextStepsUrl?: string | null;
 };
@@ -396,7 +403,7 @@ function Hero({ payload }: { payload: McasReportPayload }) {
             <HeroMetric label="Operating Style" value={operatingStyleLabel(primaryOs.code)} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
             <HeroMetric label="Career Vertical" value={careerVerticalDisplayCode(primaryVertical.code)} caption={primaryVertical.label} />
-            <HeroMetric label="Career Career Vertical Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
+            <HeroMetric label="Career Vertical Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={careerVerticalDisplayText(payload.result.careerVertical.readinessLabel ?? "Growth readiness")} />
           </div>
         </div>
 
@@ -623,7 +630,7 @@ function SectionShell({ id, title, icon, children }: { id: string; title: string
       <div className="rounded-[18px] bg-white p-6 md:p-8">
         <div className="mb-7 flex items-center gap-4">
           <img src={icon} alt="" className="h-11 w-11 rounded-xl object-cover ring-1 ring-[#3B82F6]/20" />
-          <h2 className="text-2xl font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">{title}</h2>
+          <h2 className="text-[15px] font-bold leading-5 text-[#0D0F1C]">{title}</h2>
         </div>
         {children}
       </div>
@@ -664,7 +671,7 @@ function PlainLanguageSection({ payload }: { payload: McasReportPayload }) {
   return (
     <SectionShell id="plain-language" title="Your Work Pattern in Plain Language" icon="/mcas/report-icons/work-style.png">
       <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
-        <p className="text-lg leading-9 text-[#0D1B2A]">{payload.candidateFacing.workPatternSummary}</p>
+        <p className="text-lg leading-9 text-[#0D1B2A]">{careerVerticalDisplayText(payload.candidateFacing.workPatternSummary)}</p>
       </div>
     </SectionShell>
   );
@@ -724,7 +731,7 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
                 </h3>
 
                 <p className="mt-4 max-w-[470px] text-[13px] leading-7 text-[#5A5F7E]">
-                  {payload.candidateFacing.operatingStyleNarrative}
+                  {careerVerticalDisplayText(payload.candidateFacing.operatingStyleNarrative)}
                 </p>
               </div>
             </div>
@@ -833,7 +840,7 @@ function CoreCompactCard({
       </div>
 
       <p className="text-[11px] leading-5 text-[#4A5568]">
-        {item.description}
+        {careerVerticalDisplayText(item.description)}
       </p>
     </div>
   );
@@ -887,7 +894,7 @@ function StrengthCompactCard({ strength }: { strength: McasStrength }) {
       </h3>
 
       <p className="mt-2 text-[11px] leading-5 text-[#4A5568]">
-        {strength.description}
+        {careerVerticalDisplayText(strength.description)}
       </p>
     </div>
   );
@@ -972,7 +979,7 @@ function BlindSpotsSection({
                 </h3>
 
                 <p className="mt-2 text-[12px] leading-5 text-[#4A5568]">
-                  {blindSpot.description}
+                  {careerVerticalDisplayText(blindSpot.description)}
                 </p>
 
                 <p
@@ -983,7 +990,7 @@ function BlindSpotsSection({
                 </p>
 
                 <p className="mt-1 text-[11px] leading-5 text-[#4A5568]">
-                  {blindSpot.managementStrategy}
+                  {careerVerticalDisplayText(blindSpot.managementStrategy)}
                 </p>
               </div>
             );
@@ -1083,14 +1090,14 @@ function RolesSection({
 
 function roleContextCopy(code: McasOperatingStyleCode): string {
   if (code === "OS8") {
-    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Career Vertical Readiness should guide the level of responsibility considered.";
+    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Vertical Readiness should guide the level of responsibility considered.";
   }
 
   if (code === "OS4") {
-    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Career Vertical Readiness should guide the level of responsibility considered.";
+    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical Readiness should guide the level of responsibility considered.";
   }
 
-  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Career Vertical Readiness should guide the level of responsibility considered.";
+  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Vertical Readiness should guide the level of responsibility considered.";
 }
 
 function RoleDiagramCard({
@@ -1109,7 +1116,7 @@ function RoleDiagramCard({
       </h3>
 
       <p className="mt-2 text-[12px] leading-5 text-[#5A5F7E]">
-        {role.description}
+        {careerVerticalDisplayText(role.description)}
       </p>
     </div>
   );
@@ -1288,7 +1295,7 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
         />
 
         <p className="text-[14px] leading-7 text-[#4A5568]">
-          Progression changes work itself. Higher verticals increase ambiguity,
+          Progression changes work itself. Higher Career Verticals increase ambiguity,
           scope, and accountability.
         </p>
 
@@ -1325,7 +1332,7 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
                     {careerVerticalDisplayCode(item.code)} · {item.label}
                   </p>
                   <p className="mt-1 text-[12px] leading-5 text-[#718096]">
-                    {item.description}
+                    {careerVerticalDisplayText(item.description)}
                   </p>
                 </div>
 
@@ -1464,11 +1471,11 @@ function SuccessGuideSection({
                 </p>
 
                 <h3 className="mt-4 text-[17px] font-black leading-6 text-[#0D0F1C]">
-                  {item.title}
+                  {careerVerticalDisplayText(item.title)}
                 </h3>
 
                 <p className="mt-3 text-[13px] leading-6 text-[#4A5568]">
-                  {item.description}
+                  {careerVerticalDisplayText(item.description)}
                 </p>
               </div>
             );
