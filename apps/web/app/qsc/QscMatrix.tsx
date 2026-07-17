@@ -68,15 +68,14 @@ type MindsetRow = {
 };
 
 /**
- * Keep the existing MindCanvas orientation unchanged:
- * Origin first, then Momentum, Vector, Orbit and Quantum.
+ * Display from highest growth stage to earliest stage.
  */
 const MINDSET_ROWS: MindsetRow[] = [
-  { key: "ORIGIN", level: 1, label: "Origin" },
-  { key: "MOMENTUM", level: 2, label: "Momentum" },
-  { key: "VECTOR", level: 3, label: "Vector" },
-  { key: "ORBIT", level: 4, label: "Orbit" },
   { key: "QUANTUM", level: 5, label: "Quantum" },
+  { key: "ORBIT", level: 4, label: "Orbit" },
+  { key: "VECTOR", level: 3, label: "Vector" },
+  { key: "MOMENTUM", level: 2, label: "Momentum" },
+  { key: "ORIGIN", level: 1, label: "Origin" },
 ];
 
 const DEFAULT_CELL_STYLES: Record<CellState, string> = {
@@ -152,7 +151,7 @@ function DefaultMatrix(props: QscMatrixProps) {
   const {
     eyebrow = "Quantum Source Code",
     title = "Buyer Persona Matrix",
-    description = "This grid maps your Buyer Frequency Type from left to right against your Buyer Mindset Level. Your combined profile sits at the intersection.",
+    description = "This grid maps your Buyer Frequency Type from left to right against your Buyer Mindset Level from top to bottom. Your combined profile sits at the intersection.",
     showLegend = true,
   } = props;
 
@@ -283,7 +282,7 @@ function GedMatrix(props: QscMatrixProps) {
   const {
     eyebrow = "Quantum Source Code",
     title = "Quantum Profile Matrix",
-    description = "This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection.",
+    description = "This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (top to bottom). Your combined profile sits at the intersection.",
     showLegend = true,
   } = props;
 

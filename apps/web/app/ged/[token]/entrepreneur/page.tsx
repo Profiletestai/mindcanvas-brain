@@ -108,6 +108,13 @@ const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
   FIELD: "Field",
 };
 
+const PERSONALITY_FREQUENCY_LABELS: Record<PersonalityKey, string> = {
+  FIRE: "Fire (A)",
+  FLOW: "Flow (B)",
+  FORM: "Form (C)",
+  FIELD: "Field (D)",
+};
+
 const MINDSET_LABELS: Record<MindsetKey, string> = {
   ORIGIN: "Origin",
   MOMENTUM: "Momentum",
@@ -806,7 +813,7 @@ function PersonalityFrequencyPanel({
                 style={{ backgroundColor: displayColors[item.key] }}
               />
               <span className="flex-1 font-semibold text-[#1a1a1a]">
-                {PERSONALITY_LABELS[item.key]}
+                {PERSONALITY_FREQUENCY_LABELS[item.key]}
               </span>
               <span className="tabular-nums font-bold text-[#4b5563]">
                 {Math.round(item.value)}%
@@ -820,10 +827,10 @@ function PersonalityFrequencyPanel({
         {data.map((item) => (
           <div
             key={item.key}
-            className="grid grid-cols-[42px_minmax(0,1fr)_30px] items-center gap-3 text-xs"
+            className="grid grid-cols-[64px_minmax(0,1fr)_34px] items-center gap-3 text-xs"
           >
             <span className="font-semibold text-[#1a1a1a]">
-              {PERSONALITY_LABELS[item.key]}
+              {PERSONALITY_FREQUENCY_LABELS[item.key]}
             </span>
             <div className="h-2.5 overflow-hidden rounded bg-[#e5e7eb]">
               <div
@@ -1252,6 +1259,12 @@ function GedFrameworkSection({
 
       <div className="mt-5 rounded-2xl bg-white p-4 text-[#0c1d1a] md:p-6">
         <p className="text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
+          The GED — the Growth Engine Diagnostic — connects two layers of your
+          operating pattern into one combined result. Rather than reducing you to
+          a single label, it shows the personality wiring you naturally lead
+          with, the stage your business has actually reached, and the specific
+          pattern that emerges when the two meet. Read all three together — not
+          the headline result alone — before acting on anything in this report.
         </p>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)] lg:items-center">
@@ -2281,7 +2294,7 @@ export default function GedEntrepreneurStrategicReportPage({
                       style={{ backgroundColor: FREQUENCY_COLORS[item.key] }}
                     />
                     <span className="flex-1 text-slate-200">
-                      {PERSONALITY_LABELS[item.key]}
+                      {PERSONALITY_FREQUENCY_LABELS[item.key]}
                     </span>
                     <span className="w-10 text-right tabular-nums text-slate-200">
                       {Math.round(item.value)}%
@@ -2304,11 +2317,11 @@ export default function GedEntrepreneurStrategicReportPage({
             <div className="mt-5 space-y-3">
               {(
                 [
-                  "ORIGIN",
-                  "MOMENTUM",
-                  "VECTOR",
-                  "ORBIT",
                   "QUANTUM",
+                  "ORBIT",
+                  "VECTOR",
+                  "MOMENTUM",
+                  "ORIGIN",
                 ] as MindsetKey[]
               ).map((key) => {
                 const value = clampPercent(mindsetPercentages[key] || 0);
@@ -2317,7 +2330,7 @@ export default function GedEntrepreneurStrategicReportPage({
                   <div key={key}>
                     <div className="flex items-center justify-between gap-4 text-xs md:text-sm">
                       <span className="text-slate-200">
-                        {MINDSET_LABELS[key]}
+                        {MINDSET_LABELS[key]} (L{MINDSET_LEVELS[key]})
                       </span>
                       <span className="tabular-nums text-slate-200">
                         {value}%
@@ -2369,7 +2382,7 @@ export default function GedEntrepreneurStrategicReportPage({
                   mindsetPercentages={mindsetPercentages}
                   eyebrow="Quantum Source Code"
                   title="Quantum Profile Matrix"
-                  description="This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection."
+                  description="This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (top to bottom). Your combined profile sits at the intersection."
                 />
               </div>
             </section>
