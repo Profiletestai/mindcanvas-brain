@@ -35,34 +35,286 @@ const COUNTRY_CODES: CountryCode[] = [
   { iso: "AU", label: "Australia", dial: "+61" },
   { iso: "NZ", label: "New Zealand", dial: "+64" },
   { iso: "IE", label: "Ireland", dial: "+353" },
+  { iso: "IS", label: "Iceland", dial: "+354" },
   { iso: "AE", label: "United Arab Emirates", dial: "+971" },
-  { iso: "FR", label: "France", dial: "+33" },
-  { iso: "DE", label: "Germany", dial: "+49" },
-  { iso: "NL", label: "Netherlands", dial: "+31" },
-  { iso: "ES", label: "Spain", dial: "+34" },
-  { iso: "IT", label: "Italy", dial: "+39" },
-  { iso: "PT", label: "Portugal", dial: "+351" },
-  { iso: "CH", label: "Switzerland", dial: "+41" },
+  { iso: "AF", label: "Afghanistan", dial: "+93" },
+  { iso: "AL", label: "Albania", dial: "+355" },
+  { iso: "DZ", label: "Algeria", dial: "+213" },
+  { iso: "AS", label: "American Samoa", dial: "+1" },
+  { iso: "AD", label: "Andorra", dial: "+376" },
+  { iso: "AO", label: "Angola", dial: "+244" },
+  { iso: "AI", label: "Anguilla", dial: "+1" },
+  { iso: "AQ", label: "Antarctica", dial: "+672" },
+  { iso: "AG", label: "Antigua and Barbuda", dial: "+1" },
+  { iso: "AR", label: "Argentina", dial: "+54" },
+  { iso: "AM", label: "Armenia", dial: "+374" },
+  { iso: "AW", label: "Aruba", dial: "+297" },
+  { iso: "AT", label: "Austria", dial: "+43" },
+  { iso: "AZ", label: "Azerbaijan", dial: "+994" },
+  { iso: "BS", label: "Bahamas", dial: "+1" },
+  { iso: "BH", label: "Bahrain", dial: "+973" },
+  { iso: "BD", label: "Bangladesh", dial: "+880" },
+  { iso: "BB", label: "Barbados", dial: "+1" },
+  { iso: "BY", label: "Belarus", dial: "+375" },
   { iso: "BE", label: "Belgium", dial: "+32" },
-  { iso: "SE", label: "Sweden", dial: "+46" },
-  { iso: "NO", label: "Norway", dial: "+47" },
-  { iso: "DK", label: "Denmark", dial: "+45" },
-  { iso: "FI", label: "Finland", dial: "+358" },
-  { iso: "IN", label: "India", dial: "+91" },
-  { iso: "SG", label: "Singapore", dial: "+65" },
-  { iso: "HK", label: "Hong Kong", dial: "+852" },
-  { iso: "JP", label: "Japan", dial: "+81" },
-  { iso: "CN", label: "China", dial: "+86" },
-  { iso: "BR", label: "Brazil", dial: "+55" },
-  { iso: "MX", label: "Mexico", dial: "+52" },
-  { iso: "KE", label: "Kenya", dial: "+254" },
-  { iso: "NG", label: "Nigeria", dial: "+234" },
-  { iso: "ZW", label: "Zimbabwe", dial: "+263" },
-  { iso: "ZM", label: "Zambia", dial: "+260" },
+  { iso: "BZ", label: "Belize", dial: "+501" },
+  { iso: "BJ", label: "Benin", dial: "+229" },
+  { iso: "BM", label: "Bermuda", dial: "+1" },
+  { iso: "BT", label: "Bhutan", dial: "+975" },
+  { iso: "BO", label: "Bolivia", dial: "+591" },
+  { iso: "BA", label: "Bosnia and Herzegovina", dial: "+387" },
   { iso: "BW", label: "Botswana", dial: "+267" },
-  { iso: "NA", label: "Namibia", dial: "+264" },
+  { iso: "BR", label: "Brazil", dial: "+55" },
+  { iso: "IO", label: "British Indian Ocean Territory", dial: "+246" },
+  { iso: "VG", label: "British Virgin Islands", dial: "+1" },
+  { iso: "BN", label: "Brunei", dial: "+673" },
+  { iso: "BG", label: "Bulgaria", dial: "+359" },
+  { iso: "BF", label: "Burkina Faso", dial: "+226" },
+  { iso: "BI", label: "Burundi", dial: "+257" },
+  { iso: "CV", label: "Cabo Verde", dial: "+238" },
+  { iso: "KH", label: "Cambodia", dial: "+855" },
+  { iso: "CM", label: "Cameroon", dial: "+237" },
+  { iso: "BQ", label: "Caribbean Netherlands", dial: "+599" },
+  { iso: "KY", label: "Cayman Islands", dial: "+1" },
+  { iso: "CF", label: "Central African Republic", dial: "+236" },
+  { iso: "TD", label: "Chad", dial: "+235" },
+  { iso: "CL", label: "Chile", dial: "+56" },
+  { iso: "CN", label: "China", dial: "+86" },
+  { iso: "CX", label: "Christmas Island", dial: "+61" },
+  { iso: "CC", label: "Cocos (Keeling) Islands", dial: "+61" },
+  { iso: "CO", label: "Colombia", dial: "+57" },
+  { iso: "KM", label: "Comoros", dial: "+269" },
+  { iso: "CK", label: "Cook Islands", dial: "+682" },
+  { iso: "CR", label: "Costa Rica", dial: "+506" },
+  { iso: "HR", label: "Croatia", dial: "+385" },
+  { iso: "CU", label: "Cuba", dial: "+53" },
+  { iso: "CW", label: "Curaçao", dial: "+599" },
+  { iso: "CY", label: "Cyprus", dial: "+357" },
+  { iso: "CZ", label: "Czechia", dial: "+420" },
+  { iso: "CI", label: "Côte d’Ivoire", dial: "+225" },
+  { iso: "CD", label: "Democratic Republic of the Congo", dial: "+243" },
+  { iso: "DK", label: "Denmark", dial: "+45" },
+  { iso: "DJ", label: "Djibouti", dial: "+253" },
+  { iso: "DM", label: "Dominica", dial: "+1" },
+  { iso: "DO", label: "Dominican Republic", dial: "+1" },
+  { iso: "TL", label: "East Timor", dial: "+670" },
+  { iso: "EC", label: "Ecuador", dial: "+593" },
+  { iso: "EG", label: "Egypt", dial: "+20" },
+  { iso: "SV", label: "El Salvador", dial: "+503" },
+  { iso: "GQ", label: "Equatorial Guinea", dial: "+240" },
+  { iso: "ER", label: "Eritrea", dial: "+291" },
+  { iso: "EE", label: "Estonia", dial: "+372" },
+  { iso: "SZ", label: "Eswatini", dial: "+268" },
+  { iso: "ET", label: "Ethiopia", dial: "+251" },
+  { iso: "FK", label: "Falkland Islands", dial: "+500" },
+  { iso: "FO", label: "Faroe Islands", dial: "+298" },
+  { iso: "FJ", label: "Fiji", dial: "+679" },
+  { iso: "FI", label: "Finland", dial: "+358" },
+  { iso: "FR", label: "France", dial: "+33" },
+  { iso: "GF", label: "French Guiana", dial: "+594" },
+  { iso: "PF", label: "French Polynesia", dial: "+689" },
+  { iso: "GA", label: "Gabon", dial: "+241" },
+  { iso: "GM", label: "Gambia", dial: "+220" },
+  { iso: "GE", label: "Georgia", dial: "+995" },
+  { iso: "DE", label: "Germany", dial: "+49" },
+  { iso: "GH", label: "Ghana", dial: "+233" },
+  { iso: "GI", label: "Gibraltar", dial: "+350" },
+  { iso: "GR", label: "Greece", dial: "+30" },
+  { iso: "GL", label: "Greenland", dial: "+299" },
+  { iso: "GD", label: "Grenada", dial: "+1" },
+  { iso: "GP", label: "Guadeloupe", dial: "+590" },
+  { iso: "GU", label: "Guam", dial: "+1" },
+  { iso: "GT", label: "Guatemala", dial: "+502" },
+  { iso: "GG", label: "Guernsey", dial: "+44" },
+  { iso: "GN", label: "Guinea", dial: "+224" },
+  { iso: "GW", label: "Guinea-Bissau", dial: "+245" },
+  { iso: "GY", label: "Guyana", dial: "+592" },
+  { iso: "HT", label: "Haiti", dial: "+509" },
+  { iso: "HN", label: "Honduras", dial: "+504" },
+  { iso: "HK", label: "Hong Kong", dial: "+852" },
+  { iso: "HU", label: "Hungary", dial: "+36" },
+  { iso: "IN", label: "India", dial: "+91" },
+  { iso: "ID", label: "Indonesia", dial: "+62" },
+  { iso: "IR", label: "Iran", dial: "+98" },
+  { iso: "IQ", label: "Iraq", dial: "+964" },
+  { iso: "IM", label: "Isle of Man", dial: "+44" },
+  { iso: "IL", label: "Israel", dial: "+972" },
+  { iso: "IT", label: "Italy", dial: "+39" },
+  { iso: "JM", label: "Jamaica", dial: "+1" },
+  { iso: "JP", label: "Japan", dial: "+81" },
+  { iso: "JE", label: "Jersey", dial: "+44" },
+  { iso: "JO", label: "Jordan", dial: "+962" },
+  { iso: "KZ", label: "Kazakhstan", dial: "+7" },
+  { iso: "KE", label: "Kenya", dial: "+254" },
+  { iso: "KI", label: "Kiribati", dial: "+686" },
+  { iso: "XK", label: "Kosovo", dial: "+383" },
+  { iso: "KW", label: "Kuwait", dial: "+965" },
+  { iso: "KG", label: "Kyrgyzstan", dial: "+996" },
+  { iso: "LA", label: "Laos", dial: "+856" },
+  { iso: "LV", label: "Latvia", dial: "+371" },
+  { iso: "LB", label: "Lebanon", dial: "+961" },
+  { iso: "LS", label: "Lesotho", dial: "+266" },
+  { iso: "LR", label: "Liberia", dial: "+231" },
+  { iso: "LY", label: "Libya", dial: "+218" },
+  { iso: "LI", label: "Liechtenstein", dial: "+423" },
+  { iso: "LT", label: "Lithuania", dial: "+370" },
+  { iso: "LU", label: "Luxembourg", dial: "+352" },
+  { iso: "MO", label: "Macau", dial: "+853" },
+  { iso: "MG", label: "Madagascar", dial: "+261" },
+  { iso: "MW", label: "Malawi", dial: "+265" },
+  { iso: "MY", label: "Malaysia", dial: "+60" },
+  { iso: "MV", label: "Maldives", dial: "+960" },
+  { iso: "ML", label: "Mali", dial: "+223" },
+  { iso: "MT", label: "Malta", dial: "+356" },
+  { iso: "MH", label: "Marshall Islands", dial: "+692" },
+  { iso: "MQ", label: "Martinique", dial: "+596" },
+  { iso: "MR", label: "Mauritania", dial: "+222" },
   { iso: "MU", label: "Mauritius", dial: "+230" },
+  { iso: "YT", label: "Mayotte", dial: "+262" },
+  { iso: "MX", label: "Mexico", dial: "+52" },
+  { iso: "FM", label: "Micronesia", dial: "+691" },
+  { iso: "MD", label: "Moldova", dial: "+373" },
+  { iso: "MC", label: "Monaco", dial: "+377" },
+  { iso: "MN", label: "Mongolia", dial: "+976" },
+  { iso: "ME", label: "Montenegro", dial: "+382" },
+  { iso: "MS", label: "Montserrat", dial: "+1" },
+  { iso: "MA", label: "Morocco", dial: "+212" },
+  { iso: "MZ", label: "Mozambique", dial: "+258" },
+  { iso: "MM", label: "Myanmar", dial: "+95" },
+  { iso: "NA", label: "Namibia", dial: "+264" },
+  { iso: "NR", label: "Nauru", dial: "+674" },
+  { iso: "NP", label: "Nepal", dial: "+977" },
+  { iso: "NL", label: "Netherlands", dial: "+31" },
+  { iso: "NC", label: "New Caledonia", dial: "+687" },
+  { iso: "NI", label: "Nicaragua", dial: "+505" },
+  { iso: "NE", label: "Niger", dial: "+227" },
+  { iso: "NG", label: "Nigeria", dial: "+234" },
+  { iso: "NU", label: "Niue", dial: "+683" },
+  { iso: "NF", label: "Norfolk Island", dial: "+672" },
+  { iso: "KP", label: "North Korea", dial: "+850" },
+  { iso: "MK", label: "North Macedonia", dial: "+389" },
+  { iso: "MP", label: "Northern Mariana Islands", dial: "+1" },
+  { iso: "NO", label: "Norway", dial: "+47" },
+  { iso: "OM", label: "Oman", dial: "+968" },
+  { iso: "PK", label: "Pakistan", dial: "+92" },
+  { iso: "PW", label: "Palau", dial: "+680" },
+  { iso: "PS", label: "Palestine", dial: "+970" },
+  { iso: "PA", label: "Panama", dial: "+507" },
+  { iso: "PG", label: "Papua New Guinea", dial: "+675" },
+  { iso: "PY", label: "Paraguay", dial: "+595" },
+  { iso: "PE", label: "Peru", dial: "+51" },
+  { iso: "PH", label: "Philippines", dial: "+63" },
+  { iso: "PN", label: "Pitcairn Islands", dial: "+64" },
+  { iso: "PL", label: "Poland", dial: "+48" },
+  { iso: "PT", label: "Portugal", dial: "+351" },
+  { iso: "PR", label: "Puerto Rico", dial: "+1" },
+  { iso: "QA", label: "Qatar", dial: "+974" },
+  { iso: "CG", label: "Republic of the Congo", dial: "+242" },
+  { iso: "RO", label: "Romania", dial: "+40" },
+  { iso: "RU", label: "Russia", dial: "+7" },
+  { iso: "RW", label: "Rwanda", dial: "+250" },
+  { iso: "RE", label: "Réunion", dial: "+262" },
+  { iso: "BL", label: "Saint Barthélemy", dial: "+590" },
+  { iso: "SH", label: "Saint Helena", dial: "+290" },
+  { iso: "KN", label: "Saint Kitts and Nevis", dial: "+1" },
+  { iso: "LC", label: "Saint Lucia", dial: "+1" },
+  { iso: "MF", label: "Saint Martin", dial: "+590" },
+  { iso: "PM", label: "Saint Pierre and Miquelon", dial: "+508" },
+  { iso: "VC", label: "Saint Vincent and the Grenadines", dial: "+1" },
+  { iso: "WS", label: "Samoa", dial: "+685" },
+  { iso: "SM", label: "San Marino", dial: "+378" },
+  { iso: "SA", label: "Saudi Arabia", dial: "+966" },
+  { iso: "SN", label: "Senegal", dial: "+221" },
+  { iso: "RS", label: "Serbia", dial: "+381" },
+  { iso: "SC", label: "Seychelles", dial: "+248" },
+  { iso: "SL", label: "Sierra Leone", dial: "+232" },
+  { iso: "SG", label: "Singapore", dial: "+65" },
+  { iso: "SX", label: "Sint Maarten", dial: "+1" },
+  { iso: "SK", label: "Slovakia", dial: "+421" },
+  { iso: "SI", label: "Slovenia", dial: "+386" },
+  { iso: "SB", label: "Solomon Islands", dial: "+677" },
+  { iso: "SO", label: "Somalia", dial: "+252" },
+  { iso: "GS", label: "South Georgia", dial: "+500" },
+  { iso: "KR", label: "South Korea", dial: "+82" },
+  { iso: "SS", label: "South Sudan", dial: "+211" },
+  { iso: "ES", label: "Spain", dial: "+34" },
+  { iso: "LK", label: "Sri Lanka", dial: "+94" },
+  { iso: "SD", label: "Sudan", dial: "+249" },
+  { iso: "SR", label: "Suriname", dial: "+597" },
+  { iso: "SJ", label: "Svalbard and Jan Mayen", dial: "+47" },
+  { iso: "SE", label: "Sweden", dial: "+46" },
+  { iso: "CH", label: "Switzerland", dial: "+41" },
+  { iso: "SY", label: "Syria", dial: "+963" },
+  { iso: "ST", label: "São Tomé and Príncipe", dial: "+239" },
+  { iso: "TW", label: "Taiwan", dial: "+886" },
+  { iso: "TJ", label: "Tajikistan", dial: "+992" },
+  { iso: "TZ", label: "Tanzania", dial: "+255" },
+  { iso: "TH", label: "Thailand", dial: "+66" },
+  { iso: "TG", label: "Togo", dial: "+228" },
+  { iso: "TK", label: "Tokelau", dial: "+690" },
+  { iso: "TO", label: "Tonga", dial: "+676" },
+  { iso: "TT", label: "Trinidad and Tobago", dial: "+1" },
+  { iso: "TN", label: "Tunisia", dial: "+216" },
+  { iso: "TR", label: "Turkey", dial: "+90" },
+  { iso: "TM", label: "Turkmenistan", dial: "+993" },
+  { iso: "TC", label: "Turks and Caicos Islands", dial: "+1" },
+  { iso: "TV", label: "Tuvalu", dial: "+688" },
+  { iso: "VI", label: "U.S. Virgin Islands", dial: "+1" },
+  { iso: "UG", label: "Uganda", dial: "+256" },
+  { iso: "UA", label: "Ukraine", dial: "+380" },
+  { iso: "UY", label: "Uruguay", dial: "+598" },
+  { iso: "UZ", label: "Uzbekistan", dial: "+998" },
+  { iso: "VU", label: "Vanuatu", dial: "+678" },
+  { iso: "VA", label: "Vatican City", dial: "+39" },
+  { iso: "VE", label: "Venezuela", dial: "+58" },
+  { iso: "VN", label: "Vietnam", dial: "+84" },
+  { iso: "WF", label: "Wallis and Futuna", dial: "+681" },
+  { iso: "EH", label: "Western Sahara", dial: "+212" },
+  { iso: "YE", label: "Yemen", dial: "+967" },
+  { iso: "ZM", label: "Zambia", dial: "+260" },
+  { iso: "ZW", label: "Zimbabwe", dial: "+263" },
+  { iso: "AX", label: "Åland Islands", dial: "+358" },
 ];
+
+const DEFAULT_COUNTRY =
+  COUNTRY_CODES.find((country) => country.iso === "ZA") ?? COUNTRY_CODES[0];
+
+function formatCountryOption(country: CountryCode) {
+  return `${country.label} (${country.iso}) ${country.dial}`;
+}
+
+function findCountryByIso(iso: string) {
+  const normalizedIso = safeString(iso).trim().toUpperCase();
+  return COUNTRY_CODES.find((country) => country.iso === normalizedIso) ?? null;
+}
+
+function findCountryByDial(dial: string) {
+  const normalizedDial = safeString(dial).replace(/\s+/g, "").trim();
+  return COUNTRY_CODES.find((country) => country.dial === normalizedDial) ?? null;
+}
+
+function findCountryFromSearch(value: string) {
+  const normalized = safeString(value).trim().toLowerCase();
+  if (!normalized) return null;
+
+  const exact =
+    COUNTRY_CODES.find(
+      (country) =>
+        formatCountryOption(country).toLowerCase() === normalized ||
+        country.label.toLowerCase() === normalized ||
+        country.iso.toLowerCase() === normalized ||
+        country.dial === value.trim()
+    ) ?? null;
+
+  if (exact) return exact;
+
+  const partialMatches = COUNTRY_CODES.filter((country) => {
+    const searchable = `${country.label} ${country.iso} ${country.dial}`.toLowerCase();
+    return searchable.includes(normalized);
+  });
+
+  return partialMatches.length === 1 ? partialMatches[0] : null;
+}
 
 async function fetchJson(url: string, init?: RequestInit) {
   const r = await fetch(url, init);
@@ -120,9 +372,19 @@ function buildInternationalPhone(countryCode: string, localNumber: string) {
   return cleanedLocal ? `${cleanedCountryCode}${cleanedLocal}` : "";
 }
 
-function parseSavedPhone(savedCountryCode: any, savedPhone: any) {
+function parseSavedPhone(
+  savedCountryCode: any,
+  savedPhone: any,
+  savedCountryIso?: any
+) {
   const existingCountryCode = safeString(savedCountryCode).trim();
+  const existingCountryIso = safeString(savedCountryIso).trim().toUpperCase();
   const phone = safeString(savedPhone).trim();
+
+  const savedCountry =
+    findCountryByIso(existingCountryIso) ??
+    findCountryByDial(existingCountryCode) ??
+    DEFAULT_COUNTRY;
 
   if (existingCountryCode) {
     const localWithoutCountry = phone.startsWith(existingCountryCode)
@@ -130,14 +392,16 @@ function parseSavedPhone(savedCountryCode: any, savedPhone: any) {
       : phone;
 
     return {
-      countryCode: existingCountryCode,
+      countryCode: savedCountry.dial,
+      countryIso: savedCountry.iso,
       localPhone: localWithoutCountry,
     };
   }
 
   if (!phone) {
     return {
-      countryCode: "+27",
+      countryCode: savedCountry.dial,
+      countryIso: savedCountry.iso,
       localPhone: "",
     };
   }
@@ -151,12 +415,14 @@ function parseSavedPhone(savedCountryCode: any, savedPhone: any) {
   if (matchingCountry) {
     return {
       countryCode: matchingCountry.dial,
+      countryIso: matchingCountry.iso,
       localPhone: compactPhone.slice(matchingCountry.dial.length),
     };
   }
 
   return {
-    countryCode: "+27",
+    countryCode: DEFAULT_COUNTRY.dial,
+    countryIso: DEFAULT_COUNTRY.iso,
     localPhone: phone,
   };
 }
@@ -190,7 +456,11 @@ export default function PublicTestClient({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneCountryCode, setPhoneCountryCode] = useState("+27");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_COUNTRY.dial);
+  const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY.iso);
+  const [phoneCountrySearch, setPhoneCountrySearch] = useState(
+    formatCountryOption(DEFAULT_COUNTRY)
+  );
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
@@ -270,12 +540,22 @@ export default function PublicTestClient({
           if (d) {
             try {
               const o = JSON.parse(d);
-              const parsedPhone = parseSavedPhone(o.phoneCountryCode, o.phone);
+              const parsedPhone = parseSavedPhone(
+                o.phoneCountryCode,
+                o.phone,
+                o.phoneCountryIso
+              );
 
               setFirstName(o.firstName || "");
               setLastName(o.lastName || "");
               setEmail(o.email || "");
               setPhoneCountryCode(parsedPhone.countryCode);
+              setPhoneCountryIso(parsedPhone.countryIso);
+
+              const restoredCountry =
+                findCountryByIso(parsedPhone.countryIso) ?? DEFAULT_COUNTRY;
+              setPhoneCountrySearch(formatCountryOption(restoredCountry));
+
               setPhone(parsedPhone.localPhone);
               setCompany(o.company || "");
               setRoleTitle(o.roleTitle || "");
@@ -323,6 +603,7 @@ export default function PublicTestClient({
           lastName,
           email,
           phoneCountryCode,
+          phoneCountryIso,
           phone,
           company,
           roleTitle,
@@ -337,6 +618,7 @@ export default function PublicTestClient({
     lastName,
     email,
     phoneCountryCode,
+    phoneCountryIso,
     phone,
     company,
     roleTitle,
@@ -345,6 +627,20 @@ export default function PublicTestClient({
     dataConsent,
     token,
   ]);
+
+  const selectedPhoneCountry =
+    findCountryByIso(phoneCountryIso) ??
+    findCountryByDial(phoneCountryCode) ??
+    DEFAULT_COUNTRY;
+
+  const countryListId = `mc-country-codes-${token}`;
+
+  const selectPhoneCountry = (country: CountryCode) => {
+    setPhoneCountryCode(country.dial);
+    setPhoneCountryIso(country.iso);
+    setPhoneCountrySearch(formatCountryOption(country));
+    setDetailsError(null);
+  };
 
   const q = questions[i];
 
@@ -669,34 +965,73 @@ export default function PublicTestClient({
                 <label className="block">
                   <span className="text-sm text-white/80">Mobile *</span>
 
-                  <div className="mt-1 flex gap-2">
-                    <select
-                      className="w-36 rounded-xl bg-white text-black p-3"
-                      value={phoneCountryCode}
-                      onChange={(e) => {
-                        setPhoneCountryCode(e.target.value);
-                        setDetailsError(null);
-                      }}
-                    >
-                      {COUNTRY_CODES.map((country) => (
-                        <option key={`${country.iso}-${country.dial}`} value={country.dial}>
-                          {country.iso} {country.dial}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+                    <div>
+                      <input
+                        type="text"
+                        list={countryListId}
+                        autoComplete="country"
+                        placeholder="Search country or dialling code"
+                        className="w-full rounded-xl bg-white text-black p-3"
+                        value={phoneCountrySearch}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPhoneCountrySearch(value);
+                          setDetailsError(null);
 
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      placeholder="Mobile number"
-                      className="min-w-0 flex-1 rounded-xl bg-white text-black p-3"
-                      value={phone}
-                      onChange={(e) => {
-                        setPhone(e.target.value);
-                        setDetailsError(null);
-                      }}
-                    />
+                          const country = findCountryFromSearch(value);
+                          if (country) {
+                            setPhoneCountryCode(country.dial);
+                            setPhoneCountryIso(country.iso);
+                          }
+                        }}
+                        onBlur={() => {
+                          const country = findCountryFromSearch(phoneCountrySearch);
+
+                          if (country) {
+                            selectPhoneCountry(country);
+                          } else {
+                            setPhoneCountrySearch(
+                              formatCountryOption(selectedPhoneCountry)
+                            );
+                          }
+                        }}
+                      />
+
+                      <datalist id={countryListId}>
+                        {COUNTRY_CODES.map((country) => (
+                          <option
+                            key={country.iso}
+                            value={formatCountryOption(country)}
+                          />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-semibold text-slate-600">
+                        {phoneCountryCode}
+                      </div>
+
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel-national"
+                        placeholder="Mobile number"
+                        className="w-full rounded-xl bg-white py-3 pr-3 pl-16 text-black"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          setDetailsError(null);
+                        }}
+                      />
+                    </div>
                   </div>
+
+                  <p className="mt-1 text-xs text-white/55">
+                    Start typing a country name or dialling code. The selected
+                    code is added automatically.
+                  </p>
                 </label>
 
                 <label className="block">

@@ -1687,7 +1687,7 @@ export default function GedEntrepreneurStrategicReportPage({
   }));
 
   const indexItems: ReportIndexItem[] = [
-    { href: "#quantum-profile-matrix", label: "Buyers Persona Matrix" },
+    { href: "#quantum-profile-matrix", label: "Growth Engine Profile Matrix" },
     { href: "#ged-framework", label: "Introducing the GED Framework" },
     { href: "#personality-layer", label: "Your Personality layer" },
     {
@@ -1994,7 +1994,7 @@ export default function GedEntrepreneurStrategicReportPage({
               <div className="mt-9 space-y-8">
                 <div>
                   <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
-                    Your Personality Layer
+                    Personality Layer Meaning
                   </p>
                   <p className="mt-2 max-w-[43rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
                     How you naturally think, act and make decisions. This is
@@ -2005,7 +2005,7 @@ export default function GedEntrepreneurStrategicReportPage({
 
                 <div>
                   <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
-                    Your Mindset Layer
+                    Mindset Layer Meaning
                   </p>
                   <p className="mt-2 max-w-[43rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
                     Where your business is right now and what stage of growth
@@ -2374,7 +2374,7 @@ export default function GedEntrepreneurStrategicReportPage({
             >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.quantum_profile_matrix}
-                eyebrow="Quantum Profile Matrix"
+                eyebrow="Growth Engine Profile Matrix"
                 title="Where your buyer frequency meets your mindset level"
                 body="Each cell represents a different Quantum buyer persona. Your primary pattern is highlighted — this is where your emotional wiring and current growth stage meet."
                 dark
@@ -2390,8 +2390,8 @@ export default function GedEntrepreneurStrategicReportPage({
                   secondaryMindset={result.secondary_mindset}
                   personalityPercentages={personalityPercentages}
                   mindsetPercentages={mindsetPercentages}
-                  eyebrow="Quantum Source Code"
-                  title="Quantum Profile Matrix"
+                  eyebrow=""
+                  title="Growth Engine Profile Matrix"
                   description="This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (top to bottom). Your combined profile sits at the intersection."
                 />
               </div>
