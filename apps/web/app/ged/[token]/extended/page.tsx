@@ -2179,10 +2179,10 @@ export default function GedPredictiveSellingPlaybookPage({
 
         <PageSection
           id="fast-read"
-          className="border-cyan-300/15 bg-[#0d1b2b]/80"
+          className="border-emerald-300/10 bg-[#0c1d1a]"
         >
           <header>
-            <p className="text-[0.72rem] font-bold uppercase tracking-[0.36em] text-sky-300/85">
+            <p className="text-[0.72rem] font-bold uppercase tracking-[0.36em] text-cyan-300/85">
               Snapshot for your sales playbook
             </p>
             <h2 className="mt-5 text-base font-extrabold leading-6 text-white md:text-lg">
@@ -2190,46 +2190,46 @@ export default function GedPredictiveSellingPlaybookPage({
             </h2>
           </header>
 
-          <div className="mt-7 rounded-[2rem] border border-sky-300/20 bg-[#101c31]/70 p-6 shadow-inner shadow-black/20 md:p-8">
-            <section>
-              <h3 className="text-base font-extrabold text-white md:text-lg">
-                How to communicate
-              </h3>
-              <ul className="mt-5 space-y-1.5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
-                {(salesSnapshot.communicate.length
-                  ? salesSnapshot.communicate
-                  : [
-                      "Use the buyer’s profile to set the right tone, pace and level of strategic language.",
-                    ]
-                ).map((item, index) => (
-                  <li
-                    key={`snapshot-communicate-${index}`}
-                    className="flex gap-2"
-                  >
-                    <span className="text-slate-400" aria-hidden="true">
-                      -
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          <div className="mt-7 rounded-[1.65rem] border border-white/12 bg-[#0a1f1b] p-5 shadow-inner shadow-black/20 md:p-6">
+            <div className="grid gap-4 xl:grid-cols-4">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 xl:col-span-2">
+                <h3 className="text-base font-extrabold text-white">
+                  How to communicate
+                </h3>
+                <ul className="mt-4 grid gap-x-6 gap-y-2 text-sm leading-5 text-slate-300 md:grid-cols-2">
+                  {(salesSnapshot.communicate.length
+                    ? salesSnapshot.communicate
+                    : [
+                        "Use the buyer’s profile to set the right tone, pace and level of strategic language.",
+                      ]
+                  ).map((item, index) => (
+                    <li
+                      key={`snapshot-communicate-${index}`}
+                      className="flex gap-2"
+                    >
+                      <span className="text-emerald-300" aria-hidden="true">
+                        -
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
 
-            <section className="mt-7">
-              <h3 className="text-base font-extrabold text-white md:text-lg">
-                Decision style
-              </h3>
-              <p className="mt-5 max-w-5xl text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
-                {salesSnapshot.decision}
-              </p>
-            </section>
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 xl:col-span-2">
+                <h3 className="text-base font-extrabold text-white">
+                  Decision style
+                </h3>
+                <p className="mt-4 text-sm leading-6 text-slate-300">
+                  {salesSnapshot.decision}
+                </p>
+              </section>
 
-            <div className="mt-7 grid gap-x-10 gap-y-7 md:grid-cols-2">
-              <section>
-                <h3 className="text-base font-extrabold text-white md:text-lg">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                <h3 className="text-base font-extrabold text-white">
                   Core challenges
                 </h3>
-                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                <p className="mt-4 text-sm leading-6 text-slate-300">
                   {(salesSnapshot.coreChallenges.length
                     ? salesSnapshot.coreChallenges
                     : [
@@ -2242,11 +2242,11 @@ export default function GedPredictiveSellingPlaybookPage({
                 </p>
               </section>
 
-              <section>
-                <h3 className="text-base font-extrabold text-white md:text-lg">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                <h3 className="text-base font-extrabold text-white">
                   Trust signals
                 </h3>
-                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                <p className="mt-4 text-sm leading-6 text-slate-300">
                   {(salesSnapshot.trustSignals.length
                     ? salesSnapshot.trustSignals
                     : [
@@ -2256,16 +2256,16 @@ export default function GedPredictiveSellingPlaybookPage({
                 </p>
               </section>
 
-              <section>
-                <h3 className="text-base font-extrabold text-white md:text-lg">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                <h3 className="text-base font-extrabold text-white">
                   Offer fit
                 </h3>
-                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                <p className="mt-4 text-sm leading-6 text-slate-300">
                   {(salesSnapshot.offerFit.length
                     ? salesSnapshot.offerFit
                     : [
                         safeText(
-                          extended.what_offer_ready_for,
+                          extended?.what_offer_ready_for,
                           "Position the offer around the specific outcome the buyer is ready to move toward.",
                         ),
                       ]
@@ -2273,16 +2273,16 @@ export default function GedPredictiveSellingPlaybookPage({
                 </p>
               </section>
 
-              <section>
-                <h3 className="text-base font-extrabold text-white md:text-lg">
+              <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
+                <h3 className="text-base font-extrabold text-white">
                   Sale blockers
                 </h3>
-                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                <p className="mt-4 text-sm leading-6 text-slate-300">
                   {(salesSnapshot.saleBlockers.length
                     ? salesSnapshot.saleBlockers
                     : [
                         safeText(
-                          extended.what_blocks_sale,
+                          extended?.what_blocks_sale,
                           "Avoid anything that lowers confidence, slows the pace or makes the offer feel generic.",
                         ),
                       ]
@@ -3823,3 +3823,4 @@ export default function GedPredictiveSellingPlaybookPage({
     </div>
   );
 }
+
