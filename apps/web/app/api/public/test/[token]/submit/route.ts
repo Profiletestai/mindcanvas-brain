@@ -2831,8 +2831,36 @@ export async function POST(
       }
     }
 
+    /*
+     * GED -> Profiletest.ai GHL ring-fence
+     *
+     * A GED wrapper can be used by many organisations, so `isGedTest` alone is
+     * not enough to decide whether the submission belongs in Profiletest.ai's
+     * GHL account. Only sync when the submitting organisation matches the
+     * configured Profiletest.ai portal organisation.
+     *
+     * Preferred configuration:
+     *   GHL_GED_ALLOWED_ORG_ID=<portal.orgs.id for Profiletest.ai>
+     *
+     * Optional fallback when an ID has not been configured:
+     *   GHL_GED_ALLOWED_ORG_SLUG=<portal.orgs.slug for Profiletest.ai>
+     *
+     * This deliberately fails closed: when neither value is configured, GED
+     * submissions are still scored and reported, but none are sent to GHL.
+     */
+    const gedGhlAllowedOrgId = normalizeText(
+      process.env.GHL_GED_ALLOWED_ORG_ID
+    );
+    const gedGhlAllowedOrgSlug = normalizeSlug(
+      process.env.GHL_GED_ALLOWED_ORG_SLUG
+    );
+
+    const isAllowedGedGhlOrg = gedGhlAllowedOrgId
+      ? String(taker.org_id) === gedGhlAllowedOrgId
+      : Boolean(gedGhlAllowedOrgSlug && orgSlug === gedGhlAllowedOrgSlug);
+
     let ghlSyncResult: GhlSyncResult | null = null;
-    if (isGedTest) {
+    if (isGedTest && isAllowedGedGhlOrg) {
       ghlSyncResult = await syncGedToGhl({
         taker,
         token,
@@ -2850,6 +2878,23 @@ export async function POST(
       } else if (ghlSyncResult.skipped) {
         console.warn("[submit] GED GHL sync skipped", ghlSyncResult);
       }
+    } else if (isGedTest) {
+      ghlSyncResult = {
+        ok: true,
+        skipped: true,
+        message:
+          gedGhlAllowedOrgId || gedGhlAllowedOrgSlug
+            ? "Skipped GED GHL sync because the submission belongs to a different organisation."
+            : "Skipped GED GHL sync because GHL_GED_ALLOWED_ORG_ID or GHL_GED_ALLOWED_ORG_SLUG is not configured.",
+      };
+
+      console.info("[submit] GED GHL sync ring-fenced", {
+        taker_id: taker.id,
+        submission_org_id: String(taker.org_id),
+        submission_org_slug: orgSlug || null,
+        allowed_org_id: gedGhlAllowedOrgId || null,
+        allowed_org_slug: gedGhlAllowedOrgSlug || null,
+      });
     }
 
     let takerEmailResult: any = null;

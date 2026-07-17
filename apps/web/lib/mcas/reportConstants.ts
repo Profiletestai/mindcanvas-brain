@@ -108,39 +108,52 @@ export const MCAS_VERTICAL_LABELS: Record<
   McasCareerVerticalCode,
   {
     code: McasCareerVerticalCode;
+    displayCode: string;
     label: string;
     shortDescription: string;
   }
 > = {
   V1: {
     code: "V1",
-    label: "Entry / Foundational",
-    shortDescription: "Task-level execution with guided delivery.",
+    displayCode: "CV1",
+    label: "Apprentice or Student",
+    shortDescription:
+      "An entry-level or learning stage where work is guided closely, responsibilities are clearly defined, and progress comes through structured practice, coaching, and dependable habit-building.",
   },
   V2: {
     code: "V2",
-    label: "Developing",
-    shortDescription: "Growing ownership with structured guidance.",
+    displayCode: "CV2",
+    label: "Workforce Contributor",
+    shortDescription:
+      "A reliable individual-contributor stage where the focus is on consistent output, growing ownership, and delivering work independently within a defined role or function.",
   },
   V3: {
     code: "V3",
-    label: "Established",
-    shortDescription: "Independent delivery and cross-team coordination.",
+    displayCode: "CV3",
+    label: "Team Lead or Junior Management",
+    shortDescription:
+      "A first-line leadership stage where responsibility expands into leading projects, coordinating people or workflows, and balancing personal delivery with supervision of others.",
   },
   V4: {
     code: "V4",
-    label: "Senior Scope",
-    shortDescription: "Strategic influence and broader accountability.",
+    displayCode: "CV4",
+    label: "Middle Management",
+    shortDescription:
+      "A broader management stage where the role includes leading functions or teams, balancing multiple priorities, managing resources, and making decisions across a wider operational scope.",
   },
   V5: {
     code: "V5",
-    label: "Strategic Leadership",
-    shortDescription: "Organisation-wide direction and accountability.",
+    displayCode: "CV5",
+    label: "Senior Management",
+    shortDescription:
+      "A senior leadership stage with accountability across larger functions or business units, requiring strategic judgement, cross-functional leadership, and responsibility for broader organisational outcomes.",
   },
   V6: {
     code: "V6",
-    label: "Executive / Enterprise",
-    shortDescription: "Enterprise leadership and long-horizon strategy.",
+    displayCode: "CV6",
+    label: "Executive Leadership",
+    shortDescription:
+      "An executive stage focused on enterprise direction, long-range decision-making, organisational stewardship, and leading at scale with the highest level of consequence and accountability.",
   },
 };
 
@@ -158,4 +171,12 @@ export function getCoreLabel(code: McasCoreCode) {
 
 export function getVerticalLabel(code: McasCareerVerticalCode) {
   return MCAS_VERTICAL_LABELS[code]?.label ?? code;
+}
+
+export function getCareerVerticalDisplayCode(code: McasCareerVerticalCode) {
+  return MCAS_VERTICAL_LABELS[code]?.displayCode ?? code.replace(/^V/, "CV");
+}
+
+export function replaceCareerVerticalCodesForDisplay(value: string) {
+  return value.replace(/\bV([1-6])\b/g, "CV$1");
 }

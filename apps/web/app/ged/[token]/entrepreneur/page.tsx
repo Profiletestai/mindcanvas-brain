@@ -108,12 +108,27 @@ const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
   FIELD: "Field",
 };
 
+const PERSONALITY_FREQUENCY_LABELS: Record<PersonalityKey, string> = {
+  FIRE: "Fire (A)",
+  FLOW: "Flow (B)",
+  FORM: "Form (C)",
+  FIELD: "Field (D)",
+};
+
 const MINDSET_LABELS: Record<MindsetKey, string> = {
   ORIGIN: "Origin",
   MOMENTUM: "Momentum",
   VECTOR: "Vector",
   ORBIT: "Orbit",
   QUANTUM: "Quantum",
+};
+
+const MINDSET_LEVELS: Record<MindsetKey, number> = {
+  ORIGIN: 1,
+  MOMENTUM: 2,
+  VECTOR: 3,
+  ORBIT: 4,
+  QUANTUM: 5,
 };
 
 const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
@@ -152,6 +167,14 @@ const SECTION_ICON_PATHS = {
 
 const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
 const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
+const MINDSET_LAYER_IMAGE_PATHS: Record<MindsetKey, string> = {
+  ORIGIN: `${REPORT_ICON_BASE}/mindset-layer/mindset-origin.png`,
+  MOMENTUM: `${REPORT_ICON_BASE}/mindset-layer/mindset-momentum.png`,
+  VECTOR: `${REPORT_ICON_BASE}/mindset-layer/mindset-vector.png`,
+  ORBIT: `${REPORT_ICON_BASE}/mindset-layer/mindset-orbit.png`,
+  QUANTUM: `${REPORT_ICON_BASE}/mindset-layer/mindset-quantum.png`,
+};
+const GED_FRAMEWORK_GRAPHIC = `${REPORT_ICON_BASE}/section-icons/ged-framework.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
 
 const BUSINESS_CONTEXT_ICON_PATHS = {
@@ -413,7 +436,7 @@ function SectionMarker({
         <h2
           className={[
             "mt-1 font-extrabold tracking-tight",
-            compact ? "text-xl leading-7" : "text-2xl md:text-[2rem]",
+            compact ? "text-xl leading-7" : "text-xl leading-7",
             dark ? "text-white" : "text-[#111827]",
           ].join(" ")}
         >
@@ -797,7 +820,7 @@ function PersonalityFrequencyPanel({
                 style={{ backgroundColor: displayColors[item.key] }}
               />
               <span className="flex-1 font-semibold text-[#1a1a1a]">
-                {PERSONALITY_LABELS[item.key]}
+                {PERSONALITY_FREQUENCY_LABELS[item.key]}
               </span>
               <span className="tabular-nums font-bold text-[#4b5563]">
                 {Math.round(item.value)}%
@@ -811,10 +834,10 @@ function PersonalityFrequencyPanel({
         {data.map((item) => (
           <div
             key={item.key}
-            className="grid grid-cols-[42px_minmax(0,1fr)_30px] items-center gap-3 text-xs"
+            className="grid grid-cols-[64px_minmax(0,1fr)_34px] items-center gap-3 text-xs"
           >
             <span className="font-semibold text-[#1a1a1a]">
-              {PERSONALITY_LABELS[item.key]}
+              {PERSONALITY_FREQUENCY_LABELS[item.key]}
             </span>
             <div className="h-2.5 overflow-hidden rounded bg-[#e5e7eb]">
               <div
@@ -1011,8 +1034,17 @@ function QuantumProfileVisual({
 
 function QuantumProfileDiagram() {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:p-5 md:p-7">
-      <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-white sm:min-h-[360px] md:min-h-[460px]">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 md:p-7">
+      <p className="max-w-6xl text-sm leading-6 text-[#1f2937] md:text-[0.95rem] md:leading-7">
+        Your Quantum Profile is the single combined result this whole report is
+        built around — your Personality Layer and Mindset Layer working
+        together. What it shows: the four archetypes that make up every Quantum
+        Profile, and where you currently sit among them. How to use it: treat it
+        as your starting frame of reference, not a fixed label — the sections
+        that follow unpack what it actually means in practice.
+      </p>
+
+      <div className="mt-6 flex min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-white sm:min-h-[360px] md:min-h-[460px]">
         <AssetIcon
           src={UNDERSTAND_QUANTUM_PROFILE_GRAPH}
           alt="Quantum Profile diagram"
@@ -1143,6 +1175,249 @@ function ReportIndex({
         </div>
       </div>
     </aside>
+  );
+}
+
+
+
+
+function GedFrameworkSection({
+  canonicalProfile,
+  primaryPersonalityLabel,
+  primaryMindsetLabel,
+}: {
+  canonicalProfile: string;
+  primaryPersonalityLabel: string;
+  primaryMindsetLabel: string;
+}) {
+  const personalityStyles = [
+    {
+      key: "fire",
+      label: "Fire",
+      description: "Fast, bold, decisive, driven",
+      color: "#f97316",
+      background: "#fff3ea",
+    },
+    {
+      key: "flow",
+      label: "Flow",
+      description: "Relational, intuitive, collaborative",
+      color: "#0ea5e9",
+      background: "#e8f6ff",
+    },
+    {
+      key: "form",
+      label: "Form",
+      description: "Structured, organised, consistent",
+      color: "#22c55e",
+      background: "#eafaf0",
+    },
+    {
+      key: "field",
+      label: "Field",
+      description: "Analytical, precise, strategic",
+      color: "#a855f7",
+      background: "#f4eaff",
+    },
+  ];
+
+  const mindsetStages = [
+    {
+      key: "origin",
+      label: "Origin (L1)",
+      description: "Early stage, inconsistent, unclear.",
+    },
+    {
+      key: "momentum",
+      label: "Momentum (L2)",
+      description: "Some traction, inconsistent growth.",
+    },
+    {
+      key: "vector",
+      label: "Vector (L3)",
+      description: "Clear direction, building systems.",
+    },
+    {
+      key: "orbit",
+      label: "Orbit (L4)",
+      description: "Stable business, leverage and team.",
+    },
+    {
+      key: "quantum",
+      label: "Quantum (L5)",
+      description: "Scaled strategy, partnerships, expansion.",
+    },
+  ];
+
+  return (
+    <section
+      data-ged-pdf-page
+      id="ged-framework"
+      className="scroll-mt-6 rounded-3xl border border-white/10 bg-[#0c1d1a] p-5 shadow-2xl shadow-black/20 md:p-7"
+    >
+      <SectionMarker
+        icon={SECTION_ICON_PATHS.understand_quantum_profile}
+        eyebrow="Introducing the GED Framework"
+        title="What the Growth Engine Diagnostic measures, before you read your result"
+        body="The GED connects two layers of your operating pattern into one combined result. Rather than reducing you to a single label, it shows the personality wiring you naturally lead with, the stage your business has actually reached, and the specific pattern that emerges when the two meet."
+        dark
+        compact
+      />
+
+      <div className="mt-5 rounded-2xl bg-white p-4 text-[#0c1d1a] md:p-6">
+        <p className="text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
+          The GED — the Growth Engine Diagnostic — connects two layers of your
+          operating pattern into one combined result. Rather than reducing you to
+          a single label, it shows the personality wiring you naturally lead
+          with, the stage your business has actually reached, and the specific
+          pattern that emerges when the two meet. Read all three together — not
+          the headline result alone — before acting on anything in this report.
+        </p>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)] lg:items-center">
+          <div className="flex min-h-[320px] items-center justify-center rounded-2xl bg-white p-2 md:min-h-[390px]">
+            <AssetIcon
+              src={GED_FRAMEWORK_GRAPHIC}
+              alt="Growth Engine Diagnostic framework"
+              className="h-auto max-h-[380px] w-full object-contain"
+            />
+          </div>
+
+          <div className="grid gap-4">
+            {[
+              {
+                number: "01",
+                title: "Personality Layer",
+                body: "Shows which of the four operating styles — Fire, Flow, Form or Field — you naturally lead with in how you work and decide.",
+              },
+              {
+                number: "02",
+                title: "Mindset Layer",
+                body: "Places your business against five stages of growth capability, from early Origin through to peak Quantum.",
+              },
+              {
+                number: "03",
+                title: "Quantum Profile",
+                body: "Combines both into your result — the lens the rest of this report is built from.",
+              },
+            ].map((item) => (
+              <article
+                key={item.number}
+                className="min-h-[116px] rounded-xl bg-[#f3faf6] p-5"
+              >
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#34d399] text-[0.62rem] font-black text-[#0c1d1a]">
+                  {item.number}
+                </span>
+                <h3 className="mt-3 text-sm font-extrabold text-[#0c1d1a] md:text-base">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-[#4b5563] md:text-sm">
+                  {item.body}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <h3 className="text-base font-extrabold text-[#0c1d1a] md:text-lg">
+            What the Personality Layer stands for
+          </h3>
+          <p className="mt-2 text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
+            This layer predicts your communication style, decision-making
+            pattern, what motivates you, what overwhelms you, and what you trust
+            or distrust.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {personalityStyles.map((style) => (
+              <article
+                key={style.label}
+                className="min-h-[118px] rounded-xl p-4 text-center"
+                style={{ backgroundColor: style.background }}
+              >
+                <div
+                  className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: style.color }}
+                >
+                  <AssetIcon
+                    src={`${REPORT_ICON_BASE}/4-profile-icons/${style.key}.png`}
+                    alt=""
+                    className="h-7 w-7 object-contain"
+                  />
+                </div>
+                <h4 className="mt-3 text-sm font-extrabold text-[#0c1d1a]">
+                  {style.label}
+                </h4>
+                <p className="mt-1 text-xs leading-4 text-[#4b5563]">
+                  {style.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <h3 className="text-base font-extrabold text-[#0c1d1a] md:text-lg">
+            The 5 Mindset Stages
+          </h3>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {mindsetStages.map((stage) => (
+              <article
+                key={stage.label}
+                className="min-h-[132px] rounded-xl bg-[#f3faf6] p-4 text-left"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#05231f]">
+                  <AssetIcon
+                    src={`${REPORT_ICON_BASE}/quantum-profile-matrix/${stage.key}.png`}
+                    alt=""
+                    className="h-5 w-5 object-contain"
+                  />
+                </div>
+                <h4 className="mt-3 text-sm font-extrabold text-[#31554a]">
+                  {stage.label}
+                </h4>
+                <p className="mt-2 text-xs leading-5 text-[#31554a]">
+                  {stage.description}
+                </p>
+              </article>
+            ))}
+          </div>
+
+          <p className="mt-4 text-xs leading-5 text-[#4b5563] md:text-sm md:leading-6">
+            This layer reveals your readiness to invest, your level of business
+            sophistication, your capability to implement, and your current
+            strategic gaps and bottlenecks.
+          </p>
+        </div>
+
+        <div className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="text-sm leading-6 text-[#14532d]">
+            Reading the percentages in this report: the number next to each layer
+            shows how your answers are distributed across all options, not a
+            score out of 100. Your highest share is your primary result even at a
+            modest percentage — a low percentage elsewhere means that style or
+            stage shows up less often for you, not that it is absent.
+          </p>
+          <p className="mt-4 text-sm font-bold text-[#0c1d1a]">
+            Your Quantum Profile = Personality + Mindset
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+            There are 20 possible combinations across the 4×5 matrix. Yours is{" "}
+            <strong>{canonicalProfile}</strong> — the combination created by
+            your <strong>{primaryPersonalityLabel}</strong> operating style and
+            your <strong>{primaryMindsetLabel}</strong> growth stage.
+          </p>
+          <p className="mt-4 text-xs leading-5 text-[#6b7280]">
+            Methodology: results are derived from responses to the Growth Engine
+            Diagnostic and reflect observable work patterns, not fixed
+            personality traits. Use this report alongside your own business
+            context and professional advice — never as a standalone strategic
+            decision.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1412,7 +1687,8 @@ export default function GedEntrepreneurStrategicReportPage({
   }));
 
   const indexItems: ReportIndexItem[] = [
-    { href: "#quantum-profile-matrix", label: "Buyers Persona Matrix" },
+    { href: "#quantum-profile-matrix", label: "Growth Engine Profile Matrix" },
+    { href: "#ged-framework", label: "Introducing the GED Framework" },
     { href: "#personality-layer", label: "Your Personality layer" },
     {
       href: "#understand-quantum-profile",
@@ -1450,6 +1726,9 @@ export default function GedEntrepreneurStrategicReportPage({
   const mindsetStageCopy = primaryMindset
     ? MINDSET_STAGE_COPY[primaryMindset]
     : MINDSET_STAGE_COPY.VECTOR;
+  const mindsetLayerImage = primaryMindset
+    ? MINDSET_LAYER_IMAGE_PATHS[primaryMindset]
+    : MINDSET_LAYER_INFOGRAPHIC;
 
   const onePageIconBase = `${REPORT_ICON_BASE}/one-page-quantum-section`;
   const onePageIcons = {
@@ -1632,11 +1911,11 @@ export default function GedEntrepreneurStrategicReportPage({
         ref={reportRef}
         className="relative mx-auto max-w-[1440px] px-3 py-4 md:px-5 md:py-6"
       >
-        <header
-          data-ged-pdf-page
-          className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7"
-        >
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,190px))] xl:items-center">
+        <div data-ged-pdf-page className="space-y-5">
+          <header
+            className="overflow-hidden rounded-3xl border border-white/10 bg-[#17403a] px-5 py-5 text-white shadow-2xl shadow-black/25 md:px-8 md:py-7"
+          >
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_repeat(4,minmax(0,190px))] xl:items-center">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-1.5">
                 <img
@@ -1658,7 +1937,7 @@ export default function GedEntrepreneurStrategicReportPage({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 xl:contents">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:contents">
               <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
                 <p className="text-[0.65rem] text-white/55">Prepared for</p>
                 <p className="mt-1 truncate text-sm font-bold">{name || "—"}</p>
@@ -1671,14 +1950,34 @@ export default function GedEntrepreneurStrategicReportPage({
                 <p className="text-[0.65rem] text-white/55">Framework</p>
                 <p className="mt-1 text-sm font-bold">{canonicalProfile}</p>
               </div>
+              <div className="rounded-2xl border border-white/15 bg-black/5 p-3">
+                <p className="text-[0.65rem] text-white/55">Report actions</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={downloading}
+                    className="inline-flex h-8 items-center justify-center rounded-md bg-[#34D399] px-3 text-xs font-bold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {downloading ? "Preparing…" : "Download PDF"}
+                  </button>
+                  <a
+                    href={nextStepsHref || "#recommended-next-steps"}
+                    target={nextStepsHref ? "_blank" : undefined}
+                    rel={nextStepsHref ? "noopener noreferrer" : undefined}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-white/30 px-3 text-xs font-bold text-white transition hover:bg-white/10"
+                  >
+                    Next steps
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
-        </header>
+          </header>
 
-        <section
-          data-ged-pdf-page
-          className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9"
-        >
+          <section
+            className="overflow-hidden rounded-3xl border border-white/10 bg-[#0c1d1a] p-6 text-white shadow-2xl shadow-black/25 md:p-9"
+          >
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:gap-10">
             <div>
               <h2 className="text-4xl font-extrabold tracking-tight text-white md:text-5xl">
@@ -1695,7 +1994,7 @@ export default function GedEntrepreneurStrategicReportPage({
               <div className="mt-9 space-y-8">
                 <div>
                   <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
-                    Your Personality Layer
+                    Personality Layer Meaning
                   </p>
                   <p className="mt-2 max-w-[43rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
                     How you naturally think, act and make decisions. This is
@@ -1706,7 +2005,7 @@ export default function GedEntrepreneurStrategicReportPage({
 
                 <div>
                   <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.18em] text-emerald-300">
-                    Your Mindset Layer
+                    Mindset Layer Meaning
                   </p>
                   <p className="mt-2 max-w-[43rem] text-sm leading-6 text-slate-400 md:text-[0.95rem]">
                     Where your business is right now and what stage of growth
@@ -1735,7 +2034,8 @@ export default function GedEntrepreneurStrategicReportPage({
               </p>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
 
         <section
           data-ged-pdf-page
@@ -2004,7 +2304,7 @@ export default function GedEntrepreneurStrategicReportPage({
                       style={{ backgroundColor: FREQUENCY_COLORS[item.key] }}
                     />
                     <span className="flex-1 text-slate-200">
-                      {PERSONALITY_LABELS[item.key]}
+                      {PERSONALITY_FREQUENCY_LABELS[item.key]}
                     </span>
                     <span className="w-10 text-right tabular-nums text-slate-200">
                       {Math.round(item.value)}%
@@ -2027,11 +2327,11 @@ export default function GedEntrepreneurStrategicReportPage({
             <div className="mt-5 space-y-3">
               {(
                 [
-                  "ORIGIN",
-                  "MOMENTUM",
-                  "VECTOR",
-                  "ORBIT",
                   "QUANTUM",
+                  "ORBIT",
+                  "VECTOR",
+                  "MOMENTUM",
+                  "ORIGIN",
                 ] as MindsetKey[]
               ).map((key) => {
                 const value = clampPercent(mindsetPercentages[key] || 0);
@@ -2040,7 +2340,7 @@ export default function GedEntrepreneurStrategicReportPage({
                   <div key={key}>
                     <div className="flex items-center justify-between gap-4 text-xs md:text-sm">
                       <span className="text-slate-200">
-                        {MINDSET_LABELS[key]}
+                        {MINDSET_LABELS[key]} (L{MINDSET_LEVELS[key]})
                       </span>
                       <span className="tabular-nums text-slate-200">
                         {value}%
@@ -2058,7 +2358,6 @@ export default function GedEntrepreneurStrategicReportPage({
             </div>
           </article>
         </section>
-
         <div className="mt-5 grid gap-5 xl:grid-cols-[240px_minmax(0,1fr)]">
           <ReportIndex
             items={indexItems}
@@ -2075,7 +2374,7 @@ export default function GedEntrepreneurStrategicReportPage({
             >
               <SectionMarker
                 icon={SECTION_ICON_PATHS.quantum_profile_matrix}
-                eyebrow="Quantum Profile Matrix"
+                eyebrow="Growth Engine Profile Matrix"
                 title="Where your buyer frequency meets your mindset level"
                 body="Each cell represents a different Quantum buyer persona. Your primary pattern is highlighted — this is where your emotional wiring and current growth stage meet."
                 dark
@@ -2091,12 +2390,18 @@ export default function GedEntrepreneurStrategicReportPage({
                   secondaryMindset={result.secondary_mindset}
                   personalityPercentages={personalityPercentages}
                   mindsetPercentages={mindsetPercentages}
-                  eyebrow="Quantum Source Code"
-                  title="Quantum Profile Matrix"
-                  description="This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (bottom to top). Your combined profile sits at the intersection."
+                  eyebrow=""
+                  title="Growth Engine Profile Matrix"
+                  description="This grid maps your Buyer Frequency Type (left to right) against your Buyer Mindset Level (top to bottom). Your combined profile sits at the intersection."
                 />
               </div>
             </section>
+
+            <GedFrameworkSection
+              canonicalProfile={canonicalProfile}
+              primaryPersonalityLabel={primaryPersonalityLabel}
+              primaryMindsetLabel={primaryMindsetLabel}
+            />
 
             <section
               data-ged-pdf-page
@@ -2138,12 +2443,21 @@ export default function GedEntrepreneurStrategicReportPage({
                 icon={SECTION_ICON_PATHS.personality_layer}
                 eyebrow="Your Personality Layer"
                 title="How you show up emotionally & behaviourally"
-                body="Your personality layer is your emotional wiring and energetic pattern. It does not change overnight, which is why it is such a powerful anchor for business design."
                 dark
                 compact
               />
 
               <div className="mt-6 rounded-2xl bg-[#f9f8f6] p-4 sm:p-5 md:p-6">
+                <p className="mb-5 max-w-6xl text-sm leading-6 text-[#1f2937] md:text-[0.95rem] md:leading-7">
+                  Your Personality Layer is your emotional wiring — the way you
+                  naturally think, communicate and make decisions. It&apos;s largely
+                  stable over time, which is why it&apos;s such a reliable anchor.
+                  What it shows: your dominant style, what energises you, and
+                  what quietly drains your effectiveness. How to use it: read it
+                  as a mirror on your instincts, not a constraint — it explains
+                  your default mode, not your ceiling.
+                </p>
+
                 <div className="grid gap-5 lg:grid-cols-[0.9fr_1fr] lg:items-stretch">
                   <PersonalityFrequencyPanel
                     data={frequencyData}
@@ -2197,6 +2511,7 @@ export default function GedEntrepreneurStrategicReportPage({
                 icon={SECTION_ICON_PATHS.mindset_layer}
                 eyebrow="Your Mindset Layer"
                 title="Where you are in your growth journey"
+                body="Your Mindset Layer reflects where your business actually stands today — not your ambition for it, but your current operating reality. What it shows: your growth stage, and how your focus and energy are currently distributed across all five stages. How to use it: this layer shifts as you grow, so it is worth revisiting periodically — it is a snapshot of now, not a permanent stage."
                 dark
                 compact
               />
@@ -2226,7 +2541,7 @@ export default function GedEntrepreneurStrategicReportPage({
                                   isPrimary ? "font-bold" : "font-medium"
                                 }
                               >
-                                {MINDSET_LABELS[key]}
+                                {MINDSET_LABELS[key]} (L{MINDSET_LEVELS[key]})
                               </span>
                               <span className="tabular-nums font-medium">
                                 {value}%
@@ -2246,8 +2561,8 @@ export default function GedEntrepreneurStrategicReportPage({
 
                   <div className="relative min-h-[240px] overflow-hidden rounded-xl bg-[#f9f8f6] sm:min-h-[300px] xl:min-h-[330px]">
                     <AssetIcon
-                      src={MINDSET_LAYER_INFOGRAPHIC}
-                      alt="Quantum mindset growth-stage infographic"
+                      src={mindsetLayerImage}
+                      alt={`${primaryMindsetLabel} mindset growth-stage infographic`}
                       className="absolute inset-0 h-full w-full object-contain p-2 sm:p-3"
                     />
                   </div>
@@ -3387,7 +3702,7 @@ export default function GedEntrepreneurStrategicReportPage({
                 <p className="mt-5 text-[0.68rem] font-extrabold uppercase tracking-[0.22em] text-[#34D399]">
                   Your Recommended Next Step
                 </p>
-                <h2 className="mt-3 max-w-4xl text-3xl font-extrabold tracking-tight text-white md:text-[2.2rem] md:leading-[1.12]">
+                <h2 className="mt-3 max-w-4xl text-2xl font-extrabold tracking-tight text-white md:text-[1.65rem] md:leading-[1.15]">
                   {diagnostic.recommended_next_step.title ||
                     "Your Growth Engine Is Ready to Scale."}
                 </h2>
