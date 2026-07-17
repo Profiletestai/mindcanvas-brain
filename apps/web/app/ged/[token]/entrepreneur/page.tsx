@@ -436,7 +436,7 @@ function SectionMarker({
         <h2
           className={[
             "mt-1 font-extrabold tracking-tight",
-            compact ? "text-xl leading-7" : "text-2xl md:text-[2rem]",
+            compact ? "text-xl leading-7" : "text-xl leading-7",
             dark ? "text-white" : "text-[#111827]",
           ].join(" ")}
         >
@@ -3702,7 +3702,7 @@ export default function GedEntrepreneurStrategicReportPage({
                 <p className="mt-5 text-[0.68rem] font-extrabold uppercase tracking-[0.22em] text-[#34D399]">
                   Your Recommended Next Step
                 </p>
-                <h2 className="mt-3 max-w-4xl text-3xl font-extrabold tracking-tight text-white md:text-[2.2rem] md:leading-[1.12]">
+                <h2 className="mt-3 max-w-4xl text-2xl font-extrabold tracking-tight text-white md:text-[1.65rem] md:leading-[1.15]">
                   {diagnostic.recommended_next_step.title ||
                     "Your Growth Engine Is Ready to Scale."}
                 </h2>

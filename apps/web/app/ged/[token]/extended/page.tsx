@@ -310,7 +310,14 @@ const PERSONALITY_TONES: Record<PersonalityKey, string> = {
 
 const TONE_STYLE: Record<
   Tone,
-  { label: string; top: string; panel: string; border: string; icon: string; dot: string }
+  {
+    label: string;
+    top: string;
+    panel: string;
+    border: string;
+    icon: string;
+    dot: string;
+  }
 > = {
   emerald: {
     label: "text-emerald-600",
@@ -370,7 +377,10 @@ const TONE_STYLE: Record<
   },
 };
 
-function safeText(value: unknown, fallback = "Not available for this profile."): string {
+function safeText(
+  value: unknown,
+  fallback = "Not available for this profile.",
+): string {
   const text = typeof value === "string" ? value.trim() : "";
   return text || fallback;
 }
@@ -407,7 +417,10 @@ function cleanProfileLabel(value: unknown): string {
 }
 
 function getName(taker: TakerRow | null | undefined): string {
-  const name = [taker?.first_name, taker?.last_name].filter(Boolean).join(" ").trim();
+  const name = [taker?.first_name, taker?.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   return name || taker?.email?.trim() || "Buyer";
 }
 
@@ -415,7 +428,9 @@ function sentence(value: unknown, maxLength = 180): string {
   const text = safeText(value, "").replace(/\s+/g, " ").trim();
   if (!text) return "Not recorded";
   const first = text.match(/^(.+?[.!?])(?:\s|$)/)?.[1] || text;
-  return first.length > maxLength ? `${first.slice(0, maxLength - 1).trim()}…` : first;
+  return first.length > maxLength
+    ? `${first.slice(0, maxLength - 1).trim()}…`
+    : first;
 }
 
 function textItems(value: unknown, limit = 8): string[] {
@@ -464,7 +479,8 @@ function firstAction(steps: GedEngineDiagnostic["action_plan"]): string {
 
 function compactDecisionStyle(value: unknown): string {
   const text = safeText(value, "").toLowerCase();
-  if (/instant|immediate|fast decision|quick decision|decisive/.test(text)) return "Instant";
+  if (/instant|immediate|fast decision|quick decision|decisive/.test(text))
+    return "Instant";
   if (/evidence|proof|data|logic/.test(text)) return "Evidence-led";
   if (/relationship|consensus|collaborative/.test(text)) return "Collaborative";
   if (/careful|deliberate|considered/.test(text)) return "Considered";
@@ -473,9 +489,12 @@ function compactDecisionStyle(value: unknown): string {
 
 function compactBuyerMode(value: unknown): string {
   const text = safeText(value, "").toLowerCase();
-  if (/scale|expansion|leverage|ecosystem/.test(text)) return "Buys scale, not improvement";
-  if (/clarity|certainty|confidence|safety/.test(text)) return "Buys confidence and clarity";
-  if (/strategy|advisory|framework/.test(text)) return "Buys strategic leverage";
+  if (/scale|expansion|leverage|ecosystem/.test(text))
+    return "Buys scale, not improvement";
+  if (/clarity|certainty|confidence|safety/.test(text))
+    return "Buys confidence and clarity";
+  if (/strategy|advisory|framework/.test(text))
+    return "Buys strategic leverage";
   return "Buys outcomes, not tactics";
 }
 
@@ -487,11 +506,19 @@ function splitFlags(value: unknown): { green: string[]; red: string[] } {
 
   for (const item of all) {
     const lower = item.toLowerCase();
-    if (lower.includes("red flag") || lower.includes("pause") || lower.includes("weaker fit")) {
+    if (
+      lower.includes("red flag") ||
+      lower.includes("pause") ||
+      lower.includes("weaker fit")
+    ) {
       side = "red";
       continue;
     }
-    if (lower.includes("green flag") || lower.includes("stronger fit") || lower.includes("strong fit")) {
+    if (
+      lower.includes("green flag") ||
+      lower.includes("stronger fit") ||
+      lower.includes("strong fit")
+    ) {
       side = "green";
       continue;
     }
@@ -500,7 +527,10 @@ function splitFlags(value: unknown): { green: string[]; red: string[] } {
   }
 
   if (!red.length && green.length > 3) {
-    return { green: green.slice(0, Math.ceil(green.length / 2)), red: green.slice(Math.ceil(green.length / 2)) };
+    return {
+      green: green.slice(0, Math.ceil(green.length / 2)),
+      red: green.slice(Math.ceil(green.length / 2)),
+    };
   }
 
   return { green, red };
@@ -520,12 +550,21 @@ function splitPlaybookBullets(value: string, limit = 8): string[] {
     .split(/(?:\n+|\s+[•✓✔➜▸]\s*|\s+-\s+)/)
     .map((item) => item.replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "").trim())
     .filter(Boolean)
-    .filter((item) => !/^(key insights|example behaviours|when you hear this|if you hear this,? it means|your role)\b/i.test(item));
+    .filter(
+      (item) =>
+        !/^(key insights|example behaviours|when you hear this|if you hear this,? it means|your role)\b/i.test(
+          item,
+        ),
+    );
 
   return uniqueStrings(items).slice(0, limit);
 }
 
-function sliceBetweenHeadings(raw: string, start: RegExp, endings: RegExp[]): string {
+function sliceBetweenHeadings(
+  raw: string,
+  start: RegExp,
+  endings: RegExp[],
+): string {
   const startMatch = start.exec(raw);
   if (!startMatch || startMatch.index == null) return "";
 
@@ -561,39 +600,56 @@ function parsePersonalityLayer(value: unknown): PersonalityLayerView {
 
   const keyHeading = /\bkey\s+insights\s*[:\-–—]?/i;
   const exampleHeading = /\bexample\s+behaviou?rs?\s*[:\-–—]?/i;
-  const listenHeading = /\b(?:when you hear this|if you hear this,? it means)\s*[:\-–—]?/i;
+  const listenHeading =
+    /\b(?:when you hear this|if you hear this,? it means)\s*[:\-–—]?/i;
   const roleHeading = /\byour role\s*[:\-–—]?/i;
 
-  const headingPositions = [keyHeading, exampleHeading, listenHeading, roleHeading]
+  const headingPositions = [
+    keyHeading,
+    exampleHeading,
+    listenHeading,
+    roleHeading,
+  ]
     .map((pattern) => {
       const match = pattern.exec(raw);
       return match?.index ?? -1;
     })
     .filter((index) => index >= 0);
 
-  const firstHeading = headingPositions.length ? Math.min(...headingPositions) : raw.length;
+  const firstHeading = headingPositions.length
+    ? Math.min(...headingPositions)
+    : raw.length;
   const introductoryBlock = raw.slice(0, firstHeading).trim();
 
-  const traitsMarker = /(?:they are|they tend to be|they are often|key traits)\s*:/i;
+  const traitsMarker =
+    /(?:they are|they tend to be|they are often|key traits)\s*:/i;
   const traitsMatch = traitsMarker.exec(introductoryBlock);
-  const overview = traitsMatch?.index != null
-    ? introductoryBlock.slice(0, traitsMatch.index).trim()
-    : sentence(introductoryBlock, 330);
+  const overview =
+    traitsMatch?.index != null
+      ? introductoryBlock.slice(0, traitsMatch.index).trim()
+      : sentence(introductoryBlock, 330);
   const traits = traitsMatch
-    ? splitPlaybookBullets(introductoryBlock.slice(traitsMatch.index + traitsMatch[0].length), 6)
+    ? splitPlaybookBullets(
+        introductoryBlock.slice(traitsMatch.index + traitsMatch[0].length),
+        6,
+      )
     : [];
 
   const keyInsights = splitPlaybookBullets(
-    sliceBetweenHeadings(raw, keyHeading, [exampleHeading, listenHeading, roleHeading]),
-    5
+    sliceBetweenHeadings(raw, keyHeading, [
+      exampleHeading,
+      listenHeading,
+      roleHeading,
+    ]),
+    5,
   );
   const exampleBehaviours = splitPlaybookBullets(
     sliceBetweenHeadings(raw, exampleHeading, [listenHeading, roleHeading]),
-    6
+    6,
   );
   const listenFor = splitPlaybookBullets(
     sliceBetweenHeadings(raw, listenHeading, [roleHeading]),
-    3
+    3,
   );
   const role = sliceBetweenHeadings(raw, roleHeading, []);
 
@@ -606,7 +662,6 @@ function parsePersonalityLayer(value: unknown): PersonalityLayerView {
     role,
   };
 }
-
 
 function cleanStructuredPlaybookCopy(value: unknown): string {
   return safeText(value, "")
@@ -631,7 +686,7 @@ function structuredListItems(value: unknown, limit = 8): string[] {
       item
         .replace(/^[\s•✓✔✕✗❌➜▸\-–—]+/, "")
         .replace(/^["“]|["”]$/g, "")
-        .trim()
+        .trim(),
     )
     .filter(Boolean);
 
@@ -640,7 +695,10 @@ function structuredListItems(value: unknown, limit = 8): string[] {
 
 function parseMindsetLayer(value: unknown): MindsetLayerView {
   const raw = cleanStructuredPlaybookCopy(value)
-    .replace(/^where they are in (?:their|the) current business journey\.?\s*/i, "")
+    .replace(
+      /^where they are in (?:their|the) current business journey\.?\s*/i,
+      "",
+    )
     .trim();
 
   if (!raw) {
@@ -653,8 +711,10 @@ function parseMindsetLayer(value: unknown): MindsetLayerView {
     };
   }
 
-  const exampleHeading = /\bexample\s+statements?\s+(?:they\s+)?make\s*[:\-–—]?/i;
-  const perceivedHeading = /\bwhat\s+they\s+think\s+the\s+problem\s+is\s*[:\-–—]?/i;
+  const exampleHeading =
+    /\bexample\s+statements?\s+(?:they\s+)?make\s*[:\-–—]?/i;
+  const perceivedHeading =
+    /\bwhat\s+they\s+think\s+the\s+problem\s+is\s*[:\-–—]?/i;
   const realHeading = /\bwhat\s+the\s+real\s+problem\s+is\s*[:\-–—]?/i;
 
   const positions = [exampleHeading, perceivedHeading, realHeading]
@@ -669,17 +729,17 @@ function parseMindsetLayer(value: unknown): MindsetLayerView {
 
   const exampleStatements = structuredListItems(
     sliceBetweenHeadings(raw, exampleHeading, [perceivedHeading, realHeading]),
-    6
+    6,
   );
 
   const perceivedProblems = structuredListItems(
     sliceBetweenHeadings(raw, perceivedHeading, [realHeading]),
-    6
+    6,
   );
 
   const realProblems = structuredListItems(
     sliceBetweenHeadings(raw, realHeading, []),
-    7
+    7,
   );
 
   return {
@@ -697,7 +757,7 @@ function parseCombinedQuantumPattern(
     realWorldExample?: unknown;
     vulnerability?: unknown;
     positioningLine?: unknown;
-  } = {}
+  } = {},
 ): CombinedPatternView {
   const raw = cleanStructuredPlaybookCopy(value);
 
@@ -706,41 +766,67 @@ function parseCombinedQuantumPattern(
       overview: "No combined-pattern narrative is recorded for this profile.",
       realWorldExamples: structuredListItems(fallback.realWorldExample, 6),
       vulnerabilities: structuredListItems(fallback.vulnerability, 6),
-      positioningLine: safeText(fallback.positioningLine, "Use the diagnostic evidence to position the next conversation with clarity."),
+      positioningLine: safeText(
+        fallback.positioningLine,
+        "Use the diagnostic evidence to position the next conversation with clarity.",
+      ),
     };
   }
 
   const realWorldHeading = /\breal\s*world\s*example\b\s*[:\-–—]?/i;
-  const vulnerabilityHeading = /\b(?:their\s+)?vulnerabilit(?:y|ies)\b\s*[:\-–—]?/i;
-  const positioningHeading = /\bpositioning\s+line\s+that\s+works\b\s*[:\-–—]?/i;
+  const vulnerabilityHeading =
+    /\b(?:their\s+)?vulnerabilit(?:y|ies)\b\s*[:\-–—]?/i;
+  const positioningHeading =
+    /\bpositioning\s+line\s+that\s+works\b\s*[:\-–—]?/i;
 
-  const markerPositions = [realWorldHeading, vulnerabilityHeading, positioningHeading]
+  const markerPositions = [
+    realWorldHeading,
+    vulnerabilityHeading,
+    positioningHeading,
+  ]
     .map((pattern) => {
       const match = pattern.exec(raw);
       return match?.index ?? -1;
     })
     .filter((index) => index >= 0);
 
-  const introEnd = markerPositions.length ? Math.min(...markerPositions) : raw.length;
+  const introEnd = markerPositions.length
+    ? Math.min(...markerPositions)
+    : raw.length;
   const overview = raw.slice(0, introEnd).trim() || sentence(raw, 520);
 
-  const realWorldRaw = sliceBetweenHeadings(raw, realWorldHeading, [vulnerabilityHeading, positioningHeading]);
-  const vulnerabilityRaw = sliceBetweenHeadings(raw, vulnerabilityHeading, [positioningHeading]);
+  const realWorldRaw = sliceBetweenHeadings(raw, realWorldHeading, [
+    vulnerabilityHeading,
+    positioningHeading,
+  ]);
+  const vulnerabilityRaw = sliceBetweenHeadings(raw, vulnerabilityHeading, [
+    positioningHeading,
+  ]);
   const positioningRaw = sliceBetweenHeadings(raw, positioningHeading, []);
 
   const realWorldExamples = structuredListItems(realWorldRaw, 6);
   const vulnerabilities = structuredListItems(vulnerabilityRaw, 6);
 
   const fallbackExamples = structuredListItems(fallback.realWorldExample, 6);
-  const fallbackVulnerabilities = structuredListItems(fallback.vulnerability, 6);
+  const fallbackVulnerabilities = structuredListItems(
+    fallback.vulnerability,
+    6,
+  );
 
   return {
     overview,
-    realWorldExamples: realWorldExamples.length ? realWorldExamples : fallbackExamples,
-    vulnerabilities: vulnerabilities.length ? vulnerabilities : fallbackVulnerabilities,
+    realWorldExamples: realWorldExamples.length
+      ? realWorldExamples
+      : fallbackExamples,
+    vulnerabilities: vulnerabilities.length
+      ? vulnerabilities
+      : fallbackVulnerabilities,
     positioningLine: safeText(
       positioningRaw,
-      safeText(fallback.positioningLine, "Use the diagnostic evidence to position the next conversation with clarity.")
+      safeText(
+        fallback.positioningLine,
+        "Use the diagnostic evidence to position the next conversation with clarity.",
+      ),
     ),
   };
 }
@@ -748,15 +834,19 @@ function parseCombinedQuantumPattern(
 function parseCommunicationPlan(
   communicationValue: unknown,
   blockerValue: unknown,
-  microScriptsValue: unknown
+  microScriptsValue: unknown,
 ): CommunicationView {
   const raw = cleanStructuredPlaybookCopy(communicationValue);
 
   const doHeading = /(?:^|\n)\s*do\s*[:\-–—]?/im;
   const dontHeading = /(?:^|\n)\s*(?:don['’]?t|do\s+not|avoid)\s*[:\-–—]?/im;
-  const effectiveHeading = /(?:^|\n)\s*(?:effective\s+lines?|lines?\s+that\s+work)\s*[:\-–—]?/im;
+  const effectiveHeading =
+    /(?:^|\n)\s*(?:effective\s+lines?|lines?\s+that\s+work)\s*[:\-–—]?/im;
 
-  const doRaw = sliceBetweenHeadings(raw, doHeading, [dontHeading, effectiveHeading]);
+  const doRaw = sliceBetweenHeadings(raw, doHeading, [
+    dontHeading,
+    effectiveHeading,
+  ]);
   const dontRaw = sliceBetweenHeadings(raw, dontHeading, [effectiveHeading]);
   const effectiveRaw = sliceBetweenHeadings(raw, effectiveHeading, []);
 
@@ -788,7 +878,7 @@ function parseCommunicationPlan(
 
 function isTrustHeading(value: string): boolean {
   return /^(?:what\s+builds\s+trust|build\s+trust\s+through|break\s+trust\s+through|what\s+breaks\s+trust|effective\s+lines?)\b/i.test(
-    value.trim()
+    value.trim(),
   );
 }
 
@@ -797,11 +887,21 @@ function trustListItems(value: unknown, limit = 6): string[] {
   if (!raw) return [];
 
   const cleaned = raw
-    .replace(/(?:^|\n)\s*(?:what\s+builds\s+trust|build\s+trust\s+through|break\s+trust\s+through|what\s+breaks\s+trust|effective\s+lines?)\s*[:\-–—]?/gim, "\n")
+    .replace(
+      /(?:^|\n)\s*(?:what\s+builds\s+trust|build\s+trust\s+through|break\s+trust\s+through|what\s+breaks\s+trust|effective\s+lines?)\s*[:\-–—]?/gim,
+      "\n",
+    )
     .trim();
 
   const parsed = structuredListItems(cleaned, limit + 2)
-    .map((item) => item.replace(/^(?:build|break)\s+trust\s+(?:with|through)\s*[:\-–—]?\s*/i, "").trim())
+    .map((item) =>
+      item
+        .replace(
+          /^(?:build|break)\s+trust\s+(?:with|through)\s*[:\-–—]?\s*/i,
+          "",
+        )
+        .trim(),
+    )
     .filter((item) => item && !isTrustHeading(item));
 
   return uniqueStrings(parsed).slice(0, limit);
@@ -810,7 +910,7 @@ function trustListItems(value: unknown, limit = 6): string[] {
 function parseTrustPlan(
   trustValue: unknown,
   blockerValue: unknown,
-  microScriptsValue: unknown
+  microScriptsValue: unknown,
 ): TrustPlan {
   const buildItems = trustListItems(trustValue, 6);
   const breakItems = trustListItems(blockerValue, 6);
@@ -829,16 +929,16 @@ function offerFitItems(value: unknown, limit = 6): string[] {
       item
         .replace(
           /^(?:fits?\s+well|best\s+offer\s+fit|does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|avoid)\s*[:\-–—]?\s*/i,
-          ""
+          "",
         )
-        .trim()
+        .trim(),
     )
     .filter(
       (item) =>
         item &&
         !/^(?:fits?\s+well|best\s+offer\s+fit|does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|avoid)$/i.test(
-          item
-        )
+          item,
+        ),
     );
 
   return uniqueStrings(items).slice(0, limit);
@@ -849,7 +949,8 @@ function parseOfferFitPlan(value: unknown): OfferFitPlan {
   if (!raw) return { fitsWell: [], doesNotFit: [] };
 
   const fitsHeading = /\b(?:fits?\s+well|best\s+offer\s+fit)\b\s*[:\-–—]?/i;
-  const doesNotFitHeading = /\b(?:does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|does\s+not\s+suit)\b\s*[:\-–—]?/i;
+  const doesNotFitHeading =
+    /\b(?:does\s+not\s+fit|doesn['’]?t\s+fit|not\s+a\s+fit|does\s+not\s+suit)\b\s*[:\-–—]?/i;
 
   const fitsMatch = fitsHeading.exec(raw);
   const doesNotFitMatch = doesNotFitHeading.exec(raw);
@@ -876,7 +977,10 @@ function parseSaleBlockerPlan(value: unknown): SaleBlockerPlan {
 
   const practiceHeading = /\bwhat\s+this\s+means\s+in\s+practice\b\s*[:\-–—]?/i;
   const practiceMatch = practiceHeading.exec(raw);
-  const blockerRaw = practiceMatch?.index != null ? raw.slice(0, practiceMatch.index).trim() : raw;
+  const blockerRaw =
+    practiceMatch?.index != null
+      ? raw.slice(0, practiceMatch.index).trim()
+      : raw;
   const practice = practiceMatch
     ? raw.slice(practiceMatch.index + practiceMatch[0].length).trim()
     : "";
@@ -884,7 +988,7 @@ function parseSaleBlockerPlan(value: unknown): SaleBlockerPlan {
   const withoutHeading = blockerRaw
     .replace(
       /^(?:what\s+blocks\s+the\s+sale(?:\s+completely)?|complete\s+sale\s+blockers?|sale\s+blockers?)\s*[:\-–—]?\s*/i,
-      ""
+      "",
     )
     .trim();
 
@@ -893,9 +997,9 @@ function parseSaleBlockerPlan(value: unknown): SaleBlockerPlan {
       item
         .replace(
           /^(?:what\s+blocks\s+the\s+sale(?:\s+completely)?|complete\s+sale\s+blockers?|sale\s+blockers?)\s*[:\-–—]?\s*/i,
-          ""
+          "",
         )
-        .trim()
+        .trim(),
     )
     .filter(Boolean);
 
@@ -905,12 +1009,14 @@ function parseSaleBlockerPlan(value: unknown): SaleBlockerPlan {
     .filter(Boolean);
 
   const blockers = uniqueStrings(
-    explicitItems.length > 1 ? explicitItems : titleCaseItems
+    explicitItems.length > 1 ? explicitItems : titleCaseItems,
   ).slice(0, 8);
 
   return {
     blockers,
-    practice: practice || (/[.!?]/.test(withoutHeading) ? sentence(withoutHeading, 520) : ""),
+    practice:
+      practice ||
+      (/[.!?]/.test(withoutHeading) ? sentence(withoutHeading, 520) : ""),
   };
 }
 
@@ -919,7 +1025,7 @@ function parseRealLifeExample(
   fallback: {
     bottleneck?: unknown;
     firstFix?: unknown;
-  } = {}
+  } = {},
 ): RealLifeExampleView {
   const raw = cleanStructuredPlaybookCopy(value)
     .replace(/^real[-\s]?life\s+example\s*[:\-–—]?\s*/i, "")
@@ -952,11 +1058,17 @@ function parseRealLifeExample(
   const meansMatch = meansHeading.exec(raw);
   const roleMatch = roleHeading.exec(raw);
 
-  const firstContentIndex = quoteMatch?.index != null ? quoteMatch.index + quoteMatch[0].length : 0;
+  const firstContentIndex =
+    quoteMatch?.index != null ? quoteMatch.index + quoteMatch[0].length : 0;
   const quoteEndCandidates = [meansMatch?.index, roleMatch?.index]
-    .filter((index): index is number => typeof index === "number" && index >= firstContentIndex)
+    .filter(
+      (index): index is number =>
+        typeof index === "number" && index >= firstContentIndex,
+    )
     .sort((a, b) => a - b);
-  const quoteRaw = raw.slice(firstContentIndex, quoteEndCandidates[0] ?? raw.length).trim();
+  const quoteRaw = raw
+    .slice(firstContentIndex, quoteEndCandidates[0] ?? raw.length)
+    .trim();
 
   const quotedMatch = quoteRaw.match(/[“"]([^”"]{12,700})[”"]/);
   const quote = (
@@ -970,22 +1082,31 @@ function parseRealLifeExample(
     .trim();
 
   const meansRaw = meansMatch
-    ? raw.slice(meansMatch.index + meansMatch[0].length, roleMatch?.index ?? raw.length).trim()
+    ? raw
+        .slice(
+          meansMatch.index + meansMatch[0].length,
+          roleMatch?.index ?? raw.length,
+        )
+        .trim()
     : "";
   const roleRaw = roleMatch
     ? raw.slice(roleMatch.index + roleMatch[0].length).trim()
     : "";
 
   const implications = structuredListItems(meansRaw, 6).filter(
-    (item) => !/^(?:what\s+they\s+might\s+say|this\s+means|your\s+role)$/i.test(item)
+    (item) =>
+      !/^(?:what\s+they\s+might\s+say|this\s+means|your\s+role)$/i.test(item),
   );
 
   const role = uniqueStrings([
     ...structuredListItems(roleRaw, 4),
     ...(roleRaw ? textItems(roleRaw, 4) : []),
-  ]).filter(
-    (item) => !/^(?:what\s+they\s+might\s+say|this\s+means|your\s+role)$/i.test(item)
-  ).slice(0, 4);
+  ])
+    .filter(
+      (item) =>
+        !/^(?:what\s+they\s+might\s+say|this\s+means|your\s+role)$/i.test(item),
+    )
+    .slice(0, 4);
 
   return {
     quote: quote || empty.quote,
@@ -997,7 +1118,9 @@ function parseRealLifeExample(
         ]).slice(0, 5),
     role: role.length
       ? role
-      : (fallback.firstFix ? textItems(fallback.firstFix, 3) : []),
+      : fallback.firstFix
+        ? textItems(fallback.firstFix, 3)
+        : [],
   };
 }
 
@@ -1007,10 +1130,13 @@ function parseDecisionPlan(value: unknown): DecisionView {
     .trim();
 
   const fallback: DecisionView = {
-    overview: raw ? sentence(raw, 360) : "No profile-specific decision guidance is recorded.",
+    overview: raw
+      ? sentence(raw, 360)
+      : "No profile-specific decision guidance is recorded.",
     yesItems: [],
     hesitateItems: [],
-    takeaway: "Use the buyer’s decision logic to frame the conversation at the right level.",
+    takeaway:
+      "Use the buyer’s decision logic to frame the conversation at the right level.",
   };
 
   if (!raw) return fallback;
@@ -1023,11 +1149,17 @@ function parseDecisionPlan(value: unknown): DecisionView {
   const hesitateMatch = hesitateHeading.exec(raw);
   const takeawayMatch = takeawayHeading.exec(raw);
 
-  const firstMarker = [yesMatch?.index, hesitateMatch?.index, takeawayMatch?.index]
+  const firstMarker = [
+    yesMatch?.index,
+    hesitateMatch?.index,
+    takeawayMatch?.index,
+  ]
     .filter((index): index is number => typeof index === "number")
     .sort((a, b) => a - b)[0];
 
-  const overview = (typeof firstMarker === "number" ? raw.slice(0, firstMarker) : raw).trim();
+  const overview = (
+    typeof firstMarker === "number" ? raw.slice(0, firstMarker) : raw
+  ).trim();
 
   const yesRaw = yesMatch
     ? sliceBetweenHeadings(raw, yesHeading, [hesitateHeading, takeawayHeading])
@@ -1035,9 +1167,8 @@ function parseDecisionPlan(value: unknown): DecisionView {
   const hesitateRaw = hesitateMatch
     ? sliceBetweenHeadings(raw, hesitateHeading, [takeawayHeading])
     : "";
-  const takeaway = takeawayMatch?.index != null
-    ? raw.slice(takeawayMatch.index).trim()
-    : "";
+  const takeaway =
+    takeawayMatch?.index != null ? raw.slice(takeawayMatch.index).trim() : "";
 
   const allItems = structuredListItems(raw, 14);
   const yesItems = structuredListItems(yesRaw, 6);
@@ -1049,7 +1180,9 @@ function parseDecisionPlan(value: unknown): DecisionView {
     hesitateItems: hesitateItems.length
       ? hesitateItems
       : allItems.slice(yesItems.length ? yesItems.length : 5, 10),
-    takeaway: takeaway || "Position the offer around the outcome this buyer wants to create, not around incremental fixes.",
+    takeaway:
+      takeaway ||
+      "Position the offer around the outcome this buyer wants to create, not around incremental fixes.",
   };
 }
 
@@ -1084,7 +1217,7 @@ function parseCoreBusinessProblems(value: unknown): CoreBusinessProblem[] {
 
   const parsed: CoreBusinessProblem[] = [];
 
-  for (let index = 0; index < lines.length; ) {
+  for (let index = 0; index < lines.length;) {
     const current = lines[index];
     const next = lines[index + 1];
 
@@ -1127,7 +1260,11 @@ function parseCoreBusinessProblems(value: unknown): CoreBusinessProblem[] {
 function SectionIcon({ file, alt }: { file: string; alt: string }) {
   return (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/40 bg-cyan-400/20 p-2 shadow-inner shadow-cyan-950/20">
-      <img src={`${SECTION_ICON_BASE}/${file}`} alt={alt} className="h-full w-full object-contain" />
+      <img
+        src={`${SECTION_ICON_BASE}/${file}`}
+        alt={alt}
+        className="h-full w-full object-contain"
+      />
     </span>
   );
 }
@@ -1147,9 +1284,17 @@ function SectionHeader({
     <header className="flex gap-4">
       <SectionIcon file={icon} alt="" />
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">{eyebrow}</p>
-        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white md:text-3xl">{title}</h2>
-        {description ? <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">{description}</p> : null}
+        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+          {eyebrow}
+        </p>
+        <h2 className="mt-1 text-base font-extrabold leading-6 text-white md:text-lg">
+          {title}
+        </h2>
+        {description ? (
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">
+            {description}
+          </p>
+        ) : null}
       </div>
     </header>
   );
@@ -1165,7 +1310,10 @@ function PageSection({
   className?: string;
 }) {
   return (
-    <section id={id} className={`scroll-mt-8 rounded-[1.6rem] border border-white/10 bg-[#0c1d1a] p-5 shadow-[0_16px_60px_rgba(0,0,0,0.18)] md:p-7 ${className}`}>
+    <section
+      id={id}
+      className={`scroll-mt-8 rounded-[1.6rem] border border-white/10 bg-[#0c1d1a] p-5 shadow-[0_16px_60px_rgba(0,0,0,0.18)] md:p-7 ${className}`}
+    >
       {children}
     </section>
   );
@@ -1184,11 +1332,19 @@ function InfoCard({
 }) {
   const style = TONE_STYLE[tone];
   return (
-    <article className={`relative overflow-hidden rounded-xl border ${style.border} bg-white p-4 shadow-sm`}>
+    <article
+      className={`relative overflow-hidden rounded-xl border ${style.border} bg-white p-4 shadow-sm`}
+    >
       <div className={`absolute inset-x-0 top-0 h-1 ${style.top}`} />
-      <p className={`text-[10px] font-bold uppercase tracking-[0.16em] ${style.label}`}>{label}</p>
+      <p
+        className={`text-[10px] font-bold uppercase tracking-[0.16em] ${style.label}`}
+      >
+        {label}
+      </p>
       <p className="mt-2 text-base font-extrabold text-slate-950">{value}</p>
-      {detail ? <p className="mt-2 text-xs leading-5 text-slate-600">{detail}</p> : null}
+      {detail ? (
+        <p className="mt-2 text-xs leading-5 text-slate-600">{detail}</p>
+      ) : null}
     </article>
   );
 }
@@ -1210,44 +1366,67 @@ function NarrativeCard({
   const lines = textItems(content);
 
   return (
-    <article className={`relative overflow-hidden rounded-xl border ${style.border} ${style.panel} p-5`}>
+    <article
+      className={`relative overflow-hidden rounded-xl border ${style.border} ${style.panel} p-5`}
+    >
       <div className={`absolute inset-x-0 top-0 h-1 ${style.top}`} />
-      {eyebrow ? <p className={`text-[10px] font-bold uppercase tracking-[0.17em] ${style.label}`}>{eyebrow}</p> : null}
+      {eyebrow ? (
+        <p
+          className={`text-[10px] font-bold uppercase tracking-[0.17em] ${style.label}`}
+        >
+          {eyebrow}
+        </p>
+      ) : null}
       <h3 className="mt-2 text-base font-extrabold text-slate-950">{title}</h3>
       {bullets ? (
         <ul className="mt-3 space-y-2.5">
           {lines.map((line, index) => (
-            <li key={`${title}-${index}`} className="flex gap-2 text-sm leading-5 text-slate-600">
-              <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`} />
+            <li
+              key={`${title}-${index}`}
+              className="flex gap-2 text-sm leading-5 text-slate-600"
+            >
+              <span
+                className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`}
+              />
               <span>{line}</span>
             </li>
           ))}
         </ul>
       ) : (
         <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-          {lines.map((line, index) => <p key={`${title}-${index}`}>{line}</p>)}
+          {lines.map((line, index) => (
+            <p key={`${title}-${index}`}>{line}</p>
+          ))}
         </div>
       )}
     </article>
   );
 }
 
-function FastReadCard({
-  title,
-  content,
-}: {
-  title: string;
-  content: unknown;
-}) {
+function FastReadCard({ title, content }: { title: string; content: unknown }) {
   return (
     <article className="min-h-[106px] rounded-xl border border-emerald-300/10 bg-[#062c23] px-4 py-3 shadow-inner shadow-black/20">
-      <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-300">{title}</h3>
-      <p className="mt-2 text-[12px] leading-5 text-slate-200/85">{sentence(content, 190)}</p>
+      <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-300">
+        {title}
+      </h3>
+      <p className="mt-2 text-[12px] leading-5 text-slate-200/85">
+        {sentence(content, 190)}
+      </p>
     </article>
   );
 }
 
-function ProgressBar({ label, value, tone = "emerald", description }: { label: string; value: number; tone?: Tone; description?: string }) {
+function ProgressBar({
+  label,
+  value,
+  tone = "emerald",
+  description,
+}: {
+  label: string;
+  value: number;
+  tone?: Tone;
+  description?: string;
+}) {
   const safe = normalisePercent(value);
   const style = TONE_STYLE[tone];
   return (
@@ -1255,12 +1434,21 @@ function ProgressBar({ label, value, tone = "emerald", description }: { label: s
       <div className="flex items-end justify-between gap-4 text-sm">
         <div>
           <p className="font-bold text-slate-900">{label}</p>
-          {description ? <p className="mt-1 text-xs leading-4 text-slate-500">{description}</p> : null}
+          {description ? (
+            <p className="mt-1 text-xs leading-4 text-slate-500">
+              {description}
+            </p>
+          ) : null}
         </div>
-        <span className={`font-extrabold ${style.label}`}>{Math.round(safe)}%</span>
+        <span className={`font-extrabold ${style.label}`}>
+          {Math.round(safe)}%
+        </span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-slate-200">
-        <div className={`h-2 rounded-full ${style.top}`} style={{ width: `${safe}%` }} />
+        <div
+          className={`h-2 rounded-full ${style.top}`}
+          style={{ width: `${safe}%` }}
+        />
       </div>
     </div>
   );
@@ -1274,8 +1462,19 @@ function Donut({ score }: { score: number }) {
 
   return (
     <div className="relative grid h-40 w-40 place-items-center">
-      <svg className="h-full w-full -rotate-90" viewBox="0 0 112 112" aria-hidden="true">
-        <circle cx="56" cy="56" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="9" />
+      <svg
+        className="h-full w-full -rotate-90"
+        viewBox="0 0 112 112"
+        aria-hidden="true"
+      >
+        <circle
+          cx="56"
+          cy="56"
+          r={radius}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth="9"
+        />
         <circle
           cx="56"
           cy="56"
@@ -1289,8 +1488,12 @@ function Donut({ score }: { score: number }) {
         />
       </svg>
       <div className="absolute text-center">
-        <p className="text-3xl font-extrabold text-slate-950">{Math.round(safe)}%</p>
-        <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">Call readiness</p>
+        <p className="text-3xl font-extrabold text-slate-950">
+          {Math.round(safe)}%
+        </p>
+        <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Call readiness
+        </p>
       </div>
     </div>
   );
@@ -1306,7 +1509,8 @@ export default function GedPredictiveSellingPlaybookPage({
   const tid = String(searchParams.get("tid") || "").trim();
   const reportRef = useRef<HTMLDivElement>(null);
 
-  const [extendedPayload, setExtendedPayload] = useState<QscExtendedPayload | null>(null);
+  const [extendedPayload, setExtendedPayload] =
+    useState<QscExtendedPayload | null>(null);
   const [gedPayload, setGedPayload] = useState<GedPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -1322,8 +1526,14 @@ export default function GedPredictiveSellingPlaybookPage({
       try {
         const suffix = tid ? `?tid=${encodeURIComponent(tid)}` : "";
         const [extendedResponse, gedResponse] = await Promise.all([
-          fetch(`/api/public/qsc/${encodeURIComponent(token)}/extended${suffix}`, { cache: "no-store" }),
-          fetch(`/api/public/ged/${encodeURIComponent(token)}/result${suffix}`, { cache: "no-store" }),
+          fetch(
+            `/api/public/qsc/${encodeURIComponent(token)}/extended${suffix}`,
+            { cache: "no-store" },
+          ),
+          fetch(
+            `/api/public/ged/${encodeURIComponent(token)}/result${suffix}`,
+            { cache: "no-store" },
+          ),
         ]);
 
         const [extendedJson, gedJson] = await Promise.all([
@@ -1337,14 +1547,21 @@ export default function GedPredictiveSellingPlaybookPage({
         const ged = gedJson as GedPayload;
 
         if (!extendedResponse.ok || extended.ok === false) {
-          throw new Error(extended.error || "The Playbook content could not be loaded.");
+          throw new Error(
+            extended.error || "The Playbook content could not be loaded.",
+          );
         }
 
         setExtendedPayload(extended);
         setGedPayload(gedResponse.ok && ged.ok !== false ? ged : null);
       } catch (loadError: any) {
         if (!active) return;
-        setError(String(loadError?.message || "Unexpected error while loading the Playbook."));
+        setError(
+          String(
+            loadError?.message ||
+              "Unexpected error while loading the Playbook.",
+          ),
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -1402,35 +1619,79 @@ export default function GedPredictiveSellingPlaybookPage({
   const diagnostic = gedPayload?.ged?.engine_diagnostic || null;
 
   const profile = useMemo(() => {
-    const personality = formatProfilePart(result?.primary_personality || extended?.personality_label);
-    const mindset = formatProfilePart(result?.primary_mindset || extended?.mindset_label);
-    const stored = cleanProfileLabel(extended?.persona_label || extended?.profile_code || "");
-    return stored || [personality, mindset].filter(Boolean).join(" ") || "Quantum Profile";
-  }, [extended?.mindset_label, extended?.persona_label, extended?.personality_label, extended?.profile_code, result?.primary_mindset, result?.primary_personality]);
+    const personality = formatProfilePart(
+      result?.primary_personality || extended?.personality_label,
+    );
+    const mindset = formatProfilePart(
+      result?.primary_mindset || extended?.mindset_label,
+    );
+    const stored = cleanProfileLabel(
+      extended?.persona_label || extended?.profile_code || "",
+    );
+    return (
+      stored ||
+      [personality, mindset].filter(Boolean).join(" ") ||
+      "Quantum Profile"
+    );
+  }, [
+    extended?.mindset_label,
+    extended?.persona_label,
+    extended?.personality_label,
+    extended?.profile_code,
+    result?.primary_mindset,
+    result?.primary_personality,
+  ]);
 
   const personality = useMemo<PersonalityKey | null>(() => {
-    const raw = String(result?.primary_personality || extended?.personality_label || "").trim().toUpperCase();
-    return raw === "FIRE" || raw === "FLOW" || raw === "FORM" || raw === "FIELD" ? raw : null;
+    const raw = String(
+      result?.primary_personality || extended?.personality_label || "",
+    )
+      .trim()
+      .toUpperCase();
+    return raw === "FIRE" || raw === "FLOW" || raw === "FORM" || raw === "FIELD"
+      ? raw
+      : null;
   }, [extended?.personality_label, result?.primary_personality]);
 
   const mindset = useMemo<MindsetKey | null>(() => {
-    const raw = String(result?.primary_mindset || extended?.mindset_label || "").trim().toUpperCase();
-    return raw === "ORIGIN" || raw === "MOMENTUM" || raw === "VECTOR" || raw === "ORBIT" || raw === "QUANTUM" ? raw : null;
+    const raw = String(result?.primary_mindset || extended?.mindset_label || "")
+      .trim()
+      .toUpperCase();
+    return raw === "ORIGIN" ||
+      raw === "MOMENTUM" ||
+      raw === "VECTOR" ||
+      raw === "ORBIT" ||
+      raw === "QUANTUM"
+      ? raw
+      : null;
   }, [extended?.mindset_label, result?.primary_mindset]);
 
   const fullName = getName(taker);
   const company = safeText(taker?.company, "");
   const role = safeText(taker?.role_title, "");
   const completedOn = formatDate(result?.created_at);
-  const nextStepsHref = safeText(gedPayload?.link?.next_steps_url || gedPayload?.link?.redirect_url, "");
+  const nextStepsHref = safeText(
+    gedPayload?.link?.next_steps_url || gedPayload?.link?.redirect_url,
+    "",
+  );
   const readiness = normalisePercent(diagnostic?.scores?.scale_readiness);
-  const callReadiness = Math.round((readiness + (100 - normalisePercent(diagnostic?.scores?.founder_dependency))) / 2);
+  const callReadiness = Math.round(
+    (readiness +
+      (100 - normalisePercent(diagnostic?.scores?.founder_dependency))) /
+      2,
+  );
   const decisionStyle = sentence(extended?.how_they_make_decisions, 115);
   const buyerMode = sentence(extended?.what_offer_ready_for, 115);
-  const compactDecision = compactDecisionStyle(extended?.how_they_make_decisions);
+  const compactDecision = compactDecisionStyle(
+    extended?.how_they_make_decisions,
+  );
   const compactBuyer = compactBuyerMode(extended?.what_offer_ready_for);
-  const personalityLabel = personality ? PERSONALITY_LABELS[personality] : safeText(extended?.personality_label, "Not recorded");
-  const mindsetLabel = mindset ? MINDSET_LABELS[mindset] : safeText(extended?.mindset_label, "Not recorded");
+  const personalityLabel = personality
+    ? PERSONALITY_LABELS[personality]
+    : safeText(extended?.personality_label, "Not recorded");
+  const mindsetLabel = mindset
+    ? MINDSET_LABELS[mindset]
+    : safeText(extended?.mindset_label, "Not recorded");
   const frameworkLabel = mindsetLabel || "—";
   const strategicPriorities = uniqueStrings([
     firstAction(diagnostic?.action_plan),
@@ -1460,7 +1721,7 @@ export default function GedPredictiveSellingPlaybookPage({
       extended?.core_business_problems,
       extended?.how_to_communicate,
       extended?.real_life_example,
-    ]
+    ],
   );
 
   const fastReadWhatTheyNeed =
@@ -1474,40 +1735,47 @@ export default function GedPredictiveSellingPlaybookPage({
       parseCommunicationPlan(
         extended?.how_to_communicate,
         extended?.what_blocks_sale,
-        extended?.micro_scripts
+        extended?.micro_scripts,
       ),
-    [extended?.how_to_communicate, extended?.micro_scripts, extended?.what_blocks_sale]
+    [
+      extended?.how_to_communicate,
+      extended?.micro_scripts,
+      extended?.what_blocks_sale,
+    ],
   );
-
 
   const trustPlan = useMemo(
     () =>
       parseTrustPlan(
         extended?.what_builds_trust,
         extended?.what_blocks_sale,
-        extended?.micro_scripts
+        extended?.micro_scripts,
       ),
-    [extended?.micro_scripts, extended?.what_blocks_sale, extended?.what_builds_trust]
+    [
+      extended?.micro_scripts,
+      extended?.what_blocks_sale,
+      extended?.what_builds_trust,
+    ],
   );
 
   const decisionPlan = useMemo(
     () => parseDecisionPlan(extended?.how_they_make_decisions),
-    [extended?.how_they_make_decisions]
+    [extended?.how_they_make_decisions],
   );
 
   const coreBusinessProblems = useMemo(
     () => parseCoreBusinessProblems(extended?.core_business_problems),
-    [extended?.core_business_problems]
+    [extended?.core_business_problems],
   );
 
   const offerFitPlan = useMemo(
     () => parseOfferFitPlan(extended?.what_offer_ready_for),
-    [extended?.what_offer_ready_for]
+    [extended?.what_offer_ready_for],
   );
 
   const saleBlockerPlan = useMemo(
     () => parseSaleBlockerPlan(extended?.what_blocks_sale),
-    [extended?.what_blocks_sale]
+    [extended?.what_blocks_sale],
   );
 
   /**
@@ -1517,13 +1785,15 @@ export default function GedPredictiveSellingPlaybookPage({
    */
   const followUpGuidance = useMemo(() => {
     const liveConstraint = safeText(
-      diagnostic?.primary_bottleneck?.label || diagnostic?.core_constraint?.label,
-      "the strategic constraint discussed in the call"
+      diagnostic?.primary_bottleneck?.label ||
+        diagnostic?.core_constraint?.label,
+      "the strategic constraint discussed in the call",
     );
 
     const liveProfile = safeText(
       profile,
-      [personalityLabel, mindsetLabel].filter(Boolean).join(" ") || "this buyer"
+      [personalityLabel, mindsetLabel].filter(Boolean).join(" ") ||
+        "this buyer",
     );
 
     return {
@@ -1543,11 +1813,17 @@ export default function GedPredictiveSellingPlaybookPage({
       ],
       callout: `Send within 24 hours. One strategic observation. One specific next step. No fluff. Keep the follow-up relevant to ${liveProfile} and the live constraint — not a chase.`,
     };
-  }, [diagnostic?.core_constraint?.label, diagnostic?.primary_bottleneck?.label, mindsetLabel, personalityLabel, profile]);
+  }, [
+    diagnostic?.core_constraint?.label,
+    diagnostic?.primary_bottleneck?.label,
+    mindsetLabel,
+    personalityLabel,
+    profile,
+  ]);
 
   const fitFlags = useMemo(
     () => splitFlags(extended?.green_red_flags),
-    [extended?.green_red_flags]
+    [extended?.green_red_flags],
   );
 
   const realLifeExample = useMemo(
@@ -1568,7 +1844,7 @@ export default function GedPredictiveSellingPlaybookPage({
       diagnostic?.recommended_next_step?.summary,
       extended?.core_business_problems,
       extended?.real_life_example,
-    ]
+    ],
   );
 
   /**
@@ -1594,6 +1870,35 @@ export default function GedPredictiveSellingPlaybookPage({
 
     return { label: "Pause or reframe", position };
   }, [fitFlags.green.length, fitFlags.red.length]);
+
+  const salesSnapshot = {
+    communicate: (communication.doItems.length
+      ? communication.doItems
+      : textItems(extended?.how_to_communicate, 4)
+    ).slice(0, 4),
+    decision:
+      decisionPlan.overview ||
+      decisionStyle ||
+      "Use the buyer’s decision logic to frame the conversation at the right level.",
+    coreChallenges: (coreBusinessProblems.length
+      ? coreBusinessProblems.map((problem) =>
+          [problem.title, problem.description].filter(Boolean).join(": "),
+        )
+      : textItems(extended?.core_business_problems, 4)
+    ).slice(0, 4),
+    trustSignals: (trustPlan.buildItems.length
+      ? trustPlan.buildItems
+      : textItems(extended?.what_builds_trust, 4)
+    ).slice(0, 4),
+    offerFit: (offerFitPlan.fitsWell.length
+      ? offerFitPlan.fitsWell
+      : textItems(extended?.what_offer_ready_for, 4)
+    ).slice(0, 4),
+    saleBlockers: (saleBlockerPlan.blockers.length
+      ? saleBlockerPlan.blockers
+      : textItems(extended?.what_blocks_sale, 4)
+    ).slice(0, 4),
+  };
 
   // The signed-off Playbook index begins with the detailed intelligence
   // sections. Fast Read is intentionally not repeated here because it sits
@@ -1636,8 +1941,12 @@ export default function GedPredictiveSellingPlaybookPage({
       <div className="relative min-h-screen bg-[#06111b] text-white">
         <AppBackground />
         <main className="relative mx-auto max-w-6xl px-5 py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Growth Engine Diagnostic</p>
-          <h1 className="mt-3 text-3xl font-extrabold">Preparing your Predictive Selling Playbook…</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">
+            Growth Engine Diagnostic
+          </p>
+          <h1 className="mt-3 text-3xl font-extrabold">
+            Preparing your Predictive Selling Playbook…
+          </h1>
         </main>
       </div>
     );
@@ -1648,12 +1957,19 @@ export default function GedPredictiveSellingPlaybookPage({
       <div className="relative min-h-screen bg-[#06111b] text-white">
         <AppBackground />
         <main className="relative mx-auto max-w-5xl px-5 py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Predictive Selling Playbook</p>
-          <h1 className="mt-3 text-3xl font-extrabold">We could not prepare this Playbook</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            This internal report needs a completed QSC result and a matching entrepreneur extended-report record.
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">
+            Predictive Selling Playbook
           </p>
-          <pre className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs text-slate-300">{error || "Extended report content was not available."}</pre>
+          <h1 className="mt-3 text-3xl font-extrabold">
+            We could not prepare this Playbook
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+            This internal report needs a completed QSC result and a matching
+            entrepreneur extended-report record.
+          </p>
+          <pre className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs text-slate-300">
+            {error || "Extended report content was not available."}
+          </pre>
         </main>
       </div>
     );
@@ -1662,7 +1978,10 @@ export default function GedPredictiveSellingPlaybookPage({
   return (
     <div className="min-h-screen bg-[#06111b] text-slate-900">
       <AppBackground />
-      <main ref={reportRef} className="relative mx-auto max-w-[1440px] space-y-7 px-3 py-4 md:space-y-9 md:px-6 md:py-7">
+      <main
+        ref={reportRef}
+        className="relative mx-auto max-w-[1440px] space-y-7 px-3 py-4 md:space-y-9 md:px-6 md:py-7"
+      >
         <section className="overflow-hidden rounded-[1.7rem] border border-white/10 bg-[#0c1d1a] text-white shadow-2xl shadow-black/30">
           <header className="border-b border-white/10 bg-[#14483f] px-5 py-4 md:px-7 md:py-5">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_auto] xl:items-center">
@@ -1726,64 +2045,133 @@ export default function GedPredictiveSellingPlaybookPage({
           <div className="p-5 md:p-7">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.22fr)_minmax(320px,0.78fr)] lg:items-start">
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">{fullName}</h1>
-                <p className="mt-1 text-sm text-white/70">{[role, company].filter(Boolean).join(" · ") || "Completed diagnostic"}</p>
+                <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+                  {fullName}
+                </h1>
+                <p className="mt-1 text-sm text-white/70">
+                  {[role, company].filter(Boolean).join(" · ") ||
+                    "Completed diagnostic"}
+                </p>
 
                 <div className="mt-5 max-w-2xl border-l-4 border-emerald-400 pl-4 text-sm font-medium leading-6 text-white/90">
-                  An advisor-only guide to how this buyer thinks, communicates, decides and buys — built to be read before the call, not during it.
+                  An advisor-only guide to how this buyer thinks, communicates,
+                  decides and buys — built to be read before the call, not
+                  during it.
                 </div>
 
                 <div className="mt-5 grid max-w-xl gap-4 sm:grid-cols-2">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Buyer profile</p>
-                    <p className="mt-1 text-lg font-extrabold text-emerald-300">{profile}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                      Buyer profile
+                    </p>
+                    <p className="mt-1 text-lg font-extrabold text-emerald-300">
+                      {profile}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Report type</p>
-                    <p className="mt-1 text-sm font-extrabold text-emerald-300">Internal Sales Intelligence</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                      Report type
+                    </p>
+                    <p className="mt-1 text-sm font-extrabold text-emerald-300">
+                      Internal Sales Intelligence
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Personality layer</p>
-                  <p className="mt-1 text-base font-extrabold text-white">{personalityLabel}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                    Personality layer
+                  </p>
+                  <p className="mt-1 text-base font-extrabold text-white">
+                    {personalityLabel}
+                  </p>
                 </article>
                 <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Mindset layer</p>
-                  <p className="mt-1 text-base font-extrabold text-white">{mindsetLabel}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                    Mindset layer
+                  </p>
+                  <p className="mt-1 text-base font-extrabold text-white">
+                    {mindsetLabel}
+                  </p>
                 </article>
                 <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Decision style</p>
-                  <p className="mt-1 text-base font-extrabold text-white">{compactDecision}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                    Decision style
+                  </p>
+                  <p className="mt-1 text-base font-extrabold text-white">
+                    {compactDecision}
+                  </p>
                 </article>
                 <article className="rounded-xl border border-emerald-300/25 bg-[#164d42] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Buyer mode</p>
-                  <p className="mt-1 text-base font-extrabold leading-5 text-white">{compactBuyer}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                    Buyer mode
+                  </p>
+                  <p className="mt-1 text-base font-extrabold leading-5 text-white">
+                    {compactBuyer}
+                  </p>
                 </article>
               </div>
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Business stage</p>
-                <p className="mt-2 text-sm font-extrabold text-white">{safeText(diagnostic?.business_stage?.label, "Not recorded")}</p>
-                <p className="mt-2 text-xs leading-5 text-white/70">{safeText(diagnostic?.business_stage?.summary, "No qualifying answer recorded.")}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                  Business stage
+                </p>
+                <p className="mt-2 text-sm font-extrabold text-white">
+                  {safeText(diagnostic?.business_stage?.label, "Not recorded")}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-white/70">
+                  {safeText(
+                    diagnostic?.business_stage?.summary,
+                    "No qualifying answer recorded.",
+                  )}
+                </p>
               </article>
               <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Core constraint</p>
-                <p className="mt-2 text-sm font-extrabold text-white">{safeText(diagnostic?.core_constraint?.label, "Not recorded")}</p>
-                <p className="mt-2 text-xs leading-5 text-white/70">{safeText(diagnostic?.core_constraint?.summary, "No qualifying answer recorded.")}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                  Core constraint
+                </p>
+                <p className="mt-2 text-sm font-extrabold text-white">
+                  {safeText(diagnostic?.core_constraint?.label, "Not recorded")}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-white/70">
+                  {safeText(
+                    diagnostic?.core_constraint?.summary,
+                    "No qualifying answer recorded.",
+                  )}
+                </p>
               </article>
               <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Scale readiness</p>
-                <p className="mt-2 text-sm font-extrabold text-white">{safeText(diagnostic?.scale_readiness_signal?.label || diagnostic?.scale_readiness_level, `${Math.round(readiness)}%`)}</p>
-                <p className="mt-2 text-xs leading-5 text-white/70">{safeText(diagnostic?.scale_readiness_signal?.summary, "Current readiness signal from the Growth Engine Diagnostic.")}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                  Scale readiness
+                </p>
+                <p className="mt-2 text-sm font-extrabold text-white">
+                  {safeText(
+                    diagnostic?.scale_readiness_signal?.label ||
+                      diagnostic?.scale_readiness_level,
+                    `${Math.round(readiness)}%`,
+                  )}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-white/70">
+                  {safeText(
+                    diagnostic?.scale_readiness_signal?.summary,
+                    "Current readiness signal from the Growth Engine Diagnostic.",
+                  )}
+                </p>
               </article>
               <article className="rounded-xl border border-white/10 bg-white/[0.12] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Strategic self-diagnosis</p>
-                <p className="mt-2 text-xs leading-5 text-white/80">{safeText(diagnostic?.self_diagnosis, "No self-diagnosis was recorded.")}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                  Strategic self-diagnosis
+                </p>
+                <p className="mt-2 text-xs leading-5 text-white/80">
+                  {safeText(
+                    diagnostic?.self_diagnosis,
+                    "No self-diagnosis was recorded.",
+                  )}
+                </p>
               </article>
             </div>
           </div>
@@ -1791,33 +2179,117 @@ export default function GedPredictiveSellingPlaybookPage({
 
         <PageSection
           id="fast-read"
-          className="border-emerald-300/10 bg-[linear-gradient(135deg,rgba(255,138,61,0.12),rgba(45,212,191,0.12))]"
+          className="border-cyan-300/15 bg-[#0d1b2b]/80"
         >
           <header>
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-orange-300">
-              Read this before you dial in
+            <p className="text-[0.72rem] font-bold uppercase tracking-[0.36em] text-sky-300/85">
+              Snapshot for your sales playbook
             </p>
-            <h2 className="mt-1 text-lg font-extrabold tracking-tight text-white md:text-xl">
+            <h2 className="mt-5 text-base font-extrabold leading-6 text-white md:text-lg">
               Fast-Read Sales Summary
             </h2>
           </header>
 
-          <div className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-            <FastReadCard
-              title="Who they are"
-              content={extended.combined_quantum_pattern || extended.personality_layer}
-            />
-            <FastReadCard title="How they think" content={extended.personality_layer} />
-            <FastReadCard
-              title="Where they are now"
-              content={diagnostic?.business_stage?.summary || extended.mindset_layer || diagnostic?.scale_readiness_signal?.summary}
-            />
-            <FastReadCard title="Combined pattern" content={extended.combined_quantum_pattern} />
-            <FastReadCard title="How to communicate" content={extended.how_to_communicate} />
-            <FastReadCard title="How they decide" content={extended.how_they_make_decisions} />
-            <FastReadCard title="What they need" content={fastReadWhatTheyNeed} />
-            <FastReadCard title="What blocks the sale" content={extended.what_blocks_sale} />
-            <FastReadCard title="Best offer fit" content={extended.what_offer_ready_for} />
+          <div className="mt-7 rounded-[2rem] border border-sky-300/20 bg-[#101c31]/70 p-6 shadow-inner shadow-black/20 md:p-8">
+            <section>
+              <h3 className="text-base font-extrabold text-white md:text-lg">
+                How to communicate
+              </h3>
+              <ul className="mt-5 space-y-1.5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                {(salesSnapshot.communicate.length
+                  ? salesSnapshot.communicate
+                  : [
+                      "Use the buyer’s profile to set the right tone, pace and level of strategic language.",
+                    ]
+                ).map((item, index) => (
+                  <li
+                    key={`snapshot-communicate-${index}`}
+                    className="flex gap-2"
+                  >
+                    <span className="text-slate-400" aria-hidden="true">
+                      -
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="mt-7">
+              <h3 className="text-base font-extrabold text-white md:text-lg">
+                Decision style
+              </h3>
+              <p className="mt-5 max-w-5xl text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                {salesSnapshot.decision}
+              </p>
+            </section>
+
+            <div className="mt-7 grid gap-x-10 gap-y-7 md:grid-cols-2">
+              <section>
+                <h3 className="text-base font-extrabold text-white md:text-lg">
+                  Core challenges
+                </h3>
+                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                  {(salesSnapshot.coreChallenges.length
+                    ? salesSnapshot.coreChallenges
+                    : [
+                        safeText(
+                          diagnostic?.primary_bottleneck?.summary,
+                          "No core challenge has been recorded yet.",
+                        ),
+                      ]
+                  ).join(" ")}
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-base font-extrabold text-white md:text-lg">
+                  Trust signals
+                </h3>
+                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                  {(salesSnapshot.trustSignals.length
+                    ? salesSnapshot.trustSignals
+                    : [
+                        "Show strategic pattern recognition, confidence and a practical path forward.",
+                      ]
+                  ).join(" ")}
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-base font-extrabold text-white md:text-lg">
+                  Offer fit
+                </h3>
+                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                  {(salesSnapshot.offerFit.length
+                    ? salesSnapshot.offerFit
+                    : [
+                        safeText(
+                          extended.what_offer_ready_for,
+                          "Position the offer around the specific outcome the buyer is ready to move toward.",
+                        ),
+                      ]
+                  ).join(" ")}
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-base font-extrabold text-white md:text-lg">
+                  Sale blockers
+                </h3>
+                <p className="mt-5 text-sm leading-6 text-slate-300 md:text-[0.95rem] md:leading-7">
+                  {(salesSnapshot.saleBlockers.length
+                    ? salesSnapshot.saleBlockers
+                    : [
+                        safeText(
+                          extended.what_blocks_sale,
+                          "Avoid anything that lowers confidence, slows the pace or makes the offer feel generic.",
+                        ),
+                      ]
+                  ).join(" ")}
+                </p>
+              </section>
+            </div>
           </div>
         </PageSection>
 
@@ -1827,7 +2299,10 @@ export default function GedPredictiveSellingPlaybookPage({
               Report Index
             </p>
 
-            <nav className="mt-3 space-y-1.5" aria-label="Playbook report index">
+            <nav
+              className="mt-3 space-y-1.5"
+              aria-label="Playbook report index"
+            >
               {reportIndex.map(([id, label]) => (
                 <a
                   key={id}
@@ -1866,15 +2341,22 @@ export default function GedPredictiveSellingPlaybookPage({
                   <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
                     Introducing the GED Framework
                   </p>
-                  <h2 className="mt-1 max-w-4xl text-lg font-extrabold leading-6 text-white md:text-xl md:leading-7">
-                    What the Growth Engine Diagnostic measures, before you read this buyer&apos;s result
+                  <h2 className="mt-1 max-w-4xl text-base font-extrabold leading-6 text-white md:text-lg">
+                    What the Growth Engine Diagnostic measures, before you read
+                    this buyer&apos;s result
                   </h2>
                 </div>
               </header>
 
               <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-6">
                 <p className="max-w-6xl text-sm leading-6 text-slate-800">
-                  The GED — the Growth Engine Diagnostic — connects two layers of this buyer&apos;s operating pattern into one combined result. Rather than reducing them to a single label, it shows the personality wiring they naturally lead with, the stage their business has actually reached, and the specific pattern that emerges when the two meet. Read all three together — not the headline result alone — before you get on the call.
+                  The GED — the Growth Engine Diagnostic — connects two layers
+                  of this buyer&apos;s operating pattern into one combined
+                  result. Rather than reducing them to a single label, it shows
+                  the personality wiring they naturally lead with, the stage
+                  their business has actually reached, and the specific pattern
+                  that emerges when the two meet. Read all three together — not
+                  the headline result alone — before you get on the call.
                 </p>
 
                 <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:items-center">
@@ -1930,7 +2412,9 @@ export default function GedPredictiveSellingPlaybookPage({
                     What the Personality Layer stands for
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    This layer predicts how quickly they buy, what motivates them, what overwhelms them, and what sales approach will actually land.
+                    This layer predicts how quickly they buy, what motivates
+                    them, what overwhelms them, and what sales approach will
+                    actually land.
                   </p>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1966,7 +2450,10 @@ export default function GedPredictiveSellingPlaybookPage({
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                     {GED_MINDSET_STAGE_CARDS.map((card) => (
-                      <article key={card.key} className="rounded-xl bg-emerald-50/70 p-4">
+                      <article
+                        key={card.key}
+                        className="rounded-xl bg-emerald-50/70 p-4"
+                      >
                         <span className="flex h-8 w-8 items-center justify-center rounded-md border border-emerald-700/30 bg-[#0c1d1a] p-1.5">
                           <img
                             src={`${GED_MINDSET_ICON_BASE}/${card.iconFile}`}
@@ -1985,22 +2472,33 @@ export default function GedPredictiveSellingPlaybookPage({
                   </div>
 
                   <p className="mt-4 text-sm leading-6 text-slate-600">
-                    This layer reveals their readiness to invest, level of business sophistication, capability to implement, and current strategic gaps and bottlenecks.
+                    This layer reveals their readiness to invest, level of
+                    business sophistication, capability to implement, and
+                    current strategic gaps and bottlenecks.
                   </p>
                 </div>
 
                 <aside className="mt-7 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4">
                   <p className="text-sm leading-6 text-slate-700">
-                    Reading the percentages below: the number next to each layer shows how the buyer&apos;s answers are distributed across all options, not a score out of 100. Their highest share is their primary result even at a modest percentage.
+                    Reading the percentages below: the number next to each layer
+                    shows how the buyer&apos;s answers are distributed across
+                    all options, not a score out of 100. Their highest share is
+                    their primary result even at a modest percentage.
                   </p>
                   <p className="mt-4 text-sm font-extrabold text-slate-950">
                     Their Quantum Profile = Personality + Mindset
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-700">
-                    There are 20 possible combinations across the 4×5 matrix. This buyer&apos;s combined result is {profile} — the core predictive profile this entire playbook is built from.
+                    There are 20 possible combinations across the 4×5 matrix.
+                    This buyer&apos;s combined result is {profile} — the core
+                    predictive profile this entire playbook is built from.
                   </p>
                   <p className="mt-4 text-xs leading-5 text-slate-500">
-                    Methodology: results are derived from the buyer&apos;s responses to the Growth Engine Diagnostic and reflect observable work patterns, not fixed personality traits. Use alongside your own judgement and discovery conversation — never as a standalone sales decision.
+                    Methodology: results are derived from the buyer&apos;s
+                    responses to the Growth Engine Diagnostic and reflect
+                    observable work patterns, not fixed personality traits. Use
+                    alongside your own judgement and discovery conversation —
+                    never as a standalone sales decision.
                   </p>
                 </aside>
               </div>
@@ -2008,7 +2506,9 @@ export default function GedPredictiveSellingPlaybookPage({
 
             <PageSection id="personality">
               {(() => {
-                const personalityView = parsePersonalityLayer(extended.personality_layer);
+                const personalityView = parsePersonalityLayer(
+                  extended.personality_layer,
+                );
                 const insightItems = personalityView.keyInsights.length
                   ? personalityView.keyInsights
                   : textItems(extended.personality_layer, 4);
@@ -2021,8 +2521,12 @@ export default function GedPredictiveSellingPlaybookPage({
                     <header className="flex gap-3">
                       <SectionIcon file="personality-layer.png" alt="" />
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">Their personality layer</p>
-                        <h2 className="mt-1 text-base font-extrabold text-white md:text-lg">How they think, behave and decide</h2>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
+                          Their personality layer
+                        </p>
+                        <h2 className="mt-1 text-base font-extrabold text-white md:text-lg">
+                          How they think, behave and decide
+                        </h2>
                       </div>
                     </header>
 
@@ -2032,34 +2536,52 @@ export default function GedPredictiveSellingPlaybookPage({
                         {personalityView.traits.length ? (
                           <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-800">
                             {personalityView.traits.map((trait, index) => (
-                              <li key={`personality-trait-${index}`} className="flex gap-2">
-                                <span className="mt-1.5 text-emerald-500">›</span>
+                              <li
+                                key={`personality-trait-${index}`}
+                                className="flex gap-2"
+                              >
+                                <span className="mt-1.5 text-emerald-500">
+                                  ›
+                                </span>
                                 <span>{trait}</span>
                               </li>
                             ))}
                           </ul>
                         ) : null}
                         {personalityView.role ? (
-                          <p className="mt-2 text-slate-700">{personalityView.role}</p>
+                          <p className="mt-2 text-slate-700">
+                            {personalityView.role}
+                          </p>
                         ) : null}
                       </div>
 
                       <div className="mt-5 grid gap-4 lg:grid-cols-2">
                         <article className="rounded-xl bg-slate-100 p-5">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-500">Key insights</p>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-500">
+                            Key insights
+                          </p>
                           <div className="mt-3 space-y-3">
                             {insightItems.slice(0, 3).map((item, index) => (
-                              <div key={`personality-insight-${index}`} className="flex gap-2.5">
+                              <div
+                                key={`personality-insight-${index}`}
+                                className="flex gap-2.5"
+                              >
                                 <span className="mt-1 inline-flex h-3 w-3 shrink-0 rounded-full bg-emerald-300" />
-                                <p className="text-sm leading-5 text-slate-700">{item}</p>
+                                <p className="text-sm leading-5 text-slate-700">
+                                  {item}
+                                </p>
                               </div>
                             ))}
                             {personalityView.listenFor.length ? (
                               <div className="flex gap-2.5">
                                 <span className="mt-1 inline-flex h-3 w-3 shrink-0 rounded-full bg-emerald-300" />
                                 <div>
-                                  <p className="text-sm font-bold text-slate-950">When you hear this</p>
-                                  <p className="mt-1 text-sm leading-5 text-slate-700">{personalityView.listenFor.join(" ")}</p>
+                                  <p className="text-sm font-bold text-slate-950">
+                                    When you hear this
+                                  </p>
+                                  <p className="mt-1 text-sm leading-5 text-slate-700">
+                                    {personalityView.listenFor.join(" ")}
+                                  </p>
                                 </div>
                               </div>
                             ) : null}
@@ -2067,10 +2589,15 @@ export default function GedPredictiveSellingPlaybookPage({
                         </article>
 
                         <article className="rounded-xl bg-[#0c2a22] p-5 text-white">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">Example behaviours</p>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-300">
+                            Example behaviours
+                          </p>
                           <ul className="mt-4 space-y-3">
                             {exampleItems.slice(0, 6).map((item, index) => (
-                              <li key={`personality-behaviour-${index}`} className="flex gap-2.5 text-sm leading-5 text-slate-100/90">
+                              <li
+                                key={`personality-behaviour-${index}`}
+                                className="flex gap-2.5 text-sm leading-5 text-slate-100/90"
+                              >
                                 <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
                                 <span>{item}</span>
                               </li>
@@ -2114,9 +2641,11 @@ export default function GedPredictiveSellingPlaybookPage({
 
                 const leftStatements = exampleStatements.slice(
                   0,
-                  Math.max(1, Math.ceil(exampleStatements.length / 2))
+                  Math.max(1, Math.ceil(exampleStatements.length / 2)),
                 );
-                const rightStatements = exampleStatements.slice(leftStatements.length);
+                const rightStatements = exampleStatements.slice(
+                  leftStatements.length,
+                );
 
                 return (
                   <>
@@ -2144,8 +2673,13 @@ export default function GedPredictiveSellingPlaybookPage({
                               ? mindsetView.focusSignals
                               : fallbackSignals
                             ).map((signal, index) => (
-                              <li key={`mindset-signal-${index}`} className="flex gap-2">
-                                <span className="mt-0.5 text-emerald-500">›</span>
+                              <li
+                                key={`mindset-signal-${index}`}
+                                className="flex gap-2"
+                              >
+                                <span className="mt-0.5 text-emerald-500">
+                                  ›
+                                </span>
                                 <span>{signal}</span>
                               </li>
                             ))}
@@ -2167,24 +2701,29 @@ export default function GedPredictiveSellingPlaybookPage({
                                     className="flex gap-2.5 text-sm leading-5 text-white/90"
                                   >
                                     <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-                                    <span>“{statement.replace(/^["“]|["”]$/g, "")}”</span>
+                                    <span>
+                                      “{statement.replace(/^["“]|["”]$/g, "")}”
+                                    </span>
                                   </li>
                                 ))}
                               </ul>
                             </article>
                             <article className="rounded-xl bg-[#0c2a22] px-5 py-4">
                               <ul className="space-y-3">
-                                {(rightStatements.length ? rightStatements : leftStatements).map(
-                                  (statement, index) => (
-                                    <li
-                                      key={`mindset-example-right-${index}`}
-                                      className="flex gap-2.5 text-sm leading-5 text-white/90"
-                                    >
-                                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
-                                      <span>“{statement.replace(/^["“]|["”]$/g, "")}”</span>
-                                    </li>
-                                  )
-                                )}
+                                {(rightStatements.length
+                                  ? rightStatements
+                                  : leftStatements
+                                ).map((statement, index) => (
+                                  <li
+                                    key={`mindset-example-right-${index}`}
+                                    className="flex gap-2.5 text-sm leading-5 text-white/90"
+                                  >
+                                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" />
+                                    <span>
+                                      “{statement.replace(/^["“]|["”]$/g, "")}”
+                                    </span>
+                                  </li>
+                                ))}
                               </ul>
                             </article>
                           </div>
@@ -2257,7 +2796,14 @@ export default function GedPredictiveSellingPlaybookPage({
 
               <div className="mt-5 overflow-hidden rounded-2xl bg-white p-4 md:p-6">
                 <p className="max-w-6xl text-sm leading-6 text-slate-800">
-                  Their Quantum Profile is the single combined result this entire playbook is built around — their Personality Layer and Mindset Layer working together. What it shows: the four archetypes that make up every Quantum Profile, and where this buyer sits among them. How to use it: treat it as your starting read on them, not the whole picture — the sections that follow unpack what it actually means for how you sell to them.
+                  Their Quantum Profile is the single combined result this
+                  entire playbook is built around — their Personality Layer and
+                  Mindset Layer working together. What it shows: the four
+                  archetypes that make up every Quantum Profile, and where this
+                  buyer sits among them. How to use it: treat it as your
+                  starting read on them, not the whole picture — the sections
+                  that follow unpack what it actually means for how you sell to
+                  them.
                 </p>
 
                 <div className="mt-5 flex min-h-[260px] items-center justify-center md:min-h-[300px]">
@@ -2311,7 +2857,8 @@ export default function GedPredictiveSellingPlaybookPage({
                       icon: "✧",
                     },
                   ].map((card) => {
-                    const isPrimary = card.code === `${personality || ""}_${mindset || ""}`;
+                    const isPrimary =
+                      card.code === `${personality || ""}_${mindset || ""}`;
 
                     return (
                       <article
@@ -2330,7 +2877,9 @@ export default function GedPredictiveSellingPlaybookPage({
                         <h3 className="mt-1 text-base font-extrabold leading-5 text-slate-950">
                           {card.title}
                         </h3>
-                        <p className="mt-3 text-xs leading-5 text-slate-500">{card.description}</p>
+                        <p className="mt-3 text-xs leading-5 text-slate-500">
+                          {card.description}
+                        </p>
                         {isPrimary ? (
                           <span className="mt-3 inline-flex rounded-full bg-emerald-500 px-2 py-1 text-[9px] font-extrabold uppercase tracking-[0.12em] text-white">
                             Your primary
@@ -2398,7 +2947,9 @@ export default function GedPredictiveSellingPlaybookPage({
                 </div>
 
                 <div className="mt-4">
-                  <p className="text-xs font-extrabold text-slate-950">Positioning Line That Works</p>
+                  <p className="text-xs font-extrabold text-slate-950">
+                    Positioning Line That Works
+                  </p>
                   <blockquote className="mt-2 rounded-r-md border-l-2 border-cyan-400 bg-cyan-50 px-4 py-3 text-sm italic leading-6 text-slate-700">
                     {combinedPattern.positioningLine}
                   </blockquote>
@@ -2414,7 +2965,8 @@ export default function GedPredictiveSellingPlaybookPage({
                     How to communicate
                   </p>
                   <h2 className="mt-1 text-sm font-extrabold leading-5 text-white md:text-base">
-                    Tone, language and delivery style that makes them feel understood and safe.
+                    Tone, language and delivery style that makes them feel
+                    understood and safe.
                   </h2>
                 </div>
               </header>
@@ -2423,14 +2975,23 @@ export default function GedPredictiveSellingPlaybookPage({
                 <div className="grid gap-4 lg:grid-cols-2">
                   <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100/75 p-5">
                     <div className="absolute inset-x-0 top-0 h-1 bg-emerald-400" />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">Do</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                      Do
+                    </p>
                     <ul className="mt-3 space-y-2.5">
                       {(communication.doItems.length
                         ? communication.doItems
-                        : ["No profile-specific communication guidance is recorded."]
+                        : [
+                            "No profile-specific communication guidance is recorded.",
+                          ]
                       ).map((item, index) => (
-                        <li key={`communication-do-${index}`} className="flex gap-2 text-sm leading-5 text-slate-700">
-                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-emerald-500">✓</span>
+                        <li
+                          key={`communication-do-${index}`}
+                          className="flex gap-2 text-sm leading-5 text-slate-700"
+                        >
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-emerald-500">
+                            ✓
+                          </span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -2439,14 +3000,23 @@ export default function GedPredictiveSellingPlaybookPage({
 
                   <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100/80 p-5">
                     <div className="absolute inset-x-0 top-0 h-1 bg-rose-400" />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-500">Don&apos;t</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-rose-500">
+                      Don&apos;t
+                    </p>
                     <ul className="mt-3 space-y-2.5">
                       {(communication.dontItems.length
                         ? communication.dontItems
-                        : ["No profile-specific communication risks are recorded."]
+                        : [
+                            "No profile-specific communication risks are recorded.",
+                          ]
                       ).map((item, index) => (
-                        <li key={`communication-dont-${index}`} className="flex gap-2 text-sm leading-5 text-slate-700">
-                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-rose-400">×</span>
+                        <li
+                          key={`communication-dont-${index}`}
+                          className="flex gap-2 text-sm leading-5 text-slate-700"
+                        >
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-rose-400">
+                            ×
+                          </span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -2455,11 +3025,15 @@ export default function GedPredictiveSellingPlaybookPage({
                 </div>
 
                 <div className="mt-4">
-                  <p className="text-xs font-extrabold text-slate-950">Effective Lines</p>
+                  <p className="text-xs font-extrabold text-slate-950">
+                    Effective Lines
+                  </p>
                   <div className="mt-2 space-y-2">
                     {(communication.effectiveLines.length
                       ? communication.effectiveLines
-                      : ["Use the buyer&apos;s own language to frame the next strategic conversation."]
+                      : [
+                          "Use the buyer&apos;s own language to frame the next strategic conversation.",
+                        ]
                     ).map((line, index) => (
                       <blockquote
                         key={`communication-line-${index}`}
@@ -2481,7 +3055,8 @@ export default function GedPredictiveSellingPlaybookPage({
                     How they make decisions
                   </p>
                   <h2 className="mt-1 text-sm font-extrabold leading-6 text-white md:text-base">
-                    What helps them say yes, makes them hesitate, and the decision filters they use.
+                    What helps them say yes, makes them hesitate, and the
+                    decision filters they use.
                   </h2>
                 </div>
               </header>
@@ -2500,13 +3075,17 @@ export default function GedPredictiveSellingPlaybookPage({
                     <ul className="mt-3 space-y-2">
                       {(decisionPlan.yesItems.length
                         ? decisionPlan.yesItems
-                        : ["The offer is framed around a clear, high-value outcome."]
+                        : [
+                            "The offer is framed around a clear, high-value outcome.",
+                          ]
                       ).map((item, index) => (
                         <li
                           key={`decision-yes-${index}`}
                           className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                         >
-                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-emerald-500">✓</span>
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-emerald-500">
+                            ✓
+                          </span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -2521,13 +3100,17 @@ export default function GedPredictiveSellingPlaybookPage({
                     <ul className="mt-3 space-y-2">
                       {(decisionPlan.hesitateItems.length
                         ? decisionPlan.hesitateItems
-                        : ["The offer feels unclear, low-confidence or misaligned with the decision they need to make."]
+                        : [
+                            "The offer feels unclear, low-confidence or misaligned with the decision they need to make.",
+                          ]
                       ).map((item, index) => (
                         <li
                           key={`decision-hesitate-${index}`}
                           className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                         >
-                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-rose-400">×</span>
+                          <span className="mt-0.5 shrink-0 text-base font-bold leading-5 text-rose-400">
+                            ×
+                          </span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -2549,7 +3132,8 @@ export default function GedPredictiveSellingPlaybookPage({
                     Their core business problems
                   </p>
                   <h2 className="mt-1 text-sm font-extrabold leading-6 text-white md:text-base">
-                    The recurring patterns and friction points that show up most often for this buyer.
+                    The recurring patterns and friction points that show up most
+                    often for this buyer.
                   </h2>
                 </div>
               </header>
@@ -2582,7 +3166,8 @@ export default function GedPredictiveSellingPlaybookPage({
                   </div>
                 ) : (
                   <p className="text-sm leading-6 text-slate-600">
-                    No profile-specific core business problems have been recorded for this buyer.
+                    No profile-specific core business problems have been
+                    recorded for this buyer.
                   </p>
                 )}
               </div>
@@ -2596,7 +3181,8 @@ export default function GedPredictiveSellingPlaybookPage({
                     What builds trust
                   </p>
                   <h2 className="mt-1 text-sm font-extrabold leading-6 text-white md:text-base">
-                    Signals, proof and experiences that help them feel safe moving forward with you.
+                    Signals, proof and experiences that help them feel safe
+                    moving forward with you.
                   </h2>
                 </div>
               </header>
@@ -2614,7 +3200,10 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`trust-build-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-emerald-500" aria-hidden="true">
+                            <span
+                              className="font-bold text-emerald-500"
+                              aria-hidden="true"
+                            >
                               ✓
                             </span>
                             <span>{item}</span>
@@ -2639,7 +3228,10 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`trust-break-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-rose-500" aria-hidden="true">
+                            <span
+                              className="font-bold text-rose-500"
+                              aria-hidden="true"
+                            >
                               ✕
                             </span>
                             <span>{item}</span>
@@ -2677,7 +3269,9 @@ export default function GedPredictiveSellingPlaybookPage({
               <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="grid gap-4 lg:grid-cols-2">
                   <article className="rounded-xl border border-emerald-200 bg-emerald-100/90 p-4 md:p-5">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">Fits well</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">
+                      Fits well
+                    </p>
                     {offerFitPlan.fitsWell.length ? (
                       <ul className="mt-3 space-y-2">
                         {offerFitPlan.fitsWell.map((item, index) => (
@@ -2685,20 +3279,28 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`offer-fit-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                            <span
+                              className="font-bold text-emerald-500"
+                              aria-hidden="true"
+                            >
+                              ✓
+                            </span>
                             <span>{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
                       <p className="mt-3 text-xs leading-5 text-slate-600">
-                        No profile-specific offer-fit guidance has been recorded.
+                        No profile-specific offer-fit guidance has been
+                        recorded.
                       </p>
                     )}
                   </article>
 
                   <article className="rounded-xl border border-rose-200 bg-rose-100/90 p-4 md:p-5">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">Does not fit</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">
+                      Does not fit
+                    </p>
                     {offerFitPlan.doesNotFit.length ? (
                       <ul className="mt-3 space-y-2">
                         {offerFitPlan.doesNotFit.map((item, index) => (
@@ -2706,7 +3308,12 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`offer-misfit-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                            <span
+                              className="font-bold text-rose-500"
+                              aria-hidden="true"
+                            >
+                              ✕
+                            </span>
                             <span>{item}</span>
                           </li>
                         ))}
@@ -2731,7 +3338,10 @@ export default function GedPredictiveSellingPlaybookPage({
               <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <article className="rounded-xl border border-rose-200 bg-white p-4 md:p-5">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-sm font-extrabold text-rose-500" aria-hidden="true">
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-sm font-extrabold text-rose-500"
+                      aria-hidden="true"
+                    >
                       ✕
                     </span>
                     <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose-500">
@@ -2778,32 +3388,41 @@ export default function GedPredictiveSellingPlaybookPage({
 
               <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <div className="space-y-2.5">
-                  {textItems(extended.pre_call_questions, 5).map((item, index) => {
-                    const question = item.replace(/^[“"][\s]*|[\s]*[”"]$/g, "").trim();
+                  {textItems(extended.pre_call_questions, 5).map(
+                    (item, index) => {
+                      const question = item
+                        .replace(/^[“"][\s]*|[\s]*[”"]$/g, "")
+                        .trim();
 
-                    return (
-                      <article
-                        key={`question-${index}`}
-                        className="flex items-center gap-3 rounded-lg border-l-2 border-cyan-400 bg-cyan-50 px-3 py-3 md:px-4"
-                      >
-                        <span
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-100 bg-white text-[10px] font-extrabold text-cyan-500"
-                          aria-hidden="true"
+                      return (
+                        <article
+                          key={`question-${index}`}
+                          className="flex items-center gap-3 rounded-lg border-l-2 border-cyan-400 bg-cyan-50 px-3 py-3 md:px-4"
                         >
-                          {String(index + 1).padStart(2, "0")}
-                        </span>
-                        <p className="text-xs italic leading-5 text-slate-700 md:text-sm">
-                          “{question}”
-                        </p>
-                      </article>
-                    );
-                  })}
+                          <span
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cyan-100 bg-white text-[10px] font-extrabold text-cyan-500"
+                            aria-hidden="true"
+                          >
+                            {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <p className="text-xs italic leading-5 text-slate-700 md:text-sm">
+                            “{question}”
+                          </p>
+                        </article>
+                      );
+                    },
+                  )}
                 </div>
 
                 <div className="mt-5 border-t border-slate-100 pt-4">
-                  <p className="text-xs font-extrabold text-slate-950">Why these questions work</p>
+                  <p className="text-xs font-extrabold text-slate-950">
+                    Why these questions work
+                  </p>
                   <p className="mt-2 text-xs leading-5 text-slate-600 md:text-sm">
-                    These questions surface the emotional and structural gap behind the stated problem. They position the host as a strategic peer diagnosing the architecture of the buyer’s growth, not a vendor running a generic discovery call.
+                    These questions surface the emotional and structural gap
+                    behind the stated problem. They position the host as a
+                    strategic peer diagnosing the architecture of the buyer’s
+                    growth, not a vendor running a generic discovery call.
                   </p>
                 </div>
               </div>
@@ -2823,7 +3442,8 @@ export default function GedPredictiveSellingPlaybookPage({
                     Their micro scripts
                   </p>
                   <h2 className="mt-0.5 text-sm font-extrabold text-white md:text-base">
-                    Short lines you can use in sales calls, emails and live launches.
+                    Short lines you can use in sales calls, emails and live
+                    launches.
                   </h2>
                 </div>
               </header>
@@ -2890,14 +3510,20 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`green-flag-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                            <span
+                              className="font-bold text-emerald-500"
+                              aria-hidden="true"
+                            >
+                              ✓
+                            </span>
                             <span>{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
                       <p className="mt-3 text-xs leading-5 text-slate-600 md:text-sm">
-                        No profile-specific strong-fit signals have been recorded.
+                        No profile-specific strong-fit signals have been
+                        recorded.
                       </p>
                     )}
                   </article>
@@ -2914,14 +3540,22 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`red-flag-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                            <span
+                              className="font-bold text-rose-500"
+                              aria-hidden="true"
+                            >
+                              ✕
+                            </span>
                             <span>{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
                       <p className="mt-3 text-xs leading-5 text-slate-600 md:text-sm">
-                        {safeText(extended.what_blocks_sale, "No profile-specific pause signals have been recorded.")}
+                        {safeText(
+                          extended.what_blocks_sale,
+                          "No profile-specific pause signals have been recorded.",
+                        )}
                       </p>
                     )}
                   </article>
@@ -2938,7 +3572,9 @@ export default function GedPredictiveSellingPlaybookPage({
 
               <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <section>
-                  <p className="text-xs font-medium text-slate-700">What They Might Say</p>
+                  <p className="text-xs font-medium text-slate-700">
+                    What They Might Say
+                  </p>
                   <blockquote className="mt-3 rounded-lg border border-emerald-400 bg-cyan-50 px-4 py-3 text-sm leading-6 text-slate-800 md:px-5">
                     “{realLifeExample.quote}”
                   </blockquote>
@@ -2956,7 +3592,12 @@ export default function GedPredictiveSellingPlaybookPage({
                             key={`real-life-meaning-${index}`}
                             className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                           >
-                            <span className="font-bold text-emerald-500" aria-hidden="true">•</span>
+                            <span
+                              className="font-bold text-emerald-500"
+                              aria-hidden="true"
+                            >
+                              •
+                            </span>
                             <span>{item}</span>
                           </li>
                         ))}
@@ -2980,7 +3621,8 @@ export default function GedPredictiveSellingPlaybookPage({
                       </div>
                     ) : (
                       <p className="mt-3 text-sm leading-6 text-slate-600">
-                        Use the buyer’s stated pattern to frame the conversation at the right strategic level.
+                        Use the buyer’s stated pattern to frame the conversation
+                        at the right strategic level.
                       </p>
                     )}
                   </article>
@@ -2997,15 +3639,19 @@ export default function GedPredictiveSellingPlaybookPage({
 
               <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm md:p-5">
                 <p className="max-w-5xl text-xs leading-5 text-slate-700 md:text-sm md:leading-6">
-                  Lead with the pattern already visible in their results. Do not start with generic discovery questions.
-                  Name the current constraint, connect it to their stage and frame the engagement as the direct route
-                  to the next operating outcome. Position yourself as the strategic guide, not the assistant.
+                  Lead with the pattern already visible in their results. Do not
+                  start with generic discovery questions. Name the current
+                  constraint, connect it to their stage and frame the engagement
+                  as the direct route to the next operating outcome. Position
+                  yourself as the strategic guide, not the assistant.
                 </p>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-2 md:gap-4">
                   <article className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-100 p-4 md:p-5">
                     <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">What to do</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-emerald-600">
+                      What to do
+                    </p>
                     <ul className="mt-3 space-y-2.5">
                       {uniqueStrings([
                         diagnostic?.primary_bottleneck?.label
@@ -3020,31 +3666,47 @@ export default function GedPredictiveSellingPlaybookPage({
                         diagnostic?.recommended_next_step?.summary ||
                           strategicPriorities[0] ||
                           "Make the outcome clear, specific and connected to the next practical move.",
-                      ]).slice(0, 4).map((item, index) => (
-                        <li
-                          key={`recommended-next-step-do-${index}`}
-                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
-                        >
-                          <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
+                      ])
+                        .slice(0, 4)
+                        .map((item, index) => (
+                          <li
+                            key={`recommended-next-step-do-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span
+                              className="font-bold text-emerald-500"
+                              aria-hidden="true"
+                            >
+                              ✓
+                            </span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
                     </ul>
                   </article>
 
                   <article className="relative overflow-hidden rounded-xl border border-rose-200 bg-rose-100 p-4 md:p-5">
                     <div className="absolute inset-x-0 top-0 h-1 bg-rose-500" />
-                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">Red flags — pause or reframe</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-rose-500">
+                      Red flags — pause or reframe
+                    </p>
                     <ul className="mt-3 space-y-2.5">
-                      {uniqueStrings(saleBlockerPlan.blockers).slice(0, 4).map((item, index) => (
-                        <li
-                          key={`recommended-next-step-red-flag-${index}`}
-                          className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
-                        >
-                          <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
+                      {uniqueStrings(saleBlockerPlan.blockers)
+                        .slice(0, 4)
+                        .map((item, index) => (
+                          <li
+                            key={`recommended-next-step-red-flag-${index}`}
+                            className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
+                          >
+                            <span
+                              className="font-bold text-rose-500"
+                              aria-hidden="true"
+                            >
+                              ✕
+                            </span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
                     </ul>
                   </article>
                 </div>
@@ -3058,7 +3720,7 @@ export default function GedPredictiveSellingPlaybookPage({
                   <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-300">
                     Follow-up guidance
                   </p>
-                  <h2 className="mt-1 text-xl font-extrabold tracking-tight text-white md:text-2xl">
+                  <h2 className="mt-1 text-base font-extrabold leading-6 text-white md:text-lg">
                     What to send after the call and what language to use
                   </h2>
                 </div>
@@ -3077,7 +3739,12 @@ export default function GedPredictiveSellingPlaybookPage({
                           key={`follow-up-work-${index}`}
                           className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                         >
-                          <span className="font-bold text-emerald-500" aria-hidden="true">✓</span>
+                          <span
+                            className="font-bold text-emerald-500"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -3095,7 +3762,12 @@ export default function GedPredictiveSellingPlaybookPage({
                           key={`follow-up-kill-${index}`}
                           className="flex gap-2 text-xs leading-5 text-slate-700 md:text-sm"
                         >
-                          <span className="font-bold text-rose-500" aria-hidden="true">✕</span>
+                          <span
+                            className="font-bold text-rose-500"
+                            aria-hidden="true"
+                          >
+                            ✕
+                          </span>
                           <span>{item}</span>
                         </li>
                       ))}
@@ -3112,15 +3784,31 @@ export default function GedPredictiveSellingPlaybookPage({
             </PageSection>
 
             <PageSection id="final-summary">
-              <SectionHeader icon="final-summary.png" eyebrow="Final sale summary" title="The short version to hold in mind before you design the offer" />
+              <SectionHeader
+                icon="final-summary.png"
+                eyebrow="Final sale summary"
+                title="The short version to hold in mind before you design the offer"
+              />
               <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_280px]">
                 <article className="rounded-2xl bg-gradient-to-br from-emerald-100 via-cyan-50 to-violet-100 p-7">
-                  <p className="text-sm leading-7 text-slate-800">{safeText(extended.final_summary)}</p>
+                  <p className="text-sm leading-7 text-slate-800">
+                    {safeText(extended.final_summary)}
+                  </p>
                 </article>
                 <article className="flex flex-col items-center justify-center rounded-2xl bg-white p-6 text-center">
                   <Donut score={callReadiness} />
-                  <p className="mt-1 text-base font-extrabold text-slate-950">{safeText(diagnostic?.urgency?.label, "Strategic call priority")}</p>
-                  <p className="mt-1 text-sm text-slate-600">{safeText(diagnostic?.urgency?.window, "Use the Playbook to prepare the next conversation.")}</p>
+                  <p className="mt-1 text-base font-extrabold text-slate-950">
+                    {safeText(
+                      diagnostic?.urgency?.label,
+                      "Strategic call priority",
+                    )}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {safeText(
+                      diagnostic?.urgency?.window,
+                      "Use the Playbook to prepare the next conversation.",
+                    )}
+                  </p>
                 </article>
               </div>
             </PageSection>
