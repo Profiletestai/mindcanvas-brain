@@ -6,6 +6,8 @@ import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
 import {
   getCareerVerticalDisplayCode,
   getVerticalLabel,
+  MCAS_VERTICAL_LABELS,
+  replaceCareerVerticalCodesForDisplay,
 } from "@/lib/mcas/reportConstants";
 import type {
   McasCareerVerticalCode,
@@ -70,6 +72,15 @@ function careerVerticalDisplayCode(code: McasCareerVerticalCode) {
 
 function careerVerticalDisplayLabel(code: McasCareerVerticalCode) {
   return getVerticalLabel(code);
+}
+
+function careerVerticalDefinition(code: McasCareerVerticalCode) {
+  return MCAS_VERTICAL_LABELS[code].shortDescription;
+}
+
+function careerVerticalLevel(code: McasCareerVerticalCode) {
+  const level = Number(code.replace("V", ""));
+  return Number.isFinite(level) ? level : 1;
 }
 
 function SectionShell({
@@ -396,6 +407,7 @@ function SidebarIndex() {
   const links = [
     ["welcome", "Welcome Snapshot"],
     ["style", "Your Operating Style Snapshot"],
+    ["career-vertical", "Your Career Vertical Fit Today"],
     ["strengths", "Your Natural Strengths"],
     ["environment", "Your Best Fit Work Environment"],
     ["roles", "Recommended Roles and Pathways"],
@@ -674,6 +686,209 @@ function RoleCard({ role }: { role: McasRoleRecommendation }) {
   );
 }
 
+function careerVerticalStatusMeta(
+  level: number,
+  primaryLevel: number,
+  readinessPercentage?: number,
+) {
+  if (level < primaryLevel) {
+    return {
+      label: "Completed",
+      rowClass: "border-[#DDD8FF] bg-white",
+      codeClass: "border-[#DDD8FF] bg-[#F5F3FF] text-[#6D4CFF]",
+      pillClass: "border-[#DDD8FF] bg-[#F5F3FF] text-[#6D4CFF]",
+      barColor: "#7C5CFF",
+      barWidth: 100,
+    };
+  }
+
+  if (level === primaryLevel) {
+    return {
+      label: "Current fit",
+      rowClass: "border-[#6D4CFF] bg-[#F1EEFF]",
+      codeClass: "border-[#211941] bg-[#211941] text-white",
+      pillClass: "border-[#211941] bg-[#211941] text-white",
+      barColor: "#6D4CFF",
+      barWidth: 100,
+    };
+  }
+
+  if (level === primaryLevel + 1) {
+    return {
+      label: "Stretch with support",
+      rowClass: "border-[#37C8E7] bg-[#ECFBFE]",
+      codeClass: "border-[#37C8E7] bg-white text-[#147A93]",
+      pillClass: "border-[#37C8E7] bg-white text-[#147A93]",
+      barColor: "#37C8E7",
+      barWidth:
+        typeof readinessPercentage === "number"
+          ? Math.max(18, Math.min(100, Math.round(readinessPercentage)))
+          : 38,
+    };
+  }
+
+  return {
+    label: level === primaryLevel + 2 ? "Overreach risk" : "Not indicated",
+    rowClass:
+      level === primaryLevel + 2
+        ? "border-[#F4C84A] bg-[#FFF9E8]"
+        : "border-slate-200 bg-white",
+    codeClass:
+      level === primaryLevel + 2
+        ? "border-[#F4C84A] bg-white text-[#A85C00]"
+        : "border-slate-200 bg-white text-slate-500",
+    pillClass:
+      level === primaryLevel + 2
+        ? "border-[#F4C84A] bg-white text-[#A85C00]"
+        : "border-slate-200 bg-slate-50 text-slate-500",
+    barColor: level === primaryLevel + 2 ? "#F4C84A" : "#CBD5E1",
+    barWidth: level === primaryLevel + 2 ? 12 : 6,
+  };
+}
+
+function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
+  const primary = payload.result.careerVertical.primary;
+  const next = payload.result.careerVertical.next;
+  const primaryLevel = careerVerticalLevel(primary.code);
+  const readinessPercentage =
+    payload.result.careerVertical.readinessPercentage;
+
+  const order: McasCareerVerticalCode[] = [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+  ];
+
+  const verticals = order.map((code) => {
+    const resultItem = payload.result.careerVertical.distribution.find(
+      (item) => item.code === code,
+    );
+
+    return {
+      code,
+      label: careerVerticalDisplayLabel(code),
+      description: careerVerticalDefinition(code),
+      percentage: resultItem?.percentage ?? 0,
+    };
+  });
+
+  const currentResultLabel = replaceCareerVerticalCodesForDisplay(
+    payload.result.careerVertical.readinessLabel ??
+      `${careerVerticalDisplayCode(primary.code)} fit indicated`,
+  );
+
+  const readinessDescription = next
+    ? `Current Career Vertical result indicates ${careerVerticalDisplayCode(
+        primary.code,
+      )} scope. Stretch indicators toward ${careerVerticalDisplayCode(
+        next.code,
+      )} with support.`
+    : `Current Career Vertical result indicates ${careerVerticalDisplayCode(
+        primary.code,
+      )} scope. Continue strengthening sustainable performance at this level.`;
+
+  return (
+    <SectionShell
+      id="career-vertical"
+      eyebrow="Career Career Vertical Readiness"
+      title="Your Career Vertical Fit Today"
+    >
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-[#DDD8FF] bg-[#F7F5FF] px-5 py-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6D4CFF]">
+            Current result
+          </p>
+          <p className="mt-2 text-[18px] font-black leading-6 text-[#211941]">
+            {currentResultLabel}
+          </p>
+          <p className="mt-2 text-[12px] leading-6 text-slate-600">
+            Progression changes work itself. Higher Career Verticals increase
+            ambiguity, scope, decision impact, and accountability. The next
+            level should be treated as a development horizon, not an automatic
+            promotion recommendation.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {verticals.map((item) => {
+            const level = careerVerticalLevel(item.code);
+            const meta = careerVerticalStatusMeta(
+              level,
+              primaryLevel,
+              readinessPercentage,
+            );
+
+            return (
+              <div
+                key={item.code}
+                className={`grid gap-4 rounded-2xl border px-4 py-4 md:grid-cols-[52px_minmax(0,1.45fr)_minmax(150px,0.85fr)_160px] md:items-center ${meta.rowClass}`}
+              >
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border text-[12px] font-black ${meta.codeClass}`}
+                >
+                  {careerVerticalDisplayCode(item.code)}
+                </div>
+
+                <div>
+                  <p className="text-[13px] font-black leading-5 text-[#211941]">
+                    {careerVerticalDisplayCode(item.code)} · {item.label}
+                  </p>
+                  <p className="mt-1 text-[12px] leading-5 text-slate-600">
+                    {item.description}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${meta.barWidth}%`,
+                        backgroundColor: meta.barColor,
+                      }}
+                    />
+                  </div>
+                  {item.percentage > 0 ? (
+                    <p className="mt-1 text-[9px] font-semibold text-slate-500">
+                      {item.percentage}% scored alignment
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="md:text-right">
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.12em] ${meta.pillClass}`}
+                  >
+                    {meta.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="rounded-2xl border border-[#6D4CFF] bg-[#EEEAFE] p-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6D4CFF] text-lg text-white">
+            ↗
+          </div>
+          <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Career Career Vertical Readiness
+          </p>
+          <p className="mt-2 text-[18px] font-black leading-6 text-[#211941]">
+            {careerVerticalDisplayCode(primary.code)} Ready
+          </p>
+          <p className="mt-2 text-[12px] leading-5 text-slate-600">
+            {readinessDescription}
+          </p>
+        </div>
+      </div>
+    </SectionShell>
+  );
+}
+
 function UpgradePanel({
   payload,
   token,
@@ -691,7 +906,7 @@ function UpgradePanel({
           🔒
         </div>
 
-        <h2 className="text-[18px] font-black leading-6 md:text-[20px]">
+        <h2 className="text-[16px] font-bold leading-5 md:text-[18px]">
           Unlock Your Full Strategic Career Growth Report
         </h2>
 
@@ -799,6 +1014,7 @@ export default async function McasSnapshotReportPage({ params }: PageProps) {
           <div className="space-y-6">
             <WelcomeSection />
             <OperatingStyleSnapshot payload={payload} />
+            <CareerVerticalSection payload={payload} />
             <StrengthsSection strengths={payload.candidateFacing.strengths} />
             <EnvironmentSection payload={payload} />
             <RolesSection roles={payload.candidateFacing.roleRecommendations} />

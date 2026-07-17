@@ -396,7 +396,7 @@ function Hero({ payload }: { payload: McasReportPayload }) {
             <HeroMetric label="Operating Style" value={operatingStyleLabel(primaryOs.code)} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
             <HeroMetric label="Career Vertical" value={careerVerticalDisplayCode(primaryVertical.code)} caption={primaryVertical.label} />
-            <HeroMetric label="Next Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
+            <HeroMetric label="Career Career Vertical Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
           </div>
         </div>
 
@@ -1083,14 +1083,14 @@ function RolesSection({
 
 function roleContextCopy(code: McasOperatingStyleCode): string {
   if (code === "OS8") {
-    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Vertical readiness should guide the level of responsibility considered.";
+    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Career Vertical Readiness should guide the level of responsibility considered.";
   }
 
   if (code === "OS4") {
-    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical readiness should guide the level of responsibility considered.";
+    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Career Vertical Readiness should guide the level of responsibility considered.";
   }
 
-  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Vertical readiness should guide the level of responsibility considered.";
+  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Career Vertical Readiness should guide the level of responsibility considered.";
 }
 
 function RoleDiagramCard({
