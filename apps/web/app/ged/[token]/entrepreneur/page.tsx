@@ -167,6 +167,13 @@ const SECTION_ICON_PATHS = {
 
 const UNDERSTAND_QUANTUM_PROFILE_GRAPH = `${REPORT_ICON_BASE}/graphics/understand-quantum-profile-graphic.png`;
 const MINDSET_LAYER_INFOGRAPHIC = `${REPORT_ICON_BASE}/graphics/mindset-layer-infographic.png`;
+const MINDSET_LAYER_IMAGE_PATHS: Record<MindsetKey, string> = {
+  ORIGIN: `${REPORT_ICON_BASE}/mindset-layer/mindset-origin.png`,
+  MOMENTUM: `${REPORT_ICON_BASE}/mindset-layer/mindset-momentum.png`,
+  VECTOR: `${REPORT_ICON_BASE}/mindset-layer/mindset-vector.png`,
+  ORBIT: `${REPORT_ICON_BASE}/mindset-layer/mindset-orbit.png`,
+  QUANTUM: `${REPORT_ICON_BASE}/mindset-layer/mindset-quantum.png`,
+};
 const GED_FRAMEWORK_GRAPHIC = `${REPORT_ICON_BASE}/section-icons/ged-framework.png`;
 const QUANTUM_PROFILE_MIX_ICON_BASE = `${REPORT_ICON_BASE}/quantum-profile-matrix`;
 
@@ -1719,6 +1726,9 @@ export default function GedEntrepreneurStrategicReportPage({
   const mindsetStageCopy = primaryMindset
     ? MINDSET_STAGE_COPY[primaryMindset]
     : MINDSET_STAGE_COPY.VECTOR;
+  const mindsetLayerImage = primaryMindset
+    ? MINDSET_LAYER_IMAGE_PATHS[primaryMindset]
+    : MINDSET_LAYER_INFOGRAPHIC;
 
   const onePageIconBase = `${REPORT_ICON_BASE}/one-page-quantum-section`;
   const onePageIcons = {
@@ -2551,8 +2561,8 @@ export default function GedEntrepreneurStrategicReportPage({
 
                   <div className="relative min-h-[240px] overflow-hidden rounded-xl bg-[#f9f8f6] sm:min-h-[300px] xl:min-h-[330px]">
                     <AssetIcon
-                      src={MINDSET_LAYER_INFOGRAPHIC}
-                      alt="Quantum mindset growth-stage infographic"
+                      src={mindsetLayerImage}
+                      alt={`${primaryMindsetLabel} mindset growth-stage infographic`}
                       className="absolute inset-0 h-full w-full object-contain p-2 sm:p-3"
                     />
                   </div>
