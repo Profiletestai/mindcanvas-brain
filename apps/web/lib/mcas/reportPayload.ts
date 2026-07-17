@@ -4,9 +4,11 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import {
+  getCareerVerticalDisplayCode,
   getCoreLabel,
   getOperatingStyleDisplayLabel,
   getVerticalLabel,
+  replaceCareerVerticalCodesForDisplay,
   MCAS_CORE_LABELS,
   MCAS_OPERATING_STYLE_LABELS,
   MCAS_VERTICAL_LABELS,
@@ -710,16 +712,17 @@ function getVerticalReadinessLabel(
   verticalReadiness: unknown,
   primaryCode: McasCareerVerticalCode
 ): string {
-  if (isRecord(verticalReadiness)) {
-    return (
-      cleanString(verticalReadiness.readinessLabel) ??
+  const savedLabel = isRecord(verticalReadiness)
+    ? cleanString(verticalReadiness.readinessLabel) ??
       cleanString(verticalReadiness.readiness_label) ??
-      cleanString(verticalReadiness.label) ??
-      `${primaryCode} fit indicated`
-    );
+      cleanString(verticalReadiness.label)
+    : null;
+
+  if (savedLabel) {
+    return replaceCareerVerticalCodesForDisplay(savedLabel);
   }
 
-  return `${primaryCode} fit indicated`;
+  return `${getCareerVerticalDisplayCode(primaryCode)} fit indicated`;
 }
 
 function getVerticalReadinessPercentage(
@@ -1810,7 +1813,7 @@ function getOperatingStyleNarrative(context: CandidateContentContext): string {
     OS8: "You create value by refining established systems, removing friction, and improving quality or efficiency in controlled, sustainable ways.",
   };
 
-  return `${patternNarratives[context.primaryCode]} Your strongest CORE area is ${context.strongestCore.label} at ${context.strongestCore.percentage}%, while ${context.weakestCore.label} at ${context.weakestCore.percentage}% is the part of the work cycle that will need the most deliberate structure or partnership. At ${context.primaryVertical.code} ${context.primaryVertical.label}, your pattern needs to operate with the scope, judgement, and accountability expected at that level.${secondarySentence}`;
+  return `${patternNarratives[context.primaryCode]} Your strongest CORE area is ${context.strongestCore.label} at ${context.strongestCore.percentage}%, while ${context.weakestCore.label} at ${context.weakestCore.percentage}% is the part of the work cycle that will need the most deliberate structure or partnership. At ${getCareerVerticalDisplayCode(context.primaryVertical.code)} ${context.primaryVertical.label}, your pattern needs to operate with the scope, judgement, and accountability expected at that level.${secondarySentence}`;
 }
 
 function getWorkPatternSummary(context: CandidateContentContext): string {
@@ -1822,7 +1825,7 @@ function getWorkPatternSummary(context: CandidateContentContext): string {
     ? `${context.nextVertical.code} ${context.nextVertical.label}`
     : "the next level of sustainable responsibility";
 
-  return `Your strongest Operating Style is ${primaryLabel}, so your work energy is most naturally expressed through ${contribution}. Your CORE balance is led by ${context.strongestCore.label}, while ${context.weakestCore.label} is the area least likely to happen automatically. Your current Career Vertical is ${context.primaryVertical.code} ${context.primaryVertical.label}. This combination explains both where you create value now and what must become more deliberate as you prepare for ${nextStage}.`;
+  return `Your strongest Operating Style is ${primaryLabel}, so your work energy is most naturally expressed through ${contribution}. Your CORE balance is led by ${context.strongestCore.label}, while ${context.weakestCore.label} is the area least likely to happen automatically. Your current Career Vertical is ${getCareerVerticalDisplayCode(context.primaryVertical.code)} ${context.primaryVertical.label}. This combination explains both where you create value now and what must become more deliberate as you prepare for ${nextStage}.`;
 }
 
 function getSuccessGuide(
@@ -1855,7 +1858,7 @@ function getSuccessGuide(
     {
       period: "days_1_30",
       title: "Clarify your operating context",
-      description: `${firstStep[context.primaryCode]} Confirm what ${context.primaryVertical.code} ${context.primaryVertical.label} accountability requires from you now.`,
+      description: `${firstStep[context.primaryCode]} Confirm what ${getCareerVerticalDisplayCode(context.primaryVertical.code)} ${context.primaryVertical.label} accountability requires from you now.`,
     },
     {
       period: "days_31_60",
@@ -1907,7 +1910,7 @@ function getNextStepPathway(context: CandidateContentContext): {
   };
 
   return {
-    current: `${context.primaryVertical.code} ${context.primaryVertical.label} — current fit`,
+    current: `${getCareerVerticalDisplayCode(context.primaryVertical.code)} ${context.primaryVertical.label} — current fit`,
     next: next
       ? `${next.code} ${next.label} — next-stage responsibility`
       : "Sustain enterprise contribution at your current level",
@@ -1968,7 +1971,7 @@ function buildInternalSummary(
       flags.length > 0
         ? flags
         : ["No critical flags are currently indicated in the saved result."],
-    recommendationSummary: `${operatingStylePrimary.label} is the dominant operating pattern. Current vertical indication is ${careerVerticalPrimary.code}. Validate role fit against a role blueprint before using this result for final decision support.`,
+    recommendationSummary: `${operatingStylePrimary.label} is the dominant operating pattern. Current vertical indication is ${getCareerVerticalDisplayCode(careerVerticalPrimary.code)}. Validate role fit against a role blueprint before using this result for final decision support.`,
   } as const;
 }
 

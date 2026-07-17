@@ -108,39 +108,52 @@ export const MCAS_VERTICAL_LABELS: Record<
   McasCareerVerticalCode,
   {
     code: McasCareerVerticalCode;
+    displayCode: string;
     label: string;
     shortDescription: string;
   }
 > = {
   V1: {
     code: "V1",
-    label: "Entry / Foundational",
-    shortDescription: "Task-level execution with guided delivery.",
+    displayCode: "CV1",
+    label: "Apprentice or Student",
+    shortDescription:
+      "Learning through guided work, structured practice, and close support.",
   },
   V2: {
     code: "V2",
-    label: "Developing",
-    shortDescription: "Growing ownership with structured guidance.",
+    displayCode: "CV2",
+    label: "Workforce Contributor",
+    shortDescription:
+      "Contributing through reliable individual delivery and growing ownership.",
   },
   V3: {
     code: "V3",
-    label: "Established",
-    shortDescription: "Independent delivery and cross-team coordination.",
+    displayCode: "CV3",
+    label: "Team Lead or Junior Management",
+    shortDescription:
+      "Leading projects or small teams with increasing coordination responsibility.",
   },
   V4: {
     code: "V4",
-    label: "Senior Scope",
-    shortDescription: "Strategic influence and broader accountability.",
+    displayCode: "CV4",
+    label: "Middle Management",
+    shortDescription:
+      "Leading functions, managing wider scope, and balancing multiple priorities.",
   },
   V5: {
     code: "V5",
-    label: "Strategic Leadership",
-    shortDescription: "Organisation-wide direction and accountability.",
+    displayCode: "CV5",
+    label: "Senior Management",
+    shortDescription:
+      "Leading strategy across functions with broad organisational accountability.",
   },
   V6: {
     code: "V6",
-    label: "Executive / Enterprise",
-    shortDescription: "Enterprise leadership and long-horizon strategy.",
+    displayCode: "CV6",
+    label: "Executive Leadership",
+    shortDescription:
+      "Setting enterprise direction, carrying long-horizon accountability, and leading at organisational scale.",
   },
 };
 
@@ -158,4 +171,12 @@ export function getCoreLabel(code: McasCoreCode) {
 
 export function getVerticalLabel(code: McasCareerVerticalCode) {
   return MCAS_VERTICAL_LABELS[code]?.label ?? code;
+}
+
+export function getCareerVerticalDisplayCode(code: McasCareerVerticalCode) {
+  return MCAS_VERTICAL_LABELS[code]?.displayCode ?? code.replace(/^V/, "CV");
+}
+
+export function replaceCareerVerticalCodesForDisplay(value: string) {
+  return value.replace(/\bV([1-6])\b/g, "CV$1");
 }
