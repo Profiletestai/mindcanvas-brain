@@ -118,42 +118,42 @@ export const MCAS_VERTICAL_LABELS: Record<
     displayCode: "CV1",
     label: "Apprentice or Student",
     shortDescription:
-      "Learning through guided work, structured practice, and close support.",
+      "An entry-level or learning stage where work is guided closely, responsibilities are clearly defined, and progress comes through structured practice, coaching, and dependable habit-building.",
   },
   V2: {
     code: "V2",
     displayCode: "CV2",
     label: "Workforce Contributor",
     shortDescription:
-      "Contributing through reliable individual delivery and growing ownership.",
+      "A reliable individual-contributor stage where the focus is on consistent output, growing ownership, and delivering work independently within a defined role or function.",
   },
   V3: {
     code: "V3",
     displayCode: "CV3",
     label: "Team Lead or Junior Management",
     shortDescription:
-      "Leading projects or small teams with increasing coordination responsibility.",
+      "A first-line leadership stage where responsibility expands into leading projects, coordinating people or workflows, and balancing personal delivery with supervision of others.",
   },
   V4: {
     code: "V4",
     displayCode: "CV4",
     label: "Middle Management",
     shortDescription:
-      "Leading functions, managing wider scope, and balancing multiple priorities.",
+      "A broader management stage where the role includes leading functions or teams, balancing multiple priorities, managing resources, and making decisions across a wider operational scope.",
   },
   V5: {
     code: "V5",
     displayCode: "CV5",
     label: "Senior Management",
     shortDescription:
-      "Leading strategy across functions with broad organisational accountability.",
+      "A senior leadership stage with accountability across larger functions or business units, requiring strategic judgement, cross-functional leadership, and responsibility for broader organisational outcomes.",
   },
   V6: {
     code: "V6",
     displayCode: "CV6",
     label: "Executive Leadership",
     shortDescription:
-      "Setting enterprise direction, carrying long-horizon accountability, and leading at organisational scale.",
+      "An executive stage focused on enterprise direction, long-range decision-making, organisational stewardship, and leading at scale with the highest level of consequence and accountability.",
   },
 };
 

@@ -1227,60 +1227,12 @@ function CareerVerticalJourneyGraphic({
         </p>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-[#DDD8FF] bg-white px-4 pb-6 pt-8 md:px-7">
-        <div className="absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-[#EEEAFE] via-[#F7F5FF] to-transparent" />
-        <div className="absolute left-[8%] right-[8%] top-[68px] hidden border-t-2 border-dashed border-[#6F5CFF]/70 md:block" />
-
-        <div className="relative grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6 md:gap-3">
-          {verticals.map((item) => {
-            const level = verticalLevelNumber(item.code);
-            const isCurrent = level === primaryLevel;
-            const isCompleted = level < primaryLevel;
-            const stepHeight = 76 + level * 18;
-
-            return (
-              <div
-                key={item.code}
-                className="flex min-w-0 flex-col items-center text-center"
-              >
-                <div
-                  className={[
-                    "relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-4 text-sm font-black shadow-[0_8px_18px_rgba(79,70,229,0.24)]",
-                    isCurrent
-                      ? "border-[#CFC7FF] bg-[#4F46E5] text-white ring-4 ring-[#E5E0FF]"
-                      : isCompleted
-                        ? "border-[#D9D4FF] bg-[#6F5CFF] text-white"
-                        : "border-[#E7E5F4] bg-white text-[#6F5CFF]",
-                  ].join(" ")}
-                >
-                  {careerVerticalDisplayCode(item.code)}
-                </div>
-
-                <div
-                  className={[
-                    "mt-3 flex w-full flex-col justify-end rounded-t-2xl border-x border-t px-2 pb-3 pt-4",
-                    isCurrent
-                      ? "border-[#6F5CFF] bg-[#6F5CFF]/10"
-                      : "border-[#E5E7EB] bg-white/85",
-                  ].join(" ")}
-                  style={{ minHeight: `${stepHeight}px` }}
-                >
-                  <p className="text-[12px] font-black leading-4 text-[#17152F]">
-                    {item.label}
-                  </p>
-                  <p className="mt-2 text-[10px] leading-4 text-[#718096]">
-                    {item.description}
-                  </p>
-                  {isCurrent ? (
-                    <span className="mt-3 inline-flex self-center rounded-full bg-[#17152F] px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-white">
-                      Current fit
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="overflow-hidden rounded-2xl border border-[#DDD8FF] bg-[#FCFCFF] p-4 md:p-5">
+        <img
+          src="/mcas/graphics/career-vertical-fit.png"
+          alt="Career vertical progression graphic"
+          className="w-full rounded-xl object-contain"
+        />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -1307,7 +1259,7 @@ function CareerVerticalJourneyGraphic({
 function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   const primary = payload.result.careerVertical.primary;
   const readinessPercentage = payload.result.careerVertical.readinessPercentage;
-  const order = ["V1", "V2", "V3", "V4", "V5", "V6"] as const;
+  const order = ["V6", "V5", "V4", "V3", "V2", "V1"] as const;
   const primaryLevel = verticalLevelNumber(primary.code);
 
   const verticals = order.map((code) => {
@@ -1604,27 +1556,33 @@ function verticalSummaryForCode(payload: McasReportPayload, code: string) {
   const fallback: Record<string, { label: string; description: string }> = {
     V1: {
       label: "Apprentice or Student",
-      description: "Learning through guided work, structured practice, and close support.",
+      description:
+        "An entry-level or learning stage where work is guided closely, responsibilities are clearly defined, and progress comes through structured practice, coaching, and dependable habit-building.",
     },
     V2: {
       label: "Workforce Contributor",
-      description: "Contributing through reliable individual delivery and growing ownership.",
+      description:
+        "A reliable individual-contributor stage where the focus is on consistent output, growing ownership, and delivering work independently within a defined role or function.",
     },
     V3: {
       label: "Team Lead or Junior Management",
-      description: "Leading projects or small teams with increasing coordination responsibility.",
+      description:
+        "A first-line leadership stage where responsibility expands into leading projects, coordinating people or workflows, and balancing personal delivery with supervision of others.",
     },
     V4: {
       label: "Middle Management",
-      description: "Leading functions, managing wider scope, and balancing multiple priorities.",
+      description:
+        "A broader management stage where the role includes leading functions or teams, balancing multiple priorities, managing resources, and making decisions across a wider operational scope.",
     },
     V5: {
       label: "Senior Management",
-      description: "Leading strategy across functions with broad organisational accountability.",
+      description:
+        "A senior leadership stage with accountability across larger functions or business units, requiring strategic judgement, cross-functional leadership, and responsibility for broader organisational outcomes.",
     },
     V6: {
       label: "Executive Leadership",
-      description: "Setting enterprise direction and leading at organisational scale.",
+      description:
+        "An executive stage focused on enterprise direction, long-range decision-making, organisational stewardship, and leading at scale with the highest level of consequence and accountability.",
     },
   };
 
