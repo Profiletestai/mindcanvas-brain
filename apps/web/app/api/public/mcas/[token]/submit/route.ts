@@ -42,9 +42,7 @@ type McasTestLinkRow = {
   id: string;
   public_token: string;
   link_type:
-    | "candidate_assessment"
-    | "reverse_role_assessment"
-    | "internal_validation";
+    "candidate_assessment" | "reverse_role_assessment" | "internal_validation";
   framework_slug: string;
   framework_version: string;
   name: string;
@@ -84,6 +82,28 @@ type McasAssessmentRow = {
   status: string;
 };
 
+type GhlCustomField = {
+  id?: string;
+  key?: string;
+  fieldValue: string;
+};
+
+type GhlSyncResult = {
+  ok: boolean;
+  skipped?: boolean;
+  status?: number;
+  message?: string;
+  contactId?: string;
+  tags?: string[];
+};
+
+type RankedOperatingStyle = {
+  code: string;
+  label: string;
+  pct: number;
+  rank: number;
+};
+
 function mcasSupa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -110,6 +130,411 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function cleanText(value: unknown) {
   return String(value || "").trim();
+}
+
+function cleanEmail(value: unknown) {
+  return cleanText(value).toLowerCase();
+}
+
+function asStringMap(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, label]) => [cleanText(key), cleanText(label)])
+      .filter(([key, label]) => Boolean(key && label)),
+  );
+}
+
+function percentageValue(value: number | undefined) {
+  return Number(((Number(value) || 0) * 100).toFixed(2));
+}
+
+function absoluteUrl(req: Request, value: string) {
+  const cleaned = cleanText(value);
+  if (!cleaned) return "";
+
+  try {
+    return new URL(cleaned, req.url).toString();
+  } catch {
+    return cleaned;
+  }
+}
+
+function pushGhlCustomField(
+  customFields: GhlCustomField[],
+  identifier: string | undefined,
+  value: unknown,
+) {
+  const fieldValue = cleanText(value);
+  const token = cleanText(identifier);
+
+  if (!token || !fieldValue) return;
+
+  if (token.startsWith("key:")) {
+    const key = cleanText(token.slice(4));
+    if (key) customFields.push({ key, fieldValue });
+    return;
+  }
+
+  if (token.startsWith("id:")) {
+    const id = cleanText(token.slice(3));
+    if (id) customFields.push({ id, fieldValue });
+    return;
+  }
+
+  customFields.push({ id: token, fieldValue });
+}
+
+function uniqueTags(values: unknown[]) {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+
+  for (const value of values) {
+    const tag = cleanText(value);
+    if (!tag) continue;
+
+    const comparisonKey = tag.toLowerCase();
+    if (seen.has(comparisonKey)) continue;
+
+    seen.add(comparisonKey);
+    tags.push(tag);
+  }
+
+  return tags;
+}
+
+function readinessSignal(args: {
+  verticalReadiness: boolean;
+  verticalConfidence: "low" | "matched" | null;
+  overreachRisk: boolean;
+}) {
+  if (args.overreachRisk) return "Overreach risk identified";
+  if (args.verticalReadiness) return "Ready for broader responsibility";
+  if (args.verticalConfidence === "matched") return "Current vertical matched";
+  if (args.verticalConfidence === "low") return "Vertical confidence is low";
+  return "No additional readiness signal";
+}
+
+async function syncMcasToProfiletestGhl(args: {
+  orgId: string;
+  candidate: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
+  applicationId: string;
+  assessmentId: string;
+  completedAt: string;
+  testLinkName: string;
+  reportVersion: "lite" | "full";
+  reportUrl: string;
+  resultUrl: string;
+  primaryCareerVerticalCode: string;
+  primaryCareerVerticalLabel: string;
+  readinessSignal: string;
+  operatingStyles: RankedOperatingStyle[];
+  coreDistribution: Record<string, number>;
+}): Promise<GhlSyncResult> {
+  const profiletestOrgId = cleanText(process.env.MCAS_PROFILETEST_ORG_ID);
+
+  if (!profiletestOrgId) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped MCAS GHL sync because MCAS_PROFILETEST_ORG_ID is missing.",
+    };
+  }
+
+  if (cleanText(args.orgId) !== profiletestOrgId) {
+    return {
+      ok: false,
+      skipped: true,
+      message: "Skipped MCAS GHL sync because this is not Profiletest.ai.",
+    };
+  }
+
+  const endpoint =
+    cleanText(process.env.MCAS_GHL_CONTACT_UPSERT_URL) ||
+    cleanText(process.env.GHL_CONTACT_UPSERT_URL) ||
+    "https://services.leadconnectorhq.com/contacts/upsert";
+
+  const apiKey =
+    cleanText(process.env.MCAS_GHL_API_KEY) ||
+    cleanText(process.env.GHL_API_KEY);
+
+  const locationId =
+    cleanText(process.env.MCAS_GHL_LOCATION_ID) ||
+    cleanText(process.env.GHL_LOCATION_ID);
+
+  const apiVersion =
+    cleanText(process.env.MCAS_GHL_API_VERSION) ||
+    cleanText(process.env.GHL_API_VERSION) ||
+    "2021-07-28";
+
+  if (!endpoint || !apiKey || !locationId) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped MCAS GHL sync because the GHL endpoint, API key, or location ID is missing.",
+    };
+  }
+
+  const email = cleanEmail(args.candidate.email);
+  const phone = cleanText(args.candidate.phone);
+
+  if (!email && !phone) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped MCAS GHL sync because the candidate has neither email nor phone.",
+    };
+  }
+
+  const customFields: GhlCustomField[] = [];
+  const primary = args.operatingStyles[0] || null;
+  const secondary = args.operatingStyles[1] || null;
+  const tertiary = args.operatingStyles[2] || null;
+
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_PRIMARY_OPERATING_STYLE,
+    primary?.label || primary?.code,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_SECONDARY_OPERATING_STYLE,
+    secondary?.label || secondary?.code,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_TERTIARY_OPERATING_STYLE,
+    tertiary?.label || tertiary?.code,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_PRIMARY_CAREER_VERTICAL,
+    args.primaryCareerVerticalLabel,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_CAREER_VERTICAL_CODE,
+    args.primaryCareerVerticalCode,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_READINESS_SIGNAL,
+    args.readinessSignal,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_CORE_CREATE_PERCENTAGE,
+    percentageValue(args.coreDistribution.C),
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_CORE_ORGANISE_PERCENTAGE,
+    percentageValue(args.coreDistribution.O),
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_CORE_RESOLVE_PERCENTAGE,
+    percentageValue(args.coreDistribution.R),
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_CORE_EXAMINE_PERCENTAGE,
+    percentageValue(args.coreDistribution.E),
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_REPORT_URL,
+    args.reportUrl,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_RESULT_URL,
+    args.resultUrl,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_REPORT_VERSION,
+    args.reportVersion,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_ASSESSMENT_NAME,
+    args.testLinkName,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_APPLICATION_ID,
+    args.applicationId,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_ASSESSMENT_ID,
+    args.assessmentId,
+  );
+  pushGhlCustomField(
+    customFields,
+    process.env.GHL_CF_MCAS_COMPLETED_AT,
+    args.completedAt,
+  );
+
+  const fullName = [args.candidate.first_name, args.candidate.last_name]
+    .map(cleanText)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const payload = {
+    locationId,
+    firstName: cleanText(args.candidate.first_name) || undefined,
+    lastName: cleanText(args.candidate.last_name) || undefined,
+    name: fullName || undefined,
+    email: email || undefined,
+    phone: phone || undefined,
+    source: "MindCanvas MCAS",
+    customFields: customFields.length ? customFields : undefined,
+  };
+
+  try {
+    const upsertResponse = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Version: apiVersion,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+
+    const rawUpsertResponse = await upsertResponse.text();
+    let parsedUpsertResponse: unknown = rawUpsertResponse;
+
+    try {
+      parsedUpsertResponse = rawUpsertResponse
+        ? JSON.parse(rawUpsertResponse)
+        : null;
+    } catch {
+      // Keep the raw response for logging.
+    }
+
+    if (!upsertResponse.ok) {
+      console.error("[MCAS GHL] Contact upsert failed", {
+        status: upsertResponse.status,
+        response: parsedUpsertResponse,
+      });
+
+      return {
+        ok: false,
+        status: upsertResponse.status,
+        message: `MCAS GHL contact upsert failed with status ${upsertResponse.status}.`,
+      };
+    }
+
+    const responseRecord = isRecord(parsedUpsertResponse)
+      ? parsedUpsertResponse
+      : {};
+    const responseContact = isRecord(responseRecord.contact)
+      ? responseRecord.contact
+      : {};
+    const contactId =
+      cleanText(responseContact.id) || cleanText(responseRecord.contactId);
+
+    if (!contactId) {
+      return {
+        ok: false,
+        status: upsertResponse.status,
+        message:
+          "MCAS GHL contact was upserted, but the response did not contain a contact ID.",
+      };
+    }
+
+    const completionTag =
+      cleanText(process.env.GHL_TAG_MCAS_COMPLETED_ASSESSMENT) ||
+      "MCAS_completed_assessment";
+
+    const tags = uniqueTags([completionTag, args.testLinkName]);
+
+    if (!tags.length) {
+      return {
+        ok: true,
+        status: upsertResponse.status,
+        contactId,
+        tags: [],
+      };
+    }
+
+    let serviceOrigin = "https://services.leadconnectorhq.com";
+    try {
+      serviceOrigin = new URL(endpoint).origin;
+    } catch {
+      // Keep the standard LeadConnector service origin.
+    }
+
+    const tagsEndpoint = `${serviceOrigin}/contacts/${encodeURIComponent(
+      contactId,
+    )}/tags`;
+
+    const tagResponse = await fetch(tagsEndpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Version: apiVersion,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ tags }),
+      cache: "no-store",
+    });
+
+    const rawTagResponse = await tagResponse.text();
+    let parsedTagResponse: unknown = rawTagResponse;
+
+    try {
+      parsedTagResponse = rawTagResponse ? JSON.parse(rawTagResponse) : null;
+    } catch {
+      // Keep the raw response for logging.
+    }
+
+    if (!tagResponse.ok) {
+      console.error("[MCAS GHL] Adding contact tags failed", {
+        status: tagResponse.status,
+        tags,
+        response: parsedTagResponse,
+      });
+
+      return {
+        ok: false,
+        status: tagResponse.status,
+        contactId,
+        tags,
+        message: `MCAS GHL contact was upserted, but adding tags failed with status ${tagResponse.status}.`,
+      };
+    }
+
+    return {
+      ok: true,
+      status: tagResponse.status,
+      contactId,
+      tags,
+    };
+  } catch (caught) {
+    return {
+      ok: false,
+      message: `MCAS GHL sync request failed: ${
+        caught instanceof Error ? caught.message : String(caught)
+      }`,
+    };
+  }
 }
 
 function verticalBandMidpoint(band: string): number | null {
@@ -139,7 +564,7 @@ function normaliseDistribution(totals: Record<string, number>) {
     Object.entries(totals).map(([key, value]) => [
       key,
       Number((value / total).toFixed(4)),
-    ])
+    ]),
   ) as Record<string, number>;
 }
 
@@ -183,8 +608,7 @@ function resultUrlsForLink(testLink: McasTestLinkRow, reportToken: string) {
   }
 
   return {
-    resultUrl:
-      testLink.report_version === "full" ? fullReportUrl : snapshotUrl,
+    resultUrl: testLink.report_version === "full" ? fullReportUrl : snapshotUrl,
     snapshotUrl,
     fullReportUrl,
   };
@@ -213,14 +637,17 @@ export async function POST(req: Request, ctx: RouteContext) {
     if (answers.length === 0) {
       return NextResponse.json(
         { error: "answers[] required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const candidateCheck = validateCandidate(candidatePayload);
 
     if (!candidateCheck.ok) {
-      return NextResponse.json({ error: candidateCheck.error }, { status: 400 });
+      return NextResponse.json(
+        { error: candidateCheck.error },
+        { status: 400 },
+      );
     }
 
     const candidate = candidateCheck.candidate;
@@ -243,7 +670,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           "framework_version",
           "status",
           "started_at",
-        ].join(", ")
+        ].join(", "),
       )
       .eq("public_token", applicationPublicToken)
       .maybeSingle();
@@ -256,14 +683,14 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to resolve candidate application",
           details: applicationError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!application) {
       return NextResponse.json(
         { error: "invalid candidate application token" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -273,7 +700,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error:
             "this candidate application is not connected to an MCAS reusable test link",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -292,7 +719,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           "email_report",
           "next_steps_url",
           "status",
-        ].join(", ")
+        ].join(", "),
       )
       .eq("id", application.test_link_id)
       .maybeSingle();
@@ -305,28 +732,28 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to resolve test link",
           details: testLinkError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!testLink) {
       return NextResponse.json(
         { error: "the test link for this application could not be found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (testLink.status !== "active") {
       return NextResponse.json(
         { error: `test link is ${testLink.status}` },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     if (testLink.link_type !== "candidate_assessment") {
       return NextResponse.json(
         { error: "this link is not a candidate assessment link" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -345,27 +772,35 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to load framework",
           details: frameworkError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!framework || !isRecord(framework.definition)) {
       return NextResponse.json(
         { error: "framework not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const questions: FrameworkQuestion[] = Array.isArray(
-      framework.definition.questions
+      framework.definition.questions,
     )
       ? (framework.definition.questions as FrameworkQuestion[])
       : [];
 
+    const labels = isRecord(framework.definition.labels)
+      ? framework.definition.labels
+      : {};
+    const operatingStyleLabels = asStringMap(labels.operating_styles);
+    const careerVerticalLabels = asStringMap(labels.career_verticals);
+
     if (questions.length !== 25) {
       return NextResponse.json(
-        { error: `framework must have 25 questions; found ${questions.length}` },
-        { status: 500 }
+        {
+          error: `framework must have 25 questions; found ${questions.length}`,
+        },
+        { status: 500 },
       );
     }
 
@@ -390,7 +825,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       if (!answerMap.has(questionCode)) {
         return NextResponse.json(
           { error: `missing answer for ${questionCode}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -416,7 +851,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to save candidate details",
           details: applicationUpdateError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -433,7 +868,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to look up candidate profile",
           details: individualLookupError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -456,7 +891,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             error: "failed to update candidate profile",
             details: updateIndividualError.message,
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     } else {
@@ -479,7 +914,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             details:
               createIndividualError?.message ?? "No candidate profile returned",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -523,7 +958,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to look up assessment",
           details: existingAssessmentError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -552,7 +987,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             error: "failed to update assessment",
             details: updateAssessmentError.message,
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     } else {
@@ -587,7 +1022,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             details:
               createAssessmentError?.message ?? "No assessment token returned",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -606,7 +1041,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to replace assessment answers",
           details: deleteAnswersError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -616,7 +1051,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         question_code,
         option_code,
         response_time_ms: null,
-      })
+      }),
     );
 
     const { error: insertAnswersError } = await sb
@@ -629,7 +1064,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to save assessment answers",
           details: insertAnswersError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -658,30 +1093,28 @@ export async function POST(req: Request, ctx: RouteContext) {
       if (!question || !optionCode) {
         return NextResponse.json(
           { error: `framework or answer missing for ${questionCode}` },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
       const option = question.options.find(
-        (candidateOption) => candidateOption.code === optionCode
+        (candidateOption) => candidateOption.code === optionCode,
       );
 
       if (!option) {
         return NextResponse.json(
           { error: `invalid option ${questionCode}:${optionCode}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (question.section === "operating_style") {
-        if (
-          typeof option.points !== "number" ||
-          !option.os ||
-          !option.core
-        ) {
+        if (typeof option.points !== "number" || !option.os || !option.core) {
           return NextResponse.json(
-            { error: `missing scoring metadata on ${questionCode}:${optionCode}` },
-            { status: 500 }
+            {
+              error: `missing scoring metadata on ${questionCode}:${optionCode}`,
+            },
+            { status: 500 },
           );
         }
 
@@ -711,7 +1144,7 @@ export async function POST(req: Request, ctx: RouteContext) {
               {
                 error: `missing vertical_band on ${questionCode}:${optionCode}`,
               },
-              { status: 500 }
+              { status: 500 },
             );
           }
 
@@ -747,6 +1180,15 @@ export async function POST(req: Request, ctx: RouteContext) {
       pct: Number((item.pct / osTotal).toFixed(4)),
     }));
 
+    const rankedOperatingStyles: RankedOperatingStyle[] = osDistribution.map(
+      (item, index) => ({
+        code: item.code,
+        label: operatingStyleLabels[item.code] || item.code,
+        pct: item.pct,
+        rank: index + 1,
+      }),
+    );
+
     const verticalAverage =
       verticalValues.reduce((sum, value) => sum + value, 0) /
       (verticalValues.length || 1);
@@ -777,7 +1219,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         flags,
         computed_at: nowIso(),
       },
-      { onConflict: "assessment_id" }
+      { onConflict: "assessment_id" },
     );
 
     if (upsertResultError) {
@@ -786,7 +1228,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to save assessment result",
           details: upsertResultError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -806,7 +1248,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to complete assessment",
           details: completeAssessmentError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -824,14 +1266,55 @@ export async function POST(req: Request, ctx: RouteContext) {
           error: "failed to complete candidate application",
           details: completeApplicationError.message,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const { resultUrl, snapshotUrl, fullReportUrl } = resultUrlsForLink(
       testLink,
-      reportToken
+      reportToken,
     );
+
+    const primaryCareerVerticalCode = `V${verticalLevel}`;
+    const primaryCareerVerticalLabel =
+      careerVerticalLabels[primaryCareerVerticalCode] ||
+      primaryCareerVerticalCode;
+
+    const reportPath =
+      testLink.report_version === "full" ? fullReportUrl : snapshotUrl;
+
+    const ghlSyncResult = await syncMcasToProfiletestGhl({
+      orgId: application.org_id,
+      candidate,
+      applicationId: application.application_id,
+      assessmentId,
+      completedAt,
+      testLinkName: testLink.name,
+      reportVersion: testLink.report_version,
+      reportUrl: absoluteUrl(req, reportPath),
+      resultUrl: absoluteUrl(req, resultUrl),
+      primaryCareerVerticalCode,
+      primaryCareerVerticalLabel,
+      readinessSignal: readinessSignal({
+        verticalReadiness,
+        verticalConfidence,
+        overreachRisk,
+      }),
+      operatingStyles: rankedOperatingStyles,
+      coreDistribution,
+    });
+
+    if (!ghlSyncResult.ok && !ghlSyncResult.skipped) {
+      console.error(
+        "[MCAS submit] Profiletest.ai GHL sync failed",
+        ghlSyncResult,
+      );
+    } else if (ghlSyncResult.skipped) {
+      console.warn(
+        "[MCAS submit] Profiletest.ai GHL sync skipped",
+        ghlSyncResult,
+      );
+    }
 
     return NextResponse.json({
       ok: true,
@@ -848,15 +1331,23 @@ export async function POST(req: Request, ctx: RouteContext) {
       scoring_model: scoringModel,
       scores: {
         core: coreDistribution,
-        operating_styles: osDistribution,
+        operating_styles: rankedOperatingStyles,
         vertical_level: verticalLevel,
+        vertical_code: primaryCareerVerticalCode,
+        vertical_label: primaryCareerVerticalLabel,
       },
       confidence,
       flags,
+      ghlSync: {
+        ok: ghlSyncResult.ok,
+        skipped: Boolean(ghlSyncResult.skipped),
+        status: ghlSyncResult.status ?? null,
+        message: ghlSyncResult.message ?? null,
+        tags: ghlSyncResult.tags ?? [],
+      },
     });
   } catch (caught) {
-    const message =
-      caught instanceof Error ? caught.message : String(caught);
+    const message = caught instanceof Error ? caught.message : String(caught);
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
