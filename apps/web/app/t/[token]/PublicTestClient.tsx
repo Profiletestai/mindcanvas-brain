@@ -1,7 +1,7 @@
 // apps/web/app/t/[token]/PublicTestClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Question = {
@@ -279,10 +279,6 @@ const COUNTRY_CODES: CountryCode[] = [
 const DEFAULT_COUNTRY =
   COUNTRY_CODES.find((country) => country.iso === "ZA") ?? COUNTRY_CODES[0];
 
-function formatCountryOption(country: CountryCode) {
-  return `${country.label} (${country.iso}) ${country.dial}`;
-}
-
 function findCountryByIso(iso: string) {
   const normalizedIso = safeString(iso).trim().toUpperCase();
   return COUNTRY_CODES.find((country) => country.iso === normalizedIso) ?? null;
@@ -291,29 +287,6 @@ function findCountryByIso(iso: string) {
 function findCountryByDial(dial: string) {
   const normalizedDial = safeString(dial).replace(/\s+/g, "").trim();
   return COUNTRY_CODES.find((country) => country.dial === normalizedDial) ?? null;
-}
-
-function findCountryFromSearch(value: string) {
-  const normalized = safeString(value).trim().toLowerCase();
-  if (!normalized) return null;
-
-  const exact =
-    COUNTRY_CODES.find(
-      (country) =>
-        formatCountryOption(country).toLowerCase() === normalized ||
-        country.label.toLowerCase() === normalized ||
-        country.iso.toLowerCase() === normalized ||
-        country.dial === value.trim()
-    ) ?? null;
-
-  if (exact) return exact;
-
-  const partialMatches = COUNTRY_CODES.filter((country) => {
-    const searchable = `${country.label} ${country.iso} ${country.dial}`.toLowerCase();
-    return searchable.includes(normalized);
-  });
-
-  return partialMatches.length === 1 ? partialMatches[0] : null;
 }
 
 async function fetchJson(url: string, init?: RequestInit) {
@@ -458,9 +431,8 @@ export default function PublicTestClient({
   const [email, setEmail] = useState("");
   const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_COUNTRY.dial);
   const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY.iso);
-  const [phoneCountrySearch, setPhoneCountrySearch] = useState(
-    formatCountryOption(DEFAULT_COUNTRY)
-  );
+  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
@@ -474,6 +446,8 @@ export default function PublicTestClient({
   const [savingDetails, setSavingDetails] = useState(false);
 
   const [completedMessage, setCompletedMessage] = useState<string | null>(null);
+
+  const countryDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const key = (k: string) => `mc_${k}_${token}`;
 
@@ -552,10 +526,6 @@ export default function PublicTestClient({
               setPhoneCountryCode(parsedPhone.countryCode);
               setPhoneCountryIso(parsedPhone.countryIso);
 
-              const restoredCountry =
-                findCountryByIso(parsedPhone.countryIso) ?? DEFAULT_COUNTRY;
-              setPhoneCountrySearch(formatCountryOption(restoredCountry));
-
               setPhone(parsedPhone.localPhone);
               setCompany(o.company || "");
               setRoleTitle(o.roleTitle || "");
@@ -628,17 +598,50 @@ export default function PublicTestClient({
     token,
   ]);
 
+  useEffect(() => {
+    if (!countryDropdownOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target;
+
+      if (
+        target instanceof Node &&
+        countryDropdownRef.current &&
+        !countryDropdownRef.current.contains(target)
+      ) {
+        setCountryDropdownOpen(false);
+        setCountrySearch("");
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [countryDropdownOpen]);
+
   const selectedPhoneCountry =
     findCountryByIso(phoneCountryIso) ??
     findCountryByDial(phoneCountryCode) ??
     DEFAULT_COUNTRY;
 
-  const countryListId = `mc-country-codes-${token}`;
+  const filteredPhoneCountries = useMemo(() => {
+    const query = countrySearch.trim().toLowerCase();
+
+    if (!query) return COUNTRY_CODES;
+
+    return COUNTRY_CODES.filter((country) => {
+      const searchable = `${country.label} ${country.iso} ${country.dial}`.toLowerCase();
+      return searchable.includes(query);
+    });
+  }, [countrySearch]);
 
   const selectPhoneCountry = (country: CountryCode) => {
     setPhoneCountryCode(country.dial);
     setPhoneCountryIso(country.iso);
-    setPhoneCountrySearch(formatCountryOption(country));
+    setCountrySearch("");
+    setCountryDropdownOpen(false);
     setDetailsError(null);
   };
 
@@ -962,50 +965,89 @@ export default function PublicTestClient({
                   />
                 </label>
 
-                <label className="block">
+                <div className="block">
                   <span className="text-sm text-white/80">Mobile *</span>
 
                   <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-                    <div>
-                      <input
-                        type="text"
-                        list={countryListId}
-                        autoComplete="country"
-                        placeholder="Search country or dialling code"
-                        className="w-full rounded-xl bg-white text-black p-3"
-                        value={phoneCountrySearch}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setPhoneCountrySearch(value);
+                    <div ref={countryDropdownRef} className="relative">
+                      <button
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded={countryDropdownOpen}
+                        onClick={() => {
+                          setCountryDropdownOpen((open) => !open);
+                          setCountrySearch("");
                           setDetailsError(null);
-
-                          const country = findCountryFromSearch(value);
-                          if (country) {
-                            setPhoneCountryCode(country.dial);
-                            setPhoneCountryIso(country.iso);
-                          }
                         }}
-                        onBlur={() => {
-                          const country = findCountryFromSearch(phoneCountrySearch);
+                        className="flex w-full items-center justify-between gap-3 rounded-xl bg-white p-3 text-left text-black"
+                      >
+                        <span className="min-w-0 truncate">
+                          {selectedPhoneCountry.label} ({selectedPhoneCountry.iso})
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2 font-semibold text-slate-700">
+                          {selectedPhoneCountry.dial}
+                          <span aria-hidden="true">{countryDropdownOpen ? "▲" : "▼"}</span>
+                        </span>
+                      </button>
 
-                          if (country) {
-                            selectPhoneCountry(country);
-                          } else {
-                            setPhoneCountrySearch(
-                              formatCountryOption(selectedPhoneCountry)
-                            );
-                          }
-                        }}
-                      />
+                      {countryDropdownOpen && (
+                        <div className="absolute z-50 mt-2 w-full min-w-[280px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+                          <div className="border-b border-slate-200 p-2">
+                            <input
+                              type="search"
+                              autoFocus
+                              autoComplete="off"
+                              placeholder="Search country, IS, or +354"
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-black outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
+                              value={countrySearch}
+                              onChange={(e) => setCountrySearch(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") {
+                                  setCountryDropdownOpen(false);
+                                  setCountrySearch("");
+                                }
+                              }}
+                            />
+                          </div>
 
-                      <datalist id={countryListId}>
-                        {COUNTRY_CODES.map((country) => (
-                          <option
-                            key={country.iso}
-                            value={formatCountryOption(country)}
-                          />
-                        ))}
-                      </datalist>
+                          <div
+                            role="listbox"
+                            aria-label="Choose country dialling code"
+                            className="max-h-64 overflow-y-auto p-1"
+                          >
+                            {filteredPhoneCountries.length > 0 ? (
+                              filteredPhoneCountries.map((country) => {
+                                const selected = country.iso === selectedPhoneCountry.iso;
+
+                                return (
+                                  <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected={selected}
+                                    key={country.iso}
+                                    onClick={() => selectPhoneCountry(country)}
+                                    className={[
+                                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm",
+                                      selected
+                                        ? "bg-sky-100 font-semibold text-sky-950"
+                                        : "text-slate-900 hover:bg-slate-100",
+                                    ].join(" ")}
+                                  >
+                                    <span>{country.label} ({country.iso})</span>
+                                    <span className="shrink-0 font-semibold text-slate-600">
+                                      {country.dial}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <div className="px-3 py-4 text-sm text-slate-500">
+                                No country matches your search.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="relative">
@@ -1029,10 +1071,10 @@ export default function PublicTestClient({
                   </div>
 
                   <p className="mt-1 text-xs text-white/55">
-                    Start typing a country name or dialling code. The selected
-                    code is added automatically.
+                    Select a country, then enter the local mobile number. The
+                    international dialling code is added automatically.
                   </p>
-                </label>
+                </div>
 
                 <label className="block">
                   <span className="text-sm text-white/80">Organisation (optional)</span>
