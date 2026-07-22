@@ -47,6 +47,7 @@ type VisQuestionRow = {
   id: string;
   idx: number;
   code: string;
+  text?: string | null;
   pillar: number;
   section_code: SectionCode | null;
   is_internal_only: boolean;
@@ -58,6 +59,17 @@ type VisOptionRow = {
   option_code: string;
   scoring: VisScoring;
   is_active: boolean;
+  label?: string | null;
+  text?: string | null;
+  option_text?: string | null;
+  option_label?: string | null;
+  answer_text?: string | null;
+  display_text?: string | null;
+  title?: string | null;
+  name?: string | null;
+  value?: string | null;
+  content?: string | null;
+  copy?: string | null;
 };
 
 type ScoringPersonality = {
@@ -601,6 +613,453 @@ function pushCustomField(
   }
 
   customFields.push({ id: token, value: fieldValue, field_value: fieldValue });
+}
+
+
+function pushHighLevelCustomField(
+  customFields: any[],
+  identifier: string | undefined,
+  value: any
+) {
+  if (!identifier || !identifier.trim() || value == null) return;
+
+  let fieldValue: any = value;
+
+  if (Array.isArray(fieldValue)) {
+    fieldValue = fieldValue
+      .map((item) => normalizeText(item))
+      .filter(Boolean)
+      .join(", ");
+  } else if (typeof fieldValue === "string") {
+    fieldValue = fieldValue.trim();
+  } else if (typeof fieldValue === "boolean") {
+    fieldValue = fieldValue ? "true" : "false";
+  }
+
+  if (fieldValue === "") return;
+
+  const token = identifier.trim();
+
+  if (token.startsWith("key:")) {
+    const key = token.slice(4).trim();
+    if (!key) return;
+    customFields.push({ key, fieldValue });
+    return;
+  }
+
+  if (token.startsWith("id:")) {
+    const id = token.slice(3).trim();
+    if (!id) return;
+    customFields.push({ id, fieldValue });
+    return;
+  }
+
+  customFields.push({ id: token, fieldValue });
+}
+
+function getVisibilityOptionDisplayText(option: VisOptionRow): string | null {
+  const raw: any = option as any;
+  const candidates = [
+    raw.option_text,
+    raw.option_label,
+    raw.answer_text,
+    raw.display_text,
+    raw.label,
+    raw.text,
+    raw.title,
+    raw.name,
+    raw.value,
+    raw.content,
+    raw.copy,
+    raw?.scoring?.label,
+    raw?.scoring?.text,
+  ];
+
+  for (const candidate of candidates) {
+    const value = normalizeText(candidate);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function getVisibilityPersonalityQuestionNumber(
+  question: VisQuestionRow
+): number | null {
+  const code = normalizeText(question.code).toUpperCase();
+  const codeMatch = code.match(/^(?:P|Q)([1-8])$/);
+
+  if (codeMatch) {
+    return Number(codeMatch[1]);
+  }
+
+  if (
+    question.section_code === "personality" &&
+    Number.isFinite(question.idx) &&
+    question.idx >= 1 &&
+    question.idx <= 8
+  ) {
+    return question.idx;
+  }
+
+  return null;
+}
+
+function formatVisibilityLabel(value: any): string | null {
+  const raw = normalizeText(value);
+  if (!raw) return null;
+
+  return raw
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map(titleCaseWord)
+    .join(" ");
+}
+
+async function syncVisibilityLadderToGhl(args: {
+  taker: any;
+  assessmentName: string;
+  assessmentId: string;
+  reportUrl: string;
+  completedAt: string;
+  personalityType: AB | null;
+  personalityPercent: Record<AB, number>;
+  personalityAnswers: Record<number, string>;
+  tier: Tier;
+  level: number;
+  readiness: Readiness;
+  pillarScores: Record<string, number>;
+  overallPct: number | null;
+  strongestPillar: string | null;
+  weakestPillar: string | null;
+  balancePattern: string | null;
+  patternTags: string[];
+}): Promise<GhlSyncResult> {
+  const serviceBase =
+    normalizeText(process.env.WHATSWHAT_GHL_SERVICE_BASE_URL) ||
+    "https://services.leadconnectorhq.com";
+
+  const endpoint =
+    normalizeText(process.env.WHATSWHAT_GHL_CONTACT_UPSERT_URL) ||
+    `${serviceBase}/contacts/upsert`;
+
+  const apiKey = normalizeText(process.env.WHATSWHAT_GHL_API_KEY);
+  const locationId = normalizeText(process.env.WHATSWHAT_GHL_LOCATION_ID);
+  const apiVersion =
+    normalizeText(process.env.WHATSWHAT_GHL_API_VERSION) ||
+    normalizeText(process.env.GHL_API_VERSION) ||
+    "2021-07-28";
+
+  if (!apiKey || !locationId || !endpoint) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped Visibility Ladder GHL sync because the API key, Location ID, or endpoint is missing.",
+    };
+  }
+
+  const email = normalizeEmail(args.taker?.email);
+  const phone = normalizeText(args.taker?.phone);
+
+  if (!email && !phone) {
+    return {
+      ok: false,
+      skipped: true,
+      message:
+        "Skipped Visibility Ladder GHL sync because the taker has neither email nor phone.",
+    };
+  }
+
+  const customFields: any[] = [];
+
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_INDUSTRY,
+    args.taker?.industry
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_ROLE_OR_DEPARTMENT,
+    args.taker?.role_title
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_LINKEDIN_PROFILE,
+    args.taker?.linkedin_profile
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_REFERRED_BY,
+    args.taker?.referred_by
+  );
+
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PERSONALITY_TYPE,
+    args.personalityType
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PERSONALITY_A_PERCENTAGE,
+    args.personalityPercent.A
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PERSONALITY_B_PERCENTAGE,
+    args.personalityPercent.B
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PERSONALITY_C_PERCENTAGE,
+    args.personalityPercent.C
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PERSONALITY_D_PERCENTAGE,
+    args.personalityPercent.D
+  );
+
+  const questionFieldIds = [
+    process.env.WHATSWHAT_GHL_VL_CF_Q1_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q2_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q3_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q4_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q5_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q6_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q7_ANSWER,
+    process.env.WHATSWHAT_GHL_VL_CF_Q8_ANSWER,
+  ];
+
+  for (let questionNumber = 1; questionNumber <= 8; questionNumber += 1) {
+    pushHighLevelCustomField(
+      customFields,
+      questionFieldIds[questionNumber - 1],
+      args.personalityAnswers[questionNumber]
+    );
+  }
+
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_VISIBILITY_TIER,
+    args.tier
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_VISIBILITY_LEVEL,
+    args.level
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_READINESS,
+    formatVisibilityLabel(args.readiness)
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_VISIBILITY_SCORE,
+    args.pillarScores.visibility
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_TRUST_SCORE,
+    args.pillarScores.trust
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_AUTHORITY_SCORE,
+    args.pillarScores.authority
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_DOMINANCE_SCORE,
+    args.pillarScores.dominance
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_OVERALL_VISIBILITY_SCORE,
+    args.overallPct
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_STRONGEST_PILLAR,
+    formatVisibilityLabel(args.strongestPillar)
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_WEAKEST_PILLAR,
+    formatVisibilityLabel(args.weakestPillar)
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_BALANCE_PATTERN,
+    formatVisibilityLabel(args.balancePattern)
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PATTERN_TAGS,
+    args.patternTags
+  );
+
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_ASSESSMENT_NAME,
+    args.assessmentName
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_ASSESSMENT_ID,
+    args.assessmentId
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_REPORT_URL,
+    args.reportUrl
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_COMPLETED_AT,
+    args.completedAt
+  );
+
+  const fullName = [args.taker?.first_name, args.taker?.last_name]
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  const payload: any = {
+    locationId,
+    firstName: normalizeText(args.taker?.first_name) || undefined,
+    lastName: normalizeText(args.taker?.last_name) || undefined,
+    name: fullName || undefined,
+    email: email || undefined,
+    phone: phone || undefined,
+    source: "MindCanvas Visibility Ladder",
+    customFields: customFields.length ? customFields : undefined,
+  };
+
+  if (normalizeText(args.taker?.company)) {
+    payload.companyName = normalizeText(args.taker.company);
+  }
+
+  if (normalizeText(args.taker?.website_url)) {
+    payload.website = normalizeText(args.taker.website_url);
+  }
+
+  const countryCode = normalizeText(args.taker?.country_code).toUpperCase();
+  if (/^[A-Z]{2}$/.test(countryCode)) {
+    payload.country = countryCode;
+  }
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Version: apiVersion,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+
+    const raw = await response.text();
+    let parsed: any = raw;
+
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      // Keep the raw response text for diagnostics.
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        message: `Visibility Ladder GHL upsert failed with status ${response.status}`,
+        response: parsed,
+      };
+    }
+
+    const contactId = normalizeText(
+      parsed?.contact?.id || parsed?.contactId || parsed?.id
+    );
+
+    const completionTag =
+      normalizeText(process.env.WHATSWHAT_GHL_VL_TAG_COMPLETED) ||
+      "VL_completed_assessment";
+
+    if (completionTag && contactId) {
+      const tagResponse = await fetch(
+        `${serviceBase}/contacts/${encodeURIComponent(contactId)}/tags`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            Version: apiVersion,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tags: [completionTag] }),
+          cache: "no-store",
+        }
+      );
+
+      const tagRaw = await tagResponse.text();
+      let tagParsed: any = tagRaw;
+
+      try {
+        tagParsed = tagRaw ? JSON.parse(tagRaw) : null;
+      } catch {
+        // Keep the raw response text for diagnostics.
+      }
+
+      if (!tagResponse.ok) {
+        return {
+          ok: false,
+          status: tagResponse.status,
+          message: `Visibility Ladder contact synced, but adding the completion tag failed with status ${tagResponse.status}`,
+          response: {
+            upsert: parsed,
+            tags: tagParsed,
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        status: response.status,
+        response: {
+          upsert: parsed,
+          tags: tagParsed,
+        },
+      };
+    }
+
+    if (completionTag && !contactId) {
+      return {
+        ok: false,
+        status: response.status,
+        message:
+          "Visibility Ladder contact synced, but the GHL response did not include a contact ID, so the completion tag could not be added.",
+        response: parsed,
+      };
+    }
+
+    return {
+      ok: true,
+      status: response.status,
+      response: parsed,
+    };
+  } catch (e: any) {
+    return {
+      ok: false,
+      message: `Visibility Ladder GHL request failed: ${String(
+        e?.message || e
+      )}`,
+    };
+  }
 }
 
 async function syncGedToGhl(args: {
@@ -1505,7 +1964,7 @@ export async function POST(
 
     const { data: linkUsageRow, error: linkUsageErr } = await sb
       .from("test_links")
-      .select("id, max_uses, use_count")
+      .select("id, name, max_uses, use_count")
       .eq("token", token)
       .maybeSingle();
 
@@ -1517,6 +1976,7 @@ export async function POST(
     }
 
     const linkId: string | null = (linkUsageRow as any)?.id ?? null;
+    const linkAssessmentName = normalizeText((linkUsageRow as any)?.name);
     const linkMaxUses: number | null =
       typeof (linkUsageRow as any)?.max_uses === "number"
         ? (linkUsageRow as any).max_uses
@@ -1547,7 +2007,7 @@ export async function POST(
     const { data: taker, error: takerErr } = await sb
       .from("test_takers")
       .select(
-        "id, org_id, test_id, link_token, first_name, last_name, email, company, role_title, phone, last_result_url"
+        "id, org_id, test_id, link_token, first_name, last_name, email, company, role_title, phone, website_url, industry, country_code, country_name, linkedin_profile, referred_by, last_result_url"
       )
       .eq("id", takerId)
       .eq("link_token", token)
@@ -1660,9 +2120,7 @@ export async function POST(
 
       const { data: vQsRaw, error: vqErr } = await vis
         .from("questions")
-        .select(
-          "id, code, idx, pillar, section_code, is_internal_only, is_scored"
-        )
+        .select("*")
         .eq("test_id", vTest.id)
         .eq("is_active", true)
         .order("idx", { ascending: true });
@@ -1681,6 +2139,10 @@ export async function POST(
         id: String(q.id),
         code: String(q.code),
         idx: Number(q.idx),
+        text:
+          normalizeText(
+            q.text || q.question_text || q.prompt || q.title || q.label
+          ) || null,
         pillar: Number(q.pillar),
         section_code: q.section_code ?? null,
         is_internal_only: Boolean(q.is_internal_only),
@@ -1691,7 +2153,7 @@ export async function POST(
 
       const { data: vOptsRaw, error: voErr } = await vis
         .from("options")
-        .select("question_id, option_code, scoring, is_active")
+        .select("*")
         .in("question_id", qIds)
         .eq("is_active", true);
 
@@ -1706,6 +2168,7 @@ export async function POST(
       }
 
       const vOpts: VisOptionRow[] = (vOptsRaw || []).map((o: any) => ({
+        ...o,
         question_id: String(o.question_id),
         option_code: String(o.option_code),
         scoring: o.scoring as VisScoring,
@@ -1717,11 +2180,23 @@ export async function POST(
 
       const scoringMap: Record<string, Partial<Record<AnswerCode, VisScoring>>> =
         {};
+      const optionTextMap: Record<
+        string,
+        Partial<Record<AnswerCode, string>>
+      > = {};
+
       for (const o of vOpts) {
         const answerCode = safeAnswerCode(o.option_code);
         if (!answerCode) continue;
+
         scoringMap[o.question_id] = scoringMap[o.question_id] || {};
         scoringMap[o.question_id]![answerCode] = o.scoring;
+
+        const displayText = getVisibilityOptionDisplayText(o);
+        if (displayText) {
+          optionTextMap[o.question_id] = optionTextMap[o.question_id] || {};
+          optionTextMap[o.question_id]![answerCode] = displayText;
+        }
       }
 
       const personalityPoints = emptyPersonalityPoints();
@@ -1734,6 +2209,7 @@ export async function POST(
       let answeredPersonalityQuestions = 0;
 
       const storedAnswers: Record<string, AnswerCode> = {};
+      const personalityAnswerLabels: Record<number, string> = {};
 
       for (const row of answers) {
         const qid = row?.question_id || row?.qid || row?.id;
@@ -1750,6 +2226,36 @@ export async function POST(
 
         answeredQuestions += 1;
         storedAnswers[q.code] = answerCode;
+
+        const personalityQuestionNumber =
+          getVisibilityPersonalityQuestionNumber(q);
+
+        if (personalityQuestionNumber) {
+          const payloadAnswerText = normalizeText(
+            row?.selected_text ||
+              row?.selectedText ||
+              row?.answer_text ||
+              row?.answerText ||
+              row?.label
+          );
+
+          const selectedAnswerText =
+            payloadAnswerText || optionTextMap[q.id]?.[answerCode] || "";
+
+          if (selectedAnswerText) {
+            personalityAnswerLabels[personalityQuestionNumber] =
+              selectedAnswerText;
+          } else {
+            console.warn(
+              "[visibility submit] Could not resolve display text for a personality answer",
+              {
+                question_code: q.code,
+                question_id: q.id,
+                answer_code: answerCode,
+              }
+            );
+          }
+        }
 
         const rawScoring = scoringMap[q.id]?.[answerCode];
 
@@ -2080,6 +2586,81 @@ export async function POST(
       const supportEmail =
         normalizeEmail((orgRow as any)?.support_email) || getDefaultSupportEmail();
 
+      const visibilityOrgSlug = normalizeSlug((orgRow as any)?.slug);
+      const visibilityAllowedOrgId = normalizeText(
+        process.env.WHATSWHAT_GHL_ALLOWED_ORG_ID
+      );
+      const visibilityAllowedOrgSlug = normalizeSlug(
+        process.env.WHATSWHAT_GHL_ALLOWED_ORG_SLUG
+      );
+
+      const isAllowedVisibilityGhlOrg = visibilityAllowedOrgId
+        ? String(taker.org_id) === visibilityAllowedOrgId
+        : Boolean(
+            visibilityAllowedOrgSlug &&
+              visibilityOrgSlug === visibilityAllowedOrgSlug
+          );
+
+      const visibilityCompletedAt = new Date().toISOString();
+      let visibilityGhlSyncResult: GhlSyncResult | null = null;
+
+      if (primeMode && isAllowedVisibilityGhlOrg) {
+        visibilityGhlSyncResult = await syncVisibilityLadderToGhl({
+          taker,
+          assessmentName:
+            linkAssessmentName ||
+            normalizeText(test.name) ||
+            "Visibility Ladder",
+          assessmentId: String(sub.id),
+          reportUrl: baseReportUrl,
+          completedAt: visibilityCompletedAt,
+          personalityType: personality_type,
+          personalityPercent: personality_percent,
+          personalityAnswers: personalityAnswerLabels,
+          tier,
+          level,
+          readiness,
+          pillarScores: pillar_scores,
+          overallPct: overall_pct,
+          strongestPillar: strongest_pillar,
+          weakestPillar: weakest_pillar,
+          balancePattern: balance_pattern,
+          patternTags: pattern_tags,
+        });
+
+        if (
+          !visibilityGhlSyncResult.ok &&
+          !visibilityGhlSyncResult.skipped
+        ) {
+          console.error(
+            "[visibility submit] WhatsWhat GHL sync failed",
+            visibilityGhlSyncResult
+          );
+        } else if (visibilityGhlSyncResult.skipped) {
+          console.warn(
+            "[visibility submit] WhatsWhat GHL sync skipped",
+            visibilityGhlSyncResult
+          );
+        }
+      } else if (primeMode) {
+        visibilityGhlSyncResult = {
+          ok: true,
+          skipped: true,
+          message:
+            visibilityAllowedOrgId || visibilityAllowedOrgSlug
+              ? "Skipped Visibility Ladder GHL sync because the submission belongs to a different organisation."
+              : "Skipped Visibility Ladder GHL sync because WHATSWHAT_GHL_ALLOWED_ORG_ID or WHATSWHAT_GHL_ALLOWED_ORG_SLUG is not configured.",
+        };
+
+        console.info("[visibility submit] WhatsWhat GHL sync ring-fenced", {
+          taker_id: taker.id,
+          submission_org_id: String(taker.org_id),
+          submission_org_slug: visibilityOrgSlug || null,
+          allowed_org_id: visibilityAllowedOrgId || null,
+          allowed_org_slug: visibilityAllowedOrgSlug || null,
+        });
+      }
+
       let takerEmailResult: any = null;
       try {
         if (linkBehavior.email_report && normalizeEmail(taker.email)) {
@@ -2171,6 +2752,7 @@ export async function POST(
           visibility_test_id: vTest.id,
           engine_key: resRow.engine_key,
           version: resRow.version,
+          ghl_sync: visibilityGhlSyncResult,
         },
         owner_notification: ownerNotification,
         taker_email: takerEmailResult,
