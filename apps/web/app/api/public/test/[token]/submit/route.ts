@@ -2022,7 +2022,7 @@ export async function POST(
 
     const { data: test, error: testErr } = await sb
       .from("tests")
-      .select("id, slug, meta, name")
+      .select("id, slug, meta, name, org_id")
       .eq("id", taker.test_id)
       .maybeSingle();
 
@@ -2047,7 +2047,12 @@ export async function POST(
       );
     }
 
-    let hasAccess = accessRow?.status === "active";
+    // An organisation always has access to a test it directly owns.
+    // Shared platform tests and wrappers still require an active access row.
+    const ownsTest =
+      String((test as any)?.org_id || "") === String(taker.org_id || "");
+
+    let hasAccess = ownsTest || accessRow?.status === "active";
 
     // Wrapper tests inherit access from their source (default) test:
     // if the org has active access to the underlying source test, allow submit.
