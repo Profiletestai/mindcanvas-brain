@@ -13,6 +13,8 @@ import type {
   ProgressResponse,
   UploadLogoResponse,
   ApiErrorResponse,
+  PlanSelectionRequestBody,
+  PlanSelectionResponse,
 } from "@/app/api/onboarding/v2/_lib/types";
 
 export type {
@@ -22,6 +24,8 @@ export type {
   ContactRequestBody,
   BrandingRequestBody,
   ProgressResponse,
+  PlanSelectionRequestBody,
+  PlanSelectionResponse,
 };
 
 const BASE = "/api/onboarding/v2";
@@ -47,6 +51,9 @@ export const api = {
     send<SignupRequestBody, SignupResponse>("/signup", "POST", body),
   verifyOtp: (body: VerifyOtpRequestBody) =>
     send<VerifyOtpRequestBody, VerifyOtpResponse>("/verify-otp", "POST", body),
+  getPlanSelection: () => send<undefined, PlanSelectionResponse>("/plan", "GET"),
+  savePlanSelection: (body: PlanSelectionRequestBody) =>
+    send<PlanSelectionRequestBody, PlanSelectionResponse>("/plan", "POST", body),
   createOrg: (body: CreateOrgRequestBody) =>
     send<CreateOrgRequestBody, CreateOrgResponse>("/org", "POST", body),
   getOrg: () => send<undefined, GetOrgResponse>("/org", "GET"),

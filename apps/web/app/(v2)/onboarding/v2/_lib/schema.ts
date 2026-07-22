@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { isValidPhoneNumber } from "libphonenumber-js";
+import {
+  ENGINE_KEYS,
+  TIER_DISABLED_REASON,
+  isTierAllowed,
+  normalizeEngines,
+} from "./engines";
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const OTP_RE = /^\d{6}$/;
@@ -71,6 +77,28 @@ export const verifyOtpSchema = z.object({
   token: otpSchema,
 });
 
+// Step 3 — engines + subscription tier. Tier 4 is not selectable here, and the
+// tier/engine-count rule is re-checked server-side (see /api/onboarding/v2/plan).
+export const engineKeySchema = z.enum(ENGINE_KEYS);
+
+export const planSelectionSchema = z
+  .object({
+    engines: z
+      .array(engineKeySchema)
+      .min(1, { message: "Select at least one engine." })
+      .max(ENGINE_KEYS.length)
+      .transform((v) => normalizeEngines(v)),
+    tier: z
+      .number()
+      .int()
+      .min(1, { message: "Select a subscription tier." })
+      .max(3, { message: "Tier 4 is not available during onboarding." }),
+  })
+  .refine((v) => isTierAllowed(v.tier, v.engines.length), {
+    message: TIER_DISABLED_REASON,
+    path: ["tier"],
+  });
+
 export const orgSchema = z.object({
   name: nonEmptyTrimmed,
   country: nonEmptyTrimmed,
@@ -122,6 +150,8 @@ export const uploadLogoSchema = z.object({
 
 export type SignupInput = z.infer<typeof signupSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+export type PlanSelectionInput = z.input<typeof planSelectionSchema>;
+export type PlanSelectionOutput = z.output<typeof planSelectionSchema>;
 export type OrgInput = z.infer<typeof orgSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type BrandingInput = z.infer<typeof brandingSchema>;

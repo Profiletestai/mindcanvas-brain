@@ -58,6 +58,38 @@ export async function POST(req: Request) {
     if (ent?.tier !== PILOT_TIER) return jerr("Org already active", "org_already_active", 409);
   }
 
+  // Onboarding rule: the number of engines the org selected sets the minimum
+  // tier. Recomputed here from portal.org_engines — the browser's tier is only
+  // honoured when it is at least the minimum. Falls back to the tier stored on
+  // the org (chosen on onboarding step 3) when the request omits one.
+  const { count: engineCount, error: engineErr } = await portalAdmin()
+    .from("org_engines")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("status", "active");
+  if (engineErr) return jerr(engineErr.message, "engine_lookup_failed", 500);
+
+  const minTier = engineCount ?? 0;
+
+  if (minTier > 0) {
+    const { data: orgTier } = await portalAdmin()
+      .from("orgs")
+      .select("selected_tier")
+      .eq("id", orgId)
+      .maybeSingle<{ selected_tier: number | null }>();
+
+    if (body.tier === undefined && orgTier?.selected_tier) {
+      body.tier = orgTier.selected_tier;
+    }
+    if (body.tier !== undefined && body.tier < minTier) {
+      return jerr(
+        `Tier ${body.tier} does not support ${minTier} engines`,
+        "tier_below_minimum",
+        400
+      );
+    }
+  }
+
   if (body.tier !== undefined) {
     const admin = portalAdmin();
     const existing = await getOwnerBillingAccount(orgId);
@@ -81,6 +113,16 @@ export async function POST(req: Request) {
   const ba = await getOwnerBillingAccount(orgId);
   if (!ba) return jerr("Billing account missing", "billing_account_missing", 500);
   if (!ba.tier) return jerr("Billing account has no tier", "tier_missing", 409);
+  // The request may omit a tier entirely and fall back to whatever the billing
+  // account already carries (e.g. a stale tier from an earlier attempt), so the
+  // engine rule is checked once more against the tier that reaches Stripe.
+  if (minTier > 0 && ba.tier < minTier) {
+    return jerr(
+      `Tier ${ba.tier} does not support ${minTier} engines`,
+      "tier_below_minimum",
+      400
+    );
+  }
 
   let prices;
   try {

@@ -8,6 +8,7 @@ import type { z } from "zod";
 import { OtpInput } from "../_components/OtpInput";
 import { StepCard } from "../_components/StepCard";
 import { api, isErr } from "../_lib/api";
+import { PLAN_PATH } from "../_lib/progress";
 import { verifyOtpSchema } from "../_lib/schema";
 
 type VerifyFormInput = z.input<typeof verifyOtpSchema>;
@@ -60,7 +61,7 @@ export default function VerifyPage() {
       setError("root", { message: res.error });
       return;
     }
-    router.push("/onboarding/v2/organisation");
+    router.push(PLAN_PATH);
   });
 
   const onResend = async () => {

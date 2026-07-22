@@ -6,15 +6,16 @@ import type {
 export const STEP_TO_PATH: Record<Exclude<OnboardingStep, "complete">, string> = {
   1: "/onboarding/v2/account",
   2: "/onboarding/v2/verify",
-  3: "/onboarding/v2/organisation",
-  4: "/onboarding/v2/contact",
-  5: "/onboarding/v2/branding",
+  3: "/onboarding/v2/plan",
+  4: "/onboarding/v2/organisation",
+  5: "/onboarding/v2/contact",
   6: "/onboarding/v2/branding",
 };
 
 export const COMPLETE_PATH = "/onboarding/v2/welcome";
 export const ACCOUNT_PATH = STEP_TO_PATH[1];
 export const VERIFY_PATH = STEP_TO_PATH[2];
+export const PLAN_PATH = STEP_TO_PATH[3];
 export const ONB_EMAIL_KEY = "onb_email";
 
 // First step that requires an authenticated session (org membership exists).
@@ -32,10 +33,11 @@ export const PATH_TO_STEP: Record<string, OnboardingStep> = {
   [STEP_TO_PATH[3]]: 3,
   [STEP_TO_PATH[4]]: 4,
   [STEP_TO_PATH[5]]: 5,
+  [STEP_TO_PATH[6]]: 6,
   [COMPLETE_PATH]: "complete",
 };
 
-export const TOTAL_STEPS = 6;
+export const TOTAL_STEPS = 7;
 
 export function displayStep(step: OnboardingStep | undefined): number {
   if (step === "complete") return TOTAL_STEPS;

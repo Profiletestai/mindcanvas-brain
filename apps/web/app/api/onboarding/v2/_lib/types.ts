@@ -4,7 +4,9 @@ import type {
   OrgInput,
   ContactInput,
   BrandingInput,
+  PlanSelectionInput,
 } from "@/app/(v2)/onboarding/v2/_lib/schema";
+import type { EngineKey } from "@/app/(v2)/onboarding/v2/_lib/engines";
 
 // POST /api/onboarding/v2/signup
 export type SignupRequestBody = SignupInput;
@@ -20,6 +22,22 @@ export type VerifyOtpRequestBody = VerifyOtpInput;
 export interface VerifyOtpResponse {
   ok: true;
   user_id: string;
+}
+
+// GET/POST /api/onboarding/v2/plan
+export type PlanSelectionRequestBody = PlanSelectionInput;
+
+export interface PlanSelection {
+  engines: EngineKey[];
+  tier: number;
+  /** Minimum tier the engine count allows — recomputed server-side. */
+  minimum_tier: number;
+  trials: Array<{ engine: EngineKey; product: string; quantity: number }>;
+}
+
+export interface PlanSelectionResponse {
+  ok: true;
+  selection: PlanSelection | null;
 }
 
 // POST /api/onboarding/v2/org

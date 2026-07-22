@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
       primary_contact_first_name: contact_first_name,
       primary_contact_last_name: contact_last_name,
       primary_contact_email: contact_email,
-      last_completed_step: 4,
+      last_completed_step: 5,
     };
 
     updates.phone_number = phone_number ?? null;

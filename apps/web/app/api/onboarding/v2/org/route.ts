@@ -42,6 +42,28 @@ export async function POST(req: Request) {
       });
     }
 
+    // Step 3 must be completed first: the org is created with the engines,
+    // tier and trial credits from the selection, so without one the org would
+    // start with no engines and no tier — and the checkout min-tier rule (which
+    // derives the minimum from the engine count) would have nothing to check.
+    const { data: selection, error: selectionError } = await admin
+      .from("onboarding_selections")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle<{ user_id: string }>();
+    if (selectionError) {
+      return NextResponse.json(
+        { ok: false, error: selectionError.message },
+        { status: 500 }
+      );
+    }
+    if (!selection) {
+      return NextResponse.json(
+        { ok: false, error: "Select your engines and subscription first." },
+        { status: 400 }
+      );
+    }
+
     const slug = await generateUniqueSlug(name);
 
     const { data: orgId, error: rpcError } = await admin.rpc("fn_create_onboarding_org", {
