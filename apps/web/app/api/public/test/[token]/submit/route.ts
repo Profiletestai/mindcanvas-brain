@@ -2735,7 +2735,7 @@ export async function POST(
           ? reportPath
           : linkBehavior.redirect_url && linkBehavior.redirect_url.trim().length
             ? linkBehavior.redirect_url.trim()
-            : reportPath;
+            : resultPath;
 
       return NextResponse.json({
         ok: true,
