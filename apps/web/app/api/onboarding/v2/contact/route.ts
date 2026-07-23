@@ -40,11 +40,13 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: false, error: "No org found for user" }, { status: 404 });
     }
 
+    // Step 5 is contact details *and* payment: it is only marked complete once
+    // Stripe confirms, via POST /api/onboarding/v2/step. Saving contact
+    // details on their own must not advance the flow past checkout.
     const updates: PortalOrgUpdate = {
       primary_contact_first_name: contact_first_name,
       primary_contact_last_name: contact_last_name,
       primary_contact_email: contact_email,
-      last_completed_step: 5,
     };
 
     updates.phone_number = phone_number ?? null;

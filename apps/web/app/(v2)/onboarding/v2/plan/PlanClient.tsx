@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, isErr } from "../_lib/api";
-import { STEP_TO_PATH } from "../_lib/progress";
+import { BILLING_PATH, ORGANISATION_PATH } from "../_lib/progress";
 import {
   ENGINES,
   ENGINE_LIST,
   TRIAL_TESTS_PER_ENGINE,
+  dedupeEngines,
   engineListLabel,
   isTierAllowed,
   normalizeEngines,
@@ -16,10 +17,10 @@ import {
   trialAllocation,
   type EngineKey,
 } from "../_lib/engines";
+import { StepCard } from "../_components/StepCard";
 import { EngineCard } from "./EngineCard";
 import { TierCard, type TierCardData } from "./TierCard";
 
-const ORGANISATION_PATH = STEP_TO_PATH[4];
 
 // Figma screen 3 accent — engine pills in the summary rail.
 const ACCENT = "rgb(84,175,224)";
@@ -43,10 +44,15 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
   const router = useRouter();
   const [engines, setEngines] = useState<EngineKey[]>([]);
   const [tier, setTier] = useState<number | null>(null);
+  // Distinguishes "we picked the recommended tier for you" from "the client
+  // clicked a tier" — the rail wording differs, the saved value does not.
+  const [tierPickedByUser, setTierPickedByUser] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // Which call-to-action is in flight, so both buttons lock and only the
+  // pressed one shows its progress label.
+  const [pending, setPending] = useState<null | "subscribe" | "skip">(null);
 
   // Restore a previous visit's selection so it survives refresh / sign-out.
   useEffect(() => {
@@ -57,6 +63,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
       if (!isErr(res) && res.selection) {
         setEngines(normalizeEngines(res.selection.engines));
         setTier(res.selection.tier);
+        setTierPickedByUser(true);
       }
       setLoading(false);
     })();
@@ -71,16 +78,30 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
   const toggleEngine = (key: EngineKey) => {
     setError("");
     const adding = !engines.includes(key);
+    // Selection order, not catalogue order — the rail lists engines in the
+    // order they were picked. normalizeEngines runs only on the way out.
     const next = adding
-      ? normalizeEngines([...engines, key])
+      ? dedupeEngines([...engines, key])
       : engines.filter((k) => k !== key);
     setEngines(next);
 
-    // Adding an engine can invalidate the chosen tier — drop it and say why.
-    if (tier !== null && !isTierAllowed(tier, next.length)) {
+    if (next.length === 0) {
       setTier(null);
+      setTierPickedByUser(false);
+      setNotice("");
+      return;
+    }
+
+    // A tier is always explicitly selected: the recommendation is applied for
+    // the client whenever their current pick is missing or no longer valid.
+    if (tier === null || !isTierAllowed(tier, next.length)) {
+      const replaced = tier !== null;
+      setTier(recommendedTier(next.length));
+      setTierPickedByUser(false);
       setNotice(
-        "Your subscription recommendation has changed because you selected an additional engine."
+        replaced
+          ? "Your subscription recommendation has changed because you selected an additional engine."
+          : ""
       );
     } else {
       setNotice("");
@@ -92,20 +113,52 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
     setError("");
     setNotice("");
     setTier(t);
+    setTierPickedByUser(true);
   };
 
-  // The design lets the client continue straight from the recommended plan, so
-  // an untouched tier falls back to the minimum for the engine count.
-  const canContinue = count > 0 && !saving;
+  const canContinue = count > 0 && tier !== null && pending === null;
 
-  async function onContinue() {
-    if (!canContinue) return;
-    setSaving(true);
-    setError("");
-    const res = await api.savePlanSelection({ engines, tier: tier ?? minTier });
-    setSaving(false);
+  // Persist the engine/tier pick before either path leaves this screen. The
+  // backend re-derives the minimum tier and the trial allocation from it.
+  async function saveSelection(): Promise<boolean> {
+    if (tier === null) return false;
+    const res = await api.savePlanSelection({
+      engines: normalizeEngines(engines),
+      tier,
+    });
     if (isErr(res)) {
       setError(res.error);
+      return false;
+    }
+    return true;
+  }
+
+  // Primary CTA: hand off to the billing screen, which starts Stripe checkout.
+  async function onSubscribe() {
+    if (!canContinue) return;
+    setPending("subscribe");
+    setError("");
+    if (!(await saveSelection())) {
+      setPending(null);
+      return;
+    }
+    router.push(BILLING_PATH);
+  }
+
+  // Secondary CTA: skip payment. skipBilling creates the org, which grants the
+  // per-engine free trial tests, then onboarding continues at the org step.
+  async function onSkip() {
+    if (!canContinue) return;
+    setPending("skip");
+    setError("");
+    if (!(await saveSelection())) {
+      setPending(null);
+      return;
+    }
+    const res = await api.skipBilling();
+    if (isErr(res)) {
+      setError(res.error);
+      setPending(null);
       return;
     }
     router.push(ORGANISATION_PATH);
@@ -128,19 +181,24 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
   const planPrice = activeCard ? formatUsd(activeCard.amountCents) : "";
 
   return (
-    <div className="w-full">
-      <header className="text-center">
-        <h1 className="text-[38px] font-bold leading-[43px] tracking-[-0.5px] text-white">
-          Choose your MindCanvas{" "}
-          <span style={{ color: "rgb(84,175,224)" }}>engines</span>
-        </h1>
-        <p className="mx-auto mt-3 max-w-[578px] text-[14px] leading-[24.5px] text-white/70">
+    <StepCard
+      width="100%"
+      minHeight="auto"
+      titleNoWrap={false}
+      className="lg:px-[80px] lg:pt-[31px]"
+      title={
+        <>
+          Choose your <span style={{ color: ACCENT }}>MindCanvas</span> engines
+        </>
+      }
+      subtitle={
+        <span className="mx-auto block max-w-[578px]">
           Select the solutions you would like to use in your organisation. You
           can choose one engine or combine multiple engines as your organisation
           grows.
-        </p>
-      </header>
-
+        </span>
+      }
+    >
       <div className="mt-10 grid gap-[18px] md:grid-cols-2 lg:grid-cols-3">
         {ENGINE_LIST.map((engine) => (
           <EngineCard
@@ -155,7 +213,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
       <div className="mt-12 flex flex-col gap-[26px] lg:flex-row lg:items-start">
         <section className="lg:flex-1">
           <p
-            className="text-[17.5px] font-semibold leading-[21px]"
+            className="text-[17.6px] font-semibold leading-[21px]"
             style={{ color: "rgb(234,242,251)" }}
           >
             Recommended for your engine selection
@@ -267,9 +325,9 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
                   className="mt-[6px] text-[13px] leading-[20px]"
                   style={{ color: RAIL_LABEL }}
                 >
-                  {tier === null ? "Recommended" : "Selected"} subscription:{" "}
+                  {tierPickedByUser ? "Selected" : "Recommended"} subscription:{" "}
                   <span style={{ color: RAIL_VALUE }}>
-                    {tier === null ? recommendedName : planName} Plan
+                    {tierPickedByUser ? planName : recommendedName} Plan
                   </span>
                 </p>
                 <p
@@ -310,25 +368,61 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
                 design has no call to action in that state. */}
             {count > 0 && (
               <>
+                {/* Primary: subscribe now → Stripe checkout (via billing). */}
                 <button
                   type="button"
-                  onClick={onContinue}
+                  onClick={onSubscribe}
                   disabled={!canContinue}
-                  className={`mt-[22px] h-[45.6px] w-full rounded-[8px] text-[14.3px] font-semibold tracking-[0.2px] text-white ${
+                  className={`mt-[22px] flex h-[52px] w-full items-center justify-center gap-[10px] rounded-[12px] text-[15px] font-bold tracking-[0.2px] text-white transition ${
                     canContinue
-                      ? "cursor-pointer"
+                      ? "cursor-pointer hover:brightness-105"
                       : "cursor-not-allowed opacity-40"
                   }`}
-                  style={{
-                    background:
-                      "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
-                  }}
+                  style={{ background: "rgb(107,178,222)" }}
                 >
-                  {saving
-                    ? "Saving…"
-                    : tier === null
-                      ? "Continue"
-                      : "Continue to free trial"}
+                  {pending === "subscribe" ? (
+                    "Redirecting…"
+                  ) : (
+                    <>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#fff"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M5 12.5l4.5 4.5L19 7" />
+                      </svg>
+                      <span>Subscribe to {planName}</span>
+                      <span
+                        className="rounded-full px-[11px] py-[3px] text-[13px] font-semibold"
+                        style={{ background: "rgba(255,255,255,0.24)" }}
+                      >
+                        {planPrice}/mo
+                      </span>
+                    </>
+                  )}
+                </button>
+
+                {/* Secondary: skip payment, keep the free trial tests. */}
+                <button
+                  type="button"
+                  onClick={onSkip}
+                  disabled={!canContinue}
+                  className={`mt-[12px] flex h-[52px] w-full items-center justify-center rounded-[12px] border text-[15px] font-medium text-white transition ${
+                    canContinue
+                      ? "cursor-pointer hover:bg-white/[0.06]"
+                      : "cursor-not-allowed opacity-40"
+                  }`}
+                  style={{ borderColor: "rgba(255,255,255,0.35)" }}
+                >
+                  {pending === "skip"
+                    ? "Setting up…"
+                    : "Skip for now — start with my free tests"}
                 </button>
 
                 <p
@@ -343,6 +437,6 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
           </div>
         </aside>
       </div>
-    </div>
+    </StepCard>
   );
 }

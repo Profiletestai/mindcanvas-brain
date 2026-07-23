@@ -6,6 +6,8 @@ import type {
   CreateOrgRequestBody,
   CreateOrgResponse,
   GetOrgResponse,
+  UpdateOrgRequestBody,
+  UpdateOrgResponse,
   ContactRequestBody,
   ContactResponse,
   BrandingRequestBody,
@@ -15,17 +17,23 @@ import type {
   ApiErrorResponse,
   PlanSelectionRequestBody,
   PlanSelectionResponse,
+  StepRequestBody,
+  StepResponse,
+  EngineTrialSummary,
 } from "@/app/api/onboarding/v2/_lib/types";
 
 export type {
   SignupRequestBody,
   VerifyOtpRequestBody,
   CreateOrgRequestBody,
+  UpdateOrgRequestBody,
   ContactRequestBody,
   BrandingRequestBody,
   ProgressResponse,
   PlanSelectionRequestBody,
   PlanSelectionResponse,
+  StepResponse,
+  EngineTrialSummary,
 };
 
 const BASE = "/api/onboarding/v2";
@@ -56,12 +64,21 @@ export const api = {
     send<PlanSelectionRequestBody, PlanSelectionResponse>("/plan", "POST", body),
   createOrg: (body: CreateOrgRequestBody) =>
     send<CreateOrgRequestBody, CreateOrgResponse>("/org", "POST", body),
+  patchOrg: (body: UpdateOrgRequestBody) =>
+    send<UpdateOrgRequestBody, UpdateOrgResponse>("/org", "PATCH", body),
   getOrg: () => send<undefined, GetOrgResponse>("/org", "GET"),
   patchContact: (body: ContactRequestBody) =>
     send<ContactRequestBody, ContactResponse>("/contact", "PATCH", body),
   patchBranding: (body: BrandingRequestBody) =>
     send<BrandingRequestBody, BrandingResponse>("/branding", "PATCH", body),
   progress: () => send<undefined, ProgressResponse>("/progress", "GET"),
+  completeStep: (step: StepRequestBody["step"]) =>
+    send<StepRequestBody, StepResponse>("/step", "POST", { step }),
+  // Proceed with free trial tests instead of subscribing: creates the org
+  // (which grants the per-engine trial credits) and skips the Stripe step.
+  skipBilling: () =>
+    send<undefined, { ok: true; org_slug: string | null }>("/skip-billing", "POST"),
+  getTrials: () => send<undefined, EngineTrialSummary>("/trials", "GET"),
   uploadLogo: async (file: File): Promise<UploadLogoResponse | ApiErrorResponse> => {
     const fd = new FormData();
     fd.append("file", file);

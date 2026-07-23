@@ -44,6 +44,16 @@ type UsageResponse = {
   details?: UsageDetailsRow[];
 };
 
+// Per-engine trial credits granted during onboarding. These are spent before
+// the monthly subscription allowance, so they are worth showing next to usage.
+type EngineTrial = {
+  engine_key: string;
+  product_code: string;
+  display_name: string;
+  allocated: number;
+  remaining: number;
+};
+
 const RANGE_OPTIONS = [
   { value: "this_month", label: "This month" },
   { value: "last_month", label: "Last month" },
@@ -73,6 +83,7 @@ export default function PortalUsageClient() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [data, setData] = useState<UsageResponse | null>(null);
+  const [trials, setTrials] = useState<EngineTrial[]>([]);
 
   async function loadUsage() {
     if (!orgSlug) return;
@@ -103,6 +114,25 @@ export default function PortalUsageClient() {
   useEffect(() => {
     loadUsage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgSlug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/onboarding/v2/trials", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const json = await res.json().catch(() => null);
+        if (!cancelled && json?.ok) setTrials(json.engines ?? []);
+      } catch {
+        // Trial credits are supplementary — a failure here must not break usage.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [orgSlug]);
 
   const summary = data?.summary;
@@ -181,6 +211,33 @@ export default function PortalUsageClient() {
           Include detailed submission list (up to 1000 rows)
         </label>
       </section>
+
+      {trials.length > 0 && (
+        <section className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+          <div className="text-[11px] text-slate-400 mb-3">
+            Trial tests remaining (used before your monthly allowance)
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {trials.map((t) => (
+              <div
+                key={t.engine_key}
+                className="rounded-xl border border-white/10 bg-slate-950/60 p-3"
+              >
+                <div className="text-[11px] text-slate-400">
+                  {t.display_name} · {t.product_code}
+                </div>
+                <div className="mt-1 text-xl font-semibold text-sky-400">
+                  {t.remaining}
+                  <span className="text-xs font-normal text-slate-400">
+                    {" "}
+                    of {t.allocated}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {err && (
         <div className="rounded-md border border-red-500/50 bg-red-950/40 p-3 text-xs text-red-200">

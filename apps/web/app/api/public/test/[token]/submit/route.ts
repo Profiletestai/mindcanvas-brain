@@ -1623,7 +1623,13 @@ export async function POST(
       );
     }
 
-    const reservation = await reserveSubmission(taker.org_id, taker.id);
+    // The test id lets the RPC match a per-engine trial credit before falling
+    // back to the subscription allowance.
+    const reservation = await reserveSubmission(
+      taker.org_id,
+      taker.id,
+      taker.test_id
+    );
     if (!reservation.ok) {
       const status = reservation.reason === "no_subscription" ? 403 : 402;
       return NextResponse.json(

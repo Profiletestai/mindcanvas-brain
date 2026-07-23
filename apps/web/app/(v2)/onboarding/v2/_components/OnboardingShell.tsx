@@ -12,9 +12,11 @@ const WIDE_PATHS = new Set([PLAN_PATH]);
 export function OnboardingShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
+  // Step 3 still sits in a StepCard — it just spans the full width instead of
+  // sharing the row with the marketing pane.
   if (WIDE_PATHS.has(pathname)) {
     return (
-      <div className="mx-auto max-w-[1440px] px-6 lg:px-[120px] pb-24 pt-8 lg:pt-[52px]">
+      <div className="mx-auto max-w-[1440px] px-6 lg:px-[41px] pb-24 pt-8 lg:pt-[52px]">
         <StepGuard>{children}</StepGuard>
       </div>
     );

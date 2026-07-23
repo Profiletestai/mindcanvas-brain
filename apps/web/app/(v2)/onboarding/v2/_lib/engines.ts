@@ -64,6 +64,17 @@ export function normalizeEngines(input: readonly unknown[]): EngineKey[] {
   return ENGINE_KEYS.filter((k) => seen.has(k));
 }
 
+/**
+ * Same cleanup as normalizeEngines but keeps the caller's order. The screen
+ * lists engines in the order the client picked them; only what we persist is
+ * forced into catalogue order.
+ */
+export function dedupeEngines(input: readonly unknown[]): EngineKey[] {
+  const out: EngineKey[] = [];
+  for (const v of input) if (isEngineKey(v) && !out.includes(v)) out.push(v);
+  return out;
+}
+
 /** 1 engine -> tier 1, 2 -> tier 2, 3 -> tier 3. Also the minimum tier. */
 export function recommendedTier(engineCount: number): OnboardingTier {
   if (engineCount >= 3) return 3;
@@ -88,7 +99,7 @@ export const TIER_DISABLED_REASON =
 export function trialAllocation(
   engines: readonly EngineKey[]
 ): Array<{ engine: EngineKey; product: EngineProductCode; quantity: number }> {
-  return normalizeEngines(engines).map((key) => ({
+  return dedupeEngines(engines).map((key) => ({
     engine: key,
     product: ENGINES[key].productCode,
     quantity: TRIAL_TESTS_PER_ENGINE,
@@ -96,12 +107,12 @@ export function trialAllocation(
 }
 
 export function totalTrialTests(engines: readonly EngineKey[]): number {
-  return normalizeEngines(engines).length * TRIAL_TESTS_PER_ENGINE;
+  return dedupeEngines(engines).length * TRIAL_TESTS_PER_ENGINE;
 }
 
 /** "Sales and Coaching" / "Sales, Coaching and People" */
 export function engineListLabel(engines: readonly EngineKey[]): string {
-  const names = normalizeEngines(engines).map((k) =>
+  const names = dedupeEngines(engines).map((k) =>
     ENGINES[k].name.replace(/ Engine$/, "")
   );
   if (names.length <= 1) return names[0] ?? "";

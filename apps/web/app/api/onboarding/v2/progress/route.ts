@@ -40,7 +40,7 @@ export async function GET() {
     const last = org?.last_completed_step ?? 0;
     const org_slug = org?.slug ?? null;
 
-    if (last >= 6) {
+    if (last >= 8) {
       return NextResponse.json({ ok: true, step: "complete", org_id: membership.org_id, org_slug });
     }
 

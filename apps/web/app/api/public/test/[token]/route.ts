@@ -1,7 +1,7 @@
 // apps/web/app/api/public/test/[token]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getSubmissionUsage, isSubmissionQuotaEnforced } from "@/app/_lib/billing";
+import { getSubmissionAvailability, isSubmissionQuotaEnforced } from "@/app/_lib/billing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,8 +103,15 @@ export async function GET(
     // ALL links for the org. Exhausted => block opening/starting, not just submit.
     let orgLimitReached = false;
     if (isSubmissionQuotaEnforced()) {
-      const usage = await getSubmissionUsage(linkRow.org_id);
-      orgLimitReached = !usage.exempt && (usage.remaining ?? 0) <= 0;
+      // Per-test: the trial credit spent at submit is scoped to this test's
+      // engine, so check availability for this test rather than the org total —
+      // otherwise a taker opens a test whose engine is exhausted and only finds
+      // out when submit fails.
+      const availability = await getSubmissionAvailability(
+        linkRow.org_id,
+        linkRow.test_id
+      );
+      orgLimitReached = !availability.available;
     }
 
     const limitReached = perLinkLimitReached || orgLimitReached;
@@ -219,8 +226,10 @@ export async function POST(
     // Block starting a test once the org's monthly submission cap is reached,
     // counted across all links (not just this one).
     if (isSubmissionQuotaEnforced()) {
-      const usage = await getSubmissionUsage(link.org_id);
-      if (!usage.exempt && (usage.remaining ?? 0) <= 0) {
+      // Same per-test availability check as the open gate, so a taker is never
+      // allowed to start a test they won't be able to submit.
+      const availability = await getSubmissionAvailability(link.org_id, link.test_id);
+      if (!availability.available) {
         return NextResponse.json(
           {
             ok: false,

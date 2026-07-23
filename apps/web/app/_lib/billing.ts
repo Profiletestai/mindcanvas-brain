@@ -4,6 +4,7 @@
 import "server-only";
 import { stripe } from "@/lib/stripe";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
+import { generateUniqueSlug } from "@/app/api/onboarding/v2/_lib/slug";
 
 export type OwnerBillingAccount = {
   id: string;
@@ -178,6 +179,9 @@ export async function resolveOwnerOrgId(userId: string, orgIdHint?: string | nul
 export type ReserveSubmissionResult = {
   ok: boolean;
   reason?: "no_subscription" | "limit_reached";
+  /** Which pot the submission was drawn from when ok. */
+  source?: "engine_trial" | "subscription";
+  engine_key?: string;
   allowance?: number;
   used?: number;
   remaining?: number;
@@ -190,13 +194,16 @@ export function isSubmissionQuotaEnforced(): boolean {
 
 export async function reserveSubmission(
   orgId: string,
-  referenceId: string
+  referenceId: string,
+  /** Lets the RPC spend a per-engine trial credit before the subscription quota. */
+  testId?: string | null
 ): Promise<ReserveSubmissionResult> {
   if (!isSubmissionQuotaEnforced()) return { ok: true };
 
   const { data, error } = await portalAdmin().rpc("fn_reserve_submission", {
     p_org_id: orgId,
     p_reference_id: referenceId,
+    p_test_id: testId ?? null,
   });
   if (error) throw error;
   return data as ReserveSubmissionResult;
@@ -209,6 +216,8 @@ export type SubmissionUsage = {
   allowance: number | null;
   used: number;
   remaining: number | null;
+  /** Per-engine trial credits left; spent before the monthly allowance. */
+  trial_remaining: number | null;
   period_start: string | null;
   period_end: string | null;
 };
@@ -219,6 +228,103 @@ export async function getSubmissionUsage(orgId: string): Promise<SubmissionUsage
   });
   if (error) throw error;
   return data as SubmissionUsage;
+}
+
+export type SubmissionAvailability = {
+  ok: boolean;
+  available: boolean;
+  reason?: "no_subscription" | "limit_reached";
+  exempt?: boolean;
+  source?: "engine_trial" | "subscription";
+  engine_key?: string | null;
+  trial_remaining?: number;
+};
+
+/** Whether the org can submit THIS test right now (per-engine trial credit or
+ *  subscription allowance), without consuming anything. Mirrors the decision
+ *  fn_reserve_submission makes at submit time, so open/start gates match it. */
+export async function getSubmissionAvailability(
+  orgId: string,
+  testId: string
+): Promise<SubmissionAvailability> {
+  if (!isSubmissionQuotaEnforced()) return { ok: true, available: true };
+  const { data, error } = await portalAdmin().rpc("fn_submission_availability", {
+    p_org_id: orgId,
+    p_test_id: testId,
+  });
+  if (error) throw error;
+  return data as SubmissionAvailability;
+}
+
+/** Create the onboarding placeholder org for a user who has saved a plan
+ *  selection but has no org yet. Runs fn_create_onboarding_org, which applies
+ *  the selection (engines + tier + free trial credits) and marks step 4 done.
+ *  Shared by the Stripe checkout flow and the "skip payment" flow — both need
+ *  the org (and its trial credits) to exist before the organisation step. */
+export async function createOnboardingPlaceholderOrg(user: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+}): Promise<
+  | { ok: true; orgId: string }
+  | { ok: false; status: number; code: string; error: string }
+> {
+  const admin = portalAdmin();
+
+  const { data: selection } = await admin
+    .from("onboarding_selections")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle<{ user_id: string }>();
+  if (!selection) {
+    return {
+      ok: false,
+      status: 400,
+      code: "no_plan_selection",
+      error: "Complete the plan selection first.",
+    };
+  }
+
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const firstName = String(meta.first_name ?? "").trim();
+  const lastName = String(meta.last_name ?? "").trim();
+  // No placeholder name: the org is created blank and the organisation step
+  // requires the user to enter the real name before it advances. Slug falls
+  // back to "org" (generateUniqueSlug) until then.
+  const orgName = "";
+  const slug = await generateUniqueSlug(orgName);
+
+  const { data: newOrgId, error: rpcErr } = await admin.rpc(
+    "fn_create_onboarding_org",
+    {
+      p_user_id: user.id,
+      p_name: orgName,
+      p_slug: slug,
+      p_address: null,
+      p_country: "",
+      p_billing_region: null as unknown as string,
+      p_website_url: null,
+      p_industry: null,
+      p_logo_url: null,
+    }
+  );
+  if (rpcErr) {
+    return { ok: false, status: 500, code: "org_create_failed", error: rpcErr.message };
+  }
+
+  const nowIso = new Date().toISOString();
+  await admin
+    .from("orgs")
+    .update({
+      terms_accepted_at: nowIso,
+      privacy_accepted_at: nowIso,
+      primary_contact_first_name: firstName || null,
+      primary_contact_last_name: lastName || null,
+      primary_contact_email: user.email ?? null,
+    })
+    .eq("id", newOrgId as string);
+
+  return { ok: true, orgId: newOrgId as string };
 }
 
 export async function getOrgRow(orgId: string) {

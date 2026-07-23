@@ -11,9 +11,11 @@ export type TierCardData = PlanCardContent & { amountCents: number };
 //   selected     — white card, blue border, "Selected <plan>" button + tick
 //   unavailable  — whole card faded to 40%, no button, red notice (below minimum)
 const SURFACE_DEFAULT = "rgb(15,32,53)";
-const SURFACE_UNAVAILABLE = "rgb(20,39,58)";
 const SURFACE_SELECTED = "rgb(255,255,255)";
 const BORDER_ACTIVE = "rgb(68,136,214)";
+// Light hairline in both states — Figma uses the same stroke on the dark and
+// the selected card.
+const DIVIDER = "rgb(232,237,243)";
 const TEXT_MUTED = "rgb(138,151,171)";
 const TEXT_FEATURE = "rgb(90,107,133)";
 const TEXT_EXCLUDED = "rgb(183,191,201)";
@@ -46,11 +48,7 @@ export function TierCard({
     <div
       className="relative flex flex-col rounded-[10px] border px-[21px] pb-[21px] pt-[21px]"
       style={{
-        background: selected
-          ? SURFACE_SELECTED
-          : disabled
-            ? SURFACE_UNAVAILABLE
-            : SURFACE_DEFAULT,
+        background: selected ? SURFACE_SELECTED : SURFACE_DEFAULT,
         borderColor: bordered ? BORDER_ACTIVE : "transparent",
         // Figma fades the whole unavailable card rather than restyling it.
         opacity: disabled ? 0.4 : 1,
@@ -80,7 +78,7 @@ export function TierCard({
 
       {showBadge && (
         <span
-          className="absolute -top-[9px] left-[20px] rounded-full px-[10px] py-[2px] text-[10px] font-bold uppercase leading-[14px] tracking-[0.2px] text-white"
+          className="absolute -top-[9px] left-[20px] rounded-full px-[10px] py-[2px] text-[9.35px] font-bold uppercase leading-[14px] tracking-[0.2px] text-white"
           style={{ background: BORDER_ACTIVE }}
         >
           Recommended
@@ -96,39 +94,34 @@ export function TierCard({
 
       <div className="mt-[10px] flex items-baseline gap-[3px]">
         <span
-          className="text-[24px] font-bold leading-[29px]"
+          className="text-[24.2px] font-bold leading-[29px]"
           style={{ color: selected ? TEXT_ON_LIGHT : "#fff" }}
         >
           {formatUsd(card.amountCents)}
         </span>
-        <span className="text-[12px] leading-[15px]" style={{ color: TEXT_MUTED }}>
+        <span className="text-[13.2px] leading-[16px]" style={{ color: TEXT_MUTED }}>
           /month
         </span>
       </div>
 
-      <p className="mt-[6px] text-[12px] leading-[15px]" style={{ color: TEXT_MUTED }}>
+      <p className="mt-[6px] text-[12.1px] leading-[15px]" style={{ color: TEXT_MUTED }}>
         {card.tagline}
       </p>
 
-      <div
-        className="mt-[14px] mb-[10px] h-px"
-        style={{
-          background: selected ? "rgba(22,35,58,0.12)" : "rgba(255,255,255,0.09)",
-        }}
-      />
+      <div className="mt-[14px] mb-[10px] h-px" style={{ background: DIVIDER }} />
 
       <ul className="flex-1 space-y-[6px]">
         {card.features.map((f) => (
           <li key={f.label} className="flex items-start gap-[7px]">
             <span
               aria-hidden
-              className="mt-[1px] text-[12px] leading-[19px]"
+              className="mt-[1px] text-[12.1px] leading-[19px]"
               style={{ color: f.included ? "rgb(22,163,74)" : ICON_EXCLUDED }}
             >
               {f.included ? "✓" : "✕"}
             </span>
             <span
-              className="text-[12px] leading-[19px]"
+              className="text-[12.1px] leading-[19px]"
               style={{ color: f.included ? TEXT_FEATURE : TEXT_EXCLUDED }}
             >
               {f.label}

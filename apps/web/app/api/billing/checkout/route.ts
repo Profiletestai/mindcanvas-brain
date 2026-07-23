@@ -8,6 +8,7 @@ import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
 import {
+  createOnboardingPlaceholderOrg,
   ensureStripeCustomer,
   getActiveEntitlement,
   getOrgRow,
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error;
   const user = auth.user;
 
-  let body: { orgId?: string; tier?: number } = {};
+  let body: { orgId?: string; tier?: number; flow?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -43,8 +44,17 @@ export async function POST(req: Request) {
   }
 
   const resolved = await resolveOwnerOrgId(user.id, body.orgId ?? null);
-  if (!resolved.ok) return jerr(resolved.error, resolved.code, resolved.status);
-  const { orgId } = resolved;
+  let orgId: string;
+  if (resolved.ok) {
+    orgId = resolved.orgId;
+  } else if (resolved.code === "no_owned_org" && body.flow === "onboarding") {
+    // Auto-create a placeholder org so the user goes straight from plan to Stripe.
+    const created = await createOnboardingPlaceholderOrg(user);
+    if (!created.ok) return jerr(created.error, created.code, created.status);
+    orgId = created.orgId;
+  } else {
+    return jerr(resolved.error, resolved.code, resolved.status);
+  }
 
   const org = await getOrgRow(orgId);
   if (!org) return jerr("Org not found", "org_not_found", 404);
@@ -153,10 +163,18 @@ export async function POST(req: Request) {
 
   const baseUrl = getBaseUrl();
   const orgQs = `orgId=${encodeURIComponent(orgId)}`;
-  const successBase =
-    process.env.STRIPE_CHECKOUT_SUCCESS_URL || `${baseUrl}/portal/billing?status=success`;
-  const cancelBase =
-    process.env.STRIPE_CHECKOUT_CANCEL_URL || `${baseUrl}/portal/billing?status=cancelled`;
+  // Payment is a step inside onboarding now, so it has to come back to the
+  // onboarding screen. The env overrides stay authoritative for the portal
+  // flow, which is where clients who already have an org pay from.
+  const isOnboarding = body.flow === "onboarding";
+  const successBase = isOnboarding
+    ? `${baseUrl}/onboarding/v2/organisation?status=success`
+    : process.env.STRIPE_CHECKOUT_SUCCESS_URL ||
+      `${baseUrl}/portal/billing?status=success`;
+  const cancelBase = isOnboarding
+    ? `${baseUrl}/onboarding/v2/billing?status=cancelled`
+    : process.env.STRIPE_CHECKOUT_CANCEL_URL ||
+      `${baseUrl}/portal/billing?status=cancelled`;
   const successUrl = `${successBase}${successBase.includes("?") ? "&" : "?"}${orgQs}`;
   const cancelUrl = `${cancelBase}${cancelBase.includes("?") ? "&" : "?"}${orgQs}`;
 

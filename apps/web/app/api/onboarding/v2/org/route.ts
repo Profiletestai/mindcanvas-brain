@@ -100,6 +100,69 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PATCH(req: Request) {
+  try {
+    const { user, error: authError } = await getAuthUser();
+    if (authError) return authError;
+
+    const raw = await req.json().catch(() => ({}));
+    const parsed = orgSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
+    }
+    const { name, country, address, industry, logo_url } = parsed.data;
+    const website_url = parsed.data.website_url ?? null;
+
+    const admin = portalAdmin();
+
+    const { data: membership } = await admin
+      .from("user_orgs")
+      .select("org_id, orgs(name, slug)")
+      .eq("user_id", user.id)
+      .maybeSingle<{ org_id: string; orgs: { name: string | null; slug: string | null } | null }>();
+
+    if (!membership?.org_id) {
+      return NextResponse.json({ ok: false, error: "No org found for user" }, { status: 404 });
+    }
+
+    // The org is pre-created as a blank placeholder (name "") during the billing
+    // step, so its slug was derived from an empty name and fell back to "org".
+    // Regenerate it from the real name now, but only while the org still carries
+    // the placeholder name — never re-slug an org the user already named.
+    const currentName = membership.orgs?.name?.trim() ?? "";
+    const slugUpdate = currentName === "" ? { slug: await generateUniqueSlug(name) } : {};
+
+    const { data: org, error } = await admin
+      .from("orgs")
+      .update({
+        name,
+        country,
+        address: address ?? null,
+        website_url,
+        industry: industry ?? null,
+        logo_url: logo_url ?? null,
+        ...slugUpdate,
+      })
+      .eq("id", membership.org_id)
+      .select("*")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, org });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Unexpected error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET() {
   try {
     const { user, error: authError } = await getAuthUser();
