@@ -505,9 +505,6 @@ export default function PublicTestClient({
   const [textAnswers, setTextAnswers] =
     useState<TextAnswersMap>({});
 
-  const [isVisibilityEngine, setIsVisibilityEngine] =
-    useState(false);
-
   const [
     requiresWhatsWhatsFields,
     setRequiresWhatsWhatsFields,
@@ -616,14 +613,6 @@ export default function PublicTestClient({
           : [];
 
         setQuestions(list);
-
-        const engine = safeString(
-          qRes?.__debug?.engine
-        ).toLowerCase();
-
-        setIsVisibilityEngine(
-          engine.includes("visibility")
-        );
 
         if (typeof window !== "undefined") {
           const savedAnswers = window.localStorage.getItem(
@@ -993,9 +982,10 @@ export default function PublicTestClient({
     const showResults =
       typeof response.show_results === "boolean"
         ? response.show_results
-        : typeof (response as any)
-            .showResults === "boolean"
+        : typeof (response as any).showResults === "boolean"
         ? (response as any).showResults
+        : typeof (response as any).link?.show_results === "boolean"
+        ? (response as any).link.show_results
         : undefined;
 
     return {
@@ -1079,16 +1069,6 @@ export default function PublicTestClient({
         );
       }
 
-      if (isVisibilityEngine) {
-        router.replace(
-          `/t/${token}/visibility/report?tid=${encodeURIComponent(
-            takerId
-          )}`
-        );
-
-        return;
-      }
-
       const {
         redirect,
         nextSteps,
@@ -1127,8 +1107,8 @@ export default function PublicTestClient({
 
       setCompletedMessage(
         json.hidden_results_message ||
-          (json as any)
-            .hiddenResultsMessage ||
+          (json as any).hiddenResultsMessage ||
+          (json as any).link?.hidden_results_message ||
           "Thanks — your results have been sent to your organisation. You can close this page."
       );
     } catch (e: any) {
