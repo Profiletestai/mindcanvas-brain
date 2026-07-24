@@ -1,7 +1,7 @@
 // apps/web/app/t/[token]/PublicTestClient.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Question = {
@@ -24,6 +24,11 @@ type CountryCode = {
   dial: string;
 };
 
+type CountryOption = {
+  code: string;
+  name: string;
+};
+
 const PRIVACY_POLICY_URL = "https://profiletest.ai/privacy-policy";
 const LINKEDIN_URL = "https://linkedin.com/in/me";
 
@@ -37,270 +42,302 @@ const COUNTRY_CODES: CountryCode[] = [
   { iso: "IE", label: "Ireland", dial: "+353" },
   { iso: "IS", label: "Iceland", dial: "+354" },
   { iso: "AE", label: "United Arab Emirates", dial: "+971" },
-  { iso: "AF", label: "Afghanistan", dial: "+93" },
-  { iso: "AL", label: "Albania", dial: "+355" },
-  { iso: "DZ", label: "Algeria", dial: "+213" },
-  { iso: "AS", label: "American Samoa", dial: "+1" },
-  { iso: "AD", label: "Andorra", dial: "+376" },
-  { iso: "AO", label: "Angola", dial: "+244" },
-  { iso: "AI", label: "Anguilla", dial: "+1" },
-  { iso: "AQ", label: "Antarctica", dial: "+672" },
-  { iso: "AG", label: "Antigua and Barbuda", dial: "+1" },
-  { iso: "AR", label: "Argentina", dial: "+54" },
-  { iso: "AM", label: "Armenia", dial: "+374" },
-  { iso: "AW", label: "Aruba", dial: "+297" },
-  { iso: "AT", label: "Austria", dial: "+43" },
-  { iso: "AZ", label: "Azerbaijan", dial: "+994" },
-  { iso: "BS", label: "Bahamas", dial: "+1" },
-  { iso: "BH", label: "Bahrain", dial: "+973" },
-  { iso: "BD", label: "Bangladesh", dial: "+880" },
-  { iso: "BB", label: "Barbados", dial: "+1" },
-  { iso: "BY", label: "Belarus", dial: "+375" },
-  { iso: "BE", label: "Belgium", dial: "+32" },
-  { iso: "BZ", label: "Belize", dial: "+501" },
-  { iso: "BJ", label: "Benin", dial: "+229" },
-  { iso: "BM", label: "Bermuda", dial: "+1" },
-  { iso: "BT", label: "Bhutan", dial: "+975" },
-  { iso: "BO", label: "Bolivia", dial: "+591" },
-  { iso: "BA", label: "Bosnia and Herzegovina", dial: "+387" },
-  { iso: "BW", label: "Botswana", dial: "+267" },
-  { iso: "BR", label: "Brazil", dial: "+55" },
-  { iso: "IO", label: "British Indian Ocean Territory", dial: "+246" },
-  { iso: "VG", label: "British Virgin Islands", dial: "+1" },
-  { iso: "BN", label: "Brunei", dial: "+673" },
-  { iso: "BG", label: "Bulgaria", dial: "+359" },
-  { iso: "BF", label: "Burkina Faso", dial: "+226" },
-  { iso: "BI", label: "Burundi", dial: "+257" },
-  { iso: "CV", label: "Cabo Verde", dial: "+238" },
-  { iso: "KH", label: "Cambodia", dial: "+855" },
-  { iso: "CM", label: "Cameroon", dial: "+237" },
-  { iso: "BQ", label: "Caribbean Netherlands", dial: "+599" },
-  { iso: "KY", label: "Cayman Islands", dial: "+1" },
-  { iso: "CF", label: "Central African Republic", dial: "+236" },
-  { iso: "TD", label: "Chad", dial: "+235" },
-  { iso: "CL", label: "Chile", dial: "+56" },
-  { iso: "CN", label: "China", dial: "+86" },
-  { iso: "CX", label: "Christmas Island", dial: "+61" },
-  { iso: "CC", label: "Cocos (Keeling) Islands", dial: "+61" },
-  { iso: "CO", label: "Colombia", dial: "+57" },
-  { iso: "KM", label: "Comoros", dial: "+269" },
-  { iso: "CK", label: "Cook Islands", dial: "+682" },
-  { iso: "CR", label: "Costa Rica", dial: "+506" },
-  { iso: "HR", label: "Croatia", dial: "+385" },
-  { iso: "CU", label: "Cuba", dial: "+53" },
-  { iso: "CW", label: "Curaçao", dial: "+599" },
-  { iso: "CY", label: "Cyprus", dial: "+357" },
-  { iso: "CZ", label: "Czechia", dial: "+420" },
-  { iso: "CI", label: "Côte d’Ivoire", dial: "+225" },
-  { iso: "CD", label: "Democratic Republic of the Congo", dial: "+243" },
-  { iso: "DK", label: "Denmark", dial: "+45" },
-  { iso: "DJ", label: "Djibouti", dial: "+253" },
-  { iso: "DM", label: "Dominica", dial: "+1" },
-  { iso: "DO", label: "Dominican Republic", dial: "+1" },
-  { iso: "TL", label: "East Timor", dial: "+670" },
-  { iso: "EC", label: "Ecuador", dial: "+593" },
-  { iso: "EG", label: "Egypt", dial: "+20" },
-  { iso: "SV", label: "El Salvador", dial: "+503" },
-  { iso: "GQ", label: "Equatorial Guinea", dial: "+240" },
-  { iso: "ER", label: "Eritrea", dial: "+291" },
-  { iso: "EE", label: "Estonia", dial: "+372" },
-  { iso: "SZ", label: "Eswatini", dial: "+268" },
-  { iso: "ET", label: "Ethiopia", dial: "+251" },
-  { iso: "FK", label: "Falkland Islands", dial: "+500" },
-  { iso: "FO", label: "Faroe Islands", dial: "+298" },
-  { iso: "FJ", label: "Fiji", dial: "+679" },
-  { iso: "FI", label: "Finland", dial: "+358" },
   { iso: "FR", label: "France", dial: "+33" },
-  { iso: "GF", label: "French Guiana", dial: "+594" },
-  { iso: "PF", label: "French Polynesia", dial: "+689" },
-  { iso: "GA", label: "Gabon", dial: "+241" },
-  { iso: "GM", label: "Gambia", dial: "+220" },
-  { iso: "GE", label: "Georgia", dial: "+995" },
   { iso: "DE", label: "Germany", dial: "+49" },
-  { iso: "GH", label: "Ghana", dial: "+233" },
-  { iso: "GI", label: "Gibraltar", dial: "+350" },
-  { iso: "GR", label: "Greece", dial: "+30" },
-  { iso: "GL", label: "Greenland", dial: "+299" },
-  { iso: "GD", label: "Grenada", dial: "+1" },
-  { iso: "GP", label: "Guadeloupe", dial: "+590" },
-  { iso: "GU", label: "Guam", dial: "+1" },
-  { iso: "GT", label: "Guatemala", dial: "+502" },
-  { iso: "GG", label: "Guernsey", dial: "+44" },
-  { iso: "GN", label: "Guinea", dial: "+224" },
-  { iso: "GW", label: "Guinea-Bissau", dial: "+245" },
-  { iso: "GY", label: "Guyana", dial: "+592" },
-  { iso: "HT", label: "Haiti", dial: "+509" },
-  { iso: "HN", label: "Honduras", dial: "+504" },
-  { iso: "HK", label: "Hong Kong", dial: "+852" },
-  { iso: "HU", label: "Hungary", dial: "+36" },
-  { iso: "IN", label: "India", dial: "+91" },
-  { iso: "ID", label: "Indonesia", dial: "+62" },
-  { iso: "IR", label: "Iran", dial: "+98" },
-  { iso: "IQ", label: "Iraq", dial: "+964" },
-  { iso: "IM", label: "Isle of Man", dial: "+44" },
-  { iso: "IL", label: "Israel", dial: "+972" },
-  { iso: "IT", label: "Italy", dial: "+39" },
-  { iso: "JM", label: "Jamaica", dial: "+1" },
-  { iso: "JP", label: "Japan", dial: "+81" },
-  { iso: "JE", label: "Jersey", dial: "+44" },
-  { iso: "JO", label: "Jordan", dial: "+962" },
-  { iso: "KZ", label: "Kazakhstan", dial: "+7" },
-  { iso: "KE", label: "Kenya", dial: "+254" },
-  { iso: "KI", label: "Kiribati", dial: "+686" },
-  { iso: "XK", label: "Kosovo", dial: "+383" },
-  { iso: "KW", label: "Kuwait", dial: "+965" },
-  { iso: "KG", label: "Kyrgyzstan", dial: "+996" },
-  { iso: "LA", label: "Laos", dial: "+856" },
-  { iso: "LV", label: "Latvia", dial: "+371" },
-  { iso: "LB", label: "Lebanon", dial: "+961" },
-  { iso: "LS", label: "Lesotho", dial: "+266" },
-  { iso: "LR", label: "Liberia", dial: "+231" },
-  { iso: "LY", label: "Libya", dial: "+218" },
-  { iso: "LI", label: "Liechtenstein", dial: "+423" },
-  { iso: "LT", label: "Lithuania", dial: "+370" },
-  { iso: "LU", label: "Luxembourg", dial: "+352" },
-  { iso: "MO", label: "Macau", dial: "+853" },
-  { iso: "MG", label: "Madagascar", dial: "+261" },
-  { iso: "MW", label: "Malawi", dial: "+265" },
-  { iso: "MY", label: "Malaysia", dial: "+60" },
-  { iso: "MV", label: "Maldives", dial: "+960" },
-  { iso: "ML", label: "Mali", dial: "+223" },
-  { iso: "MT", label: "Malta", dial: "+356" },
-  { iso: "MH", label: "Marshall Islands", dial: "+692" },
-  { iso: "MQ", label: "Martinique", dial: "+596" },
-  { iso: "MR", label: "Mauritania", dial: "+222" },
-  { iso: "MU", label: "Mauritius", dial: "+230" },
-  { iso: "YT", label: "Mayotte", dial: "+262" },
-  { iso: "MX", label: "Mexico", dial: "+52" },
-  { iso: "FM", label: "Micronesia", dial: "+691" },
-  { iso: "MD", label: "Moldova", dial: "+373" },
-  { iso: "MC", label: "Monaco", dial: "+377" },
-  { iso: "MN", label: "Mongolia", dial: "+976" },
-  { iso: "ME", label: "Montenegro", dial: "+382" },
-  { iso: "MS", label: "Montserrat", dial: "+1" },
-  { iso: "MA", label: "Morocco", dial: "+212" },
-  { iso: "MZ", label: "Mozambique", dial: "+258" },
-  { iso: "MM", label: "Myanmar", dial: "+95" },
-  { iso: "NA", label: "Namibia", dial: "+264" },
-  { iso: "NR", label: "Nauru", dial: "+674" },
-  { iso: "NP", label: "Nepal", dial: "+977" },
   { iso: "NL", label: "Netherlands", dial: "+31" },
-  { iso: "NC", label: "New Caledonia", dial: "+687" },
-  { iso: "NI", label: "Nicaragua", dial: "+505" },
-  { iso: "NE", label: "Niger", dial: "+227" },
-  { iso: "NG", label: "Nigeria", dial: "+234" },
-  { iso: "NU", label: "Niue", dial: "+683" },
-  { iso: "NF", label: "Norfolk Island", dial: "+672" },
-  { iso: "KP", label: "North Korea", dial: "+850" },
-  { iso: "MK", label: "North Macedonia", dial: "+389" },
-  { iso: "MP", label: "Northern Mariana Islands", dial: "+1" },
-  { iso: "NO", label: "Norway", dial: "+47" },
-  { iso: "OM", label: "Oman", dial: "+968" },
-  { iso: "PK", label: "Pakistan", dial: "+92" },
-  { iso: "PW", label: "Palau", dial: "+680" },
-  { iso: "PS", label: "Palestine", dial: "+970" },
-  { iso: "PA", label: "Panama", dial: "+507" },
-  { iso: "PG", label: "Papua New Guinea", dial: "+675" },
-  { iso: "PY", label: "Paraguay", dial: "+595" },
-  { iso: "PE", label: "Peru", dial: "+51" },
-  { iso: "PH", label: "Philippines", dial: "+63" },
-  { iso: "PN", label: "Pitcairn Islands", dial: "+64" },
-  { iso: "PL", label: "Poland", dial: "+48" },
-  { iso: "PT", label: "Portugal", dial: "+351" },
-  { iso: "PR", label: "Puerto Rico", dial: "+1" },
-  { iso: "QA", label: "Qatar", dial: "+974" },
-  { iso: "CG", label: "Republic of the Congo", dial: "+242" },
-  { iso: "RO", label: "Romania", dial: "+40" },
-  { iso: "RU", label: "Russia", dial: "+7" },
-  { iso: "RW", label: "Rwanda", dial: "+250" },
-  { iso: "RE", label: "Réunion", dial: "+262" },
-  { iso: "BL", label: "Saint Barthélemy", dial: "+590" },
-  { iso: "SH", label: "Saint Helena", dial: "+290" },
-  { iso: "KN", label: "Saint Kitts and Nevis", dial: "+1" },
-  { iso: "LC", label: "Saint Lucia", dial: "+1" },
-  { iso: "MF", label: "Saint Martin", dial: "+590" },
-  { iso: "PM", label: "Saint Pierre and Miquelon", dial: "+508" },
-  { iso: "VC", label: "Saint Vincent and the Grenadines", dial: "+1" },
-  { iso: "WS", label: "Samoa", dial: "+685" },
-  { iso: "SM", label: "San Marino", dial: "+378" },
-  { iso: "SA", label: "Saudi Arabia", dial: "+966" },
-  { iso: "SN", label: "Senegal", dial: "+221" },
-  { iso: "RS", label: "Serbia", dial: "+381" },
-  { iso: "SC", label: "Seychelles", dial: "+248" },
-  { iso: "SL", label: "Sierra Leone", dial: "+232" },
-  { iso: "SG", label: "Singapore", dial: "+65" },
-  { iso: "SX", label: "Sint Maarten", dial: "+1" },
-  { iso: "SK", label: "Slovakia", dial: "+421" },
-  { iso: "SI", label: "Slovenia", dial: "+386" },
-  { iso: "SB", label: "Solomon Islands", dial: "+677" },
-  { iso: "SO", label: "Somalia", dial: "+252" },
-  { iso: "GS", label: "South Georgia", dial: "+500" },
-  { iso: "KR", label: "South Korea", dial: "+82" },
-  { iso: "SS", label: "South Sudan", dial: "+211" },
   { iso: "ES", label: "Spain", dial: "+34" },
-  { iso: "LK", label: "Sri Lanka", dial: "+94" },
-  { iso: "SD", label: "Sudan", dial: "+249" },
-  { iso: "SR", label: "Suriname", dial: "+597" },
-  { iso: "SJ", label: "Svalbard and Jan Mayen", dial: "+47" },
-  { iso: "SE", label: "Sweden", dial: "+46" },
+  { iso: "IT", label: "Italy", dial: "+39" },
+  { iso: "PT", label: "Portugal", dial: "+351" },
   { iso: "CH", label: "Switzerland", dial: "+41" },
-  { iso: "SY", label: "Syria", dial: "+963" },
-  { iso: "ST", label: "São Tomé and Príncipe", dial: "+239" },
-  { iso: "TW", label: "Taiwan", dial: "+886" },
-  { iso: "TJ", label: "Tajikistan", dial: "+992" },
-  { iso: "TZ", label: "Tanzania", dial: "+255" },
-  { iso: "TH", label: "Thailand", dial: "+66" },
-  { iso: "TG", label: "Togo", dial: "+228" },
-  { iso: "TK", label: "Tokelau", dial: "+690" },
-  { iso: "TO", label: "Tonga", dial: "+676" },
-  { iso: "TT", label: "Trinidad and Tobago", dial: "+1" },
-  { iso: "TN", label: "Tunisia", dial: "+216" },
-  { iso: "TR", label: "Turkey", dial: "+90" },
-  { iso: "TM", label: "Turkmenistan", dial: "+993" },
-  { iso: "TC", label: "Turks and Caicos Islands", dial: "+1" },
-  { iso: "TV", label: "Tuvalu", dial: "+688" },
-  { iso: "VI", label: "U.S. Virgin Islands", dial: "+1" },
-  { iso: "UG", label: "Uganda", dial: "+256" },
-  { iso: "UA", label: "Ukraine", dial: "+380" },
-  { iso: "UY", label: "Uruguay", dial: "+598" },
-  { iso: "UZ", label: "Uzbekistan", dial: "+998" },
-  { iso: "VU", label: "Vanuatu", dial: "+678" },
-  { iso: "VA", label: "Vatican City", dial: "+39" },
-  { iso: "VE", label: "Venezuela", dial: "+58" },
-  { iso: "VN", label: "Vietnam", dial: "+84" },
-  { iso: "WF", label: "Wallis and Futuna", dial: "+681" },
-  { iso: "EH", label: "Western Sahara", dial: "+212" },
-  { iso: "YE", label: "Yemen", dial: "+967" },
-  { iso: "ZM", label: "Zambia", dial: "+260" },
+  { iso: "BE", label: "Belgium", dial: "+32" },
+  { iso: "SE", label: "Sweden", dial: "+46" },
+  { iso: "NO", label: "Norway", dial: "+47" },
+  { iso: "DK", label: "Denmark", dial: "+45" },
+  { iso: "FI", label: "Finland", dial: "+358" },
+  { iso: "IN", label: "India", dial: "+91" },
+  { iso: "SG", label: "Singapore", dial: "+65" },
+  { iso: "HK", label: "Hong Kong", dial: "+852" },
+  { iso: "JP", label: "Japan", dial: "+81" },
+  { iso: "CN", label: "China", dial: "+86" },
+  { iso: "BR", label: "Brazil", dial: "+55" },
+  { iso: "MX", label: "Mexico", dial: "+52" },
+  { iso: "KE", label: "Kenya", dial: "+254" },
+  { iso: "NG", label: "Nigeria", dial: "+234" },
   { iso: "ZW", label: "Zimbabwe", dial: "+263" },
-  { iso: "AX", label: "Åland Islands", dial: "+358" },
+  { iso: "ZM", label: "Zambia", dial: "+260" },
+  { iso: "BW", label: "Botswana", dial: "+267" },
+  { iso: "NA", label: "Namibia", dial: "+264" },
+  { iso: "MU", label: "Mauritius", dial: "+230" },
 ];
 
-const DEFAULT_COUNTRY =
-  COUNTRY_CODES.find((country) => country.iso === "ZA") ?? COUNTRY_CODES[0];
-
-function findCountryByIso(iso: string) {
-  const normalizedIso = safeString(iso).trim().toUpperCase();
-  return COUNTRY_CODES.find((country) => country.iso === normalizedIso) ?? null;
-}
-
-function findCountryByDial(dial: string) {
-  const normalizedDial = safeString(dial).replace(/\s+/g, "").trim();
-  return COUNTRY_CODES.find((country) => country.dial === normalizedDial) ?? null;
-}
+const COUNTRY_OPTIONS: CountryOption[] = [
+  { code: "AF", name: "Afghanistan" },
+  { code: "AL", name: "Albania" },
+  { code: "DZ", name: "Algeria" },
+  { code: "AS", name: "American Samoa" },
+  { code: "AD", name: "Andorra" },
+  { code: "AO", name: "Angola" },
+  { code: "AI", name: "Anguilla" },
+  { code: "AQ", name: "Antarctica" },
+  { code: "AG", name: "Antigua and Barbuda" },
+  { code: "AR", name: "Argentina" },
+  { code: "AM", name: "Armenia" },
+  { code: "AW", name: "Aruba" },
+  { code: "AU", name: "Australia" },
+  { code: "AT", name: "Austria" },
+  { code: "AZ", name: "Azerbaijan" },
+  { code: "BS", name: "Bahamas" },
+  { code: "BH", name: "Bahrain" },
+  { code: "BD", name: "Bangladesh" },
+  { code: "BB", name: "Barbados" },
+  { code: "BY", name: "Belarus" },
+  { code: "BE", name: "Belgium" },
+  { code: "BZ", name: "Belize" },
+  { code: "BJ", name: "Benin" },
+  { code: "BM", name: "Bermuda" },
+  { code: "BT", name: "Bhutan" },
+  { code: "BO", name: "Bolivia, Plurinational State of" },
+  { code: "BQ", name: "Bonaire, Sint Eustatius and Saba" },
+  { code: "BA", name: "Bosnia and Herzegovina" },
+  { code: "BW", name: "Botswana" },
+  { code: "BV", name: "Bouvet Island" },
+  { code: "BR", name: "Brazil" },
+  { code: "IO", name: "British Indian Ocean Territory" },
+  { code: "BN", name: "Brunei Darussalam" },
+  { code: "BG", name: "Bulgaria" },
+  { code: "BF", name: "Burkina Faso" },
+  { code: "BI", name: "Burundi" },
+  { code: "CV", name: "Cabo Verde" },
+  { code: "KH", name: "Cambodia" },
+  { code: "CM", name: "Cameroon" },
+  { code: "CA", name: "Canada" },
+  { code: "KY", name: "Cayman Islands" },
+  { code: "CF", name: "Central African Republic" },
+  { code: "TD", name: "Chad" },
+  { code: "CL", name: "Chile" },
+  { code: "CN", name: "China" },
+  { code: "CX", name: "Christmas Island" },
+  { code: "CC", name: "Cocos (Keeling) Islands" },
+  { code: "CO", name: "Colombia" },
+  { code: "KM", name: "Comoros" },
+  { code: "CG", name: "Congo" },
+  { code: "CD", name: "Congo, The Democratic Republic of the" },
+  { code: "CK", name: "Cook Islands" },
+  { code: "CR", name: "Costa Rica" },
+  { code: "HR", name: "Croatia" },
+  { code: "CU", name: "Cuba" },
+  { code: "CW", name: "Curaçao" },
+  { code: "CY", name: "Cyprus" },
+  { code: "CZ", name: "Czechia" },
+  { code: "CI", name: "Côte d'Ivoire" },
+  { code: "DK", name: "Denmark" },
+  { code: "DJ", name: "Djibouti" },
+  { code: "DM", name: "Dominica" },
+  { code: "DO", name: "Dominican Republic" },
+  { code: "EC", name: "Ecuador" },
+  { code: "EG", name: "Egypt" },
+  { code: "SV", name: "El Salvador" },
+  { code: "GQ", name: "Equatorial Guinea" },
+  { code: "ER", name: "Eritrea" },
+  { code: "EE", name: "Estonia" },
+  { code: "SZ", name: "Eswatini" },
+  { code: "ET", name: "Ethiopia" },
+  { code: "FK", name: "Falkland Islands (Malvinas)" },
+  { code: "FO", name: "Faroe Islands" },
+  { code: "FJ", name: "Fiji" },
+  { code: "FI", name: "Finland" },
+  { code: "FR", name: "France" },
+  { code: "GF", name: "French Guiana" },
+  { code: "PF", name: "French Polynesia" },
+  { code: "TF", name: "French Southern Territories" },
+  { code: "GA", name: "Gabon" },
+  { code: "GM", name: "Gambia" },
+  { code: "GE", name: "Georgia" },
+  { code: "DE", name: "Germany" },
+  { code: "GH", name: "Ghana" },
+  { code: "GI", name: "Gibraltar" },
+  { code: "GR", name: "Greece" },
+  { code: "GL", name: "Greenland" },
+  { code: "GD", name: "Grenada" },
+  { code: "GP", name: "Guadeloupe" },
+  { code: "GU", name: "Guam" },
+  { code: "GT", name: "Guatemala" },
+  { code: "GG", name: "Guernsey" },
+  { code: "GN", name: "Guinea" },
+  { code: "GW", name: "Guinea-Bissau" },
+  { code: "GY", name: "Guyana" },
+  { code: "HT", name: "Haiti" },
+  { code: "HM", name: "Heard Island and McDonald Islands" },
+  { code: "VA", name: "Holy See (Vatican City State)" },
+  { code: "HN", name: "Honduras" },
+  { code: "HK", name: "Hong Kong" },
+  { code: "HU", name: "Hungary" },
+  { code: "IS", name: "Iceland" },
+  { code: "IN", name: "India" },
+  { code: "ID", name: "Indonesia" },
+  { code: "IR", name: "Iran, Islamic Republic of" },
+  { code: "IQ", name: "Iraq" },
+  { code: "IE", name: "Ireland" },
+  { code: "IM", name: "Isle of Man" },
+  { code: "IL", name: "Israel" },
+  { code: "IT", name: "Italy" },
+  { code: "JM", name: "Jamaica" },
+  { code: "JP", name: "Japan" },
+  { code: "JE", name: "Jersey" },
+  { code: "JO", name: "Jordan" },
+  { code: "KZ", name: "Kazakhstan" },
+  { code: "KE", name: "Kenya" },
+  { code: "KI", name: "Kiribati" },
+  { code: "KP", name: "Korea, Democratic People's Republic of" },
+  { code: "KR", name: "Korea, Republic of" },
+  { code: "KW", name: "Kuwait" },
+  { code: "KG", name: "Kyrgyzstan" },
+  { code: "LA", name: "Lao People's Democratic Republic" },
+  { code: "LV", name: "Latvia" },
+  { code: "LB", name: "Lebanon" },
+  { code: "LS", name: "Lesotho" },
+  { code: "LR", name: "Liberia" },
+  { code: "LY", name: "Libya" },
+  { code: "LI", name: "Liechtenstein" },
+  { code: "LT", name: "Lithuania" },
+  { code: "LU", name: "Luxembourg" },
+  { code: "MO", name: "Macao" },
+  { code: "MG", name: "Madagascar" },
+  { code: "MW", name: "Malawi" },
+  { code: "MY", name: "Malaysia" },
+  { code: "MV", name: "Maldives" },
+  { code: "ML", name: "Mali" },
+  { code: "MT", name: "Malta" },
+  { code: "MH", name: "Marshall Islands" },
+  { code: "MQ", name: "Martinique" },
+  { code: "MR", name: "Mauritania" },
+  { code: "MU", name: "Mauritius" },
+  { code: "YT", name: "Mayotte" },
+  { code: "MX", name: "Mexico" },
+  { code: "FM", name: "Micronesia, Federated States of" },
+  { code: "MD", name: "Moldova, Republic of" },
+  { code: "MC", name: "Monaco" },
+  { code: "MN", name: "Mongolia" },
+  { code: "ME", name: "Montenegro" },
+  { code: "MS", name: "Montserrat" },
+  { code: "MA", name: "Morocco" },
+  { code: "MZ", name: "Mozambique" },
+  { code: "MM", name: "Myanmar" },
+  { code: "NA", name: "Namibia" },
+  { code: "NR", name: "Nauru" },
+  { code: "NP", name: "Nepal" },
+  { code: "NL", name: "Netherlands" },
+  { code: "NC", name: "New Caledonia" },
+  { code: "NZ", name: "New Zealand" },
+  { code: "NI", name: "Nicaragua" },
+  { code: "NE", name: "Niger" },
+  { code: "NG", name: "Nigeria" },
+  { code: "NU", name: "Niue" },
+  { code: "NF", name: "Norfolk Island" },
+  { code: "MK", name: "North Macedonia" },
+  { code: "MP", name: "Northern Mariana Islands" },
+  { code: "NO", name: "Norway" },
+  { code: "OM", name: "Oman" },
+  { code: "PK", name: "Pakistan" },
+  { code: "PW", name: "Palau" },
+  { code: "PS", name: "Palestine, State of" },
+  { code: "PA", name: "Panama" },
+  { code: "PG", name: "Papua New Guinea" },
+  { code: "PY", name: "Paraguay" },
+  { code: "PE", name: "Peru" },
+  { code: "PH", name: "Philippines" },
+  { code: "PN", name: "Pitcairn" },
+  { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" },
+  { code: "PR", name: "Puerto Rico" },
+  { code: "QA", name: "Qatar" },
+  { code: "RO", name: "Romania" },
+  { code: "RU", name: "Russian Federation" },
+  { code: "RW", name: "Rwanda" },
+  { code: "RE", name: "Réunion" },
+  { code: "BL", name: "Saint Barthélemy" },
+  { code: "SH", name: "Saint Helena, Ascension and Tristan da Cunha" },
+  { code: "KN", name: "Saint Kitts and Nevis" },
+  { code: "LC", name: "Saint Lucia" },
+  { code: "MF", name: "Saint Martin (French part)" },
+  { code: "PM", name: "Saint Pierre and Miquelon" },
+  { code: "VC", name: "Saint Vincent and the Grenadines" },
+  { code: "WS", name: "Samoa" },
+  { code: "SM", name: "San Marino" },
+  { code: "ST", name: "Sao Tome and Principe" },
+  { code: "SA", name: "Saudi Arabia" },
+  { code: "SN", name: "Senegal" },
+  { code: "RS", name: "Serbia" },
+  { code: "SC", name: "Seychelles" },
+  { code: "SL", name: "Sierra Leone" },
+  { code: "SG", name: "Singapore" },
+  { code: "SX", name: "Sint Maarten (Dutch part)" },
+  { code: "SK", name: "Slovakia" },
+  { code: "SI", name: "Slovenia" },
+  { code: "SB", name: "Solomon Islands" },
+  { code: "SO", name: "Somalia" },
+  { code: "ZA", name: "South Africa" },
+  { code: "GS", name: "South Georgia and the South Sandwich Islands" },
+  { code: "SS", name: "South Sudan" },
+  { code: "ES", name: "Spain" },
+  { code: "LK", name: "Sri Lanka" },
+  { code: "SD", name: "Sudan" },
+  { code: "SR", name: "Suriname" },
+  { code: "SJ", name: "Svalbard and Jan Mayen" },
+  { code: "SE", name: "Sweden" },
+  { code: "CH", name: "Switzerland" },
+  { code: "SY", name: "Syrian Arab Republic" },
+  { code: "TW", name: "Taiwan, Province of China" },
+  { code: "TJ", name: "Tajikistan" },
+  { code: "TZ", name: "Tanzania, United Republic of" },
+  { code: "TH", name: "Thailand" },
+  { code: "TL", name: "Timor-Leste" },
+  { code: "TG", name: "Togo" },
+  { code: "TK", name: "Tokelau" },
+  { code: "TO", name: "Tonga" },
+  { code: "TT", name: "Trinidad and Tobago" },
+  { code: "TN", name: "Tunisia" },
+  { code: "TM", name: "Turkmenistan" },
+  { code: "TC", name: "Turks and Caicos Islands" },
+  { code: "TV", name: "Tuvalu" },
+  { code: "TR", name: "Türkiye" },
+  { code: "UG", name: "Uganda" },
+  { code: "UA", name: "Ukraine" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "US", name: "United States" },
+  { code: "UM", name: "United States Minor Outlying Islands" },
+  { code: "UY", name: "Uruguay" },
+  { code: "UZ", name: "Uzbekistan" },
+  { code: "VU", name: "Vanuatu" },
+  { code: "VE", name: "Venezuela, Bolivarian Republic of" },
+  { code: "VN", name: "Viet Nam" },
+  { code: "VG", name: "Virgin Islands, British" },
+  { code: "VI", name: "Virgin Islands, U.S." },
+  { code: "WF", name: "Wallis and Futuna" },
+  { code: "EH", name: "Western Sahara" },
+  { code: "YE", name: "Yemen" },
+  { code: "ZM", name: "Zambia" },
+  { code: "ZW", name: "Zimbabwe" },
+  { code: "AX", name: "Åland Islands" },
+];
 
 async function fetchJson(url: string, init?: RequestInit) {
-  const r = await fetch(url, init);
-  const ct = r.headers.get("content-type") || "";
+  const response = await fetch(url, init);
+  const contentType = response.headers.get("content-type") || "";
 
-  if (!ct.includes("application/json")) {
-    const text = (await r.text()).slice(0, 600);
-    throw new Error(`HTTP ${r.status} – non-JSON response:\n${text}`);
+  if (!contentType.includes("application/json")) {
+    const text = (await response.text()).slice(0, 600);
+    throw new Error(`HTTP ${response.status} – non-JSON response:\n${text}`);
   }
 
-  const j = await r.json();
-  if (!r.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${r.status}`);
-  return j;
+  const json = await response.json();
+
+  if (!response.ok || json?.ok === false) {
+    throw new Error(json?.error || `HTTP ${response.status}`);
+  }
+
+  return json;
 }
 
 type SubmitResponse = {
@@ -318,46 +355,80 @@ type SubmitResponse = {
   qsc_public_path?: string | null;
   qsc_public_url?: string | null;
 
-  [k: string]: any;
+  [key: string]: any;
 };
 
-function isTextQuestion(q?: Question | null) {
-  const t = String(q?.type || "").toLowerCase().trim();
-  return t === "text" || t === "textarea" || t === "longtext";
+function isTextQuestion(question?: Question | null) {
+  const type = String(question?.type || "").toLowerCase().trim();
+
+  return (
+    type === "text" ||
+    type === "textarea" ||
+    type === "longtext"
+  );
 }
 
-function safeString(x: any): string {
-  if (typeof x === "string") return x;
-  if (x == null) return "";
-  return String(x);
+function safeString(value: any): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value == null) {
+    return "";
+  }
+
+  return String(value);
 }
 
 function isAbsoluteUrl(url: string) {
   return /^https?:\/\//i.test(url);
 }
 
-function buildInternationalPhone(countryCode: string, localNumber: string) {
-  const cleanedCountryCode = safeString(countryCode).trim() || "+27";
+function isValidWebsiteInput(value: string) {
+  const raw = value.trim();
+
+  if (!raw) {
+    return false;
+  }
+
+  const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+
+  try {
+    const parsed = new URL(candidate);
+
+    return (
+      ["http:", "https:"].includes(parsed.protocol) &&
+      parsed.hostname.includes(".")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function buildInternationalPhone(
+  countryCode: string,
+  localNumber: string
+) {
+  const cleanedCountryCode =
+    safeString(countryCode).trim() || "+27";
+
   const cleanedLocal = safeString(localNumber)
     .replace(/[^\d]/g, "")
     .replace(/^0+/, "");
 
-  return cleanedLocal ? `${cleanedCountryCode}${cleanedLocal}` : "";
+  return cleanedLocal
+    ? `${cleanedCountryCode}${cleanedLocal}`
+    : "";
 }
 
 function parseSavedPhone(
   savedCountryCode: any,
-  savedPhone: any,
-  savedCountryIso?: any
+  savedPhone: any
 ) {
-  const existingCountryCode = safeString(savedCountryCode).trim();
-  const existingCountryIso = safeString(savedCountryIso).trim().toUpperCase();
-  const phone = safeString(savedPhone).trim();
+  const existingCountryCode =
+    safeString(savedCountryCode).trim();
 
-  const savedCountry =
-    findCountryByIso(existingCountryIso) ??
-    findCountryByDial(existingCountryCode) ??
-    DEFAULT_COUNTRY;
+  const phone = safeString(savedPhone).trim();
 
   if (existingCountryCode) {
     const localWithoutCountry = phone.startsWith(existingCountryCode)
@@ -365,16 +436,14 @@ function parseSavedPhone(
       : phone;
 
     return {
-      countryCode: savedCountry.dial,
-      countryIso: savedCountry.iso,
+      countryCode: existingCountryCode,
       localPhone: localWithoutCountry,
     };
   }
 
   if (!phone) {
     return {
-      countryCode: savedCountry.dial,
-      countryIso: savedCountry.iso,
+      countryCode: "+27",
       localPhone: "",
     };
   }
@@ -383,19 +452,21 @@ function parseSavedPhone(
 
   const matchingCountry = [...COUNTRY_CODES]
     .sort((a, b) => b.dial.length - a.dial.length)
-    .find((country) => compactPhone.startsWith(country.dial));
+    .find((country) =>
+      compactPhone.startsWith(country.dial)
+    );
 
   if (matchingCountry) {
     return {
       countryCode: matchingCountry.dial,
-      countryIso: matchingCountry.iso,
-      localPhone: compactPhone.slice(matchingCountry.dial.length),
+      localPhone: compactPhone.slice(
+        matchingCountry.dial.length
+      ),
     };
   }
 
   return {
-    countryCode: DEFAULT_COUNTRY.dial,
-    countryIso: DEFAULT_COUNTRY.iso,
+    countryCode: "+27",
     localPhone: phone,
   };
 }
@@ -412,44 +483,67 @@ export default function PublicTestClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
-  const [testName, setTestName] = useState<string | null>(null);
-  const [orgName, setOrgName] = useState<string | null>(null);
-  const [introText, setIntroText] = useState<string | null>(null);
+  const [testName, setTestName] =
+    useState<string | null>(null);
 
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [orgName, setOrgName] =
+    useState<string | null>(null);
+
+  const [introText, setIntroText] =
+    useState<string | null>(null);
+
+  const [questions, setQuestions] =
+    useState<Question[]>([]);
+
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState<Step>("details");
 
   const [i, setI] = useState(0);
-  const [answers, setAnswers] = useState<AnswersMap>({});
-  const [textAnswers, setTextAnswers] = useState<TextAnswersMap>({});
+  const [answers, setAnswers] =
+    useState<AnswersMap>({});
 
-  const [isVisibilityEngine, setIsVisibilityEngine] = useState(false);
+  const [textAnswers, setTextAnswers] =
+    useState<TextAnswersMap>({});
+
+  const [
+    requiresWhatsWhatsFields,
+    setRequiresWhatsWhatsFields,
+  ] = useState(false);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_COUNTRY.dial);
-  const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY.iso);
-  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
-  const [countrySearch, setCountrySearch] = useState("");
+
+  const [phoneCountryCode, setPhoneCountryCode] =
+    useState("+27");
+
   const [phone, setPhone] = useState("");
   const [company, setCompany] = useState("");
+  const [website, setWebsite] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [countryCode, setCountryCode] = useState("");
+  const [countryName, setCountryName] = useState("");
   const [roleTitle, setRoleTitle] = useState("");
-  const [linkedinProfile, setLinkedinProfile] = useState("");
+  const [linkedinProfile, setLinkedinProfile] =
+    useState("");
+
   const [referredBy, setReferredBy] = useState("");
   const [dataConsent, setDataConsent] = useState(false);
-  const [detailsError, setDetailsError] = useState<string | null>(null);
 
-  const [takerId, setTakerId] = useState<string | null>(null);
+  const [detailsError, setDetailsError] =
+    useState<string | null>(null);
+
+  const [takerId, setTakerId] =
+    useState<string | null>(null);
+
   const [submitting, setSubmitting] = useState(false);
-  const [savingDetails, setSavingDetails] = useState(false);
+  const [savingDetails, setSavingDetails] =
+    useState(false);
 
-  const [completedMessage, setCompletedMessage] = useState<string | null>(null);
+  const [completedMessage, setCompletedMessage] =
+    useState<string | null>(null);
 
-  const countryDropdownRef = useRef<HTMLDivElement | null>(null);
-
-  const key = (k: string) => `mc_${k}_${token}`;
+  const key = (name: string) => `mc_${name}_${token}`;
 
   useEffect(() => {
     let alive = true;
@@ -459,11 +553,18 @@ export default function PublicTestClient({
         setLoading(true);
         setError("");
 
-        const metaRes: any = await fetchJson(`/api/public/test/${token}`);
-        if (!alive) return;
+        const metaRes: any = await fetchJson(
+          `/api/public/test/${token}`
+        );
+
+        if (!alive) {
+          return;
+        }
 
         const metaData = metaRes?.data ?? {};
-        const nameFromMeta: string | null = metaData?.name ?? null;
+
+        const nameFromMeta: string | null =
+          metaData?.name ?? null;
 
         const orgNameFromMeta: string | null =
           metaData?.org_name ??
@@ -481,69 +582,118 @@ export default function PublicTestClient({
         setOrgName(orgNameFromMeta);
         setIntroText(introFromMeta);
 
+        setRequiresWhatsWhatsFields(
+          metaData?.requires_whatswhats_fields === true ||
+            metaData?.intake_config?.website?.visible === true
+        );
+
         if (!embed && typeof window !== "undefined") {
-          const detail = { orgName: orgNameFromMeta, testName: nameFromMeta };
-          window.dispatchEvent(new CustomEvent("mc_test_meta", { detail }));
+          const detail = {
+            orgName: orgNameFromMeta,
+            testName: nameFromMeta,
+          };
+
+          window.dispatchEvent(
+            new CustomEvent("mc_test_meta", { detail })
+          );
         }
 
-        const qRes: any = await fetchJson(`/api/public/test/${token}/questions`);
-        if (!alive) return;
+        const qRes: any = await fetchJson(
+          `/api/public/test/${token}/questions`
+        );
 
-        const list: Question[] = Array.isArray(qRes?.questions) ? qRes.questions : [];
+        if (!alive) {
+          return;
+        }
+
+        const list: Question[] = Array.isArray(
+          qRes?.questions
+        )
+          ? qRes.questions
+          : [];
+
         setQuestions(list);
 
-        const engine = safeString(qRes?.__debug?.engine).toLowerCase();
-        setIsVisibilityEngine(engine.includes("visibility"));
-
         if (typeof window !== "undefined") {
-          const savedAns = window.localStorage.getItem(key("answers"));
-          if (savedAns) {
+          const savedAnswers = window.localStorage.getItem(
+            key("answers")
+          );
+
+          if (savedAnswers) {
             try {
-              setAnswers(JSON.parse(savedAns));
+              setAnswers(JSON.parse(savedAnswers));
             } catch {}
           }
 
-          const savedText = window.localStorage.getItem(key("text_answers"));
+          const savedText =
+            window.localStorage.getItem(
+              key("text_answers")
+            );
+
           if (savedText) {
             try {
               setTextAnswers(JSON.parse(savedText));
             } catch {}
           }
 
-          const d = window.localStorage.getItem(key("details"));
-          if (d) {
+          const savedDetails =
+            window.localStorage.getItem(key("details"));
+
+          if (savedDetails) {
             try {
-              const o = JSON.parse(d);
+              const saved = JSON.parse(savedDetails);
+
               const parsedPhone = parseSavedPhone(
-                o.phoneCountryCode,
-                o.phone,
-                o.phoneCountryIso
+                saved.phoneCountryCode,
+                saved.phone
               );
 
-              setFirstName(o.firstName || "");
-              setLastName(o.lastName || "");
-              setEmail(o.email || "");
-              setPhoneCountryCode(parsedPhone.countryCode);
-              setPhoneCountryIso(parsedPhone.countryIso);
+              setFirstName(saved.firstName || "");
+              setLastName(saved.lastName || "");
+              setEmail(saved.email || "");
+
+              setPhoneCountryCode(
+                parsedPhone.countryCode
+              );
 
               setPhone(parsedPhone.localPhone);
-              setCompany(o.company || "");
-              setRoleTitle(o.roleTitle || "");
-              setLinkedinProfile(o.linkedinProfile || "");
-              setReferredBy(o.referredBy || "");
-              setDataConsent(Boolean(o.dataConsent));
+              setCompany(saved.company || "");
+              setWebsite(saved.website || "");
+              setIndustry(saved.industry || "");
+              setCountryCode(saved.countryCode || "");
+              setCountryName(saved.countryName || "");
+              setRoleTitle(saved.roleTitle || "");
+
+              setLinkedinProfile(
+                saved.linkedinProfile || ""
+              );
+
+              setReferredBy(saved.referredBy || "");
+              setDataConsent(
+                Boolean(saved.dataConsent)
+              );
             } catch {}
           }
 
-          const tid = window.localStorage.getItem(key("taker_id"));
-          if (tid) setTakerId(tid);
+          const storedTakerId =
+            window.localStorage.getItem(
+              key("taker_id")
+            );
+
+          if (storedTakerId) {
+            setTakerId(storedTakerId);
+          }
         }
 
         setStarted(true);
       } catch (e: any) {
-        if (alive) setError(String(e?.message || e));
+        if (alive) {
+          setError(String(e?.message || e));
+        }
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setLoading(false);
+        }
       }
     })();
 
@@ -554,13 +704,19 @@ export default function PublicTestClient({
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(key("answers"), JSON.stringify(answers));
+      window.localStorage.setItem(
+        key("answers"),
+        JSON.stringify(answers)
+      );
     }
   }, [answers, token]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(key("text_answers"), JSON.stringify(textAnswers));
+      window.localStorage.setItem(
+        key("text_answers"),
+        JSON.stringify(textAnswers)
+      );
     }
   }, [textAnswers, token]);
 
@@ -573,9 +729,12 @@ export default function PublicTestClient({
           lastName,
           email,
           phoneCountryCode,
-          phoneCountryIso,
           phone,
           company,
+          website,
+          industry,
+          countryCode,
+          countryName,
           roleTitle,
           linkedinProfile,
           referredBy,
@@ -588,9 +747,12 @@ export default function PublicTestClient({
     lastName,
     email,
     phoneCountryCode,
-    phoneCountryIso,
     phone,
     company,
+    website,
+    industry,
+    countryCode,
+    countryName,
     roleTitle,
     linkedinProfile,
     referredBy,
@@ -598,86 +760,87 @@ export default function PublicTestClient({
     token,
   ]);
 
-  useEffect(() => {
-    if (!countryDropdownOpen) return;
+  const question = questions[i];
 
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target;
+  const isAnswered = (item: Question) => {
+    if (isTextQuestion(item)) {
+      return (
+        textAnswers[item.id] || ""
+      ).trim().length > 0;
+    }
 
-      if (
-        target instanceof Node &&
-        countryDropdownRef.current &&
-        !countryDropdownRef.current.contains(target)
-      ) {
-        setCountryDropdownOpen(false);
-        setCountrySearch("");
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
-  }, [countryDropdownOpen]);
-
-  const selectedPhoneCountry =
-    findCountryByIso(phoneCountryIso) ??
-    findCountryByDial(phoneCountryCode) ??
-    DEFAULT_COUNTRY;
-
-  const filteredPhoneCountries = useMemo(() => {
-    const query = countrySearch.trim().toLowerCase();
-
-    if (!query) return COUNTRY_CODES;
-
-    return COUNTRY_CODES.filter((country) => {
-      const searchable = `${country.label} ${country.iso} ${country.dial}`.toLowerCase();
-      return searchable.includes(query);
-    });
-  }, [countrySearch]);
-
-  const selectPhoneCountry = (country: CountryCode) => {
-    setPhoneCountryCode(country.dial);
-    setPhoneCountryIso(country.iso);
-    setCountrySearch("");
-    setCountryDropdownOpen(false);
-    setDetailsError(null);
-  };
-
-  const q = questions[i];
-
-  const isAnswered = (qq: Question) => {
-    if (isTextQuestion(qq)) return (textAnswers[qq.id] || "").trim().length > 0;
-    return Number(answers[qq.id]) >= 1;
+    return Number(answers[item.id]) >= 1;
   };
 
   const allAnswered = useMemo(
-    () => questions.length > 0 && questions.every((qq) => isAnswered(qq)),
+    () =>
+      questions.length > 0 &&
+      questions.every((item) =>
+        isAnswered(item)
+      ),
     [questions, answers, textAnswers]
   );
 
-  const setChoice = (qid: string, val: number) => setAnswers((a) => ({ ...a, [qid]: val }));
-  const setText = (qid: string, val: string) => setTextAnswers((a) => ({ ...a, [qid]: val }));
+  const setChoice = (
+    questionId: string,
+    value: number
+  ) =>
+    setAnswers((current) => ({
+      ...current,
+      [questionId]: value,
+    }));
+
+  const setText = (
+    questionId: string,
+    value: string
+  ) =>
+    setTextAnswers((current) => ({
+      ...current,
+      [questionId]: value,
+    }));
 
   const validateDetails = (): string | null => {
-    const fn = firstName.trim();
-    const ln = lastName.trim();
-    const em = email.trim();
-    const ph = buildInternationalPhone(phoneCountryCode, phone);
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const normalisedEmail = email.trim();
 
-    if (!fn || !ln || !em || !ph) {
+    const fullPhone = buildInternationalPhone(
+      phoneCountryCode,
+      phone
+    );
+
+    if (!first || !last || !normalisedEmail || !fullPhone) {
       return "Please complete all required fields before starting.";
     }
 
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(em)) {
+    const emailPattern =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(normalisedEmail)) {
       return "Please enter a valid email address.";
     }
 
-    const localDigits = phone.replace(/[^\d]/g, "").replace(/^0+/, "");
+    const localDigits = phone
+      .replace(/[^\d]/g, "")
+      .replace(/^0+/, "");
+
     if (localDigits.length < 6) {
       return "Please enter a valid mobile number.";
+    }
+
+    if (requiresWhatsWhatsFields) {
+      if (
+        !website.trim() ||
+        !industry.trim() ||
+        !countryCode ||
+        !countryName
+      ) {
+        return "Please complete Website, Industry and Country before starting.";
+      }
+
+      if (!isValidWebsiteInput(website)) {
+        return "Please enter a valid website address.";
+      }
     }
 
     if (!dataConsent) {
@@ -700,31 +863,69 @@ export default function PublicTestClient({
       setError("");
       setDetailsError(null);
 
-      const internationalPhone = buildInternationalPhone(phoneCountryCode, phone);
+      const internationalPhone =
+        buildInternationalPhone(
+          phoneCountryCode,
+          phone
+        );
 
-      const res: any = await fetchJson(`/api/public/test/${token}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          first_name: firstName.trim() || null,
-          last_name: lastName.trim() || null,
-          email: email.trim().toLowerCase() || null,
-          phone: internationalPhone || null,
-          company: company.trim() || null,
-          role_title: roleTitle.trim() || null,
-          linkedin_profile: linkedinProfile.trim() || null,
-          referred_by: referredBy.trim() || null,
-          data_consent: true,
-        }),
-      });
+      const response: any = await fetchJson(
+        `/api/public/test/${token}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            first_name:
+              firstName.trim() || null,
+            last_name:
+              lastName.trim() || null,
+            email:
+              email.trim().toLowerCase() || null,
+            phone:
+              internationalPhone || null,
+            company:
+              company.trim() || null,
+            role_title:
+              roleTitle.trim() || null,
+            linkedin_profile:
+              linkedinProfile.trim() || null,
+            referred_by:
+              referredBy.trim() || null,
 
-      const tid = res?.id;
-      if (!tid) throw new Error("Failed to create taker");
+            // These fields are sent only for WhatsWhats.
+            website_url: requiresWhatsWhatsFields
+              ? website.trim() || null
+              : null,
+            industry: requiresWhatsWhatsFields
+              ? industry.trim() || null
+              : null,
+            country_code: requiresWhatsWhatsFields
+              ? countryCode || null
+              : null,
+            country_name: requiresWhatsWhatsFields
+              ? countryName || null
+              : null,
 
-      setTakerId(tid);
+            data_consent: true,
+          }),
+        }
+      );
+
+      const newTakerId = response?.id;
+
+      if (!newTakerId) {
+        throw new Error("Failed to create taker");
+      }
+
+      setTakerId(newTakerId);
 
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(key("taker_id"), tid);
+        window.localStorage.setItem(
+          key("taker_id"),
+          newTakerId
+        );
       }
 
       setStep("questions");
@@ -735,32 +936,63 @@ export default function PublicTestClient({
     }
   };
 
-  function resolveRedirectAndNextSteps(j: SubmitResponse) {
+  function resolveRedirectAndNextSteps(
+    response: SubmitResponse
+  ) {
     const redirect =
-      safeString(j.redirect).trim() ||
-      safeString((j as any).redirect_url).trim() ||
-      safeString((j as any).redirectUrl).trim() ||
-      safeString((j as any).qsc_public_path).trim() ||
-      safeString((j as any).qsc_public_url).trim() ||
+      safeString(response.redirect).trim() ||
+      safeString(
+        (response as any).redirect_url
+      ).trim() ||
+      safeString(
+        (response as any).redirectUrl
+      ).trim() ||
+      safeString(
+        (response as any).qsc_public_path
+      ).trim() ||
+      safeString(
+        (response as any).qsc_public_url
+      ).trim() ||
       "";
 
     const nextSteps =
-      safeString(j.next_steps_url).trim() ||
-      safeString((j as any).nextStepsUrl).trim() ||
-      safeString((j as any).next_steps?.url).trim() ||
-      safeString((j as any).link_meta?.next_steps_url).trim() ||
-      safeString((j as any).meta?.next_steps_url).trim() ||
-      safeString((j as any).link?.next_steps_url).trim() ||
+      safeString(
+        response.next_steps_url
+      ).trim() ||
+      safeString(
+        (response as any).nextStepsUrl
+      ).trim() ||
+      safeString(
+        (response as any).next_steps?.url
+      ).trim() ||
+      safeString(
+        (response as any).link_meta
+          ?.next_steps_url
+      ).trim() ||
+      safeString(
+        (response as any).meta
+          ?.next_steps_url
+      ).trim() ||
+      safeString(
+        (response as any).link
+          ?.next_steps_url
+      ).trim() ||
       "";
 
     const showResults =
-      typeof j.show_results === "boolean"
-        ? j.show_results
-        : typeof (j as any).showResults === "boolean"
-        ? (j as any).showResults
+      typeof response.show_results === "boolean"
+        ? response.show_results
+        : typeof (response as any).showResults === "boolean"
+        ? (response as any).showResults
+        : typeof (response as any).link?.show_results === "boolean"
+        ? (response as any).link.show_results
         : undefined;
 
-    return { redirect: redirect || null, nextSteps: nextSteps || null, showResults };
+    return {
+      redirect: redirect || null,
+      nextSteps: nextSteps || null,
+      showResults,
+    };
   }
 
   const submit = async () => {
@@ -769,40 +1001,79 @@ export default function PublicTestClient({
       setError("");
       setCompletedMessage(null);
 
-      if (!takerId) throw new Error("missing taker_id");
+      if (!takerId) {
+        throw new Error("missing taker_id");
+      }
 
-      const payloadAnswers = questions.map((qq) => {
-        if (isTextQuestion(qq)) {
-          return { question_id: qq.id, text: (textAnswers[qq.id] || "").trim() };
+      const payloadAnswers = questions.map(
+        (item) => {
+          if (isTextQuestion(item)) {
+            return {
+              question_id: item.id,
+              text: (
+                textAnswers[item.id] || ""
+              ).trim(),
+            };
+          }
+
+          return {
+            question_id: item.id,
+            selected:
+              Number(
+                answers[item.id] || 0
+              ) - 1,
+          };
         }
+      );
 
-        return { question_id: qq.id, selected: Number(answers[qq.id] || 0) - 1 };
-      });
+      const response = await fetch(
+        `/api/public/test/${token}/submit`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            taker_id: takerId,
+            answers: payloadAnswers,
+          }),
+        }
+      );
 
-      const res = await fetch(`/api/public/test/${token}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taker_id: takerId, answers: payloadAnswers }),
-      });
+      const json: SubmitResponse =
+        await response
+          .json()
+          .catch(() => ({} as any));
 
-      const j: SubmitResponse = await res.json().catch(() => ({} as any));
-
-      if (!res.ok || (j as any)?.ok === false) {
-        throw new Error((j as any)?.error || `HTTP ${res.status}`);
+      if (
+        !response.ok ||
+        (json as any)?.ok === false
+      ) {
+        throw new Error(
+          (json as any)?.error ||
+            `HTTP ${response.status}`
+        );
       }
 
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem(key("answers"));
-        window.localStorage.removeItem(key("text_answers"));
-        window.localStorage.removeItem(key("details"));
+        window.localStorage.removeItem(
+          key("answers")
+        );
+
+        window.localStorage.removeItem(
+          key("text_answers")
+        );
+
+        window.localStorage.removeItem(
+          key("details")
+        );
       }
 
-      if (isVisibilityEngine) {
-        router.replace(`/t/${token}/visibility/report?tid=${encodeURIComponent(takerId)}`);
-        return;
-      }
-
-      const { redirect, nextSteps, showResults } = resolveRedirectAndNextSteps(j);
+      const {
+        redirect,
+        nextSteps,
+        showResults,
+      } = resolveRedirectAndNextSteps(json);
 
       if (redirect) {
         if (isAbsoluteUrl(redirect)) {
@@ -825,13 +1096,19 @@ export default function PublicTestClient({
       }
 
       if (showResults !== false) {
-        router.replace(`/t/${token}/result?tid=${encodeURIComponent(takerId)}`);
+        router.replace(
+          `/t/${token}/result?tid=${encodeURIComponent(
+            takerId
+          )}`
+        );
+
         return;
       }
 
       setCompletedMessage(
-        j.hidden_results_message ||
-          (j as any).hiddenResultsMessage ||
+        json.hidden_results_message ||
+          (json as any).hiddenResultsMessage ||
+          (json as any).link?.hidden_results_message ||
           "Thanks — your results have been sent to your organisation. You can close this page."
       );
     } catch (e: any) {
@@ -841,22 +1118,40 @@ export default function PublicTestClient({
     }
   };
 
-  const finalOrg = orgName || "Profiletest.ai";
-  const finalTest = testName || "Profile Test";
+  const finalOrg =
+    orgName || "Profiletest.ai";
+
+  const finalTest =
+    testName || "Profile Test";
 
   if (loading) {
     return (
       <div className={embed ? "p-0" : "p-6"}>
-        <div className="text-lg font-semibold text-white">Loading…</div>
-        <div className="mt-2 text-sm text-white/70">Preparing your assessment.</div>
+        <div className="text-lg font-semibold text-white">
+          Loading…
+        </div>
+
+        <div className="mt-2 text-sm text-white/70">
+          Preparing your assessment.
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className={embed ? "p-0" : "p-6"} style={embed ? { minHeight: 420 } : undefined}>
-        <h1 className="text-xl font-semibold text-white">Couldn’t load test</h1>
+      <div
+        className={embed ? "p-0" : "p-6"}
+        style={
+          embed
+            ? { minHeight: 420 }
+            : undefined
+        }
+      >
+        <h1 className="text-xl font-semibold text-white">
+          Couldn&apos;t load test
+        </h1>
+
         <pre className="mt-3 p-3 rounded bg-white text-black whitespace-pre-wrap border border-black/10">
           {error}
         </pre>
@@ -868,24 +1163,49 @@ export default function PublicTestClient({
     return (
       <div className={embed ? "p-0" : "p-6"}>
         <div className="rounded-2xl bg-white/5 border border-white/10 p-5 max-w-2xl space-y-3">
-          <div className="text-lg font-semibold text-white">All done</div>
-          <p className="text-sm text-white/80">{completedMessage}</p>
+          <div className="text-lg font-semibold text-white">
+            All done
+          </div>
+
+          <p className="text-sm text-white/80">
+            {completedMessage}
+          </p>
         </div>
       </div>
     );
   }
 
-  const noQuestions = questions.length === 0 || !q;
+  const noQuestions =
+    questions.length === 0 || !question;
 
-  const canProceedDetails =
+  const baseRequiredFieldsComplete =
     firstName.trim().length > 0 &&
     lastName.trim().length > 0 &&
     email.trim().length > 0 &&
-    buildInternationalPhone(phoneCountryCode, phone).length > 0 &&
+    buildInternationalPhone(
+      phoneCountryCode,
+      phone
+    ).length > 0;
+
+  const whatsWhatsFieldsComplete =
+    !requiresWhatsWhatsFields ||
+    (
+      website.trim().length > 0 &&
+      industry.trim().length > 0 &&
+      countryCode.length > 0 &&
+      countryName.length > 0 &&
+      isValidWebsiteInput(website)
+    );
+
+  const canProceedDetails =
+    baseRequiredFieldsComplete &&
+    whatsWhatsFieldsComplete &&
     dataConsent &&
     !savingDetails;
 
-  const currentAnswered = q ? isAnswered(q) : false;
+  const currentAnswered = question
+    ? isAnswered(question)
+    : false;
 
   return (
     <div className={embed ? "p-0" : "p-6"}>
@@ -897,12 +1217,15 @@ export default function PublicTestClient({
                 {finalOrg} invites you to complete this assessment
               </div>
 
-              <div className="text-2xl font-semibold text-white">{finalTest}</div>
+              <div className="text-2xl font-semibold text-white">
+                {finalTest}
+              </div>
 
               <div>
                 <div className="text-sm font-semibold text-white/90">
                   Introduction To {finalTest}
                 </div>
+
                 <p className="mt-2 text-sm leading-6 text-white/75">
                   {introText?.trim()
                     ? introText
@@ -911,12 +1234,18 @@ export default function PublicTestClient({
               </div>
 
               <div className="rounded-xl bg-black/20 border border-white/10 p-4">
-                <div className="text-sm font-semibold text-white/90">Instructions</div>
+                <div className="text-sm font-semibold text-white/90">
+                  Instructions
+                </div>
+
                 <p className="mt-2 text-sm leading-6 text-white/75">
                   Please answer each question honestly and instinctively. There are no right or wrong
                   answers. Your results are based on patterns across your responses.
                 </p>
-                <p className="mt-3 text-sm text-white/75">Enjoy this experience with {finalOrg}.</p>
+
+                <p className="mt-3 text-sm text-white/75">
+                  Enjoy this experience with {finalOrg}.
+                </p>
               </div>
             </div>
           </div>
@@ -929,205 +1258,326 @@ export default function PublicTestClient({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-sm text-white/80">First name *</span>
+                  <span className="text-sm text-white/80">
+                    First name *
+                  </span>
+
                   <input
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={firstName}
-                    onChange={(e) => {
-                      setFirstName(e.target.value);
+                    onChange={(event) => {
+                      setFirstName(
+                        event.target.value
+                      );
+
                       setDetailsError(null);
                     }}
                   />
                 </label>
 
                 <label className="block">
-                  <span className="text-sm text-white/80">Last name *</span>
+                  <span className="text-sm text-white/80">
+                    Last name *
+                  </span>
+
                   <input
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={lastName}
-                    onChange={(e) => {
-                      setLastName(e.target.value);
+                    onChange={(event) => {
+                      setLastName(
+                        event.target.value
+                      );
+
                       setDetailsError(null);
                     }}
                   />
                 </label>
 
                 <label className="block md:col-span-2">
-                  <span className="text-sm text-white/80">Email *</span>
+                  <span className="text-sm text-white/80">
+                    Email *
+                  </span>
+
                   <input
                     type="email"
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
+                    onChange={(event) => {
+                      setEmail(
+                        event.target.value
+                      );
+
                       setDetailsError(null);
                     }}
                   />
                 </label>
 
-                <div className="block">
-                  <span className="text-sm text-white/80">Mobile *</span>
+                <label className="block">
+                  <span className="text-sm text-white/80">
+                    Mobile *
+                  </span>
 
-                  <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-                    <div ref={countryDropdownRef} className="relative">
-                      <button
-                        type="button"
-                        aria-haspopup="listbox"
-                        aria-expanded={countryDropdownOpen}
-                        onClick={() => {
-                          setCountryDropdownOpen((open) => !open);
-                          setCountrySearch("");
-                          setDetailsError(null);
-                        }}
-                        className="flex w-full items-center justify-between gap-3 rounded-xl bg-white p-3 text-left text-black"
-                      >
-                        <span className="min-w-0 truncate">
-                          {selectedPhoneCountry.label} ({selectedPhoneCountry.iso})
-                        </span>
-                        <span className="flex shrink-0 items-center gap-2 font-semibold text-slate-700">
-                          {selectedPhoneCountry.dial}
-                          <span aria-hidden="true">{countryDropdownOpen ? "▲" : "▼"}</span>
-                        </span>
-                      </button>
+                  <div className="mt-1 flex gap-2">
+                    <select
+                      className="w-36 rounded-xl bg-white text-black p-3"
+                      value={phoneCountryCode}
+                      onChange={(event) => {
+                        setPhoneCountryCode(
+                          event.target.value
+                        );
 
-                      {countryDropdownOpen && (
-                        <div className="absolute z-50 mt-2 w-full min-w-[280px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-                          <div className="border-b border-slate-200 p-2">
-                            <input
-                              type="search"
-                              autoFocus
-                              autoComplete="off"
-                              placeholder="Search country, IS, or +354"
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-black outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200"
-                              value={countrySearch}
-                              onChange={(e) => setCountrySearch(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") {
-                                  setCountryDropdownOpen(false);
-                                  setCountrySearch("");
-                                }
-                              }}
-                            />
-                          </div>
-
-                          <div
-                            role="listbox"
-                            aria-label="Choose country dialling code"
-                            className="max-h-64 overflow-y-auto p-1"
+                        setDetailsError(null);
+                      }}
+                    >
+                      {COUNTRY_CODES.map(
+                        (country) => (
+                          <option
+                            key={`${country.iso}-${country.dial}`}
+                            value={country.dial}
                           >
-                            {filteredPhoneCountries.length > 0 ? (
-                              filteredPhoneCountries.map((country) => {
-                                const selected = country.iso === selectedPhoneCountry.iso;
-
-                                return (
-                                  <button
-                                    type="button"
-                                    role="option"
-                                    aria-selected={selected}
-                                    key={country.iso}
-                                    onClick={() => selectPhoneCountry(country)}
-                                    className={[
-                                      "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm",
-                                      selected
-                                        ? "bg-sky-100 font-semibold text-sky-950"
-                                        : "text-slate-900 hover:bg-slate-100",
-                                    ].join(" ")}
-                                  >
-                                    <span>{country.label} ({country.iso})</span>
-                                    <span className="shrink-0 font-semibold text-slate-600">
-                                      {country.dial}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <div className="px-3 py-4 text-sm text-slate-500">
-                                No country matches your search.
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                            {country.iso}{" "}
+                            {country.dial}
+                          </option>
+                        )
                       )}
-                    </div>
+                    </select>
 
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm font-semibold text-slate-600">
-                        {phoneCountryCode}
-                      </div>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="Mobile number"
+                      className="min-w-0 flex-1 rounded-xl bg-white text-black p-3"
+                      value={phone}
+                      onChange={(event) => {
+                        setPhone(
+                          event.target.value
+                        );
 
-                      <input
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel-national"
-                        placeholder="Mobile number"
-                        className="w-full rounded-xl bg-white py-3 pr-3 pl-16 text-black"
-                        value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value);
-                          setDetailsError(null);
-                        }}
-                      />
-                    </div>
+                        setDetailsError(null);
+                      }}
+                    />
                   </div>
-
-                  <p className="mt-1 text-xs text-white/55">
-                    Select a country, then enter the local mobile number. The
-                    international dialling code is added automatically.
-                  </p>
-                </div>
+                </label>
 
                 <label className="block">
-                  <span className="text-sm text-white/80">Organisation (optional)</span>
+                  <span className="text-sm text-white/80">
+                    Organisation (optional)
+                  </span>
+
                   <input
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={company}
-                    onChange={(e) => setCompany(e.target.value)}
+                    onChange={(event) =>
+                      setCompany(
+                        event.target.value
+                      )
+                    }
                   />
                 </label>
 
-                <label className="block">
-                  <span className="text-sm text-white/80">Role / Department (optional)</span>
-                  <input
-                    className="w-full rounded-xl bg-white text-black p-3 mt-1"
-                    value={roleTitle}
-                    onChange={(e) => setRoleTitle(e.target.value)}
-                  />
-                </label>
+                {requiresWhatsWhatsFields ? (
+                  <>
+                    <label className="block">
+                      <span className="text-sm text-white/80">
+                        Website *
+                      </span>
 
-                <label className="block">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-white/80">LinkedIn Profile (optional)</span>
+                      <input
+                        type="text"
+                        inputMode="url"
+                        placeholder="yourwebsite.com"
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={website}
+                        onChange={(event) => {
+                          setWebsite(
+                            event.target.value
+                          );
 
-                    <a
-                      href={LINKEDIN_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg border border-white/20 px-3 py-1 text-xs font-medium text-white/90 hover:bg-white/10"
-                    >
-                      Open LinkedIn
-                    </a>
-                  </div>
+                          setDetailsError(null);
+                        }}
+                      />
+                    </label>
 
-                  <input
-                    type="url"
-                    placeholder="Paste your LinkedIn profile URL here"
-                    className="w-full rounded-xl bg-white text-black p-3 mt-1"
-                    value={linkedinProfile}
-                    onChange={(e) => setLinkedinProfile(e.target.value)}
-                  />
+                    <label className="block">
+                      <span className="text-sm text-white/80">
+                        Industry *
+                      </span>
 
-                  <p className="mt-1 text-xs text-white/55">
-                    Open LinkedIn, copy your profile URL, then paste it here.
-                  </p>
-                </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Professional Services"
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={industry}
+                        onChange={(event) => {
+                          setIndustry(
+                            event.target.value
+                          );
+
+                          setDetailsError(null);
+                        }}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-sm text-white/80">
+                        Country *
+                      </span>
+
+                      <select
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={countryCode}
+                        onChange={(event) => {
+                          const nextCode =
+                            event.target.value;
+
+                          const selectedCountry =
+                            COUNTRY_OPTIONS.find(
+                              (item) =>
+                                item.code === nextCode
+                            );
+
+                          setCountryCode(nextCode);
+
+                          setCountryName(
+                            selectedCountry?.name || ""
+                          );
+
+                          setDetailsError(null);
+                        }}
+                      >
+                        <option value="">
+                          Select country
+                        </option>
+
+                        {COUNTRY_OPTIONS.map(
+                          (country) => (
+                            <option
+                              key={country.code}
+                              value={country.code}
+                            >
+                              {country.name}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="text-sm text-white/80">
+                        Role / Department (optional)
+                      </span>
+
+                      <input
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={roleTitle}
+                        onChange={(event) =>
+                          setRoleTitle(
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="block md:col-span-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-white/80">
+                          LinkedIn Profile (optional)
+                        </span>
+
+                        <a
+                          href={LINKEDIN_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-white/20 px-3 py-1 text-xs font-medium text-white/90 hover:bg-white/10"
+                        >
+                          Open LinkedIn
+                        </a>
+                      </div>
+
+                      <input
+                        type="url"
+                        placeholder="Paste your LinkedIn profile URL here"
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={linkedinProfile}
+                        onChange={(event) =>
+                          setLinkedinProfile(
+                            event.target.value
+                          )
+                        }
+                      />
+
+                      <p className="mt-1 text-xs text-white/55">
+                        Open LinkedIn, copy your profile URL, then paste it here.
+                      </p>
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="text-sm text-white/80">
+                        Role / Department (optional)
+                      </span>
+
+                      <input
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={roleTitle}
+                        onChange={(event) =>
+                          setRoleTitle(
+                            event.target.value
+                          )
+                        }
+                      />
+                    </label>
+
+                    <label className="block">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-white/80">
+                          LinkedIn Profile (optional)
+                        </span>
+
+                        <a
+                          href={LINKEDIN_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-white/20 px-3 py-1 text-xs font-medium text-white/90 hover:bg-white/10"
+                        >
+                          Open LinkedIn
+                        </a>
+                      </div>
+
+                      <input
+                        type="url"
+                        placeholder="Paste your LinkedIn profile URL here"
+                        className="w-full rounded-xl bg-white text-black p-3 mt-1"
+                        value={linkedinProfile}
+                        onChange={(event) =>
+                          setLinkedinProfile(
+                            event.target.value
+                          )
+                        }
+                      />
+
+                      <p className="mt-1 text-xs text-white/55">
+                        Open LinkedIn, copy your profile URL, then paste it here.
+                      </p>
+                    </label>
+                  </>
+                )}
 
                 <label className="block md:col-span-2">
-                  <span className="text-sm text-white/80">Who referred you? (optional)</span>
+                  <span className="text-sm text-white/80">
+                    Who referred you? (optional)
+                  </span>
+
                   <input
                     placeholder="Name, company, campaign, or source"
                     className="w-full rounded-xl bg-white text-black p-3 mt-1"
                     value={referredBy}
-                    onChange={(e) => setReferredBy(e.target.value)}
+                    onChange={(event) =>
+                      setReferredBy(
+                        event.target.value
+                      )
+                    }
                   />
                 </label>
               </div>
@@ -1138,11 +1588,15 @@ export default function PublicTestClient({
                     type="checkbox"
                     className="mt-1 h-4 w-4 rounded border-white/30 bg-transparent"
                     checked={dataConsent}
-                    onChange={(e) => {
-                      setDataConsent(e.target.checked);
+                    onChange={(event) => {
+                      setDataConsent(
+                        event.target.checked
+                      );
+
                       setDetailsError(null);
                     }}
                   />
+
                   <span className="text-sm text-white/90">
                     I agree that my responses can be used to build my profile and report.
                   </span>
@@ -1159,14 +1613,23 @@ export default function PublicTestClient({
                     Privacy Policy
                   </a>{" "}
                   and{" "}
-                  <a href="/terms" target="_blank" className="underline" rel="noopener noreferrer">
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    className="underline"
+                    rel="noopener noreferrer"
+                  >
                     Terms &amp; Conditions
                   </a>
                   .
                 </p>
               </div>
 
-              {detailsError && <p className="text-sm text-red-300">{detailsError}</p>}
+              {detailsError && (
+                <p className="text-sm text-red-300">
+                  {detailsError}
+                </p>
+              )}
 
               <div className="pt-1">
                 <button
@@ -1174,12 +1637,17 @@ export default function PublicTestClient({
                   disabled={!canProceedDetails}
                   className="w-full px-5 py-3 rounded-xl bg-white text-slate-900 font-semibold hover:bg-white/90 disabled:opacity-60"
                 >
-                  {savingDetails ? "Saving…" : "Start This Assessment 👉"}
+                  {savingDetails
+                    ? "Saving…"
+                    : "Start This Assessment 👉"}
                 </button>
 
                 {!embed && (
                   <div className="pt-3 text-center text-xs text-white/50">
-                    powered by <span className="text-white/65">profiletest.ai</span>
+                    powered by{" "}
+                    <span className="text-white/65">
+                      profiletest.ai
+                    </span>
                   </div>
                 )}
               </div>
@@ -1191,6 +1659,7 @@ export default function PublicTestClient({
           <div className="text-lg font-semibold mb-2 text-white">
             This test isn&apos;t configured with any questions yet
           </div>
+
           <p className="text-sm text-white/70">
             The link is valid, but no question set was found for this test. If you believe this is an
             error, please contact the organiser or MindCanvas support so they can add questions to
@@ -1202,71 +1671,100 @@ export default function PublicTestClient({
           <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
             <div className="text-sm text-white/60 mb-2">
               Question {i + 1} / {questions.length}
-              {q.category && (
+
+              {question.category && (
                 <span className="ml-2 uppercase text-[11px] px-2 py-0.5 rounded bg-white/10">
-                  {q.category}
+                  {question.category}
                 </span>
               )}
             </div>
 
             <div className="text-lg font-medium mb-4 text-white">
-              {q.text || `Question ${i + 1}`}
+              {question.text ||
+                `Question ${i + 1}`}
             </div>
 
-            {isTextQuestion(q) ? (
+            {isTextQuestion(question) ? (
               <div className="space-y-2">
                 <textarea
                   className="w-full min-h-[140px] rounded-xl border border-white/20 bg-white/5 px-3 py-3 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-white/20"
                   placeholder="Type your answer here…"
-                  value={textAnswers[q.id] || ""}
-                  onChange={(e) => setText(q.id, e.target.value)}
+                  value={
+                    textAnswers[question.id] || ""
+                  }
+                  onChange={(event) =>
+                    setText(
+                      question.id,
+                      event.target.value
+                    )
+                  }
                 />
               </div>
-            ) : Array.isArray(q.options) && q.options.length > 0 ? (
+            ) : Array.isArray(question.options) &&
+              question.options.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {q.options.map((label: string, idx: number) => {
-                  const val = idx + 1;
-                  const selected = answers[q.id] === val;
+                {question.options.map(
+                  (label: string, index: number) => {
+                    const value = index + 1;
 
-                  return (
+                    const selected =
+                      answers[question.id] === value;
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() =>
+                          setChoice(
+                            question.id,
+                            value
+                          )
+                        }
+                        className={[
+                          "text-left px-3 py-3 rounded-xl border transition",
+                          selected
+                            ? "bg-white text-black border-white"
+                            : "bg-white/5 border-white/20 hover:bg-white/10",
+                        ].join(" ")}
+                      >
+                        {label}
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-5 gap-2">
+                {[1, 2, 3, 4, 5].map(
+                  (value) => (
                     <button
-                      key={idx}
-                      onClick={() => setChoice(q.id, val)}
+                      key={value}
+                      onClick={() =>
+                        setChoice(
+                          question.id,
+                          value
+                        )
+                      }
                       className={[
-                        "text-left px-3 py-3 rounded-xl border transition",
-                        selected
+                        "px-3 py-3 rounded-xl border transition",
+                        answers[question.id] ===
+                        value
                           ? "bg-white text-black border-white"
                           : "bg-white/5 border-white/20 hover:bg-white/10",
                       ].join(" ")}
                     >
-                      {label}
+                      {value}
                     </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="grid grid-cols-5 gap-2">
-                {[1, 2, 3, 4, 5].map((val) => (
-                  <button
-                    key={val}
-                    onClick={() => setChoice(q.id, val)}
-                    className={[
-                      "px-3 py-3 rounded-xl border transition",
-                      answers[q.id] === val
-                        ? "bg-white text-black border-white"
-                        : "bg-white/5 border-white/20 hover:bg-white/10",
-                    ].join(" ")}
-                  >
-                    {val}
-                  </button>
-                ))}
+                  )
+                )}
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between">
             <button
-              onClick={() => setI(Math.max(0, i - 1))}
+              onClick={() =>
+                setI(Math.max(0, i - 1))
+              }
               disabled={i === 0}
               className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/10 disabled:opacity-50 text-white"
             >
@@ -1275,7 +1773,14 @@ export default function PublicTestClient({
 
             {i < questions.length - 1 ? (
               <button
-                onClick={() => setI(Math.min(questions.length - 1, i + 1))}
+                onClick={() =>
+                  setI(
+                    Math.min(
+                      questions.length - 1,
+                      i + 1
+                    )
+                  )
+                }
                 className="px-4 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 disabled:opacity-60 text-white"
                 disabled={!currentAnswered}
               >
@@ -1284,10 +1789,14 @@ export default function PublicTestClient({
             ) : (
               <button
                 onClick={submit}
-                disabled={!allAnswered || submitting}
+                disabled={
+                  !allAnswered || submitting
+                }
                 className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white"
               >
-                {submitting ? "Submitting…" : "Submit"}
+                {submitting
+                  ? "Submitting…"
+                  : "Submit"}
               </button>
             )}
           </div>
