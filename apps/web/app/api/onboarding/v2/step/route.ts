@@ -1,3 +1,4 @@
+//apps/web/app/api/onboarding/v2/step/route.ts
 // POST — advance orgs.last_completed_step for the steps that have no payload
 // of their own: 5 (payment confirmed), 7 (org-created acknowledged) and
 // 8 (welcome video watched — the final step).

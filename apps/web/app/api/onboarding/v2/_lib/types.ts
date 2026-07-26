@@ -1,3 +1,4 @@
+//apps/web/app/api/onboarding/v2/_lib/types.ts
 import type {
   SignupInput,
   VerifyOtpInput,

@@ -1,3 +1,4 @@
+//apps/web/app/api/onboarding/v2/progress/route.ts
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/app/_lib/portal";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";

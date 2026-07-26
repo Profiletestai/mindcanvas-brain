@@ -1,3 +1,4 @@
+//apps/web/app/(v2)/onboarding/v2/_lib/schema.ts
 import { z } from "zod";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import {
@@ -26,6 +27,11 @@ export const emailSchema = z.preprocess(
   z.string().email({ message: "Invalid email format" })
 );
 
+export const passwordSchema = z
+  .string()
+  .min(8, { message: "Password must be at least 8 characters." })
+  .max(72, { message: "Password must be 72 characters or fewer." });
+
 export const httpUrlSchema = z
   .string()
   .url({ message: "Must be an http(s) URL." })
@@ -52,7 +58,9 @@ export const tierSchema = z
 export const phoneSchema = z
   .string()
   .trim()
-  .refine((v) => isValidPhoneNumber(v), { message: "Invalid phone number" });
+  .refine((v) => isValidPhoneNumber(v), {
+    message: "Invalid phone number",
+  });
 
 const optionalEmail = optional(emailSchema);
 const optionalPhone = optional(phoneSchema);
@@ -60,25 +68,34 @@ const optionalHttpUrl = optional(httpUrlSchema);
 const optionalHex = optional(hexColorSchema);
 const optionalTrimmed = optional(nonEmptyTrimmed);
 
-export const signupSchema = z.object({
-  first_name: nonEmptyTrimmed,
-  last_name: nonEmptyTrimmed,
-  email: emailSchema,
-  terms_accepted: z.boolean().refine((v) => v === true, {
-    message: "Please accept the Terms and Privacy Policy.",
-  }),
-  privacy_accepted: z.boolean().refine((v) => v === true, {
-    message: "Please accept the Terms and Privacy Policy.",
-  }),
-});
+export const signupSchema = z
+  .object({
+    first_name: nonEmptyTrimmed,
+    last_name: nonEmptyTrimmed,
+    email: emailSchema,
+    password: passwordSchema,
+    confirm_password: z.string().min(1, {
+      message: "Please confirm your password.",
+    }),
+    terms_accepted: z.boolean().refine((v) => v === true, {
+      message: "Please accept the Terms and Conditions.",
+    }),
+    privacy_accepted: z.boolean().refine((v) => v === true, {
+      message: "Please accept the Privacy Policy.",
+    }),
+  })
+  .refine((values) => values.password === values.confirm_password, {
+    message: "Passwords do not match.",
+    path: ["confirm_password"],
+  });
 
 export const verifyOtpSchema = z.object({
   email: emailSchema,
   token: otpSchema,
 });
 
-// Step 3 — engines + subscription tier. Tier 4 is not selectable here, and the
-// tier/engine-count rule is re-checked server-side (see /api/onboarding/v2/plan).
+// Engine and subscription selection. Tier 4 is not selectable during
+// onboarding. The tier/engine-count rule is also checked server-side.
 export const engineKeySchema = z.enum(ENGINE_KEYS);
 
 export const planSelectionSchema = z
@@ -92,7 +109,9 @@ export const planSelectionSchema = z
       .number()
       .int()
       .min(1, { message: "Select a subscription tier." })
-      .max(3, { message: "Tier 4 is not available during onboarding." }),
+      .max(3, {
+        message: "Tier 4 is not available during onboarding.",
+      }),
   })
   .refine((v) => isTierAllowed(v.tier, v.engines.length), {
     message: TIER_DISABLED_REASON,
@@ -127,11 +146,13 @@ export const brandingSchema = z.object({
 });
 
 export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
 export const LOGO_MIME_TO_EXT: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
 };
+
 const LOGO_MIMES = ["image/png", "image/jpeg", "image/webp"] as const;
 
 export const uploadLogoSchema = z.object({
@@ -161,6 +182,9 @@ export function firstError<T extends z.ZodTypeAny>(
   schema: T,
   input: unknown
 ): string | null {
-  const r = schema.safeParse(input);
-  return r.success ? null : r.error.issues[0]?.message ?? "Invalid input";
+  const result = schema.safeParse(input);
+
+  return result.success
+    ? null
+    : result.error.issues[0]?.message ?? "Invalid input";
 }

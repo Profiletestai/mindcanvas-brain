@@ -1,3 +1,4 @@
+//apps/web/app/(v2)/onboarding/v2/_lib/progress.ts
 import type {
   OnboardingStep,
   ProgressResponse,

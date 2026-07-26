@@ -1,3 +1,4 @@
+//apps/web/app/(V2)/choose-plan/PlanCard.tsx
 import type { PlanCardData } from "./ChoosePlanClient";
 import { CheckSvgIcon, CrossSvgIcon } from "./icons";
 

@@ -1,3 +1,4 @@
+//apps/web/app/(V2)/choose-plan/planContent.ts
 export type PlanFeature = { label: string; included: boolean };
 
 export type PlanCardContent = {
