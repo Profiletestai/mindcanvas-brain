@@ -59,16 +59,24 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
   // pressed one shows its progress label.
   const [pending, setPending] = useState<null | "subscribe" | "skip">(null);
 
-  // Restore a previous visit's selection so it survives refresh / sign-out.
+  // Restore the selected engines, then derive the recommended tier from the
+  // current engine count. The API does not record whether a higher saved tier
+  // was deliberately chosen by the user or came from an older default, so it
+  // must not be allowed to override the recommendation when this page loads.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const res = await api.getPlanSelection();
       if (cancelled) return;
       if (!isErr(res) && res.selection) {
-        setEngines(normalizeEngines(res.selection.engines));
-        setTier(res.selection.tier);
-        setTierPickedByUser(true);
+        const restoredEngines = normalizeEngines(res.selection.engines);
+        setEngines(restoredEngines);
+        setTier(
+          restoredEngines.length > 0
+            ? recommendedTier(restoredEngines.length)
+            : null
+        );
+        setTierPickedByUser(false);
       }
       setLoading(false);
     })();
@@ -97,9 +105,14 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
       return;
     }
 
-    // A tier is always explicitly selected: the recommendation is applied for
-    // the client whenever their current pick is missing or no longer valid.
-    if (tier === null || !isTierAllowed(tier, next.length)) {
+    // Keep the default selection aligned to the recommendation as engines are
+    // added or removed. Preserve a higher tier only when the client explicitly
+    // selected it during this visit and it still supports the engine count.
+    if (
+      !tierPickedByUser ||
+      tier === null ||
+      !isTierAllowed(tier, next.length)
+    ) {
       const replaced = tier !== null;
       setTier(recommendedTier(next.length));
       setTierPickedByUser(false);
