@@ -184,14 +184,17 @@ export async function POST(req: Request) {
     { price: selectedPrice.stripe_price_id, quantity: 1 },
   ];
 
-  const baseUrl = getBaseUrl();
   const orgQs = `orgId=${encodeURIComponent(orgId)}`;
   // Payment is a step inside onboarding now, so it has to come back to the
-  // onboarding screen. The env overrides stay authoritative for the portal
-  // flow, which is where clients who already have an org pay from.
+  // billing confirmation screen on the same host that started Checkout. This
+  // keeps Preview/Staging on its own domain while the webhook is confirmed.
+  // The env overrides stay authoritative for the portal flow, which is where
+  // clients who already have an org pay from.
   const isOnboarding = body.flow === "onboarding";
+  const requestOrigin = new URL(req.url).origin;
+  const baseUrl = isOnboarding ? requestOrigin : getBaseUrl();
   const successBase = isOnboarding
-    ? `${baseUrl}/onboarding/v2/organisation?status=success`
+    ? `${baseUrl}/onboarding/v2/billing?status=success&interval=${interval}`
     : process.env.STRIPE_CHECKOUT_SUCCESS_URL ||
       `${baseUrl}/portal/billing?status=success`;
   const cancelBase = isOnboarding
