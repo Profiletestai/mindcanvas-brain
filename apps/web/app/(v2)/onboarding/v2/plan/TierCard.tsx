@@ -1,3 +1,4 @@
+//apps/web/app/(v2)/onboarding/v2/plan/TierCard.tsx
 "use client";
 
 import type { PlanCardContent } from "@/app/(v2)/choose-plan/planContent";
