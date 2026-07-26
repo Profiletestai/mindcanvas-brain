@@ -19,7 +19,11 @@ import {
 } from "../_lib/engines";
 import { StepCard } from "../_components/StepCard";
 import { EngineCard } from "./EngineCard";
-import { TierCard, type TierCardData } from "./TierCard";
+import {
+  TierCard,
+  type BillingInterval,
+  type TierCardData,
+} from "./TierCard";
 
 
 // Figma screen 3 accent — engine pills in the summary rail.
@@ -44,6 +48,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
   const router = useRouter();
   const [engines, setEngines] = useState<EngineKey[]>([]);
   const [tier, setTier] = useState<number | null>(null);
+  const [interval, setInterval] = useState<BillingInterval>("month");
   // Distinguishes "we picked the recommended tier for you" from "the client
   // clicked a tier" — the rail wording differs, the saved value does not.
   const [tierPickedByUser, setTierPickedByUser] = useState(false);
@@ -142,7 +147,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
       setPending(null);
       return;
     }
-    router.push(BILLING_PATH);
+    router.push(`${BILLING_PATH}?interval=${interval}`);
   }
 
   // Secondary CTA: skip payment. skipBilling creates the org, which grants the
@@ -178,7 +183,14 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
     ? (RAIL_TAGLINE[activeCard.name] ?? activeCard.tagline)
     : "";
   const recommendedName = recommendedCard?.name ?? `Tier ${minTier}`;
-  const planPrice = activeCard ? formatUsd(activeCard.amountCents) : "";
+  const planPrice = activeCard
+    ? formatUsd(
+        interval === "year"
+          ? activeCard.annualAmountCents
+          : activeCard.monthlyAmountCents
+      )
+    : "";
+  const planPeriod = interval === "year" ? "yr" : "mo";
 
   return (
     <StepCard
@@ -219,6 +231,64 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
             Recommended for your engine selection
           </p>
 
+          <div className="mt-4 flex items-center gap-3">
+            <span
+              className="text-[12px] font-medium"
+              style={{
+                color:
+                  interval === "month"
+                    ? "rgb(234,242,251)"
+                    : "rgba(210,225,245,0.38)",
+              }}
+            >
+              Monthly
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={interval === "year"}
+              aria-label="Toggle annual billing"
+              onClick={() =>
+                setInterval((current) =>
+                  current === "month" ? "year" : "month"
+                )
+              }
+              className="relative h-6 w-[42px] cursor-pointer rounded-full transition-colors"
+              style={{
+                background:
+                  interval === "year"
+                    ? "rgb(84,175,224)"
+                    : "rgb(30,58,85)",
+              }}
+            >
+              <span
+                className={`absolute top-[2px] h-5 w-5 rounded-full bg-white transition-[left] duration-200 ${
+                  interval === "year" ? "left-[20px]" : "left-[2px]"
+                }`}
+              />
+            </button>
+            <span
+              className="flex items-center gap-2 text-[12px] font-medium"
+              style={{
+                color:
+                  interval === "year"
+                    ? "rgb(234,242,251)"
+                    : "rgba(210,225,245,0.38)",
+              }}
+            >
+              Annual
+              <span
+                className="rounded-full px-2 py-[2px] text-[9px] font-bold uppercase"
+                style={{
+                  background: "rgba(34,197,94,0.10)",
+                  color: "rgb(34,197,94)",
+                }}
+              >
+                2 months free
+              </span>
+            </span>
+          </div>
+
           {notice && (
             <p
               role="status"
@@ -241,6 +311,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
                 selected={tier === card.tier}
                 recommended={count > 0 && card.tier === minTier}
                 disabled={count > 0 && !isTierAllowed(card.tier, count)}
+                interval={interval}
                 onSelect={() => selectTier(card.tier)}
               />
             ))}
@@ -294,7 +365,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
                       className="text-[12.1px] leading-[15px]"
                       style={{ color: "rgba(210,225,245,0.38)" }}
                     >
-                      /mo
+                      /{planPeriod}
                     </span>
                   </p>
                 </div>
@@ -402,7 +473,7 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
                         className="rounded-full px-[11px] py-[3px] text-[13px] font-semibold"
                         style={{ background: "rgba(255,255,255,0.24)" }}
                       >
-                        {planPrice}/mo
+                        {planPrice}/{planPeriod}
                       </span>
                     </>
                   )}
@@ -440,3 +511,4 @@ export function PlanClient({ cards }: { cards: TierCardData[] }) {
     </StepCard>
   );
 }
+

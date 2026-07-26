@@ -11,12 +11,14 @@ export type BillingTier = { tier: number; name: string; tagline: string; amountC
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 20;
 
-async function startCheckout(): Promise<string> {
+type BillingInterval = "month" | "year";
+
+async function startCheckout(interval: BillingInterval): Promise<string> {
   const res = await fetch("/api/billing/checkout", {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ flow: "onboarding" }),
+    body: JSON.stringify({ flow: "onboarding", interval }),
     cache: "no-store",
   });
   const json = await res.json().catch(() => null);
@@ -28,6 +30,8 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
   const router = useRouter();
   const params = useSearchParams();
   const status = params.get("status");
+  const interval: BillingInterval =
+    params.get("interval") === "year" ? "year" : "month";
 
   const [error, setError] = useState("");
   const [retrying, setRetrying] = useState(false);
@@ -66,15 +70,15 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
     if (status === "cancelled") return;
     if (initiated.current) return;
     initiated.current = true;
-    startCheckout()
+    startCheckout(interval)
       .then((url) => { window.location.href = url; })
       .catch((e: Error) => setError(e.message));
-  }, [status, confirmPayment]);
+  }, [status, interval, confirmPayment]);
 
   const retry = () => {
     setError("");
     setRetrying(true);
-    startCheckout()
+    startCheckout(interval)
       .then((url) => { window.location.href = url; })
       .catch((e: Error) => { setError(e.message); setRetrying(false); });
   };
@@ -168,3 +172,4 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
     </StepCard>
   );
 }
+

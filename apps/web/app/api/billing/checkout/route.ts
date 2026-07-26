@@ -32,7 +32,12 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error;
   const user = auth.user;
 
-  let body: { orgId?: string; tier?: number; flow?: string } = {};
+  let body: {
+    orgId?: string;
+    tier?: number;
+    flow?: string;
+    interval?: "month" | "year";
+  } = {};
   try {
     body = await req.json();
   } catch {
@@ -42,6 +47,18 @@ export async function POST(req: Request) {
   if (body.tier !== undefined && (!Number.isInteger(body.tier) || body.tier < 1 || body.tier > 4)) {
     return jerr("tier must be an integer between 1 and 4", "invalid_tier", 400);
   }
+  if (
+    body.interval !== undefined &&
+    body.interval !== "month" &&
+    body.interval !== "year"
+  ) {
+    return jerr(
+      "interval must be month or year",
+      "invalid_interval",
+      400
+    );
+  }
+  const interval = body.interval ?? "month";
 
   const resolved = await resolveOwnerOrgId(user.id, body.orgId ?? null);
   let orgId: string;
@@ -140,13 +157,19 @@ export async function POST(req: Request) {
   } catch (e: any) {
     return jerr(e?.message || "Price lookup failed", "price_lookup_failed", 500);
   }
+  const selectedPrice =
+    interval === "year" ? prices.annual : prices.monthly;
   if (
-    !prices.monthly?.stripe_price_id ||
-    prices.monthly.stripe_price_id.endsWith("_PLACEHOLDER") ||
-    !prices.monthly.amount_cents ||
-    prices.monthly.amount_cents <= 0
+    !selectedPrice?.stripe_price_id ||
+    selectedPrice.stripe_price_id.endsWith("_PLACEHOLDER") ||
+    !selectedPrice.amount_cents ||
+    selectedPrice.amount_cents <= 0
   ) {
-    return jerr(`No active priced plan for tier ${ba.tier}`, "prices_not_configured", 502);
+    return jerr(
+      `No active ${interval === "year" ? "annual" : "monthly"} plan for tier ${ba.tier}`,
+      "prices_not_configured",
+      502
+    );
   }
   if (!user.email) return jerr("User has no email", "email_required", 400);
 
@@ -158,7 +181,7 @@ export async function POST(req: Request) {
   }
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-    { price: prices.monthly.stripe_price_id, quantity: 1 },
+    { price: selectedPrice.stripe_price_id, quantity: 1 },
   ];
 
   const baseUrl = getBaseUrl();
@@ -172,7 +195,7 @@ export async function POST(req: Request) {
     : process.env.STRIPE_CHECKOUT_SUCCESS_URL ||
       `${baseUrl}/portal/billing?status=success`;
   const cancelBase = isOnboarding
-    ? `${baseUrl}/onboarding/v2/billing?status=cancelled`
+    ? `${baseUrl}/onboarding/v2/billing?status=cancelled&interval=${interval}`
     : process.env.STRIPE_CHECKOUT_CANCEL_URL ||
       `${baseUrl}/portal/billing?status=cancelled`;
   const successUrl = `${successBase}${successBase.includes("?") ? "&" : "?"}${orgQs}`;
@@ -192,12 +215,22 @@ export async function POST(req: Request) {
         cancel_url: cancelUrl,
         allow_promotion_codes: false,
         subscription_data: {
-          metadata: { org_id: orgId, billing_account_id: ba.id },
+          metadata: {
+            org_id: orgId,
+            billing_account_id: ba.id,
+            billing_interval: interval,
+          },
         },
         client_reference_id: orgId,
-        metadata: { org_id: orgId, billing_account_id: ba.id },
+        metadata: {
+          org_id: orgId,
+          billing_account_id: ba.id,
+          billing_interval: interval,
+        },
       },
-      { idempotencyKey: `mc-checkout-${orgId}-${ba.id}-${bucket}` }
+      {
+        idempotencyKey: `mc-checkout-${orgId}-${ba.id}-${interval}-${bucket}`,
+      }
     );
   } catch (e: any) {
     if (e?.type === "StripeInvalidRequestError") return jerr(e.message, "stripe_invalid_request", 400);

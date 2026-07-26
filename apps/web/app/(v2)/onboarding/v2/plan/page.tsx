@@ -9,21 +9,30 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Choose your engines and plan" };
 
 export default async function OnboardingPlanPage() {
-  let dbPlans: Awaited<ReturnType<typeof listOnboardingPlans>> = [];
+  let monthlyPlans: Awaited<ReturnType<typeof listOnboardingPlans>> = [];
+  let annualPlans: Awaited<ReturnType<typeof listOnboardingPlans>> = [];
   try {
-    dbPlans = await listOnboardingPlans();
+    [monthlyPlans, annualPlans] = await Promise.all([
+      listOnboardingPlans("month"),
+      listOnboardingPlans("year"),
+    ]);
   } catch (e) {
     console.error("[onboarding/plan] listOnboardingPlans failed", e);
   }
 
-  const priceByTier = new Map(dbPlans.map((p) => [p.tier, p]));
+  const monthlyByTier = new Map(monthlyPlans.map((p) => [p.tier, p]));
+  const annualByTier = new Map(annualPlans.map((p) => [p.tier, p]));
 
   // Tier 4 is deliberately absent from onboarding.
   const cards: TierCardData[] = PLAN_CARDS.filter((c) =>
     (ONBOARDING_TIERS as readonly number[]).includes(c.tier)
   ).map((card) => ({
     ...card,
-    amountCents: priceByTier.get(card.tier)?.amount_cents ?? card.fallbackAmountCents,
+    monthlyAmountCents:
+      monthlyByTier.get(card.tier)?.amount_cents ?? card.fallbackAmountCents,
+    annualAmountCents:
+      annualByTier.get(card.tier)?.amount_cents ??
+      card.fallbackAmountCents * 10,
   }));
 
   return <PlanClient cards={cards} />;

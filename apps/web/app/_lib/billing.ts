@@ -73,11 +73,12 @@ export async function getOwnerBillingAccount(orgId: string): Promise<OwnerBillin
   return (data as OwnerBillingAccount) ?? null;
 }
 
-/** Lookup the active monthly price for a specific tier (owner billing).
+/** Lookup the active monthly and annual prices for a specific tier (owner billing).
  *  tier_definitions is source of truth for tier metadata; tier_prices keyed by
  *  tier_definition_id is source of truth for Stripe price IDs. */
 export async function getOwnerPricesForTier(tier: number): Promise<{
   monthly: TierPriceRow | null;
+  annual: TierPriceRow | null;
 }> {
   const admin = portalAdmin();
 
@@ -88,22 +89,25 @@ export async function getOwnerPricesForTier(tier: number): Promise<{
     .is("valid_until", null)
     .maybeSingle();
   if (tdErr) throw tdErr;
-  if (!tierDef?.id) return { monthly: null };
+  if (!tierDef?.id) return { monthly: null, annual: null };
 
-  const { data: monthlyRows, error: mErr } = await admin
+  const { data: priceRows, error: priceErr } = await admin
     .from("tier_prices")
     .select(
       "id, billing_type, tier_definition_id, stripe_price_id, interval, currency, amount_cents, active"
     )
     .eq("billing_type", "owner")
     .eq("active", true)
-    .eq("interval", "month")
+    .in("interval", ["month", "year"])
     .eq("tier_definition_id", tierDef.id)
-    .maybeSingle();
-  if (mErr) throw mErr;
+    .returns<TierPriceRow[]>();
+  if (priceErr) throw priceErr;
+
+  const rows = priceRows ?? [];
 
   return {
-    monthly: (monthlyRows as TierPriceRow) ?? null,
+    monthly: rows.find((row) => row.interval === "month") ?? null,
+    annual: rows.find((row) => row.interval === "year") ?? null,
   };
 }
 

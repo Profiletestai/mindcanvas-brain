@@ -3,7 +3,12 @@
 import type { PlanCardContent } from "@/app/(v2)/choose-plan/planContent";
 import { TIER_DISABLED_REASON } from "../_lib/engines";
 
-export type TierCardData = PlanCardContent & { amountCents: number };
+export type BillingInterval = "month" | "year";
+
+export type TierCardData = PlanCardContent & {
+  monthlyAmountCents: number;
+  annualAmountCents: number;
+};
 
 // Four states from the Figma variants of screen 3:
 //   default      — dark card, no border, "Select <plan>" button
@@ -32,6 +37,7 @@ export function TierCard({
   selected,
   recommended,
   disabled,
+  interval,
   onSelect,
 }: {
   card: TierCardData;
@@ -39,10 +45,13 @@ export function TierCard({
   recommended: boolean;
   /** Tier below the minimum for the engine count — visible but not selectable. */
   disabled: boolean;
+  interval: BillingInterval;
   onSelect: () => void;
 }) {
   const showBadge = recommended && !disabled;
   const bordered = (recommended || selected) && !disabled;
+  const amountCents =
+    interval === "year" ? card.annualAmountCents : card.monthlyAmountCents;
 
   return (
     <div
@@ -97,10 +106,10 @@ export function TierCard({
           className="text-[24.2px] font-bold leading-[29px]"
           style={{ color: selected ? TEXT_ON_LIGHT : "#fff" }}
         >
-          {formatUsd(card.amountCents)}
+          {formatUsd(amountCents)}
         </span>
         <span className="text-[13.2px] leading-[16px]" style={{ color: TEXT_MUTED }}>
-          /month
+          /{interval === "year" ? "year" : "month"}
         </span>
       </div>
 
