@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, isErr } from "../_lib/api";
 import { StepCard } from "../_components/StepCard";
-import { dashboardPath } from "../_lib/progress";
+import { BOOK_SESSION_PATH } from "../_lib/progress";
 
 // Kept in an env var so the welcome video can be swapped without a deploy.
 // Falls back to Daniel's welcome message video when nothing is configured.
@@ -32,12 +32,12 @@ export default function WelcomePage() {
   async function advance() {
     if (advancing) return;
     setAdvancing(true);
-    const res = await api.completeStep(8);
+    const res = await api.completeStep(7);
     if (isErr(res)) {
       setAdvancing(false);
       return;
     }
-    router.push(dashboardPath(res.org_slug));
+    router.push(BOOK_SESSION_PATH);
   }
 
   return (

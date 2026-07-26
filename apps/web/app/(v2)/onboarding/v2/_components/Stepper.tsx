@@ -10,7 +10,12 @@ import {
 
 // The closing screen is a celebratory full-bleed page in the design — it
 // carries no progress band.
-const HIDDEN_ON = new Set([STEP_TO_PATH[8]]);
+const HIDDEN_ON = new Set([
+  STEP_TO_PATH[7],
+  STEP_TO_PATH[8],
+  STEP_TO_PATH[9],
+  STEP_TO_PATH[10],
+]);
 
 export function Stepper() {
   const pathname = usePathname();

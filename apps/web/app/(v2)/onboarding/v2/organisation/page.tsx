@@ -9,7 +9,7 @@ import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { api, isErr } from "../_lib/api";
 import { orgSchema } from "../_lib/schema";
-import { BRANDING_PATH } from "../_lib/progress";
+import { CREATED_PATH } from "../_lib/progress";
 import { StepCard } from "../_components/StepCard";
 
 type OrgFormInput = z.input<typeof orgSchema>;
@@ -157,8 +157,12 @@ export default function OrganisationPage() {
       setError("root", { message: res.error });
       return;
     }
-    await api.completeStep(5);
-    router.push(BRANDING_PATH);
+    const stepRes = await api.completeStep(5);
+    if (isErr(stepRes)) {
+      setError("root", { message: stepRes.error });
+      return;
+    }
+    router.push(CREATED_PATH);
   });
 
   if (!ready) {

@@ -86,7 +86,18 @@ export interface ContactResponse {
 }
 
 // GET /api/onboarding/v2/progress
-export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | "complete";
+export type OnboardingStep =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | "complete";
 
 export interface ProgressResponse {
   ok: true;
@@ -97,7 +108,7 @@ export interface ProgressResponse {
 
 // POST /api/onboarding/v2/step — advance the acknowledge-only screens.
 export interface StepRequestBody {
-  step: 5 | 7 | 8;
+  step: 5 | 6 | 7 | 8 | 9 | 10;
 }
 
 export interface StepResponse {

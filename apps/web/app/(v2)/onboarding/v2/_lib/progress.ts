@@ -10,9 +10,11 @@ export const STEP_TO_PATH: Record<Exclude<OnboardingStep, "complete">, string> =
   3: "/onboarding/v2/plan",
   4: "/onboarding/v2/billing",
   5: "/onboarding/v2/organisation",
-  6: "/onboarding/v2/branding",
-  7: "/onboarding/v2/created",
-  8: "/onboarding/v2/welcome",
+  6: "/onboarding/v2/created",
+  7: "/onboarding/v2/welcome",
+  8: "/onboarding/v2/book-session",
+  9: "/onboarding/v2/session-booked",
+  10: "/onboarding/v2/diagnostic",
 };
 
 /** Onboarding ends in the portal, not on another onboarding screen. */
@@ -25,9 +27,15 @@ export const VERIFY_PATH = STEP_TO_PATH[2];
 export const PLAN_PATH = STEP_TO_PATH[3];
 export const BILLING_PATH = STEP_TO_PATH[4];
 export const ORGANISATION_PATH = STEP_TO_PATH[5];
-export const BRANDING_PATH = STEP_TO_PATH[6];
-export const CREATED_PATH = STEP_TO_PATH[7];
-export const WELCOME_PATH = STEP_TO_PATH[8];
+export const CREATED_PATH = STEP_TO_PATH[6];
+export const WELCOME_PATH = STEP_TO_PATH[7];
+export const BOOK_SESSION_PATH = STEP_TO_PATH[8];
+export const SESSION_BOOKED_PATH = STEP_TO_PATH[9];
+export const DIAGNOSTIC_PATH = STEP_TO_PATH[10];
+// Branding is configured later from Portal → Profile Settings → Customise.
+// Keep the old route constant only so existing bookmarks can be redirected
+// separately without making Branding part of onboarding progress.
+export const BRANDING_PATH = "/onboarding/v2/branding";
 export const ONB_EMAIL_KEY = "onb_email";
 
 // First step that requires an authenticated session (org membership exists).
@@ -51,9 +59,11 @@ export const PATH_TO_STEP: Record<string, OnboardingStep> = {
   [STEP_TO_PATH[6]]: 6,
   [STEP_TO_PATH[7]]: 7,
   [STEP_TO_PATH[8]]: 8,
+  [STEP_TO_PATH[9]]: 9,
+  [STEP_TO_PATH[10]]: 10,
 };
 
-export const TOTAL_STEPS = 8;
+export const TOTAL_STEPS = 10;
 
 export function displayStep(step: OnboardingStep | undefined): number {
   if (step === "complete") return TOTAL_STEPS;

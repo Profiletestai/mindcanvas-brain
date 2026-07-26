@@ -54,7 +54,7 @@ export default function OrganisationCreatedPage() {
 
   async function onContinue() {
     setAdvancing(true);
-    const res = await api.completeStep(7);
+    const res = await api.completeStep(6);
     if (isErr(res)) {
       setAdvancing(false);
       return;

@@ -1,7 +1,8 @@
 //apps/web/app/api/onboarding/v2/step/route.ts
 // POST — advance orgs.last_completed_step for the steps that have no payload
-// of their own: 5 (payment confirmed), 7 (org-created acknowledged) and
-// 8 (welcome video watched — the final step).
+// of their own: 5 (organisation saved), 6 (organisation-created acknowledged),
+// 7 (welcome video watched), 8 (booking step), 9 (booking confirmation) and
+// 10 (first diagnostic choice — the final step).
 //
 // The write is monotonic (greatest(current, step)) so re-visiting a screen or
 // a double submit can never send a client backwards.
@@ -13,7 +14,7 @@ import type { StepResponse } from "../_lib/types";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_STEPS = new Set([5, 7, 8]);
+const ALLOWED_STEPS = new Set([5, 6, 7, 8, 9, 10]);
 
 function jerr(error: string, status: number) {
   return NextResponse.json({ ok: false, error }, { status });
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     const raw = await req.json().catch(() => ({}));
     const step = Number((raw as { step?: unknown }).step);
     if (!ALLOWED_STEPS.has(step)) {
-      return jerr("step must be one of 5, 7, 8", 400);
+      return jerr("step must be one of 5, 6, 7, 8, 9, 10", 400);
     }
 
     const admin = portalAdmin();
