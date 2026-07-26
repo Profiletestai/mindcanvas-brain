@@ -1,3 +1,4 @@
+//apps/web/app/(v2)/onboarding/pilot/verify/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -23,6 +24,7 @@ export default function VerifyPage() {
     control,
     handleSubmit,
     setError,
+    clearErrors,
     setValue,
     watch,
     formState: { errors, isSubmitting },
@@ -32,59 +34,66 @@ export default function VerifyPage() {
       unknown,
       VerifyFormOutput
     >,
-    defaultValues: { email: "", token: "" },
+    defaultValues: {
+      email: "",
+      token: "",
+    },
     mode: "onSubmit",
   });
 
   const token = watch("token") ?? "";
 
   useEffect(() => {
-    const e = sessionStorage.getItem("onb_email");
-    if (!e) {
+    const storedEmail = sessionStorage.getItem("onb_email");
+
+    if (!storedEmail) {
       router.replace("/onboarding/pilot/account");
       return;
     }
-    setEmail(e);
-    setValue("email", e);
+
+    setEmail(storedEmail);
+    setValue("email", storedEmail);
   }, [router, setValue]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn((n) => Math.max(0, n - 1)), 1000);
-    return () => clearTimeout(t);
+
+    const timer = setTimeout(
+      () => setResendIn((seconds) => Math.max(0, seconds - 1)),
+      1000
+    );
+
+    return () => clearTimeout(timer);
   }, [resendIn]);
 
   const onSubmit = handleSubmit(async (values) => {
     const res = await api.verifyOtp(values);
+
     if (isErr(res)) {
       setError("root", { message: res.error });
       return;
     }
+
     router.push("/onboarding/pilot/organisation");
   });
 
   const onResend = async () => {
     if (!email || resendIn > 0 || resending) return;
-    const first = sessionStorage.getItem("onb_first_name") || "";
-    const last = sessionStorage.getItem("onb_last_name") || "";
-    if (!first || !last) {
-      router.replace("/onboarding/pilot/account");
+
+    clearErrors("root");
+    setResending(true);
+
+    const res = await api.resendOtp({ email });
+
+    setResending(false);
+
+    if (isErr(res)) {
+      setError("root", { message: res.error });
       return;
     }
-    setResending(true);
+
     setResendIn(30);
-    const res = await api.signup({
-      first_name: first,
-      last_name: last,
-      email,
-      terms_accepted: true,
-      privacy_accepted: true,
-    });
-    setResending(false);
-    if (isErr(res)) {
-      setResendIn(0);
-      setError("root", { message: res.error });
-    }
+    setValue("token", "");
   };
 
   if (!email) return null;
@@ -96,7 +105,8 @@ export default function VerifyPage() {
     <StepCard
       title={
         <>
-          Verify your <span style={{ color: "rgb(84, 175, 224)" }}>email</span>
+          Verify your{" "}
+          <span style={{ color: "rgb(84, 175, 224)" }}>email</span>
         </>
       }
       subtitle="Enter the 6-digit code we sent to your email address."
@@ -115,19 +125,27 @@ export default function VerifyPage() {
           control={control}
           name="token"
           render={({ field }) => (
-            <OtpInput value={field.value} onChange={field.onChange} autoFocus />
+            <OtpInput
+              value={field.value}
+              onChange={field.onChange}
+              autoFocus
+            />
           )}
         />
 
         {errMsg && (
-          <div className="mt-4 text-sm text-rose-500 text-center">{errMsg}</div>
+          <div className="mt-4 text-sm text-rose-500 text-center">
+            {errMsg}
+          </div>
         )}
 
         <button
           type="submit"
           disabled={!canSubmit}
           className={`mt-6 w-full h-[52px] rounded-[12px] text-white font-bold tracking-wide ${
-            canSubmit ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+            canSubmit
+              ? "cursor-pointer"
+              : "cursor-not-allowed opacity-40"
           }`}
           style={{
             background:
@@ -151,7 +169,11 @@ export default function VerifyPage() {
               fontSize: "13px",
             }}
           >
-            {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
+            {resending
+              ? "Sending…"
+              : resendIn > 0
+                ? `Resend code in ${resendIn}s`
+                : "Resend code"}
           </button>
         </div>
       </form>
