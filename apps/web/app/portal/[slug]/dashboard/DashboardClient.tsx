@@ -4,55 +4,375 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type BillingSummaryLite = {
+type BillingSummaryPayload = {
   ok: true;
-  org: { status: "pending_activation" | "active" | "past_due" | "suspended" | "archived" };
+  org: {
+    id: string;
+    name: string;
+    slug: string;
+    status:
+      | "pending_activation"
+      | "active"
+      | "past_due"
+      | "suspended"
+      | "archived";
+  };
+  billing: {
+    id: string;
+    tier: number;
+    billing_type: "owner" | "licensee";
+    billing_interval: "monthly" | "annual";
+    billing_source: "onboarding" | "legacy";
+    stripe_status: string | null;
+    stripe_customer_id: string | null;
+    stripe_subscription_id: string | null;
+    period_start: string | null;
+    period_end: string | null;
+    past_due_since: string | null;
+    is_pilot: boolean;
+    pilot_end_date: string | null;
+    pilot_grace_ends_at: string | null;
+  } | null;
+  next_action: "checkout" | "reactivate" | "none";
 };
 
-function BillingBanner({ orgId }: { orgId: string | null }) {
-  const [status, setStatus] = useState<string | null>(null);
+type BillingPresentation = {
+  label: string;
+  badgeClassName: string;
+  warning: string | null;
+};
+
+function formatBillingDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatBillingValue(value: string | null | undefined) {
+  if (!value) return "—";
+
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function getBillingPresentation(
+  summary: BillingSummaryPayload
+): BillingPresentation {
+  const billing = summary.billing;
+  const stripeStatus = billing?.stripe_status?.toLowerCase() ?? null;
+
+  if (billing?.is_pilot) {
+    return {
+      label: "Pilot · Complimentary",
+      badgeClassName:
+        "border-violet-300/25 bg-violet-300/10 text-violet-100",
+      warning: billing.pilot_grace_ends_at
+        ? `Pilot access, including the grace period, ends ${formatBillingDate(
+            billing.pilot_grace_ends_at
+          )}.`
+        : null,
+    };
+  }
+
+  if (stripeStatus === "active") {
+    return {
+      label: "Paid subscription",
+      badgeClassName:
+        "border-emerald-300/25 bg-emerald-300/10 text-emerald-100",
+      warning: null,
+    };
+  }
+
+  if (stripeStatus === "trialing") {
+    return {
+      label: "Trial",
+      badgeClassName:
+        "border-sky-300/25 bg-sky-300/10 text-sky-100",
+      warning: null,
+    };
+  }
+
+  if (stripeStatus === "past_due" || stripeStatus === "unpaid") {
+    return {
+      label: "Payment overdue",
+      badgeClassName:
+        "border-red-300/25 bg-red-300/10 text-red-100",
+      warning:
+        "Payment is overdue. Please resolve the outstanding billing issue to avoid losing platform access.",
+    };
+  }
+
+  if (
+    stripeStatus === "incomplete" ||
+    stripeStatus === "incomplete_expired"
+  ) {
+    return {
+      label: "Billing setup required",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "The subscription has not completed successfully. Please return to Billing to finish setup.",
+    };
+  }
+
+  if (stripeStatus === "paused") {
+    return {
+      label: "Subscription paused",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "The subscription is paused. Please review the billing account before continuing.",
+    };
+  }
+
+  if (stripeStatus === "canceled" || stripeStatus === "cancelled") {
+    return {
+      label: "Subscription cancelled",
+      badgeClassName:
+        "border-white/15 bg-white/5 text-white/70",
+      warning:
+        "The subscription has been cancelled. Current access depends on the organisation status and period end date.",
+    };
+  }
+
+  if (summary.org.status === "suspended") {
+    return {
+      label: "Account suspended",
+      badgeClassName:
+        "border-red-300/25 bg-red-300/10 text-red-100",
+      warning:
+        "This organisation is suspended. Contact support or resolve the billing issue to reactivate it.",
+    };
+  }
+
+  if (summary.org.status === "past_due") {
+    return {
+      label: "Payment overdue",
+      badgeClassName:
+        "border-red-300/25 bg-red-300/10 text-red-100",
+      warning:
+        "The organisation is marked past due. Please review the billing account.",
+    };
+  }
+
+  if (!billing && summary.org.status === "pending_activation") {
+    return {
+      label: "Billing setup required",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "Complete billing setup to activate the organisation.",
+    };
+  }
+
+  if (billing && !stripeStatus) {
+    return {
+      label: "Billing setup required",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "A billing account exists, but no Stripe subscription status has been recorded.",
+    };
+  }
+
+  return {
+    label: "Billing not set up",
+    badgeClassName: "border-white/15 bg-white/5 text-white/70",
+    warning: null,
+  };
+}
+
+function BillingSummaryCard({ orgId }: { orgId: string | null }) {
+  const [summary, setSummary] = useState<BillingSummaryPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId) {
+      setSummary(null);
+      setError("");
+      return;
+    }
+
     let cancelled = false;
+
     (async () => {
       try {
-        const res = await fetch(`/api/billing/summary?orgId=${encodeURIComponent(orgId)}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const j = (await res.json()) as BillingSummaryLite;
-        if (!cancelled && j?.ok) setStatus(j.org.status);
-      } catch {
-        // non-blocking
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `/api/billing/summary?orgId=${encodeURIComponent(orgId)}`,
+          { cache: "no-store" }
+        );
+
+        const payload = await response.json();
+
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+
+        if (!cancelled) {
+          setSummary(payload as BillingSummaryPayload);
+        }
+      } catch (caughtError: unknown) {
+        if (!cancelled) {
+          setSummary(null);
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to load billing information."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [orgId]);
 
-  if (!status || status === "active") return null;
-  const message =
-    status === "past_due"
-      ? "Payment past due. Pay outstanding balance to keep your account active."
-      : status === "suspended"
-      ? "Account suspended. Contact support to re-activate."
-      : "Activate billing to unlock the dashboard.";
-  const tone =
-    status === "suspended"
-      ? "border-red-400/30 bg-red-400/10 text-red-100"
-      : "border-amber-400/30 bg-amber-400/10 text-amber-100";
+  if (!orgId) return null;
+
+  const billingHref = `/portal/billing?orgId=${encodeURIComponent(orgId)}`;
+
+  if (loading && !summary) {
+    return (
+      <section className="relative z-30 rounded-3xl border border-white/10 bg-white/[0.06] px-5 py-4 text-sm text-white/60 backdrop-blur">
+        Loading billing summary…
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="relative z-30 flex flex-col gap-3 rounded-3xl border border-amber-300/20 bg-amber-300/10 px-5 py-4 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <span>Billing information could not be loaded: {error}</span>
+        <Link
+          href={billingHref}
+          className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20"
+        >
+          Open Billing
+        </Link>
+      </section>
+    );
+  }
+
+  if (!summary) return null;
+
+  const billing = summary.billing;
+  const presentation = getBillingPresentation(summary);
+  const dateLabel = billing?.is_pilot
+    ? "Pilot access ends"
+    : "Current period ends";
+  const dateValue = billing?.is_pilot
+    ? formatBillingDate(
+        billing.pilot_grace_ends_at ?? billing.pilot_end_date
+      )
+    : formatBillingDate(billing?.period_end);
 
   return (
-    <div className={`relative z-30 rounded-2xl border ${tone} px-4 py-3 text-sm flex items-center justify-between gap-3`}>
-      <span>{message}</span>
-      <Link
-        href="/portal/billing"
-        className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
-      >
-        Go to Billing
-      </Link>
-    </div>
+    <section className="relative z-30 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(700px_220px_at_15%_0%,rgba(100,186,226,0.30),transparent_65%)]" />
+
+      <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-semibold">Billing summary</h2>
+              <span
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${presentation.badgeClassName}`}
+              >
+                {presentation.label}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-white/60">
+              Subscription and account information for this organisation.
+            </p>
+          </div>
+
+          <Link
+            href={billingHref}
+            className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+          >
+            Manage billing
+          </Link>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Plan
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {billing ? `Tier ${billing.tier}` : "Not selected"}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Billing
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.billing_interval)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Account
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.billing_type)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Source
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.billing_source)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Stripe status
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.stripe_status)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              {dateLabel}
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {dateValue}
+            </div>
+          </div>
+        </div>
+
+        {presentation.warning ? (
+          <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+            {presentation.warning}
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -691,7 +1011,7 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
         </div>
       </div>
 
-      <BillingBanner orgId={data?.filters.orgId ?? null} />
+      <BillingSummaryCard orgId={data?.filters.orgId ?? null} />
 
       {loading && <div className="text-white/70">Loading…</div>}
       {err && <div className="text-red-300">Error: {err}</div>}
