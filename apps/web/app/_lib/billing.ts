@@ -58,7 +58,27 @@ export type TierPriceRow = {
   currency: string;
   amount_cents: number;
   active: boolean;
+  stripe_mode: StripeMode;
 };
+
+export type StripeMode = "sandbox" | "live";
+
+/** Resolve which Stripe catalogue this deployment is allowed to use.
+ *
+ * Vercel should set STRIPE_MODE=sandbox for Preview and STRIPE_MODE=live for
+ * Production. An unset value deliberately falls back to sandbox so a new
+ * deployment cannot start charging live prices accidentally.
+ */
+export function getStripeMode(): StripeMode {
+  const configured = process.env.STRIPE_MODE?.trim().toLowerCase();
+
+  if (!configured) return "sandbox";
+  if (configured === "sandbox" || configured === "live") return configured;
+
+  throw new Error(
+    "Invalid STRIPE_MODE. Expected 'sandbox' or 'live'."
+  );
+}
 
 export async function getOwnerBillingAccount(orgId: string): Promise<OwnerBillingAccount | null> {
   const { data, error } = await portalAdmin()
@@ -81,6 +101,7 @@ export async function getOwnerPricesForTier(tier: number): Promise<{
   annual: TierPriceRow | null;
 }> {
   const admin = portalAdmin();
+  const stripeMode = getStripeMode();
 
   const { data: tierDef, error: tdErr } = await admin
     .from("tier_definitions")
@@ -94,10 +115,11 @@ export async function getOwnerPricesForTier(tier: number): Promise<{
   const { data: priceRows, error: priceErr } = await admin
     .from("tier_prices")
     .select(
-      "id, billing_type, tier_definition_id, stripe_price_id, interval, currency, amount_cents, active"
+      "id, billing_type, tier_definition_id, stripe_price_id, interval, currency, amount_cents, active, stripe_mode"
     )
     .eq("billing_type", "owner")
     .eq("active", true)
+    .eq("stripe_mode", stripeMode)
     .in("interval", ["month", "year"])
     .eq("tier_definition_id", tierDef.id)
     .returns<TierPriceRow[]>();
