@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 export const FEATURES = [
@@ -68,6 +69,12 @@ export const FEATURES = [
 type MarketingCopy = {
   titleLines: string[];
   description: string;
+  image?: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+  };
 };
 
 const DEFAULT_COPY: MarketingCopy = {
@@ -81,31 +88,67 @@ const POST_PAYMENT_COPY: Record<string, MarketingCopy> = {
     titleLines: ["Your MindCanvas", "Workspace"],
     description:
       "Your organisation brings your selected engines, assessments, test links, reports and team activity together in one place.",
+    image: {
+      src: "/onboarding/organisation-workspace-building.png",
+      alt: "MindCanvas organisation workspace",
+      width: 150,
+      height: 112,
+    },
   },
   "/onboarding/v2/created": {
     titleLines: ["Your Workspace", "Is Ready"],
     description:
       "Your organisation has been created successfully. Review your selections, then continue with the final onboarding steps.",
+    image: {
+      src: "/onboarding/organisation-workspace-building.png",
+      alt: "MindCanvas organisation workspace",
+      width: 150,
+      height: 112,
+    },
   },
   "/onboarding/v2/welcome": {
     titleLines: ["Turn Insight", "Into Action"],
     description:
       "MindCanvas turns behavioural insight into practical decisions across sales, coaching and people.",
+    image: {
+      src: "/onboarding/welcome-profile-illustration.png",
+      alt: "MindCanvas behavioural profile",
+      width: 164,
+      height: 120,
+    },
   },
   "/onboarding/v2/book-session": {
     titleLines: ["Get Value", "Faster"],
     description:
       "Your onboarding session connects MindCanvas to your goals, helping you begin with the right engine, assessment and use case.",
+    image: {
+      src: "/onboarding/booking-chart-illustration.png",
+      alt: "MindCanvas onboarding growth chart",
+      width: 154,
+      height: 116,
+    },
   },
   "/onboarding/v2/session-booked": {
     titleLines: ["You’re Booked"],
     description:
       "Your onboarding session will help you turn your first MindCanvas use case into a practical plan.",
+    image: {
+      src: "/onboarding/session-booked-link-illustration.png",
+      alt: "MindCanvas onboarding session booked",
+      width: 148,
+      height: 108,
+    },
   },
   "/onboarding/v2/diagnostic": {
     titleLines: ["Experience It", "for Yourself"],
     description:
       "Complete a diagnostic to experience the assessment journey and report before using MindCanvas with your clients, candidates or team.",
+    image: {
+      src: "/onboarding/diagnostic-checklist-illustration.png",
+      alt: "MindCanvas diagnostic checklist",
+      width: 158,
+      height: 118,
+    },
   },
 };
 
@@ -120,15 +163,32 @@ export function MarketingPane() {
   const pathname = normalisePathname(usePathname());
   const copy = POST_PAYMENT_COPY[pathname] ?? DEFAULT_COPY;
   const showFeatures = !POST_PAYMENT_COPY[pathname];
+  const isPostPayment = Boolean(POST_PAYMENT_COPY[pathname]);
 
   return (
-    <aside className="hidden lg:flex flex-col text-white">
+    <aside className="hidden lg:flex max-w-[430px] flex-col text-white">
+      {copy.image && (
+        <div
+          className="mb-7 flex items-end"
+          style={{ minHeight: `${copy.image.height}px` }}
+        >
+          <Image
+            src={copy.image.src}
+            alt={copy.image.alt}
+            width={copy.image.width}
+            height={copy.image.height}
+            priority
+            className="h-auto w-auto select-none object-contain"
+          />
+        </div>
+      )}
+
       <h1
         className="font-extrabold tracking-tight text-white"
         style={{
-          fontSize: "62px",
-          lineHeight: "62px",
-          letterSpacing: "-2px",
+          fontSize: isPostPayment ? "52px" : "62px",
+          lineHeight: isPostPayment ? "52px" : "62px",
+          letterSpacing: isPostPayment ? "-1.7px" : "-2px",
         }}
       >
         {copy.titleLines.map((line, index) => (
@@ -140,7 +200,7 @@ export function MarketingPane() {
       </h1>
 
       <p
-        className="mt-8"
+        className={isPostPayment ? "mt-6" : "mt-8"}
         style={{
           fontSize: "15px",
           lineHeight: "25.5px",
