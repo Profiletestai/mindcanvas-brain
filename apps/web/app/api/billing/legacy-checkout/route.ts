@@ -107,8 +107,7 @@ export async function POST() {
       .limit(1)
       .maybeSingle();
 
-    const billingAccount =
-      billingData as BillingAccountRow | null;
+    const billingAccount = billingData as BillingAccountRow | null;
 
     if (billingError || !billingAccount) {
       return NextResponse.json(
@@ -169,6 +168,7 @@ export async function POST() {
     const origin = await getAppOrigin();
 
     const session = await stripe.checkout.sessions.create({
+      ui_mode: "embedded",
       mode: "subscription",
       customer: stripeCustomerId,
       client_reference_id: org.id,
@@ -200,18 +200,21 @@ export async function POST() {
         },
       },
 
-      success_url: `${origin}/portal/${org.slug}?billing=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/portal/${org.slug}?billing=cancelled`,
+      redirect_on_completion: "if_required",
+
+      return_url:
+        `${origin}/portal/${org.slug}` +
+        `?billing=return&session_id={CHECKOUT_SESSION_ID}`,
     });
 
-    if (!session.url) {
-      throw new Error("Stripe did not return a Checkout URL.");
+    if (!session.client_secret) {
+      throw new Error("Stripe did not return an Embedded Checkout client secret.");
     }
 
     return NextResponse.json({
       ok: true,
-      checkout_url: session.url,
-      session_id: session.id,
+      clientSecret: session.client_secret,
+      sessionId: session.id,
     });
   } catch (error) {
     console.error("[legacy-checkout]", error);
