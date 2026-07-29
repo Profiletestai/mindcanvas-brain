@@ -7,14 +7,72 @@ import { createClient as createAdminClient } from "@/lib/server/supabaseAdmin";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type OrganisationStatus = "active" | "pending_activation";
+
+type Organisation = {
+  id: string;
+  slug: string;
+  name: string;
+  status: OrganisationStatus;
+  created_at: string;
+  last_completed_step: number;
+};
+
+function OrganisationCard({
+  organisation,
+  showPortalButton,
+}: {
+  organisation: Organisation;
+  showPortalButton: boolean;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 shadow-lg">
+      <div className="min-w-0">
+        <div className="truncate font-medium">{organisation.name}</div>
+        <div className="mt-1 truncate text-xs text-slate-300">
+          {organisation.slug}
+        </div>
+
+        {!showPortalButton && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-200">
+              Pending activation
+            </span>
+
+            <span className="text-xs text-white/40">
+              Onboarding step {organisation.last_completed_step}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {showPortalButton ? (
+        <Link
+          className="inline-flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-4 py-2 text-sm font-medium text-white shadow transition hover:brightness-110"
+          href={`/portal/${organisation.slug}/dashboard`}
+        >
+          Open portal
+        </Link>
+      ) : (
+        <div className="shrink-0 text-xs text-white/40">
+          Not yet active
+        </div>
+      )}
+    </li>
+  );
+}
+
 export default async function AdminOrgsPage() {
   // /admin is already protected by apps/web/app/admin/layout.tsx.
   const sb = createAdminClient().schema("portal");
 
-  const { data: orgs, error } = await sb
-    .from("v_organizations")
-    .select("id, slug, name")
-    .order("name");
+  const { data, error } = await sb
+    .from("orgs")
+    .select(
+      "id, slug, name, status, created_at, last_completed_step"
+    )
+    .in("status", ["active", "pending_activation"])
+    .order("name", { ascending: true });
 
   if (error) {
     return (
@@ -23,6 +81,16 @@ export default async function AdminOrgsPage() {
       </div>
     );
   }
+
+  const organisations = (data ?? []) as Organisation[];
+
+  const activeOrganisations = organisations.filter(
+    (organisation) => organisation.status === "active"
+  );
+
+  const pendingOrganisations = organisations.filter(
+    (organisation) => organisation.status === "pending_activation"
+  );
 
   return (
     <div className="fixed inset-0 mc-bg overflow-auto text-white">
@@ -74,8 +142,12 @@ export default async function AdminOrgsPage() {
             <div className="rounded-2xl border border-sky-300/20 bg-[#0b1724]/60 p-5 shadow-lg shadow-sky-950/20">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs text-white/60">Recruitment Engine</div>
+                  <div className="text-xs text-white/60">
+                    Recruitment Engine
+                  </div>
+
                   <div className="mt-1 text-xl font-semibold">MCAS</div>
+
                   <div className="mt-1 text-sm text-white/60">
                     MindCanvas CORE Alignment System for recruitment, candidate
                     assessments, role alignment, and validation.
@@ -126,17 +198,22 @@ export default async function AdminOrgsPage() {
               </div>
 
               <div className="mt-4 text-xs text-white/40">
-                Open the MCAS Platform to manage organisations, candidate databases,
-                reusable test links, and the Validation Centre.
+                Open the MCAS Platform to manage organisations, candidate
+                databases, reusable test links, and the Validation Centre.
               </div>
             </div>
 
             {/* QSC */}
             <div className="rounded-2xl border border-white/10 bg-[#0b1724]/60 p-5">
-              <div className="text-xs text-white/60">Diagnostics Engine</div>
+              <div className="text-xs text-white/60">
+                Diagnostics Engine
+              </div>
+
               <div className="mt-1 text-xl font-semibold">QSC</div>
+
               <div className="mt-1 text-sm text-white/60">
-                Quantum Source Code diagnostics across entrepreneurs and leaders.
+                Quantum Source Code diagnostics across entrepreneurs and
+                leaders.
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3">
@@ -163,37 +240,79 @@ export default async function AdminOrgsPage() {
           </div>
         </section>
 
-        {/* Organisations */}
-        <section className="space-y-3">
+        {/* Active organisations */}
+        <section className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Organizations</h2>
-              <div className="text-sm text-white/60">
-                Manage tenants and open their portals.
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-lg font-semibold">
+                  Active organisations
+                </h2>
+
+                <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-xs font-medium text-emerald-200">
+                  {activeOrganisations.length}
+                </span>
+              </div>
+
+              <div className="mt-1 text-sm text-white/60">
+                Organisations that currently have active platform access.
               </div>
             </div>
           </div>
 
-          <ul className="grid gap-4 md:grid-cols-2">
-            {orgs?.map((org: any) => (
-              <li
-                key={org.id}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-6 py-4 shadow-lg"
-              >
-                <div>
-                  <div className="font-medium">{org.name}</div>
-                  <div className="text-xs text-slate-300">{org.slug}</div>
-                </div>
+          {activeOrganisations.length > 0 ? (
+            <ul className="grid gap-4 md:grid-cols-2">
+              {activeOrganisations.map((organisation) => (
+                <OrganisationCard
+                  key={organisation.id}
+                  organisation={organisation}
+                  showPortalButton
+                />
+              ))}
+            </ul>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-6 py-8 text-sm text-white/50">
+              There are currently no active organisations.
+            </div>
+          )}
+        </section>
 
-                <Link
-                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-4 py-2 text-sm font-medium text-white shadow transition hover:brightness-110"
-                  href={`/portal/${org.slug}/dashboard`}
-                >
-                  Open portal
-                </Link>
-              </li>
-            ))}
-          </ul>
+        {/* Pending organisations */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-lg font-semibold">
+                  Pending activation
+                </h2>
+
+                <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-xs font-medium text-amber-200">
+                  {pendingOrganisations.length}
+                </span>
+              </div>
+
+              <div className="mt-1 text-sm text-white/60">
+                Organisations that have been created but have not completed
+                activation.
+              </div>
+            </div>
+          </div>
+
+          {pendingOrganisations.length > 0 ? (
+            <ul className="grid gap-4 md:grid-cols-2">
+              {pendingOrganisations.map((organisation) => (
+                <OrganisationCard
+                  key={organisation.id}
+                  organisation={organisation}
+                  showPortalButton={false}
+                />
+              ))}
+            </ul>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-6 py-8 text-sm text-white/50">
+              There are currently no organisations awaiting activation.
+            </div>
+          )}
         </section>
       </div>
     </div>
