@@ -76,10 +76,10 @@ export default function OrganisationCreatedPage() {
       title={
         <>
           Organisation{" "}
-          <span style={{ color: "rgb(84, 175, 224)" }}>Created</span>
+          <span style={{ color: "rgb(84, 175, 224)" }}>created</span>
         </>
       }
-      subtitle={`${org?.name ?? "Your organisation"} is ready to go.`}
+      subtitle={`${org?.name ?? "Your organisation"} is ready to use.`}
     >
       <div
         className="mt-8 rounded-[18px] border"
@@ -98,13 +98,22 @@ export default function OrganisationCreatedPage() {
             padding: "20px 24px",
           }}
         >
-          <Row label="Engines" value={engineListLabel(summary.engines) || "—"} />
+          <Row
+            label="Selected engines"
+            value={engineListLabel(summary.engines) || "—"}
+          />
           <Divider />
-          <Row label="Subscription" value={tierName ? `${tierName} plan` : "—"} />
+          <Row
+            label="Subscription"
+            value={tierName ? `${tierName} plan` : "—"}
+          />
           <Divider />
           <Row label="Billing frequency" value="Monthly" />
           <Divider />
-          <Row label="Trial tests included" value={String(summary.trialTests)} />
+          <Row
+            label="Trial tests available"
+            value={String(summary.trialTests)}
+          />
         </div>
 
         <button
@@ -122,7 +131,7 @@ export default function OrganisationCreatedPage() {
             boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
           }}
         >
-          {advancing ? "Loading…" : "Continue to MindCanvas"}
+          {advancing ? "Loading…" : "Continue onboarding"}
         </button>
       </div>
     </StepCard>
@@ -132,7 +141,9 @@ export default function OrganisationCreatedPage() {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-3">
-      <span style={{ fontSize: "14px", color: "rgb(154,176,200)" }}>{label}</span>
+      <span style={{ fontSize: "14px", color: "rgb(154,176,200)" }}>
+        {label}
+      </span>
       <span
         className="text-right"
         style={{ fontSize: "14px", color: "rgb(90,122,158)" }}
@@ -144,5 +155,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 function Divider() {
-  return <div style={{ height: "1px", background: "rgba(180,204,232,0.45)" }} />;
+  return (
+    <div style={{ height: "1px", background: "rgba(180,204,232,0.45)" }} />
+  );
 }

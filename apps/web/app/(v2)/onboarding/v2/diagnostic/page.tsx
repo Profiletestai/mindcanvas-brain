@@ -16,11 +16,11 @@ type DiagnosticRecommendation = {
 
 const RECOMMENDATIONS: Record<EngineKey, DiagnosticRecommendation> = {
   sales: {
-    eyebrow: "Recommended · Sales Engine",
+    eyebrow: "Recommended · Predictive Growth Intelligence",
     name: "Growth Engine Diagnostic",
     description:
-      "Understand your growth profile, the strategic constraint affecting your progress and the clearest priority for moving forward.",
-    tags: ["Growth profile", "Strategic insight", "Personalised report"],
+      "Discover where your current growth model is strongest, where progress may be blocked and how MindCanvas can support your next stage.",
+    tags: ["Approximately 12 minutes", "Uses 1 trial test"],
   },
   coaching: {
     eyebrow: "Recommended · Coaching Engine",
@@ -93,7 +93,7 @@ export default function DiagnosticPage() {
           <span style={{ color: "rgb(84, 175, 224)" }}>diagnostic</span>
         </>
       }
-      subtitle="Before you start using MindCanvas with others, experience one of the systems yourself."
+      subtitle="Start with the recommended diagnostic below and experience MindCanvas from a test taker’s perspective."
     >
       <div
         className="mt-8 rounded-[18px] border"

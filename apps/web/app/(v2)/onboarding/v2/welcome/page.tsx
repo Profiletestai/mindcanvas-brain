@@ -49,7 +49,7 @@ export default function WelcomePage() {
           <span style={{ color: "rgb(84, 175, 224)" }}>MindCanvas</span>
         </>
       }
-      subtitle="A short message from Daniel on what MindCanvas helps you build."
+      subtitle="Watch this short welcome to see how your selected engines work, where to find your assessments and how to get started."
     >
       <div
         className="mt-8 rounded-[18px] border"
@@ -112,22 +112,22 @@ export default function WelcomePage() {
           {advancing ? "Loading…" : "Continue"}
         </button>
 
-        {/* <button
+        <button
           type="button"
           onClick={advance}
           disabled={advancing}
-          className={`mt-3 w-full h-[52px] rounded-[12px] border font-semibold ${
+          className={`mt-3 h-[50px] w-full rounded-[12px] border font-semibold ${
             advancing ? "cursor-not-allowed opacity-40" : "cursor-pointer"
           }`}
           style={{
             background: "#fff",
             borderColor: "rgb(208,224,240)",
-            color: "rgb(24,44,62)",
-            fontSize: "15px",
+            color: "rgb(42,137,190)",
+            fontSize: "14px",
           }}
         >
-          Skip
-        </button> */}
+          {advancing ? "Loading…" : "Skip for now"}
+        </button>
       </div>
     </StepCard>
   );

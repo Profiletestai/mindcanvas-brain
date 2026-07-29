@@ -2,43 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { api, isErr } from "../_lib/api";
 import { StepCard } from "../_components/StepCard";
-import {
-  DIAGNOSTIC_PATH,
-  SESSION_BOOKED_PATH,
-} from "../_lib/progress";
-
-const BOOKING_URL =
-  process.env.NEXT_PUBLIC_ONBOARDING_BOOKING_URL?.trim() ?? "";
+import { DIAGNOSTIC_PATH, SESSION_BOOKED_PATH } from "../_lib/progress";
 
 const SESSION_OUTCOMES = [
   "Choose your best first use case",
-  "Understand which model to use first",
-  "Review how diagnostic results are completed",
-  "Plan how to use your included submissions",
-  "Map MindCanvas to your sales, coaching or people workflow",
-  "Confirm your launch and next actions",
+  "Decide which engine and assessment to begin with",
+  "Understand your trial tests and available reports",
+  "Plan how to create and share your first test link",
+  "Get answers to your setup questions",
 ];
 
 export default function BookSessionPage() {
   const router = useRouter();
-  const [bookingOpened, setBookingOpened] = useState(false);
   const [pending, setPending] = useState<"booked" | "later" | null>(null);
   const [error, setError] = useState("");
-
-  function openBookingCalendar() {
-    setError("");
-    if (!BOOKING_URL) {
-      setError(
-        "The booking calendar is not connected yet. You can continue and book your session later from the portal."
-      );
-      return;
-    }
-
-    window.open(BOOKING_URL, "_blank", "noopener,noreferrer");
-    setBookingOpened(true);
-  }
 
   async function confirmBooked() {
     if (pending) return;
@@ -75,12 +55,10 @@ export default function BookSessionPage() {
       title={
         <>
           Book your{" "}
-          <span style={{ color: "rgb(84, 175, 224)" }}>
-            onboarding session
-          </span>
+          <span style={{ color: "rgb(84, 175, 224)" }}>onboarding session</span>
         </>
       }
-      subtitle="Choose a time that suits you and we will help you get value from MindCanvas faster."
+      subtitle="Choose a convenient time to meet with our team and plan your first steps with MindCanvas."
     >
       <div
         className="mt-8 rounded-[18px] border"
@@ -125,61 +103,55 @@ export default function BookSessionPage() {
           ))}
         </ul>
 
+        <div
+          className="mt-6 overflow-hidden rounded-[12px] border"
+          style={{
+            borderColor: "rgb(208,224,240)",
+            background: "#fff",
+          }}
+        >
+          <iframe
+            src="https://api.leadconnectorhq.com/widget/booking/l8LJSqYiHvaM1QxzmYNH"
+            allow="payment"
+            scrolling="no"
+            id="c5QYwNeVaP2cbd9K5KCR_1785147207106"
+            title="Book your MindCanvas onboarding session"
+            style={{
+              width: "100%",
+              minHeight: "720px",
+              border: "none",
+              overflow: "hidden",
+            }}
+          />
+        </div>
+
+        <Script
+          src="https://link.msgsndr.com/js/form_embed.js"
+          strategy="afterInteractive"
+        />
+
         {error && (
           <p className="mt-4 text-sm text-rose-500" role="alert">
             {error}
           </p>
         )}
 
-        {!bookingOpened ? (
-          <button
-            type="button"
-            onClick={openBookingCalendar}
-            disabled={pending !== null}
-            className={`mt-6 h-[54px] w-full rounded-[12px] font-bold text-white ${
-              pending ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-            }`}
-            style={{
-              background:
-                "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
-              fontSize: "15px",
-              boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
-            }}
-          >
-            Open booking calendar
-          </button>
-        ) : (
-          <>
-            <p
-              className="mt-5 text-center"
-              style={{
-                color: "rgb(90,122,158)",
-                fontSize: "12px",
-                lineHeight: "18px",
-              }}
-            >
-              Complete the booking in the calendar tab, then return here.
-            </p>
-            <button
-              type="button"
-              onClick={confirmBooked}
-              disabled={pending !== null}
-              className={`mt-3 h-[54px] w-full rounded-[12px] font-bold text-white ${
-                pending ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-              }`}
-              style={{
-                background:
-                  "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
-                fontSize: "15px",
-                boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
-              }}
-            >
-              {pending === "booked"
-                ? "Saving…"
-                : "I’ve booked my session"}
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          onClick={confirmBooked}
+          disabled={pending !== null}
+          className={`mt-6 h-[54px] w-full rounded-[12px] font-bold text-white ${
+            pending ? "cursor-not-allowed opacity-40" : "cursor-pointer"
+          }`}
+          style={{
+            background:
+              "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+            fontSize: "15px",
+            boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
+          }}
+        >
+          {pending === "booked" ? "Saving…" : "I’ve booked my session"}
+        </button>
 
         <button
           type="button"

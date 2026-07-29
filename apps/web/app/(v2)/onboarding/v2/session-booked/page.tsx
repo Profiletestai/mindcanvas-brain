@@ -9,7 +9,7 @@ import { DIAGNOSTIC_PATH, dashboardPath } from "../_lib/progress";
 export default function SessionBookedPage() {
   const router = useRouter();
   const [pending, setPending] = useState<"diagnostic" | "dashboard" | null>(
-    null
+    null,
   );
   const [error, setError] = useState("");
 
@@ -48,7 +48,7 @@ export default function SessionBookedPage() {
           <span style={{ color: "rgb(84, 175, 224)" }}>booked</span>
         </>
       }
-      subtitle="Your booking provider will send the session details to your email."
+      subtitle="We’ve sent the session details and calendar confirmation to your email."
     >
       <div
         className="mt-8 rounded-[18px] border text-center"
@@ -71,16 +71,28 @@ export default function SessionBookedPage() {
           ✓
         </div>
 
+        <h3
+          className="mt-5 font-bold"
+          style={{
+            color: "rgb(24,44,62)",
+            fontSize: "18px",
+            lineHeight: "24px",
+          }}
+        >
+          Before your session
+        </h3>
+
         <p
-          className="mx-auto mt-5 max-w-[440px]"
+          className="mx-auto mt-3 max-w-[440px]"
           style={{
             color: "rgb(90,122,158)",
             fontSize: "13px",
             lineHeight: "21px",
           }}
         >
-          Before your session, we recommend creating your first diagnostic link
-          so the call can be practical and useful.
+          Complete your first diagnostic to experience MindCanvas from a test
+          taker’s perspective. This will give us useful context for your
+          onboarding session.
         </p>
 
         {error && (
@@ -105,7 +117,7 @@ export default function SessionBookedPage() {
         >
           {pending === "diagnostic"
             ? "Loading…"
-            : "Create your first diagnostic"}
+            : "Complete your first diagnostic"}
         </button>
 
         <button
@@ -122,7 +134,7 @@ export default function SessionBookedPage() {
             fontSize: "14px",
           }}
         >
-          {pending === "dashboard" ? "Loading…" : "Continue to dashboard"}
+          {pending === "dashboard" ? "Loading…" : "Go to dashboard"}
         </button>
       </div>
     </StepCard>

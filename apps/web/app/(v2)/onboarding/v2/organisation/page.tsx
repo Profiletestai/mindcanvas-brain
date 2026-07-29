@@ -95,7 +95,7 @@ export default function OrganisationPage() {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
     setConfirmError(
-      "Your payment went through but we are still waiting for confirmation. Refresh this page in a moment."
+      "Your payment went through but we are still waiting for confirmation. Refresh this page in a moment.",
     );
     setReady(true);
   }, []);
@@ -201,11 +201,11 @@ export default function OrganisationPage() {
     <StepCard
       title={
         <>
-          Tell us about your{" "}
+          Set up your{" "}
           <span style={{ color: "rgb(84, 175, 224)" }}>organisation</span>
         </>
       }
-      subtitle="Add the core details for your main organisation."
+      subtitle="Add your organisation details to create your MindCanvas workspace. You can update this information later in Profile Settings."
     >
       <form
         onSubmit={onSubmit}
@@ -294,9 +294,7 @@ export default function OrganisationPage() {
           <div className="mt-2 text-center">
             <button
               type="button"
-              onClick={() =>
-                setValue("logo_url", "", { shouldDirty: true })
-              }
+              onClick={() => setValue("logo_url", "", { shouldDirty: true })}
               className="text-[12px] font-semibold"
               style={{ color: "rgb(200,60,80)" }}
             >
@@ -321,7 +319,8 @@ export default function OrganisationPage() {
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
-              Address <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+              Address{" "}
+              <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
             </label>
             <input
               type="text"
@@ -359,7 +358,8 @@ export default function OrganisationPage() {
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
-              Website <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+              Website{" "}
+              <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
             </label>
             <input
               type="url"
@@ -371,7 +371,8 @@ export default function OrganisationPage() {
           </div>
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
-              Industry <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+              Industry{" "}
+              <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
             </label>
             <input
               type="text"
@@ -399,7 +400,7 @@ export default function OrganisationPage() {
             boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
           }}
         >
-          {isSubmitting ? "Saving…" : "Save and continue"}
+          {isSubmitting ? "Creating…" : "Create organisation"}
         </button>
       </form>
     </StepCard>
