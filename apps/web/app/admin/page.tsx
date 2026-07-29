@@ -20,44 +20,45 @@ type Organisation = {
 
 function OrganisationCard({
   organisation,
-  showPortalButton,
 }: {
   organisation: Organisation;
-  showPortalButton: boolean;
 }) {
+  const isPending = organisation.status === "pending_activation";
+
   return (
     <li className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 shadow-lg">
       <div className="min-w-0">
         <div className="truncate font-medium">{organisation.name}</div>
+
         <div className="mt-1 truncate text-xs text-slate-300">
           {organisation.slug}
         </div>
 
-        {!showPortalButton && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-200">
-              Pending activation
-            </span>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {isPending ? (
+            <>
+              <span className="inline-flex items-center rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-xs font-medium text-amber-200">
+                Pending activation
+              </span>
 
-            <span className="text-xs text-white/40">
-              Onboarding step {organisation.last_completed_step}
+              <span className="text-xs text-white/40">
+                Onboarding step {organisation.last_completed_step}
+              </span>
+            </>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-200">
+              Active
             </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {showPortalButton ? (
-        <Link
-          className="inline-flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-4 py-2 text-sm font-medium text-white shadow transition hover:brightness-110"
-          href={`/portal/${organisation.slug}/dashboard`}
-        >
-          Open portal
-        </Link>
-      ) : (
-        <div className="shrink-0 text-xs text-white/40">
-          Not yet active
-        </div>
-      )}
+      <Link
+        className="inline-flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-4 py-2 text-sm font-medium text-white shadow transition hover:brightness-110"
+        href={`/portal/${organisation.slug}/dashboard`}
+      >
+        Open portal
+      </Link>
     </li>
   );
 }
@@ -68,9 +69,7 @@ export default async function AdminOrgsPage() {
 
   const { data, error } = await sb
     .from("orgs")
-    .select(
-      "id, slug, name, status, created_at, last_completed_step"
-    )
+    .select("id, slug, name, status, created_at, last_completed_step")
     .in("status", ["active", "pending_activation"])
     .order("name", { ascending: true });
 
@@ -131,6 +130,7 @@ export default async function AdminOrgsPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold">Engines</h2>
+
               <p className="mt-1 text-sm text-white/60">
                 Platform-level engines used across organisations and partners.
               </p>
@@ -266,7 +266,6 @@ export default async function AdminOrgsPage() {
                 <OrganisationCard
                   key={organisation.id}
                   organisation={organisation}
-                  showPortalButton
                 />
               ))}
             </ul>
@@ -304,7 +303,6 @@ export default async function AdminOrgsPage() {
                 <OrganisationCard
                   key={organisation.id}
                   organisation={organisation}
-                  showPortalButton={false}
                 />
               ))}
             </ul>
