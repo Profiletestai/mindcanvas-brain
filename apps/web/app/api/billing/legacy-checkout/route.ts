@@ -35,7 +35,8 @@ const LEGACY_ORG_IDS = new Set([
 ]);
 
 function getStripeSecretKey(): string {
-  const isProduction = process.env.VERCEL_ENV === "production";
+  const isProduction =
+    process.env.VERCEL_ENV === "production";
 
   const key = isProduction
     ? process.env.STRIPE_SECRET_KEY
@@ -53,10 +54,13 @@ function getStripeSecretKey(): string {
 }
 
 function getProMonthlyPriceId(): string {
-  const priceId = process.env.STRIPE_PRICE_PRO_MONTHLY;
+  const priceId =
+    process.env.STRIPE_PRICE_PRO_MONTHLY;
 
   if (!priceId) {
-    throw new Error("Missing STRIPE_PRICE_PRO_MONTHLY");
+    throw new Error(
+      "Missing STRIPE_PRICE_PRO_MONTHLY"
+    );
   }
 
   return priceId;
@@ -70,7 +74,8 @@ export async function POST() {
       return NextResponse.json(
         {
           ok: false,
-          error: "This organisation is not eligible for legacy billing.",
+          error:
+            "This organisation is not eligible for legacy billing.",
         },
         { status: 403 }
       );
@@ -79,26 +84,43 @@ export async function POST() {
     const admin = await getAdminClient();
     const portal = admin.schema("portal");
 
-    const { data: org, error: orgError } = await portal
-      .from("orgs")
-      .select("id, name, slug")
-      .eq("id", orgId)
-      .maybeSingle();
+    const { data: org, error: orgError } =
+      await portal
+        .from("orgs")
+        .select("id, name, slug")
+        .eq("id", orgId)
+        .maybeSingle();
 
     if (orgError || !org) {
       return NextResponse.json(
         {
           ok: false,
-          error: orgError?.message || "Organisation not found.",
+          error:
+            orgError?.message ||
+            "Organisation not found.",
         },
         { status: 404 }
       );
     }
 
-    const { data: billingData, error: billingError } = await portal
+    const {
+      data: billingData,
+      error: billingError,
+    } = await portal
       .from("billing_accounts")
       .select(
-        "id, org_id, billing_type, tier, stripe_customer_id, stripe_subscription_id, stripe_status, billing_source, billing_interval, billing_required_from"
+        [
+          "id",
+          "org_id",
+          "billing_type",
+          "tier",
+          "stripe_customer_id",
+          "stripe_subscription_id",
+          "stripe_status",
+          "billing_source",
+          "billing_interval",
+          "billing_required_from",
+        ].join(",")
       )
       .eq("org_id", orgId)
       .eq("billing_type", "owner")
@@ -107,7 +129,8 @@ export async function POST() {
       .limit(1)
       .maybeSingle();
 
-    const billingAccount = billingData as BillingAccountRow | null;
+    const billingAccount =
+      billingData as BillingAccountRow | null;
 
     if (billingError || !billingAccount) {
       return NextResponse.json(
@@ -128,35 +151,43 @@ export async function POST() {
       return NextResponse.json(
         {
           ok: false,
-          error: "This organisation already has an active subscription.",
+          error:
+            "This organisation already has an active subscription.",
         },
         { status: 409 }
       );
     }
 
-    const stripe = new Stripe(getStripeSecretKey());
+    const stripe = new Stripe(
+      getStripeSecretKey()
+    );
 
-    let stripeCustomerId = billingAccount.stripe_customer_id;
+    let stripeCustomerId =
+      billingAccount.stripe_customer_id;
 
     if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        name: org.name,
-        metadata: {
-          org_id: org.id,
-          org_slug: org.slug,
-          billing_account_id: billingAccount.id,
-          billing_source: "legacy",
-        },
-      });
+      const customer =
+        await stripe.customers.create({
+          name: org.name,
+          metadata: {
+            org_id: org.id,
+            org_slug: org.slug,
+            billing_account_id:
+              billingAccount.id,
+            billing_source: "legacy",
+          },
+        });
 
       stripeCustomerId = customer.id;
 
-      const { error: customerUpdateError } = await portal
-        .from("billing_accounts")
-        .update({
-          stripe_customer_id: stripeCustomerId,
-        })
-        .eq("id", billingAccount.id);
+      const { error: customerUpdateError } =
+        await portal
+          .from("billing_accounts")
+          .update({
+            stripe_customer_id:
+              stripeCustomerId,
+          })
+          .eq("id", billingAccount.id);
 
       if (customerUpdateError) {
         throw new Error(
@@ -167,54 +198,65 @@ export async function POST() {
 
     const origin = await getAppOrigin();
 
-    const session = await stripe.checkout.sessions.create({
-      ui_mode: "embedded",
-      mode: "subscription",
-      customer: stripeCustomerId,
-      client_reference_id: org.id,
+    const session =
+      await stripe.checkout.sessions.create({
+        ui_mode: "embedded",
+        mode: "subscription",
+        customer: stripeCustomerId,
+        client_reference_id: org.id,
 
-      line_items: [
-        {
-          price: getProMonthlyPriceId(),
-          quantity: 1,
-        },
-      ],
+        line_items: [
+          {
+            price: getProMonthlyPriceId(),
+            quantity: 1,
+          },
+        ],
 
-      metadata: {
-        org_id: org.id,
-        org_slug: org.slug,
-        billing_account_id: billingAccount.id,
-        billing_source: "legacy",
-        billing_interval: "monthly",
-        tier: String(billingAccount.tier),
-      },
-
-      subscription_data: {
         metadata: {
           org_id: org.id,
           org_slug: org.slug,
-          billing_account_id: billingAccount.id,
+          billing_account_id:
+            billingAccount.id,
           billing_source: "legacy",
           billing_interval: "monthly",
           tier: String(billingAccount.tier),
         },
-      },
 
-      redirect_on_completion: "if_required",
+        subscription_data: {
+          metadata: {
+            org_id: org.id,
+            org_slug: org.slug,
+            billing_account_id:
+              billingAccount.id,
+            billing_source: "legacy",
+            billing_interval: "monthly",
+            tier: String(
+              billingAccount.tier
+            ),
+          },
+        },
 
-      return_url:
-        `${origin}/portal/${org.slug}` +
-        `?billing=return&session_id={CHECKOUT_SESSION_ID}`,
-    });
+        redirect_on_completion: "if_required",
+
+        return_url:
+          `${origin}/portal/${org.slug}` +
+          `?billing=return&session_id={CHECKOUT_SESSION_ID}`,
+      });
 
     if (!session.client_secret) {
-      throw new Error("Stripe did not return an Embedded Checkout client secret.");
+      throw new Error(
+        "Stripe did not return an Embedded Checkout client secret."
+      );
     }
 
+    /*
+     * These snake_case field names match
+     * LegacyBillingCheckoutModal.tsx.
+     */
     return NextResponse.json({
       ok: true,
-      clientSecret: session.client_secret,
-      sessionId: session.id,
+      client_secret: session.client_secret,
+      session_id: session.id,
     });
   } catch (error) {
     console.error("[legacy-checkout]", error);
