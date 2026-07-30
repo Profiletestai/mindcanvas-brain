@@ -20,6 +20,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type RouteParams = {
+  slug: string;
+};
+
 type Org = {
   id: string;
   slug: string;
@@ -49,126 +53,164 @@ const LEGACY_ORG_IDS = new Set([
   "60fb2268-4771-4a80-ae18-8e3dc45fe101", // Brett Gordon / 5D Leadership
 ]);
 
+const LEGACY_ORG_SLUGS = new Set([
+  "focal-point",
+]);
+
 async function loadOrg(
   slug: string
 ): Promise<Org | null> {
-  const admin = await getAdminClient();
+  try {
+    const admin = await getAdminClient();
 
-  const { data, error } = await admin
-    .schema("portal")
-    .from("orgs")
-    .select(
-      [
-        "id",
-        "slug",
-        "name",
-        "brand_name",
-        "brand_primary",
-        "brand_secondary",
-        "brand_accent",
-        "brand_text",
-        "report_font_family",
-        "report_font_size",
-        "logo_url",
-      ].join(",")
-    )
-    .eq("slug", slug)
-    .maybeSingle();
+    const { data, error } = await admin
+      .schema("portal")
+      .from("orgs")
+      .select(
+        [
+          "id",
+          "slug",
+          "name",
+          "brand_name",
+          "brand_primary",
+          "brand_secondary",
+          "brand_accent",
+          "brand_text",
+          "report_font_family",
+          "report_font_size",
+          "logo_url",
+        ].join(",")
+      )
+      .eq("slug", slug)
+      .maybeSingle();
 
-  if (error || !data) {
+    if (error || !data) {
+      console.error(
+        "[portal-layout] Unable to load organisation:",
+        {
+          slug,
+          error,
+        }
+      );
+
+      return null;
+    }
+
+    return data as unknown as Org;
+  } catch (error) {
     console.error(
-      "[portal-layout] Unable to load organisation:",
-      error
+      "[portal-layout] Organisation lookup failed:",
+      {
+        slug,
+        error,
+      }
     );
 
     return null;
   }
+}
 
-  return data as unknown as Org;
+function isLegacyOrganisation(org: Org): boolean {
+  return (
+    LEGACY_ORG_IDS.has(org.id) ||
+    LEGACY_ORG_SLUGS.has(org.slug)
+  );
 }
 
 async function requiresLegacyBilling(
-  orgId: string
+  org: Org
 ): Promise<boolean> {
-  /*
-   * Only organisations included in the agreed legacy
-   * billing rollout are subject to this gate.
-   */
-  if (!LEGACY_ORG_IDS.has(orgId)) {
+  if (!isLegacyOrganisation(org)) {
     return false;
   }
 
-  const admin = await getAdminClient();
+  try {
+    const admin = await getAdminClient();
 
-  const { data, error } = await admin
-    .schema("portal")
-    .from("billing_accounts")
-    .select(
-      [
-        "id",
-        "org_id",
-        "stripe_status",
-        "billing_source",
-        "billing_required_from",
-      ].join(",")
-    )
-    .eq("org_id", orgId)
-    .eq("billing_type", "owner")
-    .eq("billing_source", "legacy")
-    .order("created_at", {
-      ascending: false,
-    })
-    .limit(1)
-    .maybeSingle();
+    const { data, error } = await admin
+      .schema("portal")
+      .from("billing_accounts")
+      .select(
+        [
+          "id",
+          "org_id",
+          "stripe_status",
+          "billing_source",
+          "billing_required_from",
+        ].join(",")
+      )
+      .eq("org_id", org.id)
+      .eq("billing_type", "owner")
+      .eq("billing_source", "legacy")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) {
-    console.error(
-      "[portal-layout] Unable to load legacy billing account:",
-      error
-    );
+    if (error) {
+      console.error(
+        "[portal-layout] Unable to load legacy billing account:",
+        {
+          orgId: org.id,
+          slug: org.slug,
+          error,
+        }
+      );
 
-    /*
-     * Known legacy organisations fail closed.
-     * A database read problem must not accidentally
-     * release access to the portal.
-     */
-    return true;
-  }
-
-  if (!data) {
-    console.error(
-      `[portal-layout] No legacy billing account found for organisation ${orgId}`
-    );
-
-    return true;
-  }
-
-  const billingAccount =
-    data as unknown as BillingAccount;
-
-  if (billingAccount.billing_required_from) {
-    const billingRequiredFrom = Date.parse(
-      billingAccount.billing_required_from
-    );
-
-    if (
-      !Number.isNaN(billingRequiredFrom) &&
-      billingRequiredFrom > Date.now()
-    ) {
-      return false;
+      return true;
     }
+
+    if (!data) {
+      console.error(
+        "[portal-layout] No legacy billing account found:",
+        {
+          orgId: org.id,
+          slug: org.slug,
+        }
+      );
+
+      return true;
+    }
+
+    const billingAccount =
+      data as unknown as BillingAccount;
+
+    if (billingAccount.billing_required_from) {
+      const requiredFrom = Date.parse(
+        billingAccount.billing_required_from
+      );
+
+      if (
+        !Number.isNaN(requiredFrom) &&
+        requiredFrom > Date.now()
+      ) {
+        return false;
+      }
+    }
+
+    const stripeStatus =
+      billingAccount.stripe_status
+        ?.trim()
+        .toLowerCase() ?? "";
+
+    const subscriptionIsActive =
+      stripeStatus === "active" ||
+      stripeStatus === "trialing";
+
+    return !subscriptionIsActive;
+  } catch (error) {
+    console.error(
+      "[portal-layout] Legacy billing check failed:",
+      {
+        orgId: org.id,
+        slug: org.slug,
+        error,
+      }
+    );
+
+    return true;
   }
-
-  const stripeStatus =
-    billingAccount.stripe_status
-      ?.trim()
-      .toLowerCase() ?? "";
-
-  const subscriptionIsActive =
-    stripeStatus === "active" ||
-    stripeStatus === "trialing";
-
-  return !subscriptionIsActive;
 }
 
 function getStripePublishableKey(): string {
@@ -198,13 +240,20 @@ export default async function OrgLayout({
   params,
 }: {
   children: ReactNode;
-  params: { slug: string };
+  params: Promise<RouteParams>;
 }) {
-  const org = await loadOrg(params.slug);
+  const { slug } = await params;
 
+  const org = await loadOrg(slug);
+
+  /*
+   * Focal Point must not be allowed through merely because
+   * the organisation lookup failed. This closes the silent
+   * bypass present in the previous version.
+   */
   const mustCompleteLegacyBilling = org
-    ? await requiresLegacyBilling(org.id)
-    : false;
+    ? await requiresLegacyBilling(org)
+    : LEGACY_ORG_SLUGS.has(slug);
 
   const brandVariables = {
     "--brand-primary":
@@ -222,11 +271,6 @@ export default async function OrgLayout({
       org?.report_font_size ?? "14px",
   } as CSSProperties;
 
-  /*
-   * The portal is not rendered underneath the payment
-   * experience. There is no dashboard, navigation,
-   * close button or route around this screen.
-   */
   if (mustCompleteLegacyBilling) {
     return (
       <div
@@ -242,7 +286,7 @@ export default async function OrgLayout({
           organisationName={
             org?.brand_name ??
             org?.name ??
-            params.slug
+            "Focal Point"
           }
         />
       </div>
@@ -264,11 +308,11 @@ export default async function OrgLayout({
         }}
       >
         <PortalChrome
-          orgSlug={params.slug}
+          orgSlug={slug}
           orgName={
             org?.brand_name ??
             org?.name ??
-            params.slug
+            slug
           }
         >
           {children}
