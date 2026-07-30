@@ -66,21 +66,7 @@ async function loadOrg(
     const { data, error } = await admin
       .schema("portal")
       .from("orgs")
-      .select(
-        [
-          "id",
-          "slug",
-          "name",
-          "brand_name",
-          "brand_primary",
-          "brand_secondary",
-          "brand_accent",
-          "brand_text",
-          "report_font_family",
-          "report_font_size",
-          "logo_url",
-        ].join(",")
-      )
+      .select("id, slug, name")
       .eq("slug", slug)
       .maybeSingle();
 
@@ -246,11 +232,6 @@ export default async function OrgLayout({
 
   const org = await loadOrg(slug);
 
-  /*
-   * Focal Point must not be allowed through merely because
-   * the organisation lookup failed. This closes the silent
-   * bypass present in the previous version.
-   */
   const mustCompleteLegacyBilling = org
     ? await requiresLegacyBilling(org)
     : LEGACY_ORG_SLUGS.has(slug);
