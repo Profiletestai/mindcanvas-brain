@@ -1,3 +1,4 @@
+//apps/web/app/portal/billing/BillingClient.tsx
 "use client";
 
 import Link from "next/link";
@@ -26,12 +27,14 @@ type Invoice = {
 
 type Summary = {
   ok: true;
+
   org: {
     id: string;
     name: string;
     slug: string | null;
     status: string;
   };
+
   usage: {
     allowance: number | null;
     used: number;
@@ -39,6 +42,7 @@ type Summary = {
     period_start: string | null;
     period_end: string | null;
   };
+
   billing: {
     tier: number | null;
     stripe_status: string | null;
@@ -48,20 +52,31 @@ type Summary = {
     past_due_since: string | null;
     billing_source: string | null;
     billing_interval: string | null;
+    included_trials_per_month:
+      | number
+      | null;
+
     plan: {
       name: string;
       interval: string | null;
       amount_cents: number | null;
       currency: string | null;
     };
+
     payment_method: {
       brand: string;
       last4: string;
       exp_month: number;
       exp_year: number;
     } | null;
+
     invoices: Invoice[];
   } | null;
+
+  next_action:
+    | "checkout"
+    | "reactivate"
+    | "none";
 };
 
 const STATUS_STYLE: Record<
@@ -78,18 +93,21 @@ const STATUS_STYLE: Record<
       "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
     dotClassName: "bg-emerald-400",
   },
+
   past_due: {
     label: "Past due",
     className:
       "border-amber-400/30 bg-amber-400/10 text-amber-100",
     dotClassName: "bg-amber-400",
   },
+
   payment_required: {
     label: "Payment required",
     className:
       "border-amber-400/30 bg-amber-400/10 text-amber-100",
     dotClassName: "bg-amber-400",
   },
+
   cancelled: {
     label: "Cancelled",
     className:
@@ -98,7 +116,9 @@ const STATUS_STYLE: Record<
   },
 };
 
-function formatDate(iso: string | null): string {
+function formatDate(
+  iso: string | null
+): string {
   if (!iso) {
     return "—";
   }
@@ -109,11 +129,14 @@ function formatDate(iso: string | null): string {
     return "—";
   }
 
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  return date.toLocaleDateString(
+    undefined,
+    {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }
+  );
 }
 
 function formatMoney(
@@ -128,10 +151,14 @@ function formatMoney(
   }
 
   try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency.toUpperCase(),
-    }).format(amountCents / 100);
+    return new Intl.NumberFormat(
+      undefined,
+      {
+        style: "currency",
+        currency:
+          currency.toUpperCase(),
+      }
+    ).format(amountCents / 100);
   } catch {
     return `${currency.toUpperCase()} ${(
       amountCents / 100
@@ -142,11 +169,17 @@ function formatMoney(
 function formatInterval(
   interval: string | null
 ): string {
-  if (interval === "month" || interval === "monthly") {
+  if (
+    interval === "month" ||
+    interval === "monthly"
+  ) {
     return "Monthly";
   }
 
-  if (interval === "year" || interval === "annual") {
+  if (
+    interval === "year" ||
+    interval === "annual"
+  ) {
     return "Annual";
   }
 
@@ -156,7 +189,9 @@ function formatInterval(
     : "—";
 }
 
-function formatCardBrand(brand: string): string {
+function formatCardBrand(
+  brand: string
+): string {
   if (brand.toLowerCase() === "amex") {
     return "American Express";
   }
@@ -175,16 +210,23 @@ export default function BillingClient({
   const [summary, setSummary] =
     useState<Summary | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [manageBusy, setManageBusy] =
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [actionBusy, setActionBusy] =
     useState(false);
-  const [manageError, setManageError] =
+
+  const [actionError, setActionError] =
     useState("");
 
   const load = useCallback(async () => {
     const query = orgId
-      ? `?orgId=${encodeURIComponent(orgId)}`
+      ? `?orgId=${encodeURIComponent(
+          orgId
+        )}`
       : "";
 
     const response = await fetch(
@@ -214,6 +256,7 @@ export default function BillingClient({
       try {
         setLoading(true);
         setError("");
+
         await load();
       } catch (loadError) {
         if (!cancelled) {
@@ -235,17 +278,65 @@ export default function BillingClient({
     };
   }, [load]);
 
+  async function activateSubscription() {
+    try {
+      setActionBusy(true);
+      setActionError("");
+
+      const response = await fetch(
+        "/api/billing/legacy-checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            presentation: "hosted",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        !response.ok ||
+        !data?.ok ||
+        !data?.url
+      ) {
+        throw new Error(
+          data?.error ||
+            "Unable to open secure subscription checkout."
+        );
+      }
+
+      window.location.assign(
+        data.url as string
+      );
+    } catch (checkoutError) {
+      setActionError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Unable to open secure subscription checkout."
+      );
+
+      setActionBusy(false);
+    }
+  }
+
   async function managePaymentMethod() {
     try {
-      setManageBusy(true);
-      setManageError("");
+      setActionBusy(true);
+      setActionError("");
 
       const response = await fetch(
         "/api/billing/customer-portal",
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
           credentials: "include",
           body: JSON.stringify(
@@ -256,21 +347,27 @@ export default function BillingClient({
 
       const data = await response.json();
 
-      if (!response.ok || !data?.url) {
+      if (
+        !response.ok ||
+        !data?.url
+      ) {
         throw new Error(
           data?.error ||
             "Unable to open secure billing management."
         );
       }
 
-      window.location.assign(data.url as string);
-    } catch (managePaymentError) {
-      setManageError(
-        managePaymentError instanceof Error
-          ? managePaymentError.message
+      window.location.assign(
+        data.url as string
+      );
+    } catch (manageError) {
+      setActionError(
+        manageError instanceof Error
+          ? manageError.message
           : "Unable to open secure billing management."
       );
-      setManageBusy(false);
+
+      setActionBusy(false);
     }
   }
 
@@ -295,11 +392,8 @@ export default function BillingClient({
     );
   }
 
-  const {
-    org,
-    billing,
-    usage,
-  } = summary;
+  const { org, billing, usage } =
+    summary;
 
   const displayStatus =
     billing?.display_status ??
@@ -309,12 +403,31 @@ export default function BillingClient({
     STATUS_STYLE[displayStatus];
 
   const allowance =
-    usage.allowance ??
-    (billing?.billing_source === "legacy"
-      ? 50
-      : null);
+    billing?.included_trials_per_month ??
+    usage.allowance;
 
-  const invoices = billing?.invoices ?? [];
+  const invoices =
+    billing?.invoices ?? [];
+
+  const isActive =
+    displayStatus === "active";
+
+  const canActivate =
+    displayStatus ===
+      "payment_required" &&
+    billing?.billing_source === "legacy";
+
+  const canManagePayment =
+    displayStatus === "active" ||
+    displayStatus === "past_due";
+
+  const recurringSuffix =
+    billing?.plan.interval === "month"
+      ? " / month"
+      : billing?.plan.interval ===
+          "year"
+        ? " / year"
+        : "";
 
   return (
     <div className="space-y-6 p-6 text-white">
@@ -330,8 +443,8 @@ export default function BillingClient({
             </h1>
 
             <p className="mt-1 text-sm text-white/60">
-              Subscription, payment and invoice details
-              for {org.name}.
+              Subscription, payment and
+              invoice details for {org.name}.
             </p>
           </div>
 
@@ -341,6 +454,7 @@ export default function BillingClient({
             <span
               className={`h-1.5 w-1.5 rounded-full ${statusStyle.dotClassName}`}
             />
+
             {statusStyle.label}
           </span>
         </div>
@@ -352,7 +466,7 @@ export default function BillingClient({
             ? "Your latest payment is past due. Please update your payment method to restore normal billing."
             : displayStatus === "cancelled"
               ? "This subscription has been cancelled. Please contact MindCanvas support."
-              : "Payment is required to activate this subscription."}
+              : "Payment is required to activate this subscription and its monthly test allocation."}
         </div>
       )}
 
@@ -385,15 +499,15 @@ export default function BillingClient({
               value={
                 <>
                   {formatMoney(
-                    billing?.plan.amount_cents ??
-                      null,
-                    billing?.plan.currency ?? null
+                    billing?.plan
+                      .amount_cents ?? null,
+                    billing?.plan.currency ??
+                      null
                   )}
-                  {billing?.plan.interval ===
-                    "month" && (
+
+                  {recurringSuffix && (
                     <span className="text-white/50">
-                      {" "}
-                      / month
+                      {recurringSuffix}
                     </span>
                   )}
                 </>
@@ -402,9 +516,14 @@ export default function BillingClient({
 
             <DetailRow
               label="Next payment"
-              value={formatDate(
-                billing?.period_end ?? null
-              )}
+              value={
+                isActive
+                  ? formatDate(
+                      billing?.period_end ??
+                        null
+                    )
+                  : "—"
+              }
             />
 
             <DetailRow
@@ -419,9 +538,11 @@ export default function BillingClient({
             <DetailRow
               label="Usage this period"
               value={
-                usage.remaining === null
-                  ? `${usage.used} used`
-                  : `${usage.used} used · ${usage.remaining} remaining`
+                !isActive
+                  ? "Starts after activation"
+                  : usage.remaining === null
+                    ? `${usage.used} used`
+                    : `${usage.used} used · ${usage.remaining} remaining`
               }
             />
           </div>
@@ -436,50 +557,81 @@ export default function BillingClient({
             <div className="mt-5 rounded-2xl border border-white/10 bg-[#06182a] p-5">
               <p className="font-medium">
                 {formatCardBrand(
-                  billing.payment_method.brand
+                  billing.payment_method
+                    .brand
                 )}{" "}
                 ending in{" "}
-                {billing.payment_method.last4}
+                {
+                  billing.payment_method
+                    .last4
+                }
               </p>
 
               <p className="mt-1 text-sm text-white/55">
                 Expires{" "}
                 {String(
-                  billing.payment_method.exp_month
+                  billing.payment_method
+                    .exp_month
                 ).padStart(2, "0")}
                 /
-                {billing.payment_method.exp_year}
+                {
+                  billing.payment_method
+                    .exp_year
+                }
               </p>
             </div>
           ) : (
             <p className="mt-5 text-sm text-white/60">
-              No saved card details are available yet.
+              {canActivate
+                ? "Your payment method will be added securely when you activate the subscription."
+                : "No saved card details are available yet."}
             </p>
           )}
 
-          {manageError && (
+          {actionError && (
             <div className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
-              {manageError}
+              {actionError}
             </div>
           )}
 
-          {billing && (
+          {canActivate && (
             <button
               type="button"
-              onClick={managePaymentMethod}
-              disabled={manageBusy}
+              onClick={
+                activateSubscription
+              }
+              disabled={actionBusy}
               className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2d8fc4] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#247baa] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {manageBusy
+              {actionBusy
+                ? "Opening secure checkout…"
+                : "Activate subscription"}
+            </button>
+          )}
+
+          {canManagePayment && (
+            <button
+              type="button"
+              onClick={
+                managePaymentMethod
+              }
+              disabled={actionBusy}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2d8fc4] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#247baa] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionBusy
                 ? "Opening secure billing…"
-                : "Manage payment method"}
+                : displayStatus ===
+                    "past_due"
+                  ? "Update payment method"
+                  : "Manage payment method"}
             </button>
           )}
 
           <p className="mt-3 text-xs leading-5 text-white/45">
-            Payment details are securely managed by
-            Stripe. Plan changes and cancellation are not
-            available here.
+            Payment details are securely
+            managed by Stripe. Plan changes
+            and cancellation are not available
+            here.
           </p>
         </div>
       </section>
@@ -492,7 +644,8 @@ export default function BillingClient({
             </h2>
 
             <p className="mt-1 text-sm text-white/55">
-              View or download receipts issued by Stripe.
+              View or download receipts
+              issued by Stripe.
             </p>
           </div>
 
@@ -518,15 +671,19 @@ export default function BillingClient({
                   <th className="px-3 py-3 font-medium">
                     Invoice
                   </th>
+
                   <th className="px-3 py-3 font-medium">
                     Date
                   </th>
+
                   <th className="px-3 py-3 font-medium">
                     Amount
                   </th>
+
                   <th className="px-3 py-3 font-medium">
                     Status
                   </th>
+
                   <th className="px-3 py-3 text-right font-medium">
                     Receipt
                   </th>
@@ -534,62 +691,67 @@ export default function BillingClient({
               </thead>
 
               <tbody>
-                {invoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="border-b border-white/[0.07] last:border-0"
-                  >
-                    <td className="px-3 py-4 font-medium">
-                      {invoice.number ??
-                        invoice.id}
-                    </td>
+                {invoices.map(
+                  (invoice) => (
+                    <tr
+                      key={invoice.id}
+                      className="border-b border-white/[0.07] last:border-0"
+                    >
+                      <td className="px-3 py-4 font-medium">
+                        {invoice.number ??
+                          invoice.id}
+                      </td>
 
-                    <td className="px-3 py-4 text-white/65">
-                      {formatDate(
-                        invoice.created_at
-                      )}
-                    </td>
-
-                    <td className="px-3 py-4">
-                      {formatMoney(
-                        invoice.amount_cents,
-                        invoice.currency
-                      )}
-                    </td>
-
-                    <td className="px-3 py-4 capitalize text-white/65">
-                      {invoice.status ?? "—"}
-                    </td>
-
-                    <td className="px-3 py-4 text-right">
-                      <div className="flex justify-end gap-3">
-                        {invoice.hosted_invoice_url && (
-                          <a
-                            href={
-                              invoice.hosted_invoice_url
-                            }
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium text-[#64bae2] hover:text-white"
-                          >
-                            View
-                          </a>
+                      <td className="px-3 py-4 text-white/65">
+                        {formatDate(
+                          invoice.created_at
                         )}
+                      </td>
 
-                        {invoice.invoice_pdf && (
-                          <a
-                            href={invoice.invoice_pdf}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-medium text-[#64bae2] hover:text-white"
-                          >
-                            Download
-                          </a>
+                      <td className="px-3 py-4">
+                        {formatMoney(
+                          invoice.amount_cents,
+                          invoice.currency
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      <td className="px-3 py-4 capitalize text-white/65">
+                        {invoice.status ??
+                          "—"}
+                      </td>
+
+                      <td className="px-3 py-4 text-right">
+                        <div className="flex justify-end gap-3">
+                          {invoice.hosted_invoice_url && (
+                            <a
+                              href={
+                                invoice.hosted_invoice_url
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-[#64bae2] hover:text-white"
+                            >
+                              View
+                            </a>
+                          )}
+
+                          {invoice.invoice_pdf && (
+                            <a
+                              href={
+                                invoice.invoice_pdf
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-[#64bae2] hover:text-white"
+                            >
+                              Download
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>

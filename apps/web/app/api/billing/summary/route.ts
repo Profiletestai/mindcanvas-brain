@@ -1,5 +1,4 @@
 // apps/web/app/api/billing/summary/route.ts
-
 import "server-only";
 
 import Stripe from "stripe";
@@ -10,11 +9,13 @@ import {
   getActiveEntitlement,
   getOrgRow,
   getOwnerBillingAccount,
+  getOwnerPricesForTier,
   getSubmissionUsage,
   PILOT_GRACE_HOURS,
   PILOT_TIER,
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
+import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +35,30 @@ type SafeInvoice = {
   currency: string;
   hosted_invoice_url: string | null;
   invoice_pdf: string | null;
+};
+
+type FallbackPlan = {
+  name: string;
+  interval: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+};
+
+const TIER_NAMES: Record<number, string> = {
+  1: "MindCanvas Starter",
+  2: "MindCanvas Pro",
+  3: "MindCanvas Niche",
+  4: "MindCanvas Enterprise",
+};
+
+const FALLBACK_MONTHLY_AMOUNTS: Record<
+  number,
+  number
+> = {
+  1: 14700,
+  2: 34700,
+  3: 54700,
+  4: 99700,
 };
 
 function jerr(
@@ -73,11 +98,17 @@ function deriveDisplayStatus(
   const status =
     stripeStatus?.trim().toLowerCase() ?? "";
 
-  if (status === "active" || status === "trialing") {
+  if (
+    status === "active" ||
+    status === "trialing"
+  ) {
     return "active";
   }
 
-  if (status === "past_due" || status === "unpaid") {
+  if (
+    status === "past_due" ||
+    status === "unpaid"
+  ) {
     return "past_due";
   }
 
@@ -106,28 +137,145 @@ function deriveNextAction(
   return "checkout";
 }
 
-function unixTimestampToIso(timestamp: number): string {
-  return new Date(timestamp * 1000).toISOString();
+function unixTimestampToIso(
+  timestamp: number
+): string {
+  return new Date(
+    timestamp * 1000
+  ).toISOString();
+}
+
+function getDefaultFallbackPlan(
+  tier: number | null,
+  isLegacy: boolean,
+  billingInterval: string | null
+): FallbackPlan {
+  if (!isLegacy || tier === null) {
+    return {
+      name: "MindCanvas subscription",
+      interval: null,
+      amount_cents: null,
+      currency: null,
+    };
+  }
+
+  return {
+    name:
+      TIER_NAMES[tier] ??
+      `MindCanvas Tier ${tier}`,
+    interval:
+      billingInterval === "annual" ||
+      billingInterval === "year"
+        ? "year"
+        : "month",
+    amount_cents:
+      billingInterval === "annual" ||
+      billingInterval === "year"
+        ? null
+        : FALLBACK_MONTHLY_AMOUNTS[
+            tier
+          ] ?? null,
+    currency: "usd",
+  };
+}
+
+async function resolveFallbackPlan({
+  tier,
+  isLegacy,
+  billingInterval,
+}: {
+  tier: number | null;
+  isLegacy: boolean;
+  billingInterval: string | null;
+}): Promise<FallbackPlan> {
+  const fallback = getDefaultFallbackPlan(
+    tier,
+    isLegacy,
+    billingInterval
+  );
+
+  if (
+    !isLegacy ||
+    tier === null ||
+    (billingInterval !== "monthly" &&
+      billingInterval !== "month")
+  ) {
+    return fallback;
+  }
+
+  try {
+    const { monthly } =
+      await getOwnerPricesForTier(tier);
+
+    if (!monthly) {
+      return fallback;
+    }
+
+    return {
+      name:
+        TIER_NAMES[tier] ??
+        `MindCanvas Tier ${tier}`,
+      interval: monthly.interval,
+      amount_cents: monthly.amount_cents,
+      currency: monthly.currency,
+    };
+  } catch (error) {
+    console.error(
+      "[billing-summary] Unable to load configured tier price:",
+      error
+    );
+
+    return fallback;
+  }
+}
+
+async function getIncludedTrialAllowance(
+  orgId: string,
+  tier: number | null
+): Promise<number | null> {
+  if (tier === null) {
+    return null;
+  }
+
+  const { data, error } = await portalAdmin()
+    .from("entitlements")
+    .select(
+      "included_trials_per_month, updated_at"
+    )
+    .eq("org_id", orgId)
+    .eq("tier", tier)
+    .order("updated_at", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "[billing-summary] Unable to load configured test allowance:",
+      error
+    );
+
+    return null;
+  }
+
+  const allowance =
+    data?.included_trials_per_month;
+
+  return typeof allowance === "number"
+    ? allowance
+    : null;
 }
 
 async function loadStripeDetails({
   customerId,
   subscriptionId,
-  isLegacy,
+  fallbackPlan,
 }: {
   customerId: string | null;
   subscriptionId: string | null;
-  isLegacy: boolean;
+  fallbackPlan: FallbackPlan;
 }) {
-  const fallbackPlan = {
-    name: isLegacy
-      ? "MindCanvas Pro"
-      : "MindCanvas subscription",
-    interval: isLegacy ? "month" : null,
-    amount_cents: isLegacy ? 34700 : null,
-    currency: isLegacy ? "usd" : null,
-  };
-
   if (!customerId) {
     return {
       plan: fallbackPlan,
@@ -137,7 +285,9 @@ async function loadStripeDetails({
   }
 
   try {
-    const stripe = new Stripe(getStripeSecretKey());
+    const stripe = new Stripe(
+      getStripeSecretKey()
+    );
 
     const [
       subscription,
@@ -154,11 +304,13 @@ async function loadStripeDetails({
             }
           )
         : Promise.resolve(null),
+
       stripe.paymentMethods.list({
         customer: customerId,
         type: "card",
         limit: 1,
       }),
+
       stripe.invoices.list({
         customer: customerId,
         limit: 12,
@@ -166,7 +318,8 @@ async function loadStripeDetails({
     ]);
 
     const price =
-      subscription?.items.data[0]?.price ?? null;
+      subscription?.items.data[0]?.price ??
+      null;
 
     const product = price?.product;
 
@@ -178,7 +331,8 @@ async function loadStripeDetails({
         ? product.name
         : null;
 
-    const card = paymentMethods.data[0]?.card;
+    const card =
+      paymentMethods.data[0]?.card;
 
     return {
       plan: {
@@ -196,6 +350,7 @@ async function loadStripeDetails({
           price?.currency ??
           fallbackPlan.currency,
       },
+
       payment_method: card
         ? {
             brand: card.brand,
@@ -204,6 +359,7 @@ async function loadStripeDetails({
             exp_year: card.exp_year,
           }
         : null,
+
       invoices: invoices.data.map(
         (invoice): SafeInvoice => ({
           id: invoice.id,
@@ -218,7 +374,8 @@ async function loadStripeDetails({
             invoice.amount_due,
           currency: invoice.currency,
           hosted_invoice_url:
-            invoice.hosted_invoice_url ?? null,
+            invoice.hosted_invoice_url ??
+            null,
           invoice_pdf:
             invoice.invoice_pdf ?? null,
         })
@@ -230,11 +387,6 @@ async function loadStripeDetails({
       error
     );
 
-    /*
-     * The database remains the status source of truth. A
-     * temporary Stripe read failure must not hide the
-     * organisation's saved billing status.
-     */
     return {
       plan: fallbackPlan,
       payment_method: null,
@@ -245,13 +397,15 @@ async function loadStripeDetails({
 
 export async function GET(req: Request) {
   const auth = await getAuthUser();
+
   if (auth.error) {
     return auth.error;
   }
 
   const user = auth.user;
   const url = new URL(req.url);
-  const orgIdHint = url.searchParams.get("orgId");
+  const orgIdHint =
+    url.searchParams.get("orgId");
 
   const resolved = await resolveOwnerOrgId(
     user.id,
@@ -281,7 +435,9 @@ export async function GET(req: Request) {
   const billingAccount =
     await getOwnerBillingAccount(orgId);
 
-  const usage = await getSubmissionUsage(orgId);
+  const usage =
+    await getSubmissionUsage(orgId);
+
   const entitlement =
     await getActiveEntitlement(orgId);
 
@@ -298,7 +454,10 @@ export async function GET(req: Request) {
           new Date(
             entitlement.period_end
           ).getTime() -
-            PILOT_GRACE_HOURS * 60 * 60 * 1000
+            PILOT_GRACE_HOURS *
+              60 *
+              60 *
+              1000
         ).toISOString()
       : null;
 
@@ -307,25 +466,50 @@ export async function GET(req: Request) {
     billingAccount?.stripe_status
   );
 
-  const stripeDetails = await loadStripeDetails({
-    customerId:
-      billingAccount?.stripe_customer_id ?? null,
-    subscriptionId:
-      billingAccount?.stripe_subscription_id ??
-      null,
-    isLegacy:
-      billingAccount?.billing_source === "legacy",
-  });
+  const isLegacy =
+    billingAccount?.billing_source ===
+    "legacy";
+
+  const fallbackPlan =
+    await resolveFallbackPlan({
+      tier: billingAccount?.tier ?? null,
+      isLegacy,
+      billingInterval:
+        billingAccount?.billing_interval ??
+        null,
+    });
+
+  const includedTrialsPerMonth =
+    billingAccount
+      ? await getIncludedTrialAllowance(
+          orgId,
+          billingAccount.tier
+        )
+      : null;
+
+  const stripeDetails =
+    await loadStripeDetails({
+      customerId:
+        billingAccount?.stripe_customer_id ??
+        null,
+      subscriptionId:
+        billingAccount
+          ?.stripe_subscription_id ?? null,
+      fallbackPlan,
+    });
 
   return NextResponse.json({
     ok: true,
+
     org: {
       id: org.id,
       name: org.name,
       slug: org.slug,
       status: org.status,
     },
+
     usage,
+
     billing: billingAccount
       ? {
           tier: billingAccount.tier,
@@ -334,22 +518,28 @@ export async function GET(req: Request) {
           display_status: displayStatus,
           period_start:
             billingAccount.period_start,
-          period_end: billingAccount.period_end,
+          period_end:
+            billingAccount.period_end,
           past_due_since:
             billingAccount.past_due_since,
           billing_source:
             billingAccount.billing_source,
           billing_interval:
             billingAccount.billing_interval,
+          included_trials_per_month:
+            includedTrialsPerMonth,
           is_pilot: isPilot,
           pilot_end_date: pilotEndDate,
           pilot_grace_ends_at: graceEndsAt,
           plan: stripeDetails.plan,
           payment_method:
             stripeDetails.payment_method,
-          invoices: stripeDetails.invoices,
+          invoices:
+            stripeDetails.invoices,
         }
       : null,
-    next_action: deriveNextAction(displayStatus),
+
+    next_action:
+      deriveNextAction(displayStatus),
   });
 }

@@ -1,5 +1,4 @@
 // apps/web/app/api/billing/legacy-checkout/route.ts
-
 import "server-only";
 
 import Stripe from "stripe";
@@ -10,6 +9,8 @@ import {
   getAppOrigin,
   requireActiveOrgId,
 } from "@/app/_lib/portal";
+
+import { getOwnerPricesForTier } from "@/app/_lib/billing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,12 +28,9 @@ type BillingAccountRow = {
   billing_required_from: string | null;
 };
 
-const LEGACY_ORG_IDS = new Set([
-  "2a0f55c9-1681-481e-b23b-82bb3a597c5b", // Focal Point
-  "64c9d1f2-6e76-48e8-9e96-95ac6254d0bf", // Team Puzzle
-  "4be387ad-dc59-47f7-a6b1-8d290b2e4a4e", // Competency Coach
-  "60fb2268-4771-4a80-ae18-8e3dc45fe101", // Brett Gordon / 5D Leadership
-]);
+type CheckoutRequest = {
+  presentation?: "embedded" | "hosted";
+};
 
 function getStripeSecretKey(): string {
   const isProduction =
@@ -53,33 +51,26 @@ function getStripeSecretKey(): string {
   return key;
 }
 
-function getProMonthlyPriceId(): string {
-  const priceId =
-    process.env.STRIPE_PRICE_PRO_MONTHLY;
-
-  if (!priceId) {
-    throw new Error(
-      "Missing STRIPE_PRICE_PRO_MONTHLY"
-    );
+async function readCheckoutRequest(
+  req: Request
+): Promise<CheckoutRequest> {
+  try {
+    return (await req.json()) as CheckoutRequest;
+  } catch {
+    return {};
   }
-
-  return priceId;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const orgId = await requireActiveOrgId();
+    const requestBody =
+      await readCheckoutRequest(req);
 
-    if (!LEGACY_ORG_IDS.has(orgId)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "This organisation is not eligible for legacy billing.",
-        },
-        { status: 403 }
-      );
-    }
+    const presentation =
+      requestBody.presentation === "hosted"
+        ? "hosted"
+        : "embedded";
 
     const admin = await getAdminClient();
     const portal = admin.schema("portal");
@@ -144,15 +135,51 @@ export async function POST() {
       );
     }
 
+    const stripeStatus =
+      billingAccount.stripe_status
+        ?.trim()
+        .toLowerCase() ?? "";
+
     if (
-      billingAccount.stripe_status === "active" ||
-      billingAccount.stripe_status === "trialing"
+      stripeStatus === "active" ||
+      stripeStatus === "trialing"
     ) {
       return NextResponse.json(
         {
           ok: false,
           error:
             "This organisation already has an active subscription.",
+        },
+        { status: 409 }
+      );
+    }
+
+    if (
+      billingAccount.billing_interval !==
+        "monthly" &&
+      billingAccount.billing_interval !== "month"
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This legacy checkout currently supports monthly subscriptions only.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { monthly } =
+      await getOwnerPricesForTier(
+        billingAccount.tier
+      );
+
+    if (!monthly?.stripe_price_id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            `No active monthly Stripe price is configured for Tier ${billingAccount.tier}.`,
         },
         { status: 409 }
       );
@@ -198,16 +225,15 @@ export async function POST() {
 
     const origin = await getAppOrigin();
 
-    const session =
-      await stripe.checkout.sessions.create({
-        ui_mode: "embedded",
+    const commonParams: Stripe.Checkout.SessionCreateParams =
+      {
         mode: "subscription",
         customer: stripeCustomerId,
         client_reference_id: org.id,
 
         line_items: [
           {
-            price: getProMonthlyPriceId(),
+            price: monthly.stripe_price_id,
             quantity: 1,
           },
         ],
@@ -235,13 +261,55 @@ export async function POST() {
             ),
           },
         },
+      };
 
-        redirect_on_completion: "if_required",
+    const sessionParams: Stripe.Checkout.SessionCreateParams =
+      presentation === "hosted"
+        ? {
+            ...commonParams,
+            success_url:
+              `${origin}/portal/billing` +
+              `?billing=success` +
+              `&orgId=${encodeURIComponent(
+                org.id
+              )}` +
+              `&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url:
+              `${origin}/portal/billing` +
+              `?billing=cancelled` +
+              `&orgId=${encodeURIComponent(
+                org.id
+              )}`,
+          }
+        : {
+            ...commonParams,
+            ui_mode: "embedded",
+            redirect_on_completion:
+              "if_required",
+            return_url:
+              `${origin}/portal/${org.slug}` +
+              `?billing=return` +
+              `&session_id={CHECKOUT_SESSION_ID}`,
+          };
 
-        return_url:
-          `${origin}/portal/${org.slug}` +
-          `?billing=return&session_id={CHECKOUT_SESSION_ID}`,
+    const session =
+      await stripe.checkout.sessions.create(
+        sessionParams
+      );
+
+    if (presentation === "hosted") {
+      if (!session.url) {
+        throw new Error(
+          "Stripe did not return a Checkout URL."
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        url: session.url,
+        session_id: session.id,
       });
+    }
 
     if (!session.client_secret) {
       throw new Error(
@@ -249,10 +317,6 @@ export async function POST() {
       );
     }
 
-    /*
-     * These snake_case field names match
-     * LegacyBillingCheckoutModal.tsx.
-     */
     return NextResponse.json({
       ok: true,
       client_secret: session.client_secret,
