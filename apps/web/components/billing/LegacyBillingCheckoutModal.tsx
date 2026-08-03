@@ -1,21 +1,12 @@
 // apps/web/components/billing/LegacyBillingCheckoutModal.tsx
-
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   EmbeddedCheckout,
   EmbeddedCheckoutProvider,
 } from "@stripe/react-stripe-js";
-import {
-  loadStripe,
-  type Stripe,
-} from "@stripe/stripe-js";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 
 type LegacyBillingCheckoutModalProps = {
   publishableKey: string;
@@ -29,9 +20,36 @@ type CheckoutResponse = {
   error?: string;
 };
 
-function getCustomAssessmentName(
-  organisationName?: string
-): string {
+type BillingSummaryResponse = {
+  ok?: boolean;
+  error?: string;
+  usage?: {
+    allowance?: number | null;
+  };
+  billing?: {
+    tier?: number | null;
+    billing_source?: string | null;
+    billing_interval?: string | null;
+    included_trials_per_month?: number | null;
+    plan?: {
+      name?: string | null;
+      interval?: string | null;
+      amount_cents?: number | null;
+      currency?: string | null;
+    } | null;
+  } | null;
+};
+
+type PlanDetails = {
+  tier: number | null;
+  name: string;
+  interval: string | null;
+  amountCents: number | null;
+  currency: string | null;
+  allowance: number | null;
+};
+
+function getCustomAssessmentName(organisationName?: string): string {
   const name = organisationName?.toLowerCase() ?? "";
 
   if (name.includes("focal")) {
@@ -46,14 +64,87 @@ function getCustomAssessmentName(
     return "Competency Coach";
   }
 
-  if (
-    name.includes("brett") ||
-    name.includes("5d leadership")
-  ) {
+  if (name.includes("brett") || name.includes("5d leadership")) {
     return "5D Leadership";
   }
 
-  return "Your organisation’s custom assessment";
+  return "Your organisation’s existing assessments";
+}
+
+function getPlanDescription(tier: number | null): string {
+  if (tier === 1) {
+    return "For organisations getting started with consistent profiling.";
+  }
+
+  if (tier === 2) {
+    return "For organisations scaling their profiling capability.";
+  }
+
+  if (tier === 3) {
+    return "For established organisations using profiling across specialist programmes.";
+  }
+
+  if (tier === 4) {
+    return "For enterprise organisations with high-volume profiling requirements.";
+  }
+
+  return "Your MindCanvas subscription, configured for your organisation.";
+}
+
+function formatMoney(
+  amountCents: number | null,
+  currency: string | null,
+  includeDecimals = false,
+): string {
+  if (amountCents === null || !currency) {
+    return "—";
+  }
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: includeDecimals ? 2 : 0,
+      maximumFractionDigits: includeDecimals ? 2 : 0,
+    }).format(amountCents / 100);
+  } catch {
+    return `${currency.toUpperCase()} ${(amountCents / 100).toFixed(
+      includeDecimals ? 2 : 0,
+    )}`;
+  }
+}
+
+function getIntervalSuffix(interval: string | null): string {
+  if (interval === "month" || interval === "monthly") {
+    return "/mo";
+  }
+
+  if (interval === "year" || interval === "annual") {
+    return "/yr";
+  }
+
+  return "";
+}
+
+function getBillingCycle(interval: string | null): string {
+  if (interval === "month" || interval === "monthly") {
+    return "Monthly";
+  }
+
+  if (interval === "year" || interval === "annual") {
+    return "Annual";
+  }
+
+  return interval
+    ? interval.charAt(0).toUpperCase() + interval.slice(1)
+    : "Subscription";
+}
+
+function getAllowanceLabel(allowance: number | null): string {
+  return allowance === null
+    ? "Unlimited test usages"
+    : `${allowance} test usages per month`;
 }
 
 export default function LegacyBillingCheckoutModal({
@@ -62,38 +153,87 @@ export default function LegacyBillingCheckoutModal({
   onPaymentComplete,
 }: LegacyBillingCheckoutModalProps) {
   const [isComplete, setIsComplete] = useState(false);
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlanDetails | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
 
-  const assessmentName =
-    getCustomAssessmentName(organisationName);
+  const assessmentName = getCustomAssessmentName(organisationName);
 
-  /*
-   * Lock the page behind the compulsory payment screen.
-   * There is deliberately no close or skip control.
-   */
   useEffect(() => {
-    const originalBodyOverflow =
-      document.body.style.overflow;
-
-    const originalDocumentOverflow =
-      document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalDocumentOverflow = document.documentElement.style.overflow;
 
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow =
-        originalBodyOverflow;
-
-      document.documentElement.style.overflow =
-        originalDocumentOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalDocumentOverflow;
     };
   }, []);
 
-  const stripePromise = useMemo<
-    Promise<Stripe | null>
-  >(() => {
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await fetch("/api/billing/summary", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        const data = (await response
+          .json()
+          .catch(() => null)) as BillingSummaryResponse | null;
+
+        if (!response.ok || !data?.ok || !data.billing) {
+          throw new Error(
+            data?.error || "Unable to load the subscription details.",
+          );
+        }
+
+        if (data.billing.billing_source !== "legacy") {
+          throw new Error(
+            "This organisation does not have a legacy subscription ready for activation.",
+          );
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setPlan({
+          tier: data.billing.tier ?? null,
+          name: data.billing.plan?.name || "MindCanvas subscription",
+          interval:
+            data.billing.plan?.interval ??
+            data.billing.billing_interval ??
+            null,
+          amountCents: data.billing.plan?.amount_cents ?? null,
+          currency: data.billing.plan?.currency ?? null,
+          allowance:
+            data.billing.included_trials_per_month ??
+            data.usage?.allowance ??
+            null,
+        });
+        setPlanError(null);
+      } catch (error) {
+        if (!cancelled) {
+          setPlanError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load the subscription details.",
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stripePromise = useMemo<Promise<Stripe | null>>(() => {
     if (!publishableKey) {
       return Promise.resolve(null);
     }
@@ -101,48 +241,39 @@ export default function LegacyBillingCheckoutModal({
     return loadStripe(publishableKey);
   }, [publishableKey]);
 
-  const fetchClientSecret =
-    useCallback(async (): Promise<string> => {
-      setErrorMessage(null);
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
+    setErrorMessage(null);
 
-      const response = await fetch(
-        "/api/billing/legacy-checkout",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+    const response = await fetch("/api/billing/legacy-checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      cache: "no-store",
+      body: JSON.stringify({
+        presentation: "embedded",
+      }),
+    });
 
-      let data: CheckoutResponse;
+    let data: CheckoutResponse;
 
-      try {
-        data =
-          (await response.json()) as CheckoutResponse;
-      } catch {
-        throw new Error(
-          "The billing service returned an invalid response."
-        );
-      }
+    try {
+      data = (await response.json()) as CheckoutResponse;
+    } catch {
+      throw new Error("The billing service returned an invalid response.");
+    }
 
-      if (
-        !response.ok ||
-        !data.ok ||
-        !data.client_secret
-      ) {
-        const message =
-          data.error ||
-          "Unable to start the secure payment checkout.";
+    if (!response.ok || !data.ok || !data.client_secret) {
+      const message =
+        data.error || "Unable to start the secure payment checkout.";
 
-        setErrorMessage(message);
-        throw new Error(message);
-      }
+      setErrorMessage(message);
+      throw new Error(message);
+    }
 
-      return data.client_secret;
-    }, []);
+    return data.client_secret;
+  }, []);
 
   const handleComplete = useCallback(() => {
     setIsComplete(true);
@@ -150,11 +281,6 @@ export default function LegacyBillingCheckoutModal({
   }, [onPaymentComplete]);
 
   const handleContinue = useCallback(() => {
-    /*
-     * Reloading causes the portal layout to check the
-     * Stripe status saved by the webhook. The dashboard
-     * will only render once the subscription is active.
-     */
     window.location.reload();
   }, []);
 
@@ -179,14 +305,27 @@ export default function LegacyBillingCheckoutModal({
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-300">
-            The Stripe publishable key has not been
-            configured for this environment. Please contact
-            MindCanvas support.
+            The Stripe publishable key has not been configured for this
+            environment. Please contact MindCanvas support.
           </p>
         </div>
       </div>
     );
   }
+
+  const planName = plan?.name ?? "Loading subscription details…";
+  const planPrice = formatMoney(
+    plan?.amountCents ?? null,
+    plan?.currency ?? null,
+  );
+  const dueToday = formatMoney(
+    plan?.amountCents ?? null,
+    plan?.currency ?? null,
+    true,
+  );
+  const intervalSuffix = getIntervalSuffix(plan?.interval ?? null);
+  const billingCycle = getBillingCycle(plan?.interval ?? null);
+  const allowanceLabel = getAllowanceLabel(plan?.allowance ?? null);
 
   return (
     <div
@@ -220,10 +359,19 @@ export default function LegacyBillingCheckoutModal({
             </h1>
 
             <p className="mt-2 text-sm text-slate-400">
-              You’re one step away from activating your
-              MindCanvas Pro workspace.
+              You’re one step away from activating your {planName} workspace.
             </p>
           </div>
+
+          {planError && (
+            <div
+              className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100"
+              role="alert"
+            >
+              {planError} The secure Stripe checkout below remains the
+              authoritative subscription amount.
+            </div>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(400px,0.85fr)]">
             <section className="space-y-5">
@@ -231,58 +379,48 @@ export default function LegacyBillingCheckoutModal({
                 <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
                   <div>
                     <div className="mb-3 inline-flex rounded-full border border-[#1f537a] bg-[#0b2b45] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#64bae2]">
-                      MindCanvas Pro
+                      {planName}
                     </div>
 
                     <h2 className="text-xl font-semibold text-white">
-                      MindCanvas Pro
+                      {planName}
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-400">
-                      For organisations scaling their profiling
-                      capability.
+                      {getPlanDescription(plan?.tier ?? null)}
                     </p>
                   </div>
 
                   <div className="shrink-0 sm:text-right">
                     <div className="text-3xl font-semibold tracking-tight text-white">
-                      <span className="mr-1 text-sm font-medium text-slate-400">
-                        US$
-                      </span>
-                      347
-                      <span className="ml-1 text-sm font-medium text-slate-400">
-                        /mo
-                      </span>
+                      {planPrice}
+                      {intervalSuffix && (
+                        <span className="ml-1 text-sm font-medium text-slate-400">
+                          {intervalSuffix}
+                        </span>
+                      )}
                     </div>
 
                     <p className="mt-1 text-xs text-slate-500">
-                      Billed monthly
+                      Billed {billingCycle.toLowerCase()}
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-6 grid gap-x-6 gap-y-3 border-t border-white/10 pt-6 text-sm text-slate-300 sm:grid-cols-2">
-                  <Feature>
-                    50 test usages included every month
-                  </Feature>
-
-                  <Feature>
-                    Growth Engine Diagnostic access
-                  </Feature>
+                  <Feature>{allowanceLabel} included</Feature>
 
                   <Feature>{assessmentName}</Feature>
 
-                  <Feature>
-                    Existing tests, links and reports retained
-                  </Feature>
+                  <Feature>Existing tests, links and reports retained</Feature>
 
                   <Feature>
-                    Existing organisation branding retained
+                    Existing users and organisation access retained
                   </Feature>
 
-                  <Feature>
-                    Secure recurring billing through Stripe
-                  </Feature>
+                  <Feature>Existing organisation branding retained</Feature>
+
+                  <Feature>Secure recurring billing through Stripe</Feature>
                 </div>
               </div>
 
@@ -293,12 +431,12 @@ export default function LegacyBillingCheckoutModal({
 
                 <div className="mt-5 space-y-4 text-sm">
                   <BillingLine
-                    label="MindCanvas Pro — Monthly"
-                    value="US$347.00"
+                    label={`${planName} — ${billingCycle}`}
+                    value={dueToday}
                   />
 
                   <BillingLine
-                    label="50 monthly test usages"
+                    label={allowanceLabel}
                     value="Included"
                     valueClassName="text-emerald-400"
                   />
@@ -306,7 +444,7 @@ export default function LegacyBillingCheckoutModal({
                   <div className="border-t border-white/10 pt-4">
                     <BillingLine
                       label="Due today"
-                      value="US$347.00"
+                      value={dueToday}
                       emphasised
                     />
                   </div>
@@ -333,13 +471,12 @@ export default function LegacyBillingCheckoutModal({
 
                 <div>
                   <p className="text-sm font-semibold text-emerald-300">
-                    Your 50 monthly test usages are included
+                    Your {allowanceLabel.toLowerCase()} are included
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Your existing organisation, users, tests,
-                    links, reports and branding will remain
-                    unchanged.
+                    Your existing organisation, users, tests, links, reports and
+                    branding will remain unchanged.
                   </p>
                 </div>
               </div>
@@ -353,8 +490,8 @@ export default function LegacyBillingCheckoutModal({
                   </h2>
 
                   <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Your payment information is encrypted and
-                    securely processed by Stripe.
+                    Your payment information is encrypted and securely processed
+                    by Stripe.
                   </p>
                 </div>
 
@@ -382,9 +519,7 @@ export default function LegacyBillingCheckoutModal({
                 <div className="border-t border-white/10 px-6 py-4 text-center">
                   <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500">
                     <LockIcon />
-                    <span>
-                      Secure payment • Protected by Stripe
-                    </span>
+                    <span>Secure payment • Protected by Stripe</span>
                   </div>
                 </div>
               </div>
@@ -413,40 +548,25 @@ export default function LegacyBillingCheckoutModal({
               </svg>
             </div>
 
-            <h2 className="mt-5 text-lg font-semibold">
-              Payment successful
-            </h2>
+            <h2 className="mt-5 text-lg font-semibold">Payment successful</h2>
 
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              Your MindCanvas Pro subscription is being
-              activated.
+              Your {planName} subscription is being activated.
             </p>
 
             <div className="mt-6 rounded-xl border border-white/10 bg-[#06182a] p-4 text-left text-sm">
-              <BillingLine
-                label="Plan"
-                value="MindCanvas Pro"
-              />
+              <BillingLine label="Plan" value={planName} />
 
               <div className="mt-3">
-                <BillingLine
-                  label="Billing"
-                  value="Monthly"
-                />
+                <BillingLine label="Billing" value={billingCycle} />
               </div>
 
               <div className="mt-3">
-                <BillingLine
-                  label="Charged today"
-                  value="US$347.00"
-                />
+                <BillingLine label="Charged today" value={dueToday} />
               </div>
 
               <div className="mt-3">
-                <BillingLine
-                  label="Test usages"
-                  value="50 per month"
-                />
+                <BillingLine label="Test usages" value={allowanceLabel} />
               </div>
             </div>
 
@@ -455,16 +575,15 @@ export default function LegacyBillingCheckoutModal({
               onClick={handleContinue}
               className="mt-6 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#2d8fc4] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#247baa] focus:outline-none focus:ring-2 focus:ring-[#64bae2] focus:ring-offset-2 focus:ring-offset-[#0a2035]"
             >
-              Continue to{" "}
-              {organisationName ?? "organisation"} portal
+              Continue to {organisationName ?? "organisation"} portal
               <span className="ml-2" aria-hidden="true">
                 →
               </span>
             </button>
 
             <p className="mt-4 text-[11px] leading-5 text-slate-500">
-              Portal access is released only after Stripe
-              confirms the active subscription.
+              Portal access is released only after Stripe confirms the active
+              subscription.
             </p>
           </div>
         </div>
@@ -473,17 +592,10 @@ export default function LegacyBillingCheckoutModal({
   );
 }
 
-function Feature({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function Feature({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-2">
-      <span
-        className="mt-0.5 text-emerald-400"
-        aria-hidden="true"
-      >
+      <span className="mt-0.5 text-emerald-400" aria-hidden="true">
         ✓
       </span>
 
@@ -509,21 +621,11 @@ function BillingLine({
         emphasised ? "text-base font-semibold" : ""
       }`}
     >
-      <span
-        className={
-          emphasised
-            ? "text-white"
-            : "text-slate-400"
-        }
-      >
+      <span className={emphasised ? "text-white" : "text-slate-400"}>
         {label}
       </span>
 
-      <span
-        className={`shrink-0 font-medium ${valueClassName}`}
-      >
-        {value}
-      </span>
+      <span className={`shrink-0 font-medium ${valueClassName}`}>{value}</span>
     </div>
   );
 }
