@@ -16,6 +16,8 @@ export type OwnerBillingAccount = {
   period_start: string | null;
   period_end: string | null;
   past_due_since: string | null;
+  billing_source: string | null;
+  billing_interval: string | null;
 };
 
 // Fixed product policy: a pilot gets 48h after pilot_end to subscribe before
@@ -63,7 +65,7 @@ export async function getOwnerBillingAccount(orgId: string): Promise<OwnerBillin
   const { data, error } = await portalAdmin()
     .from("billing_accounts")
     .select(
-      "id, org_id, billing_type, tier, stripe_customer_id, stripe_subscription_id, stripe_status, period_start, period_end, past_due_since"
+      "id, org_id, billing_type, tier, stripe_customer_id, stripe_subscription_id, stripe_status, period_start, period_end, past_due_since, billing_source, billing_interval"
     )
     .eq("org_id", orgId)
     .eq("billing_type", "owner")
