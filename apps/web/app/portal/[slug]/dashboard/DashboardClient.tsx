@@ -6,48 +6,84 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type BillingSummaryLite = {
   ok: true;
-  org: { status: "pending_activation" | "active" | "past_due" | "suspended" | "archived" };
+  billing: {
+    display_status:
+      | "active"
+      | "past_due"
+      | "payment_required"
+      | "cancelled";
+  } | null;
 };
 
-function BillingBanner({ orgId }: { orgId: string | null }) {
-  const [status, setStatus] = useState<string | null>(null);
+function BillingBanner({
+  orgId,
+  orgSlug,
+}: {
+  orgId: string | null;
+  orgSlug: string;
+}) {
+  const [status, setStatus] =
+    useState<string | null>(null);
+
   useEffect(() => {
     if (!orgId) return;
+
     let cancelled = false;
+
     (async () => {
       try {
-        const res = await fetch(`/api/billing/summary?orgId=${encodeURIComponent(orgId)}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/billing/summary?orgId=${encodeURIComponent(
+            orgId
+          )}`,
+          { cache: "no-store" }
+        );
+
         if (!res.ok) return;
-        const j = (await res.json()) as BillingSummaryLite;
-        if (!cancelled && j?.ok) setStatus(j.org.status);
+
+        const data =
+          (await res.json()) as BillingSummaryLite;
+
+        if (!cancelled && data?.ok) {
+          setStatus(
+            data.billing?.display_status ??
+              "payment_required"
+          );
+        }
       } catch {
-        // non-blocking
+        // Billing status is non-blocking on the dashboard.
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [orgId]);
 
-  if (!status || status === "active") return null;
+  if (!status || status === "active") {
+    return null;
+  }
+
   const message =
     status === "past_due"
-      ? "Payment past due. Pay outstanding balance to keep your account active."
-      : status === "suspended"
-      ? "Account suspended. Contact support to re-activate."
-      : "Activate billing to unlock the dashboard.";
+      ? "Payment past due. Update your payment method to keep your account active."
+      : status === "cancelled"
+        ? "This subscription has been cancelled. Contact MindCanvas support."
+        : "Payment is required to activate billing.";
+
   const tone =
-    status === "suspended"
+    status === "cancelled"
       ? "border-red-400/30 bg-red-400/10 text-red-100"
       : "border-amber-400/30 bg-amber-400/10 text-amber-100";
 
   return (
-    <div className={`relative z-30 rounded-2xl border ${tone} px-4 py-3 text-sm flex items-center justify-between gap-3`}>
+    <div
+      className={`relative z-30 flex items-center justify-between gap-3 rounded-2xl border ${tone} px-4 py-3 text-sm`}
+    >
       <span>{message}</span>
+
       <Link
-        href="/portal/billing"
+        href={`/portal/${orgSlug}/billing`}
         className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"
       >
         Go to Billing
@@ -578,11 +614,7 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
           {/* Help links */}
           <div className="flex items-center gap-2 lg:order-2">
             <Link
-              href={
-                data?.filters.orgId
-                  ? `/portal/billing?orgId=${encodeURIComponent(data.filters.orgId)}`
-                  : "/portal/billing"
-              }
+              href={`/portal/${org}/billing`}
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
             >
               Billing
@@ -691,7 +723,10 @@ export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
         </div>
       </div>
 
-      <BillingBanner orgId={data?.filters.orgId ?? null} />
+      <BillingBanner
+        orgId={data?.filters.orgId ?? null}
+        orgSlug={org}
+      />
 
       {loading && <div className="text-white/70">Loading…</div>}
       {err && <div className="text-red-300">Error: {err}</div>}

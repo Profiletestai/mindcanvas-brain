@@ -218,8 +218,9 @@ async function loadStripeDetails({
             invoice.amount_due,
           currency: invoice.currency,
           hosted_invoice_url:
-            invoice.hosted_invoice_url,
-          invoice_pdf: invoice.invoice_pdf,
+            invoice.hosted_invoice_url ?? null,
+          invoice_pdf:
+            invoice.invoice_pdf ?? null,
         })
       ),
     };
