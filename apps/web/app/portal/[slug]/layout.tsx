@@ -3,6 +3,7 @@ import "server-only";
 
 import type { CSSProperties, ReactNode } from "react";
 
+import { getStripeMode } from "@/app/_lib/billing";
 import { getAdminClient } from "@/app/_lib/portal";
 import LegacyBillingCheckoutModal from "@/components/billing/LegacyBillingCheckoutModal";
 import PortalChrome from "@/components/portal/PortalChrome";
@@ -139,9 +140,9 @@ async function requiresLegacyBilling(org: Org): Promise<boolean> {
 }
 
 function getStripePublishableKey(): string {
-  const isProduction = process.env.VERCEL_ENV === "production";
+  const stripeMode = getStripeMode();
 
-  if (isProduction) {
+  if (stripeMode === "live") {
     return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
   }
 
@@ -218,4 +219,3 @@ export default async function OrgLayout({
     </div>
   );
 }
-
