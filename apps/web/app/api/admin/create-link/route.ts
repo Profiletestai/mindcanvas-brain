@@ -55,7 +55,11 @@ function absoluteUrl(path: string) {
 }
 
 function normalizeReportVariant(v: any): ReportVariant {
-  return String(v || "").trim().toLowerCase() === "lite" ? "lite" : "full";
+  return String(v || "")
+    .trim()
+    .toLowerCase() === "lite"
+    ? "lite"
+    : "full";
 }
 
 export async function POST(req: Request) {
@@ -65,7 +69,7 @@ export async function POST(req: Request) {
     if (!body.orgId || !body.testId) {
       return NextResponse.json(
         { ok: false, error: "Missing orgId or testId" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -85,12 +89,111 @@ export async function POST(req: Request) {
     } = body;
 
     const reportVariant = normalizeReportVariant(
-      body.report_variant ?? body.reportVariant
+      body.report_variant ?? body.reportVariant,
     );
 
     const maxUses = normalizeMaxUses(body.max_uses);
 
     const sb = createClient().schema("portal");
+
+    // Enforce the same permission used by the test dropdown.
+    const { data: testRow, error: testErr } = await sb
+      .from("tests")
+      .select("id, org_id, status")
+      .eq("id", testId)
+      .maybeSingle();
+
+    if (testErr) {
+      return NextResponse.json(
+        { ok: false, error: testErr.message },
+        { status: 500 },
+      );
+    }
+
+    if (!testRow) {
+      return NextResponse.json(
+        { ok: false, error: "Test not found" },
+        { status: 404 },
+      );
+    }
+
+    if (testRow.status !== "active") {
+      return NextResponse.json(
+        { ok: false, error: "This test is not active" },
+        { status: 403 },
+      );
+    }
+
+    let hasTestAccess = testRow.org_id === orgId;
+
+    if (!hasTestAccess) {
+      const { data: billingAccount, error: billingErr } = await sb
+        .from("billing_accounts")
+        .select("billing_source")
+        .eq("org_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (billingErr) {
+        return NextResponse.json(
+          { ok: false, error: billingErr.message },
+          { status: 500 },
+        );
+      }
+
+      const isLegacyBilling = billingAccount?.billing_source === "legacy";
+
+      const { data: accessRow, error: accessErr } = await sb
+        .from("user_test_access")
+        .select("test_id")
+        .eq("org_id", orgId)
+        .eq("test_id", testId)
+        .limit(1)
+        .maybeSingle();
+
+      if (accessErr) {
+        return NextResponse.json(
+          { ok: false, error: accessErr.message },
+          { status: 500 },
+        );
+      }
+
+      hasTestAccess = Boolean(accessRow);
+
+      // Modern billing grants tests through org_test_access. Legacy billing
+      // deliberately ignores tier-wide access and preserves explicit tests.
+      if (!hasTestAccess && !isLegacyBilling) {
+        const { data: orgAccessRow, error: orgAccessErr } = await sb
+          .from("org_test_access")
+          .select("test_id")
+          .eq("org_id", orgId)
+          .eq("test_id", testId)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        if (orgAccessErr) {
+          return NextResponse.json(
+            { ok: false, error: orgAccessErr.message },
+            { status: 500 },
+          );
+        }
+
+        hasTestAccess = Boolean(orgAccessRow);
+      }
+    }
+
+    if (!hasTestAccess) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "This organisation does not have access to this test",
+        },
+        { status: 403 },
+      );
+    }
+
     const token = crypto.randomUUID().replace(/-/g, "");
 
     const insertPayload: any = {
@@ -106,7 +209,7 @@ export async function POST(req: Request) {
       hidden_results_message: showResults ? null : hiddenResultsMessage || null,
       redirect_url: showResults ? null : redirectUrl || null,
 
-      // keep this available on the link either way
+      // Keep this available on the link either way.
       next_steps_url: nextStepsUrl || null,
 
       max_uses: maxUses,
@@ -129,7 +232,7 @@ export async function POST(req: Request) {
     if (insErr) {
       return NextResponse.json(
         { ok: false, error: insErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -158,7 +261,7 @@ export async function POST(req: Request) {
               ${
                 contactOwner
                   ? `<p>Contact owner: <strong>${escapeHtml(
-                      contactOwner
+                      contactOwner,
                     )}</strong></p>`
                   : ""
               }
@@ -200,7 +303,7 @@ export async function POST(req: Request) {
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message || "Unexpected error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
