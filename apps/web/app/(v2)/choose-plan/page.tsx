@@ -1,3 +1,4 @@
+//apps/web/app/(V2)/choose-plan/page.tsx
 import { listOnboardingPlans } from "@/app/_lib/onboardingPlans";
 import { PLAN_CARDS } from "./planContent";
 import { ChoosePlanClient, type PlanCardData } from "./ChoosePlanClient";

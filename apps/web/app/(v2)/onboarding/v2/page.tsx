@@ -17,7 +17,7 @@ export default function OnboardingV2Entry() {
         router.replace("/onboarding/v2/account");
         return;
       }
-      router.replace(pathForStep(res.step));
+      router.replace(pathForStep(res.step, res.org_slug));
     })();
     return () => {
       cancelled = true;

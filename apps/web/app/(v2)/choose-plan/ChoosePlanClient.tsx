@@ -1,5 +1,5 @@
+//apps/web/app/(V2)/choose-plan/ChoosePlanClient.tsx
 "use client";
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, isErr } from "@/app/(v2)/onboarding/v2/_lib/api";

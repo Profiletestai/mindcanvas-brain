@@ -8,6 +8,7 @@ import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
 import {
+  createOnboardingPlaceholderOrg,
   ensureStripeCustomer,
   getActiveEntitlement,
   getOrgRow,
@@ -31,7 +32,12 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error;
   const user = auth.user;
 
-  let body: { orgId?: string; tier?: number } = {};
+  let body: {
+    orgId?: string;
+    tier?: number;
+    flow?: string;
+    interval?: "month" | "year";
+  } = {};
   try {
     body = await req.json();
   } catch {
@@ -41,10 +47,31 @@ export async function POST(req: Request) {
   if (body.tier !== undefined && (!Number.isInteger(body.tier) || body.tier < 1 || body.tier > 4)) {
     return jerr("tier must be an integer between 1 and 4", "invalid_tier", 400);
   }
+  if (
+    body.interval !== undefined &&
+    body.interval !== "month" &&
+    body.interval !== "year"
+  ) {
+    return jerr(
+      "interval must be month or year",
+      "invalid_interval",
+      400
+    );
+  }
+  const interval = body.interval ?? "month";
 
   const resolved = await resolveOwnerOrgId(user.id, body.orgId ?? null);
-  if (!resolved.ok) return jerr(resolved.error, resolved.code, resolved.status);
-  const { orgId } = resolved;
+  let orgId: string;
+  if (resolved.ok) {
+    orgId = resolved.orgId;
+  } else if (resolved.code === "no_owned_org" && body.flow === "onboarding") {
+    // Auto-create a placeholder org so the user goes straight from plan to Stripe.
+    const created = await createOnboardingPlaceholderOrg(user);
+    if (!created.ok) return jerr(created.error, created.code, created.status);
+    orgId = created.orgId;
+  } else {
+    return jerr(resolved.error, resolved.code, resolved.status);
+  }
 
   const org = await getOrgRow(orgId);
   if (!org) return jerr("Org not found", "org_not_found", 404);
@@ -56,6 +83,38 @@ export async function POST(req: Request) {
   if (org.status === "active") {
     const ent = await getActiveEntitlement(orgId);
     if (ent?.tier !== PILOT_TIER) return jerr("Org already active", "org_already_active", 409);
+  }
+
+  // Onboarding rule: the number of engines the org selected sets the minimum
+  // tier. Recomputed here from portal.org_engines — the browser's tier is only
+  // honoured when it is at least the minimum. Falls back to the tier stored on
+  // the org (chosen on onboarding step 3) when the request omits one.
+  const { count: engineCount, error: engineErr } = await portalAdmin()
+    .from("org_engines")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("status", "active");
+  if (engineErr) return jerr(engineErr.message, "engine_lookup_failed", 500);
+
+  const minTier = engineCount ?? 0;
+
+  if (minTier > 0) {
+    const { data: orgTier } = await portalAdmin()
+      .from("orgs")
+      .select("selected_tier")
+      .eq("id", orgId)
+      .maybeSingle<{ selected_tier: number | null }>();
+
+    if (body.tier === undefined && orgTier?.selected_tier) {
+      body.tier = orgTier.selected_tier;
+    }
+    if (body.tier !== undefined && body.tier < minTier) {
+      return jerr(
+        `Tier ${body.tier} does not support ${minTier} engines`,
+        "tier_below_minimum",
+        400
+      );
+    }
   }
 
   if (body.tier !== undefined) {
@@ -81,6 +140,16 @@ export async function POST(req: Request) {
   const ba = await getOwnerBillingAccount(orgId);
   if (!ba) return jerr("Billing account missing", "billing_account_missing", 500);
   if (!ba.tier) return jerr("Billing account has no tier", "tier_missing", 409);
+  // The request may omit a tier entirely and fall back to whatever the billing
+  // account already carries (e.g. a stale tier from an earlier attempt), so the
+  // engine rule is checked once more against the tier that reaches Stripe.
+  if (minTier > 0 && ba.tier < minTier) {
+    return jerr(
+      `Tier ${ba.tier} does not support ${minTier} engines`,
+      "tier_below_minimum",
+      400
+    );
+  }
 
   let prices;
   try {
@@ -88,13 +157,19 @@ export async function POST(req: Request) {
   } catch (e: any) {
     return jerr(e?.message || "Price lookup failed", "price_lookup_failed", 500);
   }
+  const selectedPrice =
+    interval === "year" ? prices.annual : prices.monthly;
   if (
-    !prices.monthly?.stripe_price_id ||
-    prices.monthly.stripe_price_id.endsWith("_PLACEHOLDER") ||
-    !prices.monthly.amount_cents ||
-    prices.monthly.amount_cents <= 0
+    !selectedPrice?.stripe_price_id ||
+    selectedPrice.stripe_price_id.endsWith("_PLACEHOLDER") ||
+    !selectedPrice.amount_cents ||
+    selectedPrice.amount_cents <= 0
   ) {
-    return jerr(`No active priced plan for tier ${ba.tier}`, "prices_not_configured", 502);
+    return jerr(
+      `No active ${interval === "year" ? "annual" : "monthly"} plan for tier ${ba.tier}`,
+      "prices_not_configured",
+      502
+    );
   }
   if (!user.email) return jerr("User has no email", "email_required", 400);
 
@@ -106,15 +181,26 @@ export async function POST(req: Request) {
   }
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-    { price: prices.monthly.stripe_price_id, quantity: 1 },
+    { price: selectedPrice.stripe_price_id, quantity: 1 },
   ];
 
-  const baseUrl = getBaseUrl();
   const orgQs = `orgId=${encodeURIComponent(orgId)}`;
-  const successBase =
-    process.env.STRIPE_CHECKOUT_SUCCESS_URL || `${baseUrl}/portal/billing?status=success`;
-  const cancelBase =
-    process.env.STRIPE_CHECKOUT_CANCEL_URL || `${baseUrl}/portal/billing?status=cancelled`;
+  // Payment is a step inside onboarding now, so it has to come back to the
+  // billing confirmation screen on the same host that started Checkout. This
+  // keeps Preview/Staging on its own domain while the webhook is confirmed.
+  // The env overrides stay authoritative for the portal flow, which is where
+  // clients who already have an org pay from.
+  const isOnboarding = body.flow === "onboarding";
+  const requestOrigin = new URL(req.url).origin;
+  const baseUrl = isOnboarding ? requestOrigin : getBaseUrl();
+  const successBase = isOnboarding
+    ? `${baseUrl}/onboarding/v2/billing?status=success&interval=${interval}`
+    : process.env.STRIPE_CHECKOUT_SUCCESS_URL ||
+      `${baseUrl}/portal/billing?status=success`;
+  const cancelBase = isOnboarding
+    ? `${baseUrl}/onboarding/v2/billing?status=cancelled&interval=${interval}`
+    : process.env.STRIPE_CHECKOUT_CANCEL_URL ||
+      `${baseUrl}/portal/billing?status=cancelled`;
   const successUrl = `${successBase}${successBase.includes("?") ? "&" : "?"}${orgQs}`;
   const cancelUrl = `${cancelBase}${cancelBase.includes("?") ? "&" : "?"}${orgQs}`;
 
@@ -132,12 +218,22 @@ export async function POST(req: Request) {
         cancel_url: cancelUrl,
         allow_promotion_codes: false,
         subscription_data: {
-          metadata: { org_id: orgId, billing_account_id: ba.id },
+          metadata: {
+            org_id: orgId,
+            billing_account_id: ba.id,
+            billing_interval: interval,
+          },
         },
         client_reference_id: orgId,
-        metadata: { org_id: orgId, billing_account_id: ba.id },
+        metadata: {
+          org_id: orgId,
+          billing_account_id: ba.id,
+          billing_interval: interval,
+        },
       },
-      { idempotencyKey: `mc-checkout-${orgId}-${ba.id}-${bucket}` }
+      {
+        idempotencyKey: `mc-checkout-${orgId}-${ba.id}-${interval}-${bucket}`,
+      }
     );
   } catch (e: any) {
     if (e?.type === "StripeInvalidRequestError") return jerr(e.message, "stripe_invalid_request", 400);
