@@ -1,6 +1,6 @@
+//apps/web/app/qsc/[token]/entrepreneur/page.tsx
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import html2canvas from "html2canvas";
@@ -89,11 +89,20 @@ type QscTakerRow = {
   role_title: string | null;
 };
 
+type LinkMeta = {
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  next_steps_url?: string | null;
+  email_report?: boolean | null;
+};
+
 type QscPayload = {
   results: QscResultsRow;
   profile: QscProfileRow | null;
   persona?: QscPersonaRow | null;
   taker: QscTakerRow | null;
+  link?: LinkMeta | null;
 };
 
 const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
@@ -111,10 +120,6 @@ const MINDSET_LABELS: Record<MindsetKey, string> = {
   QUANTUM: "Quantum",
 };
 
-// ------------------------------------------------------
-// Helpers
-// ------------------------------------------------------
-
 function normalisePercent(raw: number | undefined | null): number {
   if (raw == null || !Number.isFinite(raw)) return 0;
   if (raw > 0 && raw <= 1.5) return Math.min(100, Math.max(0, raw * 100));
@@ -124,7 +129,7 @@ function normalisePercent(raw: number | undefined | null): number {
 type FrequencyDonutDatum = {
   key: PersonalityKey;
   label: string;
-  value: number; // 0–100
+  value: number;
 };
 
 const FREQUENCY_COLORS: Record<PersonalityKey, string> = {
@@ -233,10 +238,6 @@ function getFullName(taker: QscTakerRow | null | undefined): string | null {
   return email || null;
 }
 
-// ------------------------------------------------------
-// Page
-// ------------------------------------------------------
-
 export default function QscEntrepreneurStrategicReportPage({
   params,
 }: {
@@ -263,12 +264,11 @@ export default function QscEntrepreneurStrategicReportPage({
         setLoading(true);
         setErr(null);
 
-        // Strategic Growth Report payload for entrepreneur/leader routing
-        const apiUrl = tid
-          ? `/api/public/qsc/${encodeURIComponent(
-              token
-            )}/result?tid=${encodeURIComponent(tid)}`
-          : `/api/public/qsc/${encodeURIComponent(token)}/result`;
+        const qs = new URLSearchParams();
+        if (tid) qs.set("tid", tid);
+        qs.set("aud", "entrepreneur");
+
+        const apiUrl = `/api/public/qsc/${encodeURIComponent(token)}/result?${qs.toString()}`;
 
         const res = await fetch(apiUrl, { cache: "no-store" });
 
@@ -288,6 +288,7 @@ export default function QscEntrepreneurStrategicReportPage({
           profile?: QscProfileRow | null;
           persona?: QscPersonaRow | null;
           taker?: QscTakerRow | null;
+          link?: LinkMeta | null;
         };
 
         if (!res.ok || j.ok === false) {
@@ -300,7 +301,6 @@ export default function QscEntrepreneurStrategicReportPage({
           throw new Error("No QSC results found");
         }
 
-        // If this is a LEADER result, route to Leaders strategic report page
         if (j.results.audience === "leader") {
           const base = `/qsc/${encodeURIComponent(token)}/leader`;
           const href = tid ? `${base}?tid=${encodeURIComponent(tid)}` : base;
@@ -314,6 +314,7 @@ export default function QscEntrepreneurStrategicReportPage({
             profile: j.profile ?? null,
             persona: j.persona ?? null,
             taker: j.taker ?? null,
+            link: j.link ?? null,
           });
         }
       } catch (e: any) {
@@ -428,10 +429,8 @@ export default function QscEntrepreneurStrategicReportPage({
 
   const takerDisplayName = getFullName(taker);
 
-  // ✅ Snapshot URL (this is what we should call “Back to Snapshot”, NOT Download)
-  const snapshotHref = tid
-    ? `/qsc/${encodeURIComponent(token)}?tid=${encodeURIComponent(tid)}`
-    : `/qsc/${encodeURIComponent(token)}`;
+  const nextStepsHref =
+    (payload?.link?.next_steps_url || payload?.link?.redirect_url || "").trim() || null;
 
   const rawPersonalityPerc =
     (result.personality_percentages ?? {}) as PersonalityPercMap;
@@ -548,6 +547,16 @@ export default function QscEntrepreneurStrategicReportPage({
                 {downloading ? "Preparing PDF…" : "Download PDF"}
               </button>
 
+              {nextStepsHref ? (
+                <a
+                  href={nextStepsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Next Steps
+                </a>
+              ) : null}
             </div>
 
             <span>
@@ -563,7 +572,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </header>
 
-        {/* QUANTUM PROFILE HERO */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-sky-700">
             Quantum profile
@@ -597,7 +605,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* ONE-PAGE SUMMARY */}
         <section className="rounded-3xl bg-[#f5eddc] border border-amber-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-amber-700">
             One-page Quantum Profile
@@ -637,7 +644,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* FREQUENCY + MINDSET + MATRIX */}
         <section className="grid gap-6 md:grid-cols-2 items-start">
           <div className="rounded-3xl bg-[#020617] text-slate-50 border border-slate-800 p-6 md:p-7 space-y-4">
             <h2 className="text-lg font-semibold">Buyer Frequency Type</h2>
@@ -716,7 +722,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* PERSONALITY LAYER */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-indigo-700">
             Personality layer
@@ -749,7 +754,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* COMBINED PATTERN */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-rose-700">
             Combined pattern
@@ -780,7 +784,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* EMOTIONAL & OPERATIONAL SUPPORT */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-purple-700">
             Emotional & operational alignment
@@ -811,7 +814,6 @@ export default function QscEntrepreneurStrategicReportPage({
           </div>
         </section>
 
-        {/* STRATEGIC PRIORITIES */}
         <section className="rounded-3xl bg-white shadow-sm border border-slate-200 p-6 md:p-8 space-y-4">
           <p className="text-xs font-semibold tracking-[0.25em] uppercase text-orange-700">
             Strategic priorities (next 90 days)
@@ -824,7 +826,7 @@ export default function QscEntrepreneurStrategicReportPage({
         </section>
 
         <footer className="pt-4 pb-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>

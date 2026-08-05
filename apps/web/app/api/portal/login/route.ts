@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase, getAdminClient } from "@/app/_lib/portal";
+import { getServerSupabase } from "@/app/_lib/portal";
+import { resolvePostLoginNext } from "@/app/_lib/portal-postauth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1) Authenticate + set SSR cookies
     const sb = await getServerSupabase();
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
 
@@ -36,57 +36,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const userId = data.user.id;
-
-    // 2) Admin check (service role)
-    const admin = await getAdminClient();
-    const portal = admin.schema("portal");
-
-    const { data: adminRow } = await portal
-      .from("superadmin") // ✅ singular
-      .select("user_id")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const is_superadmin = !!adminRow?.user_id;
-
-    if (is_superadmin) {
-      return NextResponse.json({
-        ok: true,
-        is_superadmin: true,
-        org_slug: null,
-        next: "/admin",
-      });
-    }
-
-    // 3) Org user
-    const { data: mem } = await portal
-      .from("user_orgs")
-      .select("org_id")
-      .eq("user_id", userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (!mem?.org_id) {
-      return NextResponse.json({
-        ok: true,
-        is_superadmin: false,
-        org_slug: null,
-        next: "/onboarding",
-      });
-    }
-
-    const { data: org } = await portal
-      .from("orgs")
-      .select("slug")
-      .eq("id", mem.org_id)
-      .maybeSingle();
+    const post = await resolvePostLoginNext(data.user.id);
 
     return NextResponse.json({
       ok: true,
-      is_superadmin: false,
-      org_slug: org?.slug ?? null,
-      next: org?.slug ? `/portal/${org.slug}/dashboard` : "/portal",
+      is_superadmin: post.is_superadmin,
+      org_slug: post.org_slug,
+      next: post.next,
     });
   } catch (e: any) {
     return NextResponse.json(
@@ -95,5 +51,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-

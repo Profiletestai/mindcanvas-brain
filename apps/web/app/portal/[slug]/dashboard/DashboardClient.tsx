@@ -1,568 +1,1361 @@
 // apps/web/app/portal/[slug]/dashboard/DashboardClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
-import dynamic from "next/dynamic";
-import { Cell } from "recharts";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-const ResponsiveContainer = dynamic(
-  async () => (await import("recharts")).ResponsiveContainer,
-  { ssr: false }
-);
-const BarChart = dynamic(async () => (await import("recharts")).BarChart, {
-  ssr: false,
-});
-const Bar = dynamic(async () => (await import("recharts")).Bar, {
-  ssr: false,
-});
-const XAxis = dynamic(async () => (await import("recharts")).XAxis, {
-  ssr: false,
-});
-const YAxis = dynamic(async () => (await import("recharts")).YAxis, {
-  ssr: false,
-});
-const Tooltip = dynamic(async () => (await import("recharts")).Tooltip, {
-  ssr: false,
-});
-const CartesianGrid = dynamic(
-  async () => (await import("recharts")).CartesianGrid,
-  { ssr: false }
-);
-const LabelList = dynamic(
-  async () => (await import("recharts")).LabelList,
-  { ssr: false }
-);
-const PieChart = dynamic(async () => (await import("recharts")).PieChart, {
-  ssr: false,
-});
-const Pie = dynamic(async () => (await import("recharts")).Pie, {
-  ssr: false,
-});
-
-type KV = { key: string; value: number; percent?: string };
-type Payload = {
-  frequencies: KV[];
-  profiles: KV[];
-  top3: KV[];
-  bottom3: KV[];
-  overall?: { average?: number; count?: number };
-};
-
-type TestMeta = {
-  id: string;
-  name: string;
-  slug: string;
-  is_default_dashboard?: boolean | null;
-};
-
-type TestsResponse =
-  | { ok: true; tests: TestMeta[] }
-  | { ok: false; error: string };
-
-type TimeRangeValue =
-  | "this_week"
-  | "last_week"
-  | "this_month"
-  | "last_month"
-  | "this_year"
-  | "last_year"
-  | "all_time";
-
-const TIME_RANGE_OPTIONS: { value: TimeRangeValue; label: string }[] = [
-  { value: "this_week", label: "This week (default)" },
-  { value: "last_week", label: "Last week" },
-  { value: "this_month", label: "This month" },
-  { value: "last_month", label: "Last month" },
-  { value: "this_year", label: "This year" },
-  { value: "last_year", label: "Last year" },
-  { value: "all_time", label: "All time" },
-];
-
-const COLORS = {
-  tileBg: "rgba(45,143,196,0.05)",
-  primary: "#2d8fc4",
-  accent: "#64bae2",
-};
-
-const FREQ_SEGMENT_COLORS = [
-  "#64bae2", // light blue
-  "#2d8fc4", // mid blue
-  "#0ea5e9", // cyan-ish
-  "#0369a1", // deep blue
-];
-
-function toCSV(rows: Array<Record<string, any>>): string {
-  if (!rows?.length) return "";
-  const headers = Object.keys(rows[0]);
-  const escape = (v: any) => {
-    const s = String(v ?? "");
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+type BillingSummaryPayload = {
+  ok: true;
+  org: {
+    id: string;
+    name: string;
+    slug: string;
+    status:
+      | "pending_activation"
+      | "active"
+      | "past_due"
+      | "suspended"
+      | "archived";
   };
-  return [
-    headers.join(","),
-    ...rows.map((r) => headers.map((h) => escape(r[h])).join(",")),
-  ].join("\n");
+  billing: {
+    id: string;
+    tier: number;
+    billing_type: "owner" | "licensee";
+    billing_interval: "monthly" | "annual";
+    billing_source: "onboarding" | "legacy";
+    stripe_status: string | null;
+    stripe_customer_id: string | null;
+    stripe_subscription_id: string | null;
+    period_start: string | null;
+    period_end: string | null;
+    past_due_since: string | null;
+    is_pilot: boolean;
+    pilot_end_date: string | null;
+    pilot_grace_ends_at: string | null;
+  } | null;
+  next_action: "checkout" | "reactivate" | "none";
+};
+
+type BillingPresentation = {
+  label: string;
+  badgeClassName: string;
+  warning: string | null;
+};
+
+function formatBillingDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+function formatBillingValue(value: string | null | undefined) {
+  if (!value) return "—";
+
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function downloadCSV(filename: string, rows: KV[]) {
-  if (!rows.length) return;
-  const csv = toCSV(
-    rows.map((r) => ({
-      name: r.key,
-      value: r.value,
-      percent: r.percent ?? "",
-    }))
+function getBillingPresentation(
+  summary: BillingSummaryPayload
+): BillingPresentation {
+  const billing = summary.billing;
+  const stripeStatus = billing?.stripe_status?.toLowerCase() ?? null;
+
+  if (billing?.is_pilot) {
+    return {
+      label: "Pilot · Complimentary",
+      badgeClassName:
+        "border-violet-300/25 bg-violet-300/10 text-violet-100",
+      warning: billing.pilot_grace_ends_at
+        ? `Pilot access, including the grace period, ends ${formatBillingDate(
+            billing.pilot_grace_ends_at
+          )}.`
+        : null,
+    };
+  }
+
+  if (stripeStatus === "active") {
+    return {
+      label: "Paid subscription",
+      badgeClassName:
+        "border-emerald-300/25 bg-emerald-300/10 text-emerald-100",
+      warning: null,
+    };
+  }
+
+  if (stripeStatus === "trialing") {
+    return {
+      label: "Trial",
+      badgeClassName:
+        "border-sky-300/25 bg-sky-300/10 text-sky-100",
+      warning: null,
+    };
+  }
+
+  if (stripeStatus === "past_due" || stripeStatus === "unpaid") {
+    return {
+      label: "Payment overdue",
+      badgeClassName:
+        "border-red-300/25 bg-red-300/10 text-red-100",
+      warning:
+        "Payment is overdue. Please resolve the outstanding billing issue to avoid losing platform access.",
+    };
+  }
+
+  if (
+    stripeStatus === "incomplete" ||
+    stripeStatus === "incomplete_expired"
+  ) {
+    return {
+      label: "Billing setup required",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "The subscription has not completed successfully. Please return to Billing to finish setup.",
+    };
+  }
+
+  if (stripeStatus === "paused") {
+    return {
+      label: "Subscription paused",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "The subscription is paused. Please review the billing account before continuing.",
+    };
+  }
+
+  if (stripeStatus === "canceled" || stripeStatus === "cancelled") {
+    return {
+      label: "Subscription cancelled",
+      badgeClassName:
+        "border-white/15 bg-white/5 text-white/70",
+      warning:
+        "The subscription has been cancelled. Current access depends on the organisation status and period end date.",
+    };
+  }
+
+  if (summary.org.status === "suspended") {
+    return {
+      label: "Account suspended",
+      badgeClassName:
+        "border-red-300/25 bg-red-300/10 text-red-100",
+      warning:
+        "This organisation is suspended. Contact support or resolve the billing issue to reactivate it.",
+    };
+  }
+
+  if (summary.org.status === "past_due") {
+    return {
+      label: "Payment overdue",
+      badgeClassName:
+        "border-red-300/25 bg-red-300/10 text-red-100",
+      warning:
+        "The organisation is marked past due. Please review the billing account.",
+    };
+  }
+
+  if (!billing && summary.org.status === "pending_activation") {
+    return {
+      label: "Billing setup required",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "Complete billing setup to activate the organisation.",
+    };
+  }
+
+  if (billing && !stripeStatus) {
+    return {
+      label: "Billing setup required",
+      badgeClassName:
+        "border-amber-300/25 bg-amber-300/10 text-amber-100",
+      warning:
+        "A billing account exists, but no Stripe subscription status has been recorded.",
+    };
+  }
+
+  return {
+    label: "Billing not set up",
+    badgeClassName: "border-white/15 bg-white/5 text-white/70",
+    warning: null,
+  };
+}
+
+function BillingSummaryCard({ orgId }: { orgId: string | null }) {
+  const [summary, setSummary] = useState<BillingSummaryPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!orgId) {
+      setSummary(null);
+      setError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `/api/billing/summary?orgId=${encodeURIComponent(orgId)}`,
+          { cache: "no-store" }
+        );
+
+        const payload = await response.json();
+
+        if (!response.ok || payload?.ok === false) {
+          throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+
+        if (!cancelled) {
+          setSummary(payload as BillingSummaryPayload);
+        }
+      } catch (caughtError: unknown) {
+        if (!cancelled) {
+          setSummary(null);
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to load billing information."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  if (!orgId) return null;
+
+  const billingHref = `/portal/billing?orgId=${encodeURIComponent(orgId)}`;
+
+  if (loading && !summary) {
+    return (
+      <section className="relative z-30 rounded-3xl border border-white/10 bg-white/[0.06] px-5 py-4 text-sm text-white/60 backdrop-blur">
+        Loading billing summary…
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="relative z-30 flex flex-col gap-3 rounded-3xl border border-amber-300/20 bg-amber-300/10 px-5 py-4 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+        <span>Billing information could not be loaded: {error}</span>
+        <Link
+          href={billingHref}
+          className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20"
+        >
+          Open Billing
+        </Link>
+      </section>
+    );
+  }
+
+  if (!summary) return null;
+
+  const billing = summary.billing;
+  const presentation = getBillingPresentation(summary);
+  const dateLabel = billing?.is_pilot
+    ? "Pilot access ends"
+    : "Current period ends";
+  const dateValue = billing?.is_pilot
+    ? formatBillingDate(
+        billing.pilot_grace_ends_at ?? billing.pilot_end_date
+      )
+    : formatBillingDate(billing?.period_end);
+
+  return (
+    <section className="relative z-30 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(700px_220px_at_15%_0%,rgba(100,186,226,0.30),transparent_65%)]" />
+
+      <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-semibold">Billing summary</h2>
+              <span
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${presentation.badgeClassName}`}
+              >
+                {presentation.label}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-white/60">
+              Subscription and account information for this organisation.
+            </p>
+          </div>
+
+          <Link
+            href={billingHref}
+            className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+          >
+            Manage billing
+          </Link>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Plan
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {billing ? `Tier ${billing.tier}` : "Not selected"}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Billing
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.billing_interval)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Account
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.billing_type)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Source
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.billing_source)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              Stripe status
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {formatBillingValue(billing?.stripe_status)}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
+              {dateLabel}
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {dateValue}
+            </div>
+          </div>
+        </div>
+
+        {presentation.warning ? (
+          <div className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+            {presentation.warning}
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+}
+
+type TimelinePoint = { date: string; submissions: number };
+
+type TopByCount = { code: string; name: string; count: number; pct: number };
+type TopByAvg = { code: string; name: string; avgPoints: number; n: number };
+
+type LinkRow = {
+  linkId: string;
+  token: string;
+  name: string | null;
+  label: string | null;
+  isActive: boolean | null;
+  createdAt: string;
+  expiresAt: string | null;
+  useCount: number;
+  maxUses: number | null;
+  testsTaken: number;
+
+  topProfilesByCount: TopByCount[];
+  topProfilesByAvg: TopByAvg[];
+
+  topFrequencyByCount: TopByCount | null;
+  topFrequencyByAvg: TopByAvg | null;
+};
+
+type DashboardV2Payload = {
+  ok: true;
+  filters: { orgId: string; org: string | null; testId: string | null; from: string; to: string };
+  kpis: { submissions: number; uniqueTakers: number | null; activeLinks: number };
+  timeline: TimelinePoint[];
+  links: LinkRow[];
+};
+
+type PortalTestsPayload = {
+  ok: true;
+  org: string;
+  tests: { id: string; name: string; slug: string; is_default_dashboard?: boolean | null; status?: string | null }[];
+};
+
+type InsightsPayload = {
+  ok: true;
+  summary: {
+    whatYoureSeeing: string[];
+    whatItSuggests: string[];
+    recommendedNextSteps: string[];
+    watchOuts: string[];
+    confidence: { sampleSize: number; level: "low" | "medium" | "high" };
+  };
+};
+
+function isoToDateInput(iso: string) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function dateInputToIsoStart(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0)).toISOString();
+}
+
+function dateInputToIsoEnd(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return null;
+  return new Date(Date.UTC(y, m - 1, d, 23, 59, 59)).toISOString();
+}
+
+function clampPct(p: number) {
+  if (!Number.isFinite(p)) return 0;
+  return Math.max(0, Math.min(1, p));
+}
+
+function fmtPct(p: number) {
+  const v = Math.round(clampPct(p) * 100);
+  return `${v}%`;
+}
+
+function fmtNum(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return String(Math.round(n));
+}
+
+function fmtDateTime(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleString();
+}
+
+function badgeClass(active: boolean | null) {
+  if (active === false) return "bg-red-500/10 text-red-200 border-red-500/20";
+  if (active === true) return "bg-emerald-500/10 text-emerald-200 border-emerald-500/20";
+  return "bg-white/5 text-white/70 border-white/10";
+}
+
+/** CSV helpers */
+function csvEscape(v: any) {
+  const s = v == null ? "" : String(v);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(filename: string, header: string[], rows: any[][]) {
+  const lines = [header.map(csvEscape).join(","), ...rows.map((r) => r.map(csvEscape).join(","))];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
-export default function DashboardClient() {
-  const pathname = usePathname();
-  const slug = useMemo(() => {
-    const segs = (pathname || "").split("/").filter(Boolean);
-    const i = segs.indexOf("portal");
-    return i >= 0 && segs[i + 1] ? segs[i + 1] : "";
-  }, [pathname]);
-
-  const [tests, setTests] = useState<TestMeta[]>([]);
-  const [selectedTestId, setSelectedTestId] = useState<string>("");
-  const [timeRange, setTimeRange] = useState<TimeRangeValue>("this_week");
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<Payload | null>(null);
-
-  // ---- Load tests for this org ----
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      if (!slug) return;
-      try {
-        const res = await fetch(
-          `/api/portal-tests?org=${encodeURIComponent(slug)}`,
-          { cache: "no-store" }
-        );
-        const json: TestsResponse = await res.json();
-        if (!active) return;
-        if (json.ok) {
-          setTests(json.tests);
-          // pick default test if none selected
-          if (!selectedTestId && json.tests.length) {
-            const preferred =
-              json.tests.find((t) => t.is_default_dashboard) ||
-              json.tests[0];
-            setSelectedTestId(preferred.id);
-          }
-        } else {
-          console.error("Failed to load tests:", json.error);
-        }
-      } catch (e) {
-        console.error("Failed to load tests", e);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
-
-  // ---- Load dashboard data for org + test + time range ----
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      if (!slug) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams();
-        params.set("org", slug);
-        if (selectedTestId) params.set("testId", selectedTestId);
-        if (timeRange) params.set("range", timeRange);
-
-        const res = await fetch(`/api/portal-dashboard?${params.toString()}`, {
-          cache: "no-store",
-        });
-        const json = await res.json();
-        if (!active) return;
-        if (!json?.ok) {
-          setError(json?.error || "Unknown error");
-          setData(null);
-        } else {
-          setData(json.data as Payload);
-        }
-      } catch (e: any) {
-        if (active) {
-          setError(e?.message ?? "Network error");
-          setData(null);
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [slug, selectedTestId, timeRange]);
-
-  const freq = data?.frequencies ?? [];
-  const prof = data?.profiles ?? [];
-  const top3 = data?.top3 ?? [];
-  const bottom3 = data?.bottom3 ?? [];
-  const overall = data?.overall;
-
-  const freqChartData = useMemo(
-    () =>
-      freq.map((f) => ({
-        name: f.key,
-        percentNum: Number((f.percent || "0%").replace("%", "")),
-      })),
-    [freq]
+/** MindCanvas background (self-contained, no dependency) */
+function MindCanvasGrid() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+      {/* depth gradient */}
+      <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_-10%,#113149_0%,#08121b_55%,#060e16_100%)]" />
+      {/* grid */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)",
+          backgroundSize: "60px 60px",
+        }}
+      />
+      {/* slight vignette */}
+      <div className="absolute inset-0 bg-[#050914]/55" />
+    </div>
   );
+}
 
-  const profChartData = useMemo(
-    () =>
-      prof.map((p) => ({
-        name: p.key,
-        percentNum: Number((p.percent || "0%").replace("%", "")),
-      })),
-    [prof]
-  );
+/** Neon sparkline with area glow */
+function SparklineGlow({ data, height = 130 }: { data: TimelinePoint[]; height?: number }) {
+  const w = 900;
+  const h = height;
+  const padX = 10;
+  const padY = 12;
 
-  const activeTest = useMemo(
-    () => tests.find((t) => t.id === selectedTestId) || null,
-    [tests, selectedTestId]
-  );
+  const sorted = (data || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const values = sorted.map((d) => Number(d.submissions || 0));
+  const maxV = Math.max(1, ...values);
+  const n = Math.max(2, sorted.length);
+  const step = (w - padX * 2) / (n - 1);
+
+  const points = sorted.map((d, i) => {
+    const x = padX + i * step;
+    const t = Number(d.submissions || 0) / (maxV || 1);
+    const y = padY + (1 - t) * (h - padY * 2);
+    return { x, y };
+  });
+
+  const lineD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const areaD =
+    lineD +
+    ` L ${(padX + (n - 1) * step).toFixed(2)} ${(h - padY).toFixed(2)}` +
+    ` L ${padX.toFixed(2)} ${(h - padY).toFixed(2)} Z`;
 
   return (
-    <div className="space-y-6">
-      {/* Filters row */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-300">Test</span>
-            <select
-              className="min-w-[260px] rounded-md border border-slate-600 bg-slate-900/60 px-3 py-1.5 text-sm text-slate-50"
-              value={selectedTestId}
-              onChange={(e) => setSelectedTestId(e.target.value)}
-            >
-              {tests.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} — {t.slug}
-                  {t.is_default_dashboard ? " (default)" : ""}
-                </option>
-              ))}
-              {!tests.length && <option>No tests available</option>}
-            </select>
-          </div>
+    <div className="w-full">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} role="img" aria-label="Submissions over time">
+        <defs>
+          <linearGradient id="mc-line" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#64bae2" />
+            <stop offset="0.45" stopColor="#8b6cff" />
+            <stop offset="1" stopColor="#2d8fc4" />
+          </linearGradient>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-300">
-              Time range
-            </span>
-            <select
-              className="min-w-[180px] rounded-md border border-slate-600 bg-slate-900/60 px-3 py-1.5 text-sm text-slate-50"
-              value={timeRange}
-              onChange={(e) =>
-                setTimeRange(e.target.value as TimeRangeValue)
-              }
-            >
-              {TIME_RANGE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+          <linearGradient id="mc-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#64bae2" stopOpacity="0.35" />
+            <stop offset="0.65" stopColor="#8b6cff" stopOpacity="0.10" />
+            <stop offset="1" stopColor="#050914" stopOpacity="0" />
+          </linearGradient>
 
-        <button
-          type="button"
-          className="self-start rounded-xl border border-sky-500/70 bg-sky-600/80 px-4 py-2 text-sm font-medium text-white shadow-sm opacity-60"
-          disabled
-        >
-          Manage Test (coming soon)
-        </button>
+          <filter id="mc-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="
+                1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.85 0"
+              result="colored"
+            />
+            <feMerge>
+              <feMergeNode in="colored" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* subtle chart grid */}
+        <g opacity="0.14">
+          {Array.from({ length: 12 }).map((_, i) => {
+            const x = (i / 11) * w;
+            return <line key={`vx-${i}`} x1={x} y1={0} x2={x} y2={h} stroke="white" strokeWidth="1" />;
+          })}
+          {Array.from({ length: 6 }).map((_, i) => {
+            const y = (i / 5) * h;
+            return <line key={`hy-${i}`} x1={0} y1={y} x2={w} y2={y} stroke="white" strokeWidth="1" />;
+          })}
+        </g>
+
+        <path d={areaD} fill="url(#mc-area)" />
+        <path d={lineD} stroke="url(#mc-line)" strokeWidth="6" fill="none" filter="url(#mc-glow)" strokeLinecap="round" />
+        <path d={lineD} stroke="url(#mc-line)" strokeWidth="2.75" fill="none" strokeLinecap="round" />
+      </svg>
+
+      <div className="mt-2 flex justify-between text-[11px] text-white/60">
+        <span>{sorted[0]?.date ?? ""}</span>
+        <span>{sorted[sorted.length - 1]?.date ?? ""}</span>
       </div>
+    </div>
+  );
+}
 
-      {/* Description row */}
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-slate-300">
-          Overview of frequency mix, profile distribution, and usage for your
-          organisation.
-        </p>
-      </div>
+export default function DashboardClient({ orgSlug }: { orgSlug: string }) {
+  const org = orgSlug;
 
-      {/* Metric tiles */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div
-          className="rounded-2xl border border-white/10 p-4 shadow-sm"
-          style={{ backgroundColor: COLORS.tileBg }}
-        >
-          <div className="mb-2 text-xs opacity-70">Overall Average</div>
-          <div className="text-2xl font-semibold text-sky-400">
-            {overall?.average ?? "—"}
-          </div>
+  const now = new Date();
+  const defaultTo = isoToDateInput(now.toISOString());
+  const defaultFrom = isoToDateInput(new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString());
+
+  const [fromDate, setFromDate] = useState<string>(defaultFrom);
+  const [toDate, setToDate] = useState<string>(defaultTo);
+
+  const [testsLoading, setTestsLoading] = useState(false);
+  const [testsErr, setTestsErr] = useState("");
+  const [tests, setTests] = useState<PortalTestsPayload["tests"]>([]);
+  const [selectedTestId, setSelectedTestId] = useState<string>("");
+
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string>("");
+  const [data, setData] = useState<DashboardV2Payload | null>(null);
+
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insights, setInsights] = useState<InsightsPayload["summary"] | null>(null);
+
+  const [selectedToken, setSelectedToken] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerErr, setDrawerErr] = useState<string>("");
+  const [drawerData, setDrawerData] = useState<any>(null);
+
+  const supportRef = useRef<HTMLDivElement>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
+
+  useEffect(() => {
+    if (!supportOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!supportRef.current?.contains(e.target as Node)) setSupportOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSupportOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [supportOpen]);
+
+  const appliedFromIso = useMemo(() => dateInputToIsoStart(fromDate), [fromDate]);
+  const appliedToIso = useMemo(() => dateInputToIsoEnd(toDate), [toDate]);
+
+  async function loadTests() {
+    try {
+      setTestsLoading(true);
+      setTestsErr("");
+      const res = await fetch(`/api/portal-tests?org=${encodeURIComponent(org)}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+
+      const payload = j as PortalTestsPayload;
+      setTests(payload.tests || []);
+
+      if (!selectedTestId) {
+        const def = (payload.tests || []).find((t) => t.is_default_dashboard) || (payload.tests || [])[0] || null;
+        if (def?.id) setSelectedTestId(def.id);
+      }
+    } catch (e: any) {
+      setTestsErr(String(e?.message || e));
+      setTests([]);
+    } finally {
+      setTestsLoading(false);
+    }
+  }
+
+  async function loadMain() {
+    try {
+      setLoading(true);
+      setErr("");
+      setInsights(null);
+
+      const q = new URLSearchParams();
+      q.set("org", org);
+      if (selectedTestId) q.set("testId", selectedTestId);
+      if (appliedFromIso) q.set("from", appliedFromIso);
+      if (appliedToIso) q.set("to", appliedToIso);
+
+      const res = await fetch(`/api/portal-dashboard-v2?${q.toString()}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+      setData(j as DashboardV2Payload);
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadInsights(d: DashboardV2Payload) {
+    try {
+      setInsightsLoading(true);
+
+      const topLink = (d.links || []).slice().sort((a, b) => b.testsTaken - a.testsTaken)[0] || null;
+
+      const payload = {
+        scope: selectedTestId ? "test" : "org",
+        orgId: d.filters.orgId,
+        testId: d.filters.testId,
+        linkToken: null,
+        from: d.filters.from,
+        to: d.filters.to,
+        metrics: {
+          kpis: d.kpis,
+          timeline: d.timeline,
+          topProfiles: topLink?.topProfilesByCount || [],
+          topFrequency: topLink?.topFrequencyByCount || null,
+          topCompanies: [],
+        },
+      };
+
+      const res = await fetch(`/api/portal-dashboard-v2/insights`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+      setInsights((j as InsightsPayload).summary);
+    } catch {
+      setInsights(null);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }
+
+  async function openLink(token: string) {
+    setSelectedToken(token);
+    setDrawerOpen(true);
+    setDrawerLoading(true);
+    setDrawerErr("");
+    setDrawerData(null);
+
+    try {
+      const q = new URLSearchParams();
+      q.set("token", token);
+      if (appliedFromIso) q.set("from", appliedFromIso);
+      if (appliedToIso) q.set("to", appliedToIso);
+
+      const res = await fetch(`/api/portal-dashboard-v2/link?${q.toString()}`, { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
+      setDrawerData(j);
+
+      // link insights (non-blocking)
+      const linkTopProfiles = j?.distributions?.profiles?.slice?.(0, 3) || [];
+      const linkTopFrequency = j?.distributions?.frequencies?.[0] || null;
+      const topCompanies = j?.segments?.companies?.slice?.(0, 5) || [];
+
+      const insightPayload = {
+        scope: "link",
+        orgId: j?.link?.orgId,
+        testId: j?.link?.testId,
+        linkToken: token,
+        from: j?.filters?.from,
+        to: j?.filters?.to,
+        metrics: {
+          kpis: { testsTaken: j?.kpis?.testsTaken ?? 0, submissions: j?.kpis?.testsTaken ?? 0 },
+          timeline: j?.timeline ?? [],
+          topProfiles: linkTopProfiles,
+          topFrequency: linkTopFrequency,
+          topCompanies,
+        },
+      };
+
+      fetch(`/api/portal-dashboard-v2/insights`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(insightPayload),
+      })
+        .then((r) => r.json())
+        .then((jj) => {
+          if (jj?.ok) setDrawerData((prev: any) => ({ ...prev, _insights: jj.summary }));
+        })
+        .catch(() => {});
+    } catch (e: any) {
+      setDrawerErr(String(e?.message || e));
+    } finally {
+      setDrawerLoading(false);
+    }
+  }
+
+  function downloadMainCsv() {
+    const d = data;
+    if (!d?.ok) return;
+
+    const header = [
+      "link_name",
+      "label",
+      "status",
+      "tests_taken",
+      "top_profile_1",
+      "top_profile_1_pct",
+      "top_profile_2",
+      "top_profile_2_pct",
+      "top_profile_3",
+      "top_profile_3_pct",
+      "top_frequency",
+      "top_frequency_pct",
+      "created_at",
+      "expires_at",
+    ];
+
+    const rows = (d.links || []).map((l) => {
+      const topP = l.topProfilesByCount?.slice(0, 3) || [];
+      const p1 = topP[0],
+        p2 = topP[1],
+        p3 = topP[2];
+      const topF = l.topFrequencyByCount;
+
+      return [
+        l.name || "",
+        l.label || "",
+        l.isActive === false ? "inactive" : "active",
+        Math.round(l.testsTaken || 0),
+        p1?.name || "",
+        p1 ? Math.round(clampPct(p1.pct) * 100) : "",
+        p2?.name || "",
+        p2 ? Math.round(clampPct(p2.pct) * 100) : "",
+        p3?.name || "",
+        p3 ? Math.round(clampPct(p3.pct) * 100) : "",
+        topF?.name || "",
+        topF ? Math.round(clampPct(topF.pct) * 100) : "",
+        l.createdAt || "",
+        l.expiresAt || "",
+      ];
+    });
+
+    const filename = `dashboard_links_${org}_${fromDate}_to_${toDate}${selectedTestId ? `_test_${selectedTestId}` : ""}.csv`;
+    downloadCsv(filename, header, rows);
+  }
+
+  // Full analytics route (NO beta, and matches your new folder structure)
+  const fullAnalyticsHref = useMemo(() => {
+    if (!selectedToken) return null;
+    const q = new URLSearchParams();
+    if (selectedTestId) q.set("testId", selectedTestId);
+    if (appliedFromIso) q.set("from", appliedFromIso);
+    if (appliedToIso) q.set("to", appliedToIso);
+    const qs = q.toString();
+    return `/portal/${org}/dashboard/link/${selectedToken}${qs ? `?${qs}` : ""}`;
+  }, [selectedToken, org, selectedTestId, appliedFromIso, appliedToIso]);
+
+  useEffect(() => {
+    loadTests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org]);
+
+  useEffect(() => {
+    loadMain();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org, selectedTestId]);
+
+  useEffect(() => {
+    if (data?.ok) loadInsights(data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.filters?.from, data?.filters?.to, data?.kpis?.submissions, data?.filters?.testId]);
+
+  const links = useMemo(() => data?.links ?? [], [data]);
+
+  const sortedTimeline = useMemo(() => {
+    const t = (data?.timeline ?? []).slice();
+    t.sort((a, b) => (a.date < b.date ? -1 : 1));
+    return t;
+  }, [data]);
+
+  const wowCard =
+    "relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur";
+
+  return (
+    <div className="relative min-h-screen p-6 space-y-6 text-white">
+      <MindCanvasGrid />
+
+      {/* Header */}
+      <div className="relative z-30 rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(900px_260px_at_20%_0%,rgba(100,186,226,0.35),transparent_65%)]" />
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(700px_220px_at_90%_30%,rgba(124,92,255,0.30),transparent_60%)]" />
         </div>
-        <div
-          className="rounded-2xl border border-white/10 p-4 shadow-sm"
-          style={{ backgroundColor: COLORS.tileBg }}
-        >
-          <div className="mb-2 text-xs opacity-70">Total Responses</div>
-          <div className="text-2xl font-semibold text-sky-400">
-            {overall?.count ?? "—"}
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="lg:order-1">
+            <h1 className="text-3xl font-semibold">Dashboard</h1>
+            <p className="text-sm text-white/70">Link analytics console (drill-down + export).</p>
           </div>
-        </div>
-        <div
-          className="rounded-2xl border border-white/10 p-4 shadow-sm"
-          style={{ backgroundColor: COLORS.tileBg }}
-        >
-          <div className="mb-2 text-xs opacity-70">Scope</div>
-          <div className="text-sm font-semibold text-sky-400">
-            {slug}
-            {activeTest ? ` – ${activeTest.name}` : ""}
-          </div>
-        </div>
-      </div>
 
-      {loading && <div className="text-sm opacity-70">Loading data…</div>}
-      {error && <div className="text-sm text-red-400">Error: {error}</div>}
-
-      {/* Charts row */}
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {/* Frequencies – donut */}
-        <div className="rounded-2xl border border-white/10 p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-medium">Frequencies (% of total)</h2>
-            <button
-              className="rounded-md border border-sky-500 px-3 py-1 text-xs text-sky-300 hover:bg-sky-500 hover:text-white transition"
-              disabled={!slug || !freq.length}
-              onClick={() =>
-                downloadCSV(
-                  `frequencies_${slug}_${timeRange}.csv`,
-                  freq
-                )
+          {/* Help links */}
+          <div className="flex items-center gap-2 lg:order-2">
+            <Link
+              href={
+                data?.filters.orgId
+                  ? `/portal/billing?orgId=${encodeURIComponent(data.filters.orgId)}`
+                  : "/portal/billing"
               }
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
             >
-              Download CSV
-            </button>
-          </div>
+              Billing
+            </Link>
 
-          <div className="flex h-60 w-full items-center gap-4">
-            <div className="h-full w-1/2 min-w-[220px]">
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={freqChartData}
-                    dataKey="percentNum"
-                    nameKey="name"
-                    innerRadius="60%"
-                    outerRadius="90%"
-                    stroke="#0f172a"
-                    strokeWidth={2}
-                    fill={COLORS.accent}
-                  >
-                    {freqChartData.map((entry, index) => (
-                      <Cell
-                        key={`freq-slice-${entry.name}-${index}`}
-                        fill={
-                          FREQ_SEGMENT_COLORS[
-                            index % FREQ_SEGMENT_COLORS.length
-                          ]
-                        }
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#020617",
-                      border:
-                        "1px solid rgba(148,163,184,0.6)",
-                      borderRadius: 8,
-                      color: "#e5e7eb",
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: "#e5e7eb" }}
-                    formatter={((value: any) => [
-                      `${value}%`,
-                      "Share",
-                    ]) as any}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Legend */}
-            <div className="flex-1">
-              <ul className="space-y-1 text-sm">
-                {freqChartData.map((f, idx) => (
-                  <li
-                    key={f.name}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-full"
-                        style={{
-                          backgroundColor:
-                            FREQ_SEGMENT_COLORS[
-                              idx % FREQ_SEGMENT_COLORS.length
-                            ],
-                        }}
-                      />
-                      <span>{f.name}</span>
-                    </span>
-                    <span className="font-medium">
-                      {f.percentNum.toFixed(1)}%
-                    </span>
-                  </li>
-                ))}
-                {!freqChartData.length && (
-                  <li className="text-xs text-slate-400">
-                    No frequency data available yet.
-                  </li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Profiles – bar chart */}
-        <div className="rounded-2xl border border-white/10 p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-medium">Profiles (% of total)</h2>
-            <button
-              className="rounded-md border border-sky-500 px-3 py-1 text-xs text-sky-300 hover:bg-sky-500 hover:text-white transition"
-              disabled={!slug || !prof.length}
-              onClick={() =>
-                downloadCSV(
-                  `profiles_${slug}_${timeRange}.csv`,
-                  prof
-                )
-              }
+            <a
+              href="https://community.profiletest.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
             >
-              Download CSV
-            </button>
-          </div>
+              Community ↗
+            </a>
 
-          <div className="h-72 w-full">
-            <ResponsiveContainer>
-              <BarChart
-                data={profChartData}
-                layout="vertical"
-                margin={{ left: 80, right: 32, top: 12, bottom: 12 }}
+            <div className="relative" ref={supportRef}>
+              <button
+                type="button"
+                onClick={() => setSupportOpen((v) => !v)}
+                aria-expanded={supportOpen}
+                aria-haspopup="dialog"
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#1e293b"
-                />
-                <XAxis
-                  type="number"
-                  domain={[0, 100]}
-                  tickFormatter={(v: number) => `${v}%`}
-                  stroke="#64748b"
-                  tick={{ fontSize: 11 }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={90}
-                  stroke="#64748b"
-                  tick={{ fontSize: 11 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#020617",
-                    border:
-                      "1px solid rgba(148,163,184,0.6)",
-                    borderRadius: 8,
-                    color: "#e5e7eb",
-                    fontSize: 12,
-                  }}
-                  labelStyle={{ color: "#e5e7eb" }}
-                  formatter={((value: any) =>
-                    `${value}%`) as any}
-                />
-                <Bar
-                  dataKey="percentNum"
-                  radius={[6, 6, 6, 6]}
-                  fill={COLORS.accent}
+                Support
+              </button>
+
+              {supportOpen && (
+                <div
+                  role="dialog"
+                  className="absolute right-0 z-40 mt-2 w-80 rounded-2xl border border-white/10 bg-[#0a1422]/95 p-4 text-sm text-white shadow-xl backdrop-blur"
                 >
-                  <LabelList
-                    dataKey="percentNum"
-                    position="right"
-                    className="fill-slate-100"
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <div className="font-semibold">How do you get help?</div>
+                  <p className="mt-2 text-white/75">
+                    You can always email{" "}
+                    <a className="underline" href="mailto:support@profiletest.ai">
+                      support@profiletest.ai
+                    </a>{" "}
+                    for support. In emergencies or technical support use{" "}
+                    <a className="underline" href="mailto:sos@profiletest.ai">
+                      sos@profiletest.ai
+                    </a>
+                    .
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a
+                      href="mailto:support@profiletest.ai"
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs hover:bg-white/10"
+                    >
+                      support@profiletest.ai
+                    </a>
+                    <a
+                      href="mailto:sos@profiletest.ai"
+                      className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs text-amber-100 hover:bg-amber-400/20"
+                    >
+                      sos@profiletest.ai (emergency)
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-end lg:order-3">
+            <div className="min-w-[240px]">
+              <label className="block text-xs text-white/60 mb-1">Test</label>
+              <select
+                value={selectedTestId}
+                onChange={(e) => setSelectedTestId(e.target.value)}
+                className="h-10 w-full rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+              >
+                <option value="">All tests</option>
+                {tests.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {testsLoading ? <div className="mt-1 text-xs text-white/50">Loading tests…</div> : null}
+              {testsErr ? <div className="mt-1 text-xs text-red-300">Tests error: {testsErr}</div> : null}
+            </div>
+
+            <div>
+              <label className="block text-xs text-white/60 mb-1">From</label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-white/60 mb-1">To</label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="h-10 rounded-xl bg-white/10 border border-white/10 px-3 text-sm text-white outline-none"
+              />
+            </div>
+
+            <button onClick={loadMain} className="h-10 rounded-xl bg-white text-black px-4 text-sm font-medium hover:bg-white/90">
+              Apply
+            </button>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Top / Bottom 3 */}
-      {(top3.length || bottom3.length) && (
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div
-            className="rounded-2xl border border-white/10 p-4 shadow-sm"
-            style={{ backgroundColor: COLORS.tileBg }}
-          >
-            <h3 className="mb-2 text-base font-medium text-sky-300">
-              Top 3 Profiles
-            </h3>
-            <ul className="space-y-1 text-sm">
-              {top3.map((t) => (
-                <li
-                  key={t.key}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span>{t.key}</span>
-                  <span className="font-semibold">
-                    {t.percent ?? `${t.value}`}
-                  </span>
-                </li>
-              ))}
-              {!top3.length && (
-                <li className="text-xs text-slate-400">
-                  No profile data available yet.
-                </li>
-              )}
-            </ul>
+      <BillingSummaryCard orgId={data?.filters.orgId ?? null} />
+
+      {loading && <div className="text-white/70">Loading…</div>}
+      {err && <div className="text-red-300">Error: {err}</div>}
+
+      {!loading && !err && data?.ok && (
+        <>
+          {/* KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={wowCard}>
+              <div className="text-xs text-white/60">Submissions</div>
+              <div className="text-5xl font-semibold mt-2">{fmtNum(data.kpis.submissions)}</div>
+              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mt-3 text-xs text-white/55">Total across selected range</div>
+            </div>
+
+            <div className={wowCard}>
+              <div className="text-xs text-white/60">Unique takers</div>
+              <div className="text-5xl font-semibold mt-2">{fmtNum(data.kpis.uniqueTakers)}</div>
+              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mt-3 text-xs text-white/55">
+                {data.kpis.uniqueTakers != null && data.kpis.submissions
+                  ? `${fmtPct(data.kpis.uniqueTakers / data.kpis.submissions)} unique`
+                  : "—"}
+              </div>
+            </div>
+
+            <div className={wowCard}>
+              <div className="text-xs text-white/60">Active links</div>
+              <div className="text-5xl font-semibold mt-2">{fmtNum(data.kpis.activeLinks)}</div>
+              <div className="mt-4 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <div className="mt-3 text-xs text-white/55">Currently usable links</div>
+            </div>
           </div>
 
-          <div
-            className="rounded-2xl border border-white/10 p-4 shadow-sm"
-            style={{ backgroundColor: COLORS.tileBg }}
-          >
-            <h3 className="mb-2 text-base font-medium text-sky-300">
-              Bottom 3 Profiles
-            </h3>
-            <ul className="space-y-1 text-sm">
-              {bottom3.map((b) => (
-                <li
-                  key={b.key}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span>{b.key}</span>
-                  <span className="font-semibold">
-                    {b.percent ?? `${b.value}`}
-                  </span>
-                </li>
-              ))}
-              {!bottom3.length && (
-                <li className="text-xs text-slate-400">
-                  No profile data available yet.
-                </li>
-              )}
-            </ul>
+          {/* Timeline + Insights */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className={`${wowCard} lg:col-span-2`}>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-semibold text-lg">Submissions over time</h2>
+                  <div className="text-xs text-white/50 mt-1">
+                    {data.filters.from ? isoToDateInput(data.filters.from) : ""} to {data.filters.to ? isoToDateInput(data.filters.to) : ""}
+                  </div>
+                </div>
+                <div className="text-xs text-white/50 rounded-full border border-white/10 bg-white/5 px-3 py-1">Neon</div>
+              </div>
+
+              <div className="mt-4">
+                {sortedTimeline.length ? <SparklineGlow data={sortedTimeline} height={130} /> : <div className="text-sm text-white/60">No activity in this range.</div>}
+              </div>
+            </div>
+
+            <div className={wowCard}>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-lg">Insights</h2>
+                {insightsLoading ? <span className="text-xs text-white/50">Generating…</span> : null}
+              </div>
+
+              {!insights && !insightsLoading ? (
+                <div className="mt-3 text-sm text-white/60">Insights unavailable (non-blocking). Dashboard data is still valid.</div>
+              ) : null}
+
+              {insights ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  <div className="text-xs text-white/50">
+                    Confidence: <span className="font-medium text-white/80">{insights.confidence.level}</span> · n={fmtNum(insights.confidence.sampleSize)}
+                  </div>
+
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-1">What you’re seeing</div>
+                    <ul className="list-disc pl-5 space-y-1 text-white/85">
+                      {insights.whatYoureSeeing.slice(0, 4).map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Recommended next steps</div>
+                    <ul className="list-disc pl-5 space-y-1 text-white/85">
+                      {insights.recommendedNextSteps.slice(0, 3).map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
-        </section>
+
+          {/* Links */}
+          <div className={wowCard}>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Links</h2>
+                <p className="text-sm text-white/60">Click a link to drill down into link-level insights + segmentation.</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={downloadMainCsv}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+                  title="Download link table as CSV"
+                >
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {links.map((l) => {
+                const topP = l.topProfilesByCount?.slice(0, 3) || [];
+                const topF = l.topFrequencyByCount;
+
+                return (
+                  <button
+                    key={l.linkId}
+                    onClick={() => openLink(l.token)}
+                    className="w-full text-left rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] transition px-4 py-4"
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold truncate">{l.name || l.label || "Untitled link"}</div>
+                          <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${badgeClass(l.isActive)}`}>
+                            {l.isActive === false ? "Inactive" : "Active"}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-white/50 mt-1">
+                          Created {fmtDateTime(l.createdAt)} · Expires {fmtDateTime(l.expiresAt)}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-xs text-white/60">Tests</div>
+                        <div className="text-2xl font-semibold">{fmtNum(l.testsTaken)}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {topF ? (
+                        <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs">
+                          Top freq <span className="ml-2 text-white/85">{topF.name}</span>
+                          <span className="ml-2 text-white/50">{fmtPct(topF.pct)}</span>
+                        </span>
+                      ) : null}
+
+                      {topP.map((p) => (
+                        <span key={p.code} className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs">
+                          {p.name} <span className="ml-2 text-white/50">{fmtPct(p.pct)}</span>
+                        </span>
+                      ))}
+
+                      {!topP.length && !topF ? <span className="text-white/50 text-sm">—</span> : null}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Drawer */}
+          {drawerOpen && (
+            <div className="fixed inset-0 z-50">
+              <div
+                className="absolute inset-0 bg-black/60"
+                onClick={() => {
+                  setDrawerOpen(false);
+                  setSelectedToken(null);
+                  setDrawerData(null);
+                }}
+              />
+
+              <div className="absolute right-0 top-0 h-full w-full max-w-[600px] bg-[#050914] border-l border-white/10 p-5 overflow-y-auto">
+                {/* local grid + glow */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 opacity-25"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)",
+                    backgroundSize: "64px 64px",
+                    maskImage: "radial-gradient(circle at 30% 10%, black 0%, transparent 70%)",
+                  }}
+                />
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -top-40 left-1/2 h-[80vh] w-[120vw] -translate-x-1/2 blur-3xl opacity-30"
+                  style={{
+                    background:
+                      "radial-gradient(60% 40% at 50% 0%, rgba(100,186,226,.35), transparent 60%), radial-gradient(45% 35% at 20% 10%, rgba(139,108,255,.25), transparent 55%)",
+                  }}
+                />
+
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs text-white/50">Link deep dive</div>
+                      <div className="text-lg font-semibold truncate">{drawerData?.link?.name || drawerData?.link?.label || "Untitled link"}</div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      {fullAnalyticsHref ? (
+                        <Link
+                          href={fullAnalyticsHref}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                          title="Open full analytics page"
+                        >
+                          Open full analytics
+                        </Link>
+                      ) : null}
+
+                      <button
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          setSelectedToken(null);
+                          setDrawerData(null);
+                        }}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+
+                  {drawerLoading && <div className="mt-4 text-white/70">Loading link analytics…</div>}
+                  {drawerErr && <div className="mt-4 text-red-300">Error: {drawerErr}</div>}
+
+                  {!drawerLoading && !drawerErr && drawerData?.ok && (
+                    <div className="mt-5 space-y-4">
+                      {/* KPIs */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                          <div className="text-xs text-white/60">Tests taken</div>
+                          <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.testsTaken)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                          <div className="text-xs text-white/60">Unique takers</div>
+                          <div className="text-2xl font-semibold mt-1">{fmtNum(drawerData?.kpis?.uniqueTakers)}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                          <div className="text-xs text-white/60">Last used</div>
+                          <div className="text-xs text-white/80 mt-2">{fmtDateTime(drawerData?.kpis?.lastUsedAt)}</div>
+                        </div>
+                      </div>
+
+                      {/* Insights */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">Insights</h3>
+                          {drawerData?._insights?.confidence ? (
+                            <div className="text-xs text-white/50">
+                              {drawerData._insights.confidence.level} · n={fmtNum(drawerData._insights.confidence.sampleSize)}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {drawerData?._insights ? (
+                          <div className="mt-3 text-sm">
+                            <ul className="list-disc pl-5 space-y-1 text-white/85">
+                              {(drawerData._insights.whatYoureSeeing || []).slice(0, 4).map((s: string, i: number) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="mt-3 text-sm text-white/60">Generating link insights…</div>
+                        )}
+                      </div>
+
+                      {/* Top profiles */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <h3 className="font-semibold">Top profiles</h3>
+                        <div className="mt-3 space-y-2">
+                          {(drawerData?.distributions?.profiles || []).slice(0, 10).map((p: any) => (
+                            <div key={p.code} className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{p.name}</div>
+                                <div className="text-xs text-white/50">
+                                  {fmtNum(p.count)} · {fmtPct(p.pct)}
+                                </div>
+                              </div>
+                              <div className="text-xs text-white/70">avg {fmtNum(p.avgPoints || 0)}</div>
+                            </div>
+                          ))}
+                          {!((drawerData?.distributions?.profiles || []).length) ? (
+                            <div className="text-sm text-white/60">No profile data.</div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Top frequencies */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <h3 className="font-semibold">Top frequencies</h3>
+                        <div className="mt-3 space-y-2">
+                          {(drawerData?.distributions?.frequencies || []).slice(0, 8).map((f: any) => (
+                            <div key={f.code} className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium truncate">{f.name}</div>
+                                <div className="text-xs text-white/50">
+                                  {fmtNum(f.count)} · {fmtPct(f.pct)}
+                                </div>
+                              </div>
+                              <div className="text-xs text-white/70">avg {fmtNum(f.avgPoints || 0)}</div>
+                            </div>
+                          ))}
+                          {!((drawerData?.distributions?.frequencies || []).length) ? (
+                            <div className="text-sm text-white/60">No frequency data.</div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Top companies */}
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
+                        <h3 className="font-semibold">Top companies</h3>
+                        <div className="mt-3 space-y-2">
+                          {(drawerData?.segments?.companies || []).length ? (
+                            (drawerData.segments.companies || []).slice(0, 12).map((c: any) => (
+                              <div key={c.company} className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="font-medium truncate">{c.company}</div>
+                                  <div className="text-xs text-white/50">
+                                    {fmtNum(c.testsTaken)} · {fmtPct(c.pct)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-sm text-white/60">No company data captured for this link.</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-white/50">
+                        Full exports (including takers) live on the full analytics page.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

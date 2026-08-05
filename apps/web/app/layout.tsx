@@ -2,6 +2,7 @@ import "./globals.css";
 import "../styles/branding.css";
 import type { ReactNode } from "react";
 import { Inter, Manrope } from "next/font/google";
+import "./pdf-print.css";
 
 /** Inter = main UI font, Manrope = optional accent via CSS variable */
 const inter = Inter({
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${manrope.variable}`}>
       {/* Make Inter the default font everywhere */}
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className} suppressHydrationWarning>{children}</body>
     </html>
   );
 }

@@ -1,15 +1,26 @@
 // apps/web/app/portal/[slug]/layout.tsx
 import "server-only";
-import { ReactNode } from "react";
-import { createClient } from "@supabase/supabase-js";
-import BackgroundGrid from "@/components/ui/BackgroundGrid";
+
+import type { CSSProperties, ReactNode } from "react";
+
+import { getStripeMode } from "@/app/_lib/billing";
+import { getAdminClient } from "@/app/_lib/portal";
+import LegacyBillingCheckoutModal from "@/components/billing/LegacyBillingCheckoutModal";
 import PortalChrome from "@/components/portal/PortalChrome";
+import BackgroundGrid from "@/components/ui/BackgroundGrid";
+
+import PilotGracePopup from "./PilotGracePopup";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type RouteParams = {
+  slug: string;
+};
+
 type Org = {
+  id: string;
   slug: string;
   name: string;
   brand_name?: string | null;
@@ -22,27 +33,125 @@ type Org = {
   logo_url?: string | null;
 };
 
+type BillingAccount = {
+  id: string;
+  org_id: string;
+  stripe_status: string | null;
+  billing_source: string;
+  billing_required_from: string | null;
+};
+
 async function loadOrg(slug: string): Promise<Org | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  try {
+    const admin = await getAdminClient();
 
-  if (!url || !key) return null;
+    const { data, error } = await admin
+      .schema("portal")
+      .from("orgs")
+      .select("id, slug, name")
+      .eq("slug", slug)
+      .maybeSingle();
 
-  const sb = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+    if (error || !data) {
+      console.error("[portal-layout] Unable to load organisation:", {
+        slug,
+        error,
+      });
 
-  const { data, error } = await sb
-    .schema("portal")
-    .from("orgs")
-    .select(
-      "slug,name,brand_name,brand_primary,brand_secondary,brand_accent,brand_text,report_font_family,report_font_size,logo_url"
-    )
-    .eq("slug", slug)
-    .maybeSingle();
+      return null;
+    }
 
-  if (error) return null;
-  return (data as Org) ?? null;
+    return data as unknown as Org;
+  } catch (error) {
+    console.error("[portal-layout] Organisation lookup failed:", {
+      slug,
+      error,
+    });
+
+    return null;
+  }
+}
+
+async function requiresLegacyBilling(org: Org): Promise<boolean> {
+  try {
+    const admin = await getAdminClient();
+
+    const { data, error } = await admin
+      .schema("portal")
+      .from("billing_accounts")
+      .select(
+        [
+          "id",
+          "org_id",
+          "stripe_status",
+          "billing_source",
+          "billing_required_from",
+        ].join(","),
+      )
+      .eq("org_id", org.id)
+      .eq("billing_type", "owner")
+      .eq("billing_source", "legacy")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[portal-layout] Unable to load legacy billing account:", {
+        orgId: org.id,
+        slug: org.slug,
+        error,
+      });
+
+      return false;
+    }
+
+    if (!data) {
+      return false;
+    }
+
+    const billingAccount = data as unknown as BillingAccount;
+
+    if (billingAccount.billing_required_from) {
+      const requiredFrom = Date.parse(billingAccount.billing_required_from);
+
+      if (!Number.isNaN(requiredFrom) && requiredFrom > Date.now()) {
+        return false;
+      }
+    }
+
+    const stripeStatus =
+      billingAccount.stripe_status?.trim().toLowerCase() ?? "";
+
+    const subscriptionIsActive =
+      stripeStatus === "active" || stripeStatus === "trialing";
+
+    return !subscriptionIsActive;
+  } catch (error) {
+    console.error("[portal-layout] Legacy billing check failed:", {
+      orgId: org.id,
+      slug: org.slug,
+      error,
+    });
+
+    return false;
+  }
+}
+
+function getStripePublishableKey(): string {
+  const stripeMode = getStripeMode();
+
+  if (stripeMode === "live") {
+    return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+  }
+
+  return (
+    process.env.NEXT_PUBLIC_SANDBOX_STRIPE_PUBLISHABLE_KEY ??
+    process.env.SANDBOX_STRIPE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ??
+    ""
+  );
 }
 
 export default async function OrgLayout({
@@ -50,41 +159,63 @@ export default async function OrgLayout({
   params,
 }: {
   children: ReactNode;
-  params: { slug: string };
+  params: Promise<RouteParams>;
 }) {
-  const org = await loadOrg(params.slug);
+  const { slug } = await params;
 
-  // ✅ Put your brand variables on a wrapping div (NOT <html>)
-  const vars: Record<string, string> = {
+  const org = await loadOrg(slug);
+
+  const mustCompleteLegacyBilling = org
+    ? await requiresLegacyBilling(org)
+    : false;
+
+  const brandVariables = {
     "--brand-primary": org?.brand_primary ?? "#2d8fc4",
     "--brand-secondary": org?.brand_secondary ?? "#015a8b",
     "--brand-accent": org?.brand_accent ?? "#64bae2",
     "--brand-text": org?.brand_text ?? "#111827",
     "--report-font-family": org?.report_font_family ?? "Inter, sans-serif",
     "--report-font-size": org?.report_font_size ?? "14px",
-  };
+  } as CSSProperties;
+
+  if (mustCompleteLegacyBilling) {
+    return (
+      <div
+        style={brandVariables}
+        className="relative min-h-screen overflow-x-hidden bg-[#020914] text-white"
+      >
+        <BackgroundGrid />
+
+        <LegacyBillingCheckoutModal
+          publishableKey={getStripePublishableKey()}
+          organisationName={org?.brand_name ?? org?.name ?? slug}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
-      style={vars as any}
-      className="relative min-h-screen bg-[#050914] text-white overflow-x-hidden"
+      style={brandVariables}
+      className="relative min-h-screen overflow-x-hidden bg-[#050914] text-white"
     >
-      {/* 🔵 MindCanvas dark grid background */}
       <BackgroundGrid />
 
-      {/* Portal nav + content */}
       <div
         className="relative z-10"
-        style={{ fontFamily: "var(--report-font-family)" }}
+        style={{
+          fontFamily: "var(--report-font-family)",
+        }}
       >
         <PortalChrome
-          orgSlug={params.slug}
-          orgName={org?.brand_name ?? org?.name ?? params.slug}
+          orgSlug={slug}
+          orgName={org?.brand_name ?? org?.name ?? slug}
         >
           {children}
         </PortalChrome>
       </div>
+
+      <PilotGracePopup />
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 // apps/web/app/portal/[slug]/database/page.tsx
 // Server component — Database list for /portal/[slug]/database
-// Simple, robust list with search, test filter, sort + CSV export.
+// Robust list with search, test filter, purpose filter, sort + CSV export.
 
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
@@ -24,6 +24,7 @@ type Row = {
   company: string;
   testName: string;
   testPurpose: string;
+  testStatus: "Completed" | "Incomplete";
   created: string;
 };
 
@@ -49,7 +50,7 @@ export default async function DatabasePage({
       throw new Error(orgErr?.message || "Organisation not found");
     }
 
-    const q = (searchParams.q || "").trim().toLowerCase();
+    const q = (searchParams.q || "").trim();
     const selectedTestId = (searchParams.testId || "").trim();
     const selectedPurpose = (searchParams.purpose || "").trim();
     const sortKey = (searchParams.sort || "created_desc") as
@@ -105,7 +106,7 @@ export default async function DatabasePage({
     );
 
     // --- 4) Build base taker query ----------------------------------------
-    let orderColumn = "created_at";
+    let orderColumn: "created_at" | "company" = "created_at";
     let ascending = false;
 
     if (sortKey === "created_asc") {
@@ -122,45 +123,53 @@ export default async function DatabasePage({
     let takerQuery = sb
       .from("test_takers")
       .select(
-        "id, first_name, last_name, email, company, created_at, test_id, link_token",
-        { count: "exact" }
+        "id, first_name, last_name, email, company, created_at, test_id, link_token, status",
+        { count: "exact" },
       )
       .eq("org_id", org.id)
-      .order(orderColumn, { ascending });
+      .order(orderColumn, { ascending })
+      .order("id", { ascending });
 
     if (selectedTestId) {
       takerQuery = takerQuery.eq("test_id", selectedTestId);
     }
 
-    const { data: takers, error: tkErr } = await takerQuery.range(from, to);
+    // Push search into DB so pagination works correctly
+    if (q) {
+      const safeQ = q.replace(/[%_,]/g, " ").trim();
+      if (safeQ) {
+        takerQuery = takerQuery.or(
+          [
+            `first_name.ilike.%${safeQ}%`,
+            `last_name.ilike.%${safeQ}%`,
+            `email.ilike.%${safeQ}%`,
+            `company.ilike.%${safeQ}%`,
+          ].join(","),
+        );
+      }
+    }
+
+    // Push purpose filter into DB via matching link tokens
+    if (selectedPurpose) {
+      const matchingTokens = (linkRows ?? [])
+        .filter((r: any) => ((r.name || "").trim() === selectedPurpose))
+        .map((r: any) => (r.token || "").trim())
+        .filter(Boolean);
+
+      if (matchingTokens.length === 0) {
+        takerQuery = takerQuery.in("link_token", ["__no_match__"]);
+      } else {
+        takerQuery = takerQuery.in("link_token", matchingTokens);
+      }
+    }
+
+    const { data: takers, error: tkErr, count } = await takerQuery.range(
+      from,
+      to,
+    );
     if (tkErr) throw new Error(tkErr.message);
 
-    // --- 5) In-memory search + purpose filter -----------------------------
-    const filtered = (takers ?? []).filter((t: any) => {
-      // Free-text search
-      if (q) {
-        const name = [t.first_name, t.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        const email = (t.email || "").toLowerCase();
-        const company = (t.company || "").toLowerCase();
-        const matchesSearch =
-          name.includes(q) || email.includes(q) || company.includes(q);
-        if (!matchesSearch) return false;
-      }
-
-      // Purpose filter (based on link_token -> name)
-      if (selectedPurpose) {
-        const linkToken = (t.link_token || "").trim();
-        const purpose = (linkNameByToken.get(linkToken) || "").trim();
-        if (purpose !== selectedPurpose) return false;
-      }
-
-      return true;
-    });
-
-    const rows: Row[] = filtered.map((t: any) => {
+    const rows: Row[] = (takers ?? []).map((t: any) => {
       const linkToken = (t.link_token || "").trim();
       const testPurpose = linkNameByToken.get(linkToken) || "—";
 
@@ -173,29 +182,37 @@ export default async function DatabasePage({
         company: t.company || "—",
         testName: testNameById.get(t.test_id) || "—",
         testPurpose,
+        testStatus:
+          String(t.status || "").toLowerCase() === "completed"
+            ? "Completed"
+            : "Incomplete",
         created: t.created_at
           ? new Date(t.created_at as any).toISOString().slice(0, 10)
           : "—",
       };
     });
 
-    const hasNext = filtered.length > pageSize;
+    const totalCount = count ?? 0;
+    const hasPrev = page > 1;
+    const hasNext = page * pageSize < totalCount;
 
-    // SAFE helper to build URLs from filters (no spreading searchParams)
+    // SAFE helper to build URLs from filters
     const buildHref = (extra: Partial<SearchParams>) => {
+      const nextQ = extra.q !== undefined ? extra.q : q;
+      const nextTestId =
+        extra.testId !== undefined ? extra.testId : selectedTestId;
+      const nextPurpose =
+        extra.purpose !== undefined ? extra.purpose : selectedPurpose;
+      const nextSort = extra.sort !== undefined ? extra.sort : sortKey;
+      const nextPage = extra.page !== undefined ? extra.page : String(page);
+
       const usp = new URLSearchParams();
-      if (q) usp.set("q", q);
-      if (selectedTestId) usp.set("testId", selectedTestId);
-      if (selectedPurpose) usp.set("purpose", selectedPurpose);
-      if (sortKey) usp.set("sort", sortKey);
 
-      const newPage = extra.page || String(page);
-      usp.set("page", newPage);
-
-      if (extra.q !== undefined) usp.set("q", extra.q);
-      if (extra.testId !== undefined) usp.set("testId", extra.testId);
-      if (extra.purpose !== undefined) usp.set("purpose", extra.purpose);
-      if (extra.sort !== undefined) usp.set("sort", extra.sort);
+      if (nextQ) usp.set("q", nextQ);
+      if (nextTestId) usp.set("testId", nextTestId);
+      if (nextPurpose) usp.set("purpose", nextPurpose);
+      if (nextSort) usp.set("sort", nextSort);
+      if (nextPage) usp.set("page", nextPage);
 
       const qs = usp.toString();
       return `/portal/${slug}/database${qs ? `?${qs}` : ""}`;
@@ -210,10 +227,11 @@ export default async function DatabasePage({
             <input type="hidden" name="org" value={slug} />
             <input type="hidden" name="q" value={q} />
             <input type="hidden" name="testId" value={selectedTestId} />
-            {/* CSV export still filters by test + search; we can add purpose later if needed */}
+            <input type="hidden" name="purpose" value={selectedPurpose} />
+            <input type="hidden" name="sort" value={sortKey} />
             <button
               type="submit"
-              className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition"
+              className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-slate-100 transition hover:bg-white/10"
             >
               Download CSV
             </button>
@@ -226,7 +244,6 @@ export default async function DatabasePage({
           action={`/portal/${slug}/database`}
           method="GET"
         >
-          {/* search */}
           <input
             name="q"
             defaultValue={searchParams.q || ""}
@@ -234,7 +251,6 @@ export default async function DatabasePage({
             className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
           />
 
-          {/* test filter (by base test) */}
           <select
             name="testId"
             defaultValue={selectedTestId}
@@ -248,7 +264,6 @@ export default async function DatabasePage({
             ))}
           </select>
 
-          {/* purpose filter */}
           <select
             name="purpose"
             defaultValue={selectedPurpose}
@@ -262,7 +277,6 @@ export default async function DatabasePage({
             ))}
           </select>
 
-          {/* sort */}
           <select
             name="sort"
             defaultValue={sortKey}
@@ -275,7 +289,7 @@ export default async function DatabasePage({
           </select>
 
           <button
-            className="rounded-xl border border-white/20 bg.white/5 px-4 py-2 text-sm text-slate-100 hover:bg-white/10 transition"
+            className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-slate-100 transition hover:bg-white/10"
             type="submit"
           >
             Apply
@@ -283,7 +297,7 @@ export default async function DatabasePage({
         </form>
 
         {/* White data card */}
-        <div className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-lg overflow-hidden">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-lg">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-100">
               <tr>
@@ -301,6 +315,9 @@ export default async function DatabasePage({
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Test name / purpose
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Test status
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Created
@@ -325,9 +342,18 @@ export default async function DatabasePage({
                   <td className="px-4 py-2">{r.company}</td>
                   <td className="px-4 py-2">{r.testName}</td>
                   <td className="px-4 py-2">{r.testPurpose}</td>
-                  <td className="px-4 py-2 whitespace-nowrap">
-                    {r.created}
+                  <td className="px-4 py-2">
+                    <span
+                      className={
+                        r.testStatus === "Completed"
+                          ? "inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
+                          : "inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700"
+                      }
+                    >
+                      {r.testStatus}
+                    </span>
                   </td>
+                  <td className="whitespace-nowrap px-4 py-2">{r.created}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-col gap-1">
                       <TestTakerEmailActions
@@ -337,7 +363,7 @@ export default async function DatabasePage({
                         compact
                       />
                       <Link
-                        className="text-[11px] text-sky-700 hover:text-sky-900 underline"
+                        className="text-[11px] text-sky-700 underline hover:text-sky-900"
                         href={`/portal/${slug}/database/${r.id}`}
                       >
                         View profile
@@ -346,11 +372,12 @@ export default async function DatabasePage({
                   </td>
                 </tr>
               ))}
+
               {rows.length === 0 && (
                 <tr>
                   <td
                     className="px-4 py-6 text-center text-slate-500"
-                    colSpan={7}
+                    colSpan={8}
                   >
                     No test takers found.
                   </td>
@@ -362,30 +389,44 @@ export default async function DatabasePage({
 
         {/* Pagination */}
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-300">Page {page}</span>
+          <span className="text-slate-300">
+            Page {page}
+            {totalCount > 0 ? ` · ${totalCount} total` : ""}
+          </span>
+
           <div className="flex gap-2">
-            <Link
-              href={buildHref({ page: String(Math.max(1, page - 1)) })}
-              className="rounded-xl border border-white/20 bg-white/5 px-3 py-1 hover:bg-white/10 transition"
-            >
-              Prev
-            </Link>
-            <Link
-              href={buildHref({
-                page: String(hasNext ? page + 1 : page),
-              })}
-              className="rounded-xl border border-white/20 bg-white/5 px-3 py-1 hover:bg-white/10 transition"
-            >
-              Next
-            </Link>
+            {hasPrev ? (
+              <Link
+                href={buildHref({ page: String(page - 1) })}
+                className="rounded-xl border border-white/20 bg-white/5 px-3 py-1 transition hover:bg-white/10"
+              >
+                Prev
+              </Link>
+            ) : (
+              <span className="cursor-not-allowed rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-slate-500">
+                Prev
+              </span>
+            )}
+
+            {hasNext ? (
+              <Link
+                href={buildHref({ page: String(page + 1) })}
+                className="rounded-xl border border-white/20 bg-white/5 px-3 py-1 transition hover:bg-white/10"
+              >
+                Next
+              </Link>
+            ) : (
+              <span className="cursor-not-allowed rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-slate-500">
+                Next
+              </span>
+            )}
           </div>
         </div>
       </div>
     );
   } catch (err: any) {
-    // Fallback so the route never hard-crashes
     return (
-      <div className="p-6 space-y-3 text-red-200">
+      <div className="space-y-3 p-6 text-red-200">
         <h1 className="text-xl font-semibold">Database page error</h1>
         <p className="text-sm">
           Something went wrong while loading the database view.
@@ -397,5 +438,3 @@ export default async function DatabasePage({
     );
   }
 }
-
-

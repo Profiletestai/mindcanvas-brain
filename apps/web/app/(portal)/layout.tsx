@@ -21,7 +21,7 @@ return (
 </Card>
 </main>
 <footer className="mc-container py-8 text-sm text-[hsl(var(--mc-subtle))]">
-© {new Date().getFullYear()} MindCanvas — Profiletest.ai
+© {new Date().getFullYear()} Powered by Profiletest.ai
 </footer>
 </div>
 )

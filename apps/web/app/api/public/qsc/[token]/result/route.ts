@@ -67,6 +67,14 @@ type TestMetaRow = {
   meta: any | null;
 };
 
+type LinkMeta = {
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  next_steps_url?: string | null;
+  email_report?: boolean | null;
+};
+
 function supa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key =
@@ -113,6 +121,32 @@ function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
 }
 
+function applyAudienceFilter(q: any, audienceHint: Audience | null) {
+  if (audienceHint === "entrepreneur") {
+    return q.or("audience.eq.entrepreneur,audience.is.null");
+  }
+  if (audienceHint === "leader") {
+    return q.or("audience.eq.leader,audience.is.null");
+  }
+  return q;
+}
+
+async function loadLinkMetaByToken(
+  sb: ReturnType<typeof supa>,
+  token: string
+): Promise<LinkMeta | null> {
+  const { data, error } = await sb
+    .from("test_links")
+    .select(
+      "show_results, redirect_url, hidden_results_message, next_steps_url, email_report"
+    )
+    .eq("token", token)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as LinkMeta;
+}
+
 /**
  * Resolve wrapper test_id -> canonical content test_id (global fix)
  * Wrapper identified by tests.meta.wrapper === true
@@ -151,7 +185,6 @@ async function resolveContentTestId(
       ? meta.default_source_test
       : null;
 
-  // ✅ Your wrappers often ONLY have default_source_test — handle that first.
   if (defaultSource && isUuidLike(defaultSource)) {
     return { contentTestId: defaultSource, resolvedBy: "meta.default_source_test" };
   }
@@ -184,7 +217,7 @@ async function resolveContentTestId(
 }
 
 /**
- * Resolve persona code A1..D5 even when combined_profile_code is e.g. FLOW_ORBIT
+ * Resolve persona_code A1..D5 even when combined_profile_code is e.g. FLOW_ORBIT
  * This is ONLY for debugging / compatibility; the real persona lookup below uses:
  *   personality_code (A/B/C/D) + mindset_level (1..5)
  */
@@ -196,7 +229,6 @@ function resolvePersonaCode(args: {
 
   const combinedRaw = String(resultRow.combined_profile_code || "").trim();
 
-  // (1) already A1..D5
   if (looksLikePersonaCode(combinedRaw)) {
     return {
       personaCode: combinedRaw.toUpperCase(),
@@ -204,7 +236,6 @@ function resolvePersonaCode(args: {
     };
   }
 
-  // (2) profile.profile_code might be B4 in some datasets
   const pcode = String(profile?.profile_code || "").trim();
   if (looksLikePersonaCode(pcode)) {
     return {
@@ -213,7 +244,6 @@ function resolvePersonaCode(args: {
     };
   }
 
-  // (3) derive from personality + mindset_level
   const letter =
     personalityToLetter(profile?.personality_code) ||
     personalityToLetter(resultRow.primary_personality);
@@ -247,6 +277,14 @@ export async function GET(
 
     const url = new URL(req.url);
     const tid = String(url.searchParams.get("tid") || "").trim();
+    const audRaw = String(url.searchParams.get("aud") || "")
+      .trim()
+      .toLowerCase();
+
+    const audienceHint: Audience | null =
+      audRaw === "entrepreneur" || audRaw === "leader"
+        ? (audRaw as Audience)
+        : null;
 
     const sb = supa();
 
@@ -277,13 +315,9 @@ export async function GET(
       | "result_id"
       | null = null;
 
-    // (0) If token is a UUID, allow direct qsc_results.id lookup
     if (isUuidLike(tokenParam)) {
-      const { data, error } = await sb
-        .from("qsc_results")
-        .select(baseSelect)
-        .eq("id", tokenParam)
-        .maybeSingle();
+      const q = sb.from("qsc_results").select(baseSelect).eq("id", tokenParam);
+      const { data, error } = await applyAudienceFilter(q, audienceHint).maybeSingle();
 
       if (error) {
         return NextResponse.json(
@@ -298,13 +332,14 @@ export async function GET(
       }
     }
 
-    // (1) token + tid (best / deterministic)
     if (!resultRow && tid && isUuidLike(tid)) {
-      const { data, error } = await sb
+      const q = sb
         .from("qsc_results")
         .select(baseSelect)
         .eq("token", tokenParam)
-        .eq("taker_id", tid)
+        .eq("taker_id", tid);
+
+      const { data, error } = await applyAudienceFilter(q, audienceHint)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -322,12 +357,16 @@ export async function GET(
       }
     }
 
-    // (2) token only — must be unique or reject
     if (!resultRow) {
-      const { count, error: countErr } = await sb
+      const countQ = sb
         .from("qsc_results")
         .select("id", { count: "exact", head: true })
         .eq("token", tokenParam);
+
+      const { count, error: countErr } = await applyAudienceFilter(
+        countQ,
+        audienceHint
+      );
 
       if (countErr) {
         return NextResponse.json(
@@ -346,6 +385,7 @@ export async function GET(
             debug: {
               token: tokenParam,
               tid: tid || null,
+              aud: audienceHint,
               matches: c,
               hint:
                 "Pass ?tid=<test_takers.id> when loading this report to disambiguate shared tokens.",
@@ -356,10 +396,12 @@ export async function GET(
       }
 
       if (c === 1) {
-        const { data, error } = await sb
+        const q = sb
           .from("qsc_results")
           .select(baseSelect)
-          .eq("token", tokenParam)
+          .eq("token", tokenParam);
+
+        const { data, error } = await applyAudienceFilter(q, audienceHint)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -377,12 +419,13 @@ export async function GET(
         }
       }
 
-      // last resort (kept for edge cases)
       if (!resultRow && c > 0) {
-        const { data, error } = await sb
+        const q = sb
           .from("qsc_results")
           .select(baseSelect)
-          .eq("token", tokenParam)
+          .eq("token", tokenParam);
+
+        const { data, error } = await applyAudienceFilter(q, audienceHint)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -406,7 +449,11 @@ export async function GET(
         {
           ok: false,
           error: "RESULT_NOT_FOUND",
-          debug: { token: tokenParam, tid: tid || null },
+          debug: {
+            token: tokenParam,
+            tid: tid || null,
+            aud: audienceHint,
+          },
         },
         { status: 404 }
       );
@@ -418,9 +465,6 @@ export async function GET(
     const { contentTestId, resolvedBy: contentResolvedBy } =
       await resolveContentTestId(sb, wrapperTestId, audience);
 
-    // ---------------------------------------------------------------------
-    // Load taker
-    // ---------------------------------------------------------------------
     let taker: TestTakerRow | null = null;
 
     if (resultRow.taker_id) {
@@ -445,9 +489,6 @@ export async function GET(
       if (!error && data) taker = data as unknown as TestTakerRow;
     }
 
-    // ---------------------------------------------------------------------
-    // Load QSC profile snapshot
-    // ---------------------------------------------------------------------
     const qscProfileId = resultRow.qsc_profile_id ?? null;
 
     let profile: QscProfileRow | null = null;
@@ -477,19 +518,11 @@ export async function GET(
       if (!error && data) profile = data as unknown as QscProfileRow;
     }
 
-    // ---------------------------------------------------------------------
-    // Resolve persona_code A1..D5 (debug / compat only)
-    // ---------------------------------------------------------------------
     const { personaCode, source: personaCodeSource } = resolvePersonaCode({
       resultRow,
       profile,
     });
 
-    // ---------------------------------------------------------------------
-    // ✅ Load persona content correctly
-    //   Entrepreneur: portal.qsc_personas (your real table)
-    //   Leader:       portal.qsc_leader_personas (if you have it)
-    // ---------------------------------------------------------------------
     let persona: any = null;
 
     const letter =
@@ -521,7 +554,6 @@ export async function GET(
     if (audience === "leader") {
       persona_debug.table = "qsc_leader_personas";
 
-      // Keep your existing leader logic as-is (since leader report looks great)
       if (personaCode) {
         const { data, error } = await sb
           .from("qsc_leader_personas")
@@ -550,10 +582,8 @@ export async function GET(
         }
       }
     } else {
-      // ✅ Entrepreneur (Core) — your real table
       persona_debug.table = "qsc_personas";
 
-      // (1) BEST: matches your unique index: test_id + personality_code + mindset_level
       if (letter && level) {
         const { data, error } = await sb
           .from("qsc_personas")
@@ -569,7 +599,6 @@ export async function GET(
         }
       }
 
-      // (2) Fallback: test_id + profile_code = FLOW_ORBIT (matches your row too)
       if (!persona && combinedProfile) {
         const { data, error } = await sb
           .from("qsc_personas")
@@ -584,7 +613,6 @@ export async function GET(
         }
       }
 
-      // (3) Fallback global: profile_code only
       if (!persona && combinedProfile) {
         const { data, error } = await sb
           .from("qsc_personas")
@@ -600,6 +628,8 @@ export async function GET(
       }
     }
 
+    const link = await loadLinkMetaByToken(sb, tokenParam);
+
     return NextResponse.json(
       {
         ok: true,
@@ -607,9 +637,11 @@ export async function GET(
         profile,
         persona,
         taker,
+        link,
         __debug: {
           token: tokenParam,
           tid: tid || null,
+          aud: audienceHint,
           resolved_by: resolvedBy,
           audience,
           combined_profile_code_raw: resultRow.combined_profile_code ?? null,
@@ -628,5 +660,3 @@ export async function GET(
     );
   }
 }
-
-

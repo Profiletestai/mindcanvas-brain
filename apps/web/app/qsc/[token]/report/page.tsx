@@ -1,3 +1,4 @@
+// apps/web/app/qsc/[token]/report/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -83,21 +84,6 @@ const MINDSETS: { key: MindsetKey; label: string; level: number }[] = [
   { key: "QUANTUM", label: "Quantum", level: 5 },
 ];
 
-const PERSONALITY_LABELS: Record<PersonalityKey, string> = {
-  FIRE: "Fire",
-  FLOW: "Flow",
-  FORM: "Form",
-  FIELD: "Field",
-};
-
-const MINDSET_LABELS: Record<MindsetKey, string> = {
-  ORIGIN: "Origin",
-  MOMENTUM: "Momentum",
-  VECTOR: "Vector",
-  ORBIT: "Orbit",
-  QUANTUM: "Quantum",
-};
-
 function buildMatrix(): MatrixCell[] {
   const cells: MatrixCell[] = [];
   for (const m of MINDSETS) {
@@ -112,7 +98,10 @@ function buildMatrix(): MatrixCell[] {
 
 const MATRIX = buildMatrix();
 
-function classifyCell(result: QscResultsRow | null, cell: MatrixCell): CellCategory {
+function classifyCell(
+  result: QscResultsRow | null,
+  cell: MatrixCell
+): CellCategory {
   if (!result) return "other";
 
   const combined = (result.combined_profile_code || "").toUpperCase(); // e.g. "FIELD_ORBIT"
@@ -293,10 +282,14 @@ export default function QscResultPage({ params }: { params: { token: string } })
         setLoading(true);
         setErr(null);
 
-        const res = await fetch(
-          `/api/public/qsc/${encodeURIComponent(token)}/result`,
-          { cache: "no-store" }
-        );
+        // ✅ IMPORTANT: include tid when present to avoid AMBIGUOUS_TOKEN_REQUIRES_TID
+        const apiUrl = tid
+          ? `/api/public/qsc/${encodeURIComponent(
+              token
+            )}/result?tid=${encodeURIComponent(tid)}`
+          : `/api/public/qsc/${encodeURIComponent(token)}/result`;
+
+        const res = await fetch(apiUrl, { cache: "no-store" });
 
         const ct = res.headers.get("content-type") || "";
         if (!ct.includes("application/json")) {
@@ -331,7 +324,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, tid]);
 
   const result = payload?.results ?? null;
   const profile = payload?.profile ?? null;
@@ -364,6 +357,10 @@ export default function QscResultPage({ params }: { params: { token: string } })
   }
 
   if (err || !result) {
+    const debugEndpoint = tid
+      ? `/api/public/qsc/${token}/result?tid=${tid}`
+      : `/api/public/qsc/${token}/result`;
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-50">
         <AppBackground />
@@ -380,9 +377,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
           </pre>
           <p className="text-xs text-slate-500">
             Debug endpoint:{" "}
-            <code className="break-all">
-              /api/public/qsc/{token}/result
-            </code>
+            <code className="break-all">{debugEndpoint}</code>
           </p>
         </main>
       </div>
@@ -518,15 +513,12 @@ export default function QscResultPage({ params }: { params: { token: string } })
                     How to communicate
                   </h3>
                   <p className="mt-1 text-slate-300 whitespace-pre-line">
-                    {profile?.how_to_communicate ||
-                      "[todo: how to communicate]"}
+                    {profile?.how_to_communicate || "[todo: how to communicate]"}
                   </p>
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-slate-100">
-                    Decision style
-                  </h3>
+                  <h3 className="font-semibold text-slate-100">Decision style</h3>
                   <p className="mt-1 text-slate-300 whitespace-pre-line">
                     {profile?.decision_style || "[todo: decision style]"}
                   </p>
@@ -534,18 +526,14 @@ export default function QscResultPage({ params }: { params: { token: string } })
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
-                    <h3 className="font-semibold text-slate-100">
-                      Core challenges
-                    </h3>
+                    <h3 className="font-semibold text-slate-100">Core challenges</h3>
                     <p className="mt-1 text-slate-300 whitespace-pre-line">
                       {profile?.business_challenges ||
                         "[todo: core business challenges]"}
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-100">
-                      Trust signals
-                    </h3>
+                    <h3 className="font-semibold text-slate-100">Trust signals</h3>
                     <p className="mt-1 text-slate-300 whitespace-pre-line">
                       {profile?.trust_signals || "[todo: trust signals]"}
                     </p>
@@ -554,20 +542,15 @@ export default function QscResultPage({ params }: { params: { token: string } })
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
-                    <h3 className="font-semibold text-slate-100">
-                      Offer fit
-                    </h3>
+                    <h3 className="font-semibold text-slate-100">Offer fit</h3>
                     <p className="mt-1 text-slate-300 whitespace-pre-line">
                       {profile?.offer_fit || "[todo: best offer fit]"}
                     </p>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-100">
-                      Sale blockers
-                    </h3>
+                    <h3 className="font-semibold text-slate-100">Sale blockers</h3>
                     <p className="mt-1 text-slate-300 whitespace-pre-line">
-                      {profile?.sale_blockers ||
-                        "[todo: what blocks the sale]"}
+                      {profile?.sale_blockers || "[todo: what blocks the sale]"}
                     </p>
                   </div>
                 </div>
@@ -582,8 +565,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
           <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 shadow-lg shadow-black/40">
             <h2 className="text-lg font-semibold">Buyer Frequency Type</h2>
             <p className="mt-1 text-sm text-slate-300">
-              Your emotional & energetic style across Fire, Flow, Form and
-              Field.
+              Your emotional & energetic style across Fire, Flow, Form and Field.
             </p>
 
             <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center">
@@ -602,9 +584,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
                         className="inline-block h-2.5 w-2.5 rounded-full"
                         style={{ backgroundColor: FREQUENCY_COLORS[d.key] }}
                       />
-                      <span className="font-medium text-slate-100">
-                        {d.label}
-                      </span>
+                      <span className="font-medium text-slate-100">{d.label}</span>
                     </div>
                     <span className="text-sm text-slate-300">
                       {percentLabel(d.value)}
@@ -628,12 +608,8 @@ export default function QscResultPage({ params }: { params: { token: string } })
                 return (
                   <div key={m.key} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-100">
-                        {m.label}
-                      </span>
-                      <span className="text-slate-400">
-                        {percentLabel(pct)}
-                      </span>
+                      <span className="font-medium text-slate-100">{m.label}</span>
+                      <span className="text-slate-400">{percentLabel(pct)}</span>
                     </div>
                     <Bar pct={pct} />
                   </div>
@@ -654,8 +630,8 @@ export default function QscResultPage({ params }: { params: { token: string } })
                 This grid maps your{" "}
                 <span className="font-semibold">Buyer Frequency Type</span>{" "}
                 (left to right) against your{" "}
-                <span className="font-semibold">Buyer Mindset Level</span> (top
-                to bottom). Your combined profile sits at the intersection.
+                <span className="font-semibold">Buyer Mindset Level</span> (top to
+                bottom). Your combined profile sits at the intersection.
               </p>
             </div>
           </div>
@@ -692,8 +668,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
                   {/* Row cells */}
                   {PERSONALITIES.map((p) => {
                     const cell = MATRIX.find(
-                      (c) =>
-                        c.personality === p.key && c.mindset === m.key
+                      (c) => c.personality === p.key && c.mindset === m.key
                     )!;
                     const cat = classifyCell(result, cell);
 
@@ -760,7 +735,7 @@ export default function QscResultPage({ params }: { params: { token: string } })
         </section>
 
         <footer className="pt-4 text-xs text-slate-500">
-          © {new Date().getFullYear()} MindCanvas — Profiletest.ai
+          © {new Date().getFullYear()} Powered by Profiletest.ai
         </footer>
       </main>
     </div>

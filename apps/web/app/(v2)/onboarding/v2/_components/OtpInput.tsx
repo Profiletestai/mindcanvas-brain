@@ -1,0 +1,79 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
+interface Props {
+  value: string;
+  onChange: (v: string) => void;
+  length?: number;
+  autoFocus?: boolean;
+}
+
+export function OtpInput({ value, onChange, length = 6, autoFocus }: Props) {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (autoFocus) refs.current[0]?.focus();
+  }, [autoFocus]);
+
+  const setCharAt = (i: number, ch: string) => {
+    const arr = value.padEnd(length, " ").split("");
+    arr[i] = ch;
+    onChange(arr.join("").trim());
+  };
+
+  const handleChange = (i: number, raw: string) => {
+    const ch = raw.replace(/\D/g, "").slice(-1);
+    if (!ch) return;
+    setCharAt(i, ch);
+    if (i < length - 1) refs.current[i + 1]?.focus();
+  };
+
+  const handleKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      const cur = value[i] ?? "";
+      if (cur) {
+        setCharAt(i, "");
+      } else if (i > 0) {
+        setCharAt(i - 1, "");
+        refs.current[i - 1]?.focus();
+      }
+    }
+    if (e.key === "ArrowLeft" && i > 0) refs.current[i - 1]?.focus();
+    if (e.key === "ArrowRight" && i < length - 1) refs.current[i + 1]?.focus();
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const txt = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    if (!txt) return;
+    e.preventDefault();
+    onChange(txt);
+    refs.current[Math.min(txt.length, length - 1)]?.focus();
+  };
+
+  return (
+    <div className="flex gap-2.5 justify-center">
+      {Array.from({ length }).map((_, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          inputMode="numeric"
+          maxLength={1}
+          value={value[i] ?? ""}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKey(i, e)}
+          onPaste={handlePaste}
+          className="h-[68px] w-[68px] text-center text-2xl font-bold rounded-[14px] outline-none transition focus:ring-2"
+          style={{
+            background: "rgb(240,246,255)",
+            border: `1.5px solid ${value[i] ? "rgb(90,150,210)" : "rgb(220,232,246)"}`,
+            color: "rgb(24,44,62)",
+          }}
+        />
+      ))}
+    </div>
+  );
+}

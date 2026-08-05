@@ -52,6 +52,13 @@ type SectionsPayload = {
   framework_path?: string | null;
 };
 
+type RaisonDetreData = {
+  raw_score: number;
+  percentage: number;
+  eligible_count?: number;
+  answered_count?: number;
+};
+
 type ResultData = {
   org_slug: string;
   org_name?: string | null;
@@ -72,6 +79,11 @@ type ResultData = {
   top_freq: AB;
   top_profile_code: string;
   top_profile_name: string;
+
+  // ✅ optional secondary metric
+  raison_detre?: RaisonDetreData;
+  raison_detre_raw_score?: number;
+  raison_detre_percentage?: number;
 
   sections?: SectionsPayload | null;
 
@@ -116,40 +128,59 @@ function getSectionDomId(section: ReportSection, idx: number) {
   return `section-${idx}`;
 }
 
-function findWelcomeIndex(sections: ReportSection[]) {
-  const idx = sections.findIndex((s) => {
-    const id = (s.id || "").toLowerCase();
-    const title = (s.title || "").toLowerCase();
-    return (
-      id.includes("welcome") ||
-      title.includes("welcome from daniel") ||
-      title.includes("welcome from daniel acutt")
-    );
-  });
-  return idx;
-}
-
 function isNextStepsSection(s: ReportSection) {
   const id = (s.id || "").toLowerCase();
   const title = (s.title || "").toLowerCase();
   return id === "next-steps" || title === "next steps" || title.includes("next steps");
 }
 
-/** ----------------- NEW: profile image helpers (fail-soft) ----------------- */
+function getRaisonDetre(data?: ResultData | null): RaisonDetreData | null {
+  if (!data) return null;
+
+  const obj = data.raison_detre;
+  if (obj && typeof obj === "object") {
+    const percentage = Number(obj.percentage ?? 0);
+    const raw_score = Number(obj.raw_score ?? 0);
+    const eligible_count = Number(obj.eligible_count ?? 0);
+    const answered_count = Number(obj.answered_count ?? 0);
+
+    if (eligible_count > 0 || answered_count > 0 || raw_score > 0 || percentage > 0) {
+      return {
+        raw_score,
+        percentage,
+        eligible_count,
+        answered_count,
+      };
+    }
+  }
+
+  const raw_score = Number(data.raison_detre_raw_score ?? 0);
+  const percentage = Number(data.raison_detre_percentage ?? 0);
+
+  if (raw_score > 0 || percentage > 0) {
+    return {
+      raw_score,
+      percentage,
+      eligible_count: 0,
+      answered_count: 0,
+    };
+  }
+
+  return null;
+}
+
+/** ----------------- profile image helpers (fail-soft) ----------------- */
 
 function inferProfileCardsBase(data?: ResultData | null): string {
   const fp = String(data?.sections?.framework_path || "").toLowerCase();
   const tn = String(data?.test_name || "").toLowerCase();
 
-  // Prefer framework_path when available
   if (fp.includes("operatingframe")) return "/images/operatingframe-full-test/profile-cards";
   if (fp.includes("lead")) return "/images/mindCanvas-LEAD-system/profile-cards";
 
-  // Fallback to test name
   if (tn.includes("operating")) return "/images/operatingframe-full-test/profile-cards";
   if (tn.includes("lead")) return "/images/mindCanvas-LEAD-system/profile-cards";
 
-  // Unknown framework
   return "";
 }
 
@@ -186,17 +217,11 @@ function buildProfileImageCandidates(base: string, profileName: string) {
   const n = String(profileName || "").trim();
   if (!n) return [];
 
-  const a = spacedLower(n);     // "vision engineer"
-  const b = dashed(n);          // "vision-engineer"
-  const c = underscored(n);     // "vision_engineer"
+  const a = spacedLower(n);
+  const b = dashed(n);
+  const c = underscored(n);
 
-  // IMPORTANT: keep spaces un-encoded in the string; browser will request with %20 automatically
-  const candidates = [
-    `${base}/${a}.png`,
-    `${base}/${b}.png`,
-    `${base}/${c}.png`,
-  ];
-
+  const candidates = [`${base}/${a}.png`, `${base}/${b}.png`, `${base}/${c}.png`];
   return Array.from(new Set(candidates));
 }
 
@@ -213,12 +238,8 @@ function ProfileImage({ candidates, alt }: { candidates: string[]; alt: string }
       crossOrigin="anonymous"
       className="hidden sm:block h-16 w-auto rounded-xl border border-white/10 bg-white/5 p-1"
       onError={(e) => {
-        // Try next candidate; if none left, hide.
-        if (idx < candidates.length - 1) {
-          setIdx(idx + 1);
-        } else {
-          e.currentTarget.style.display = "none";
-        }
+        if (idx < candidates.length - 1) setIdx(idx + 1);
+        else e.currentTarget.style.display = "none";
       }}
     />
   );
@@ -327,9 +348,12 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
   if (type === "divider") return <hr className="my-5 border-slate-200" />;
   if (type === "image") return <ImageRenderer block={block as ImageBlock} />;
 
-  if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
-  if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
-  if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
+  if (type === "h1")
+    return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText((block as any).text)}</h1>;
+  if (type === "h2")
+    return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText((block as any).text)}</h2>;
+  if (type === "h3")
+    return <h3 className="text-lg font-semibold text-slate-900">{safeText((block as any).text)}</h3>;
   if (type === "h4") {
     return (
       <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -347,7 +371,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
       <ul className="list-disc pl-5 text-sm text-slate-700 space-y-1">
-        {items.map((it: any, i: number) => <li key={i}>{safeText(it)}</li>)}
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
       </ul>
     );
   }
@@ -356,7 +382,9 @@ function BlockRenderer({ block }: { block: SectionBlock }) {
     const items = Array.isArray((block as any).items) ? (block as any).items : [];
     return (
       <ol className="list-decimal pl-5 text-sm text-slate-700 space-y-1">
-        {items.map((it: any, i: number) => <li key={i}>{safeText(it)}</li>)}
+        {items.map((it: any, i: number) => (
+          <li key={i}>{safeText(it)}</li>
+        ))}
       </ol>
     );
   }
@@ -449,13 +477,6 @@ export default function LegacyReportClient(props: { token: string; tid: string }
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(s);
-    }
-
-    const idx = findWelcomeIndex(deduped);
-    if (idx > 0) {
-      const welcome = deduped[idx];
-      deduped.splice(idx, 1);
-      deduped.unshift(welcome);
     }
 
     return deduped;
@@ -598,7 +619,8 @@ export default function LegacyReportClient(props: { token: string; tid: string }
 
   const topFreqCode = data.top_freq;
   const topFreqPct = data.frequency_percentages?.[topFreqCode] ?? 0;
-  const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
+  const topFreqName =
+    data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
 
   const sortedProfiles = [...data.profile_labels]
     .map((p) => ({ ...p, pct: data.profile_percentages?.[p.code] ?? 0 }))
@@ -608,6 +630,10 @@ export default function LegacyReportClient(props: { token: string; tid: string }
   const secondary = sortedProfiles[1];
   const tertiary = sortedProfiles[2];
 
+  const raisonDetre = getRaisonDetre(data);
+  const hasRaisonDetre = !!raisonDetre;
+  const raisonPct = Math.max(0, Math.min(100, Number(raisonDetre?.percentage ?? 0)));
+
   return (
     <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
       <AppBackground />
@@ -616,11 +642,12 @@ export default function LegacyReportClient(props: { token: string; tid: string }
         {/* Header */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="flex items-start gap-4">
-            {/* NEW: profile image (fail-soft) */}
             <ProfileImage candidates={profileImgCandidates} alt={data.top_profile_name} />
 
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Personalised report</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+                Personalised report
+              </p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight">{reportTitle}</h1>
               <p className="mt-2 text-sm text-slate-200">
                 For {participant} · Organisation: {orgName}
@@ -649,7 +676,7 @@ export default function LegacyReportClient(props: { token: string; tid: string }
         </div>
 
         {/* Top summary row */}
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className={`mt-6 grid gap-4 ${hasRaisonDetre ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
           {/* Frequencies */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <h2 className="text-lg font-semibold">Frequencies</h2>
@@ -690,7 +717,10 @@ export default function LegacyReportClient(props: { token: string; tid: string }
                         <span className="text-slate-700">{pctLabel(p.pct)}</span>
                       </div>
                       <div className="mt-1 h-2 w-full rounded-full bg-slate-200">
-                        <div className="h-2 rounded-full bg-slate-900" style={{ width: `${Math.round(pct * 100)}%` }} />
+                        <div
+                          className="h-2 rounded-full bg-slate-900"
+                          style={{ width: `${Math.round(pct * 100)}%` }}
+                        />
                       </div>
                     </div>
                   );
@@ -698,16 +728,59 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               </div>
             </div>
           </div>
+
+          {/* Raison D'Etre */}
+          {hasRaisonDetre ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <h2 className="text-lg font-semibold">Raison D&apos;Etre Score</h2>
+              <p className="mt-2 text-sm text-slate-200">
+                A percentage measure of purpose, alignment, and clarity of your deeper “why”.
+              </p>
+
+              <div className="mt-4 rounded-xl bg-white p-4 text-slate-900">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Purpose alignment
+                    </div>
+                    <div className="mt-2 text-4xl font-bold tracking-tight">{raisonPct}%</div>
+                  </div>
+
+                  <div className="text-right text-xs text-slate-500">
+                    {raisonDetre?.answered_count ? (
+                      <div>
+                        {raisonDetre.answered_count}
+                        {raisonDetre.eligible_count ? ` / ${raisonDetre.eligible_count}` : ""} answered
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-4 h-3 w-full rounded-full bg-slate-200">
+                  <div
+                    className="h-3 rounded-full bg-slate-900"
+                    style={{ width: `${raisonPct}%` }}
+                  />
+                </div>
+
+                <p className="mt-3 text-sm text-slate-700">
+                  This score reflects how strongly your work is connected to purpose, meaning, and long-term direction.
+                </p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Body layout */}
         <div className="mt-6 grid gap-4 md:grid-cols-[280px_1fr]">
           <aside className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Quick index</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              Quick index
+            </p>
             <p className="mt-1 text-xs text-slate-300">Jump straight to the section you need.</p>
 
             <div className="mt-4 space-y-2">
-              {quickIndex.slice(0, 30).map((s, i) => (
+              {quickIndex.slice(0, 50).map((s, i) => (
                 <button
                   key={s.id + i}
                   onClick={() => scrollToSection(s.id)}
@@ -766,11 +839,12 @@ export default function LegacyReportClient(props: { token: string; tid: string }
               </button>
             </div>
 
-            <footer className="pt-4 text-xs text-slate-400">© {new Date().getFullYear()} MindCanvas</footer>
+            <footer className="pt-4 text-xs text-slate-400">
+              © {new Date().getFullYear()} Powered by Profiletest.ai
+            </footer>
           </main>
         </div>
       </div>
     </div>
   );
 }
-

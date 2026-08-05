@@ -77,6 +77,14 @@ type PersonaSectionRow = {
   is_active: boolean;
 };
 
+type LinkMeta = {
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  next_steps_url?: string | null;
+  email_report?: boolean | null;
+};
+
 function supa() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key =
@@ -125,6 +133,22 @@ function personalityToLetter(
 
 function normalizeSlug(s: any) {
   return String(s || "").trim().toLowerCase();
+}
+
+async function loadLinkMetaByToken(
+  sb: ReturnType<typeof supa>,
+  token: string
+): Promise<LinkMeta | null> {
+  const { data, error } = await sb
+    .from("test_links")
+    .select(
+      "show_results, redirect_url, hidden_results_message, next_steps_url, email_report"
+    )
+    .eq("token", token)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as LinkMeta;
 }
 
 /**
@@ -200,9 +224,6 @@ async function resolveContentTestId(
   return { contentTestId: wrapperTestId, resolvedBy: "wrapper_no_sources" };
 }
 
-/**
- * Resolve persona code A1..D5 using same strategy as result endpoint
- */
 function resolvePersonaCode(args: {
   resultRow: QscResultsRow;
   profile: QscProfileRow | null;
@@ -289,7 +310,6 @@ export async function GET(
       | "token_latest"
       | null = null;
 
-    // (0) If token is a UUID, allow direct qsc_results.id lookup
     if (isUuidLike(tokenParam)) {
       const { data, error } = await sb
         .from("qsc_results")
@@ -309,7 +329,6 @@ export async function GET(
       }
     }
 
-    // (1) token + tid (deterministic)
     if (!results && tid && isUuidLike(tid)) {
       const { data, error } = await sb
         .from("qsc_results")
@@ -332,7 +351,6 @@ export async function GET(
       }
     }
 
-    // (2) token only — MUST be unique OR we reject
     if (!results) {
       const { count, error: countErr } = await sb
         .from("qsc_results")
@@ -386,7 +404,6 @@ export async function GET(
         }
       }
 
-      // last-resort fallback (kept for edge cases)
       if (!results && c > 0) {
         const { data, error } = await sb
           .from("qsc_results")
@@ -420,7 +437,6 @@ export async function GET(
       );
     }
 
-    // Leader-only endpoint
     if (results.audience && results.audience !== "leader") {
       return NextResponse.json(
         {
@@ -432,12 +448,10 @@ export async function GET(
       );
     }
 
-    // ✅ wrapper -> canonical content test (qsc-leaders)
     const wrapperTestId = String(results.test_id);
     const { contentTestId, resolvedBy: contentResolvedBy } =
       await resolveContentTestId(sb, wrapperTestId, "leader");
 
-    // Load taker
     let taker: QscTakerRow | null = null;
 
     if (results.taker_id) {
@@ -474,7 +488,6 @@ export async function GET(
       if (data) taker = data as unknown as QscTakerRow;
     }
 
-    // Load profile snapshot (needed for persona_code resolution)
     let profile: QscProfileRow | null = null;
 
     if (results.qsc_profile_id) {
@@ -493,13 +506,11 @@ export async function GET(
       if (data) profile = data as unknown as QscProfileRow;
     }
 
-    // ✅ persona_code A1..D5
     const { personaCode, source: personaCodeSource } = resolvePersonaCode({
       resultRow: results,
       profile,
     });
 
-    // Templates (per canonical content test)
     const { data: templateRows, error: tplErr } = await sb
       .from("qsc_leader_report_templates")
       .select("id, test_id, section_key, content, sort_order, is_active")
@@ -517,7 +528,6 @@ export async function GET(
       );
     }
 
-    // Persona sections (canonical content test + persona_code)
     let sectionRows: PersonaSectionRow[] = [];
     if (personaCode) {
       const { data: secRows, error: secErr } = await sb
@@ -551,12 +561,15 @@ export async function GET(
       content: safeJsonParse(r.content),
     })) as PersonaSectionRow[];
 
+    const link = await loadLinkMetaByToken(sb, tokenParam);
+
     return NextResponse.json(
       {
         ok: true,
         results,
         profile,
         taker,
+        link,
         report: {
           test_id: contentTestId,
           persona_code: personaCode,
@@ -590,4 +603,3 @@ export async function GET(
     );
   }
 }
-

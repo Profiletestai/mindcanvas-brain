@@ -2,6 +2,7 @@
   "name": "@mindcanvas/web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,32 +11,45 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.10.0",
     "@react-pdf/renderer": "^4.3.1",
+    "@sparticuz/chromium": "^148.0.0",
+    "@stripe/react-stripe-js": "^6.8.0",
+    "@stripe/stripe-js": "^9.12.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.79.0",
+    "chart.js": "^4.5.1",
     "html2canvas": "^1.4.1",
+    "i18n-iso-countries": "^7.14.0",
     "jspdf": "^4.0.0",
-    "next": "^15.5.7",
+    "libphonenumber-js": "^1.13.1",
+    "next": "15.5.7",
     "openai": "^4.104.0",
     "pdf-lib": "^1.17.1",
+    "playwright": "^1.59.1",
+    "playwright-core": "^1.59.1",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.3.1",
+    "react-hook-form": "^7.75.0",
+    "react-phone-number-input": "^3.4.16",
     "recharts": "^3.3.0",
-    "resend": "^6.4.1"
+    "resend": "^6.4.1",
+    "stripe": "^16.12.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^20.19.24",
-    "@types/react": "^18.3.4",
-    "@types/react-dom": "^18.3.2",
+    "@types/node": "^20.19.33",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.19",
     "eslint": "^9.37.0",
-    "eslint-config-next": "^15.5.6",
+    "eslint-config-next": "15.5.7",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.6.3"
   },
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   }
 }

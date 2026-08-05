@@ -5,42 +5,125 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
-import { buildCoachSummary } from "@/lib/report/buildCoachSummary";
+import { StandardResultGraphs, QscResultGraphs } from "./ResultGraphs";
 
 export const dynamic = "force-dynamic";
 
 type Totals = Record<string, any> | string | null | undefined;
 
+type GedChoiceAnswer = {
+  question_id?: string | null;
+  question_text?: string | null;
+  value?: string | null;
+  label?: string | null;
+};
+
+type GedDiagnostics = {
+  business_stage: GedChoiceAnswer | null;
+  core_constraint: GedChoiceAnswer | null;
+  scale_readiness: GedChoiceAnswer | null;
+  self_diagnosis: string | null;
+};
+
 function parseTotals(totals: Totals): any {
   if (!totals) return {};
+
   try {
     if (typeof totals === "string") {
       const once = JSON.parse(totals);
-      if (typeof once === "string") return JSON.parse(once);
+
+      if (typeof once === "string") {
+        return JSON.parse(once);
+      }
+
       return once;
     }
+
     return totals || {};
   } catch {
     return {};
   }
 }
 
+function normaliseGedChoice(value: any): GedChoiceAnswer | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const questionId =
+    typeof value.question_id === "string" ? value.question_id.trim() : null;
+
+  const questionText =
+    typeof value.question_text === "string"
+      ? value.question_text.trim()
+      : null;
+
+  const answerValue =
+    typeof value.value === "string" ? value.value.trim() : null;
+
+  const answerLabel =
+    typeof value.label === "string" ? value.label.trim() : null;
+
+  if (!questionId && !questionText && !answerValue && !answerLabel) {
+    return null;
+  }
+
+  return {
+    question_id: questionId || null,
+    question_text: questionText || null,
+    value: answerValue || null,
+    label: answerLabel || null,
+  };
+}
+
+function extractGedDiagnostics(totals: Totals): GedDiagnostics | null {
+  const parsed = parseTotals(totals);
+  const rawGed = parsed?.meta?.ged;
+
+  if (!rawGed || typeof rawGed !== "object" || Array.isArray(rawGed)) {
+    return null;
+  }
+
+  const selfDiagnosis =
+    typeof rawGed.self_diagnosis === "string"
+      ? rawGed.self_diagnosis.trim() || null
+      : null;
+
+  const diagnostics: GedDiagnostics = {
+    business_stage: normaliseGedChoice(rawGed.business_stage),
+    core_constraint: normaliseGedChoice(rawGed.core_constraint),
+    scale_readiness: normaliseGedChoice(rawGed.scale_readiness),
+    self_diagnosis: selfDiagnosis,
+  };
+
+  const hasAnyValue = Boolean(
+    diagnostics.business_stage ||
+      diagnostics.core_constraint ||
+      diagnostics.scale_readiness ||
+      diagnostics.self_diagnosis
+  );
+
+  return hasAnyValue ? diagnostics : null;
+}
+
+function gedAnswerText(answer: GedChoiceAnswer | null): string {
+  if (!answer) return "—";
+
+  return answer.label || answer.value || "—";
+}
+
 function asPercentMap(values: Record<string, number>): Record<string, number> {
   const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
-  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
+
+  if (!sum) {
+    return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
+  }
+
   return Object.fromEntries(
     Object.entries(values).map(([k, v]) => [
       k,
       Math.round(((Number(v) || 0) / sum) * 100),
     ])
-  );
-}
-
-function asDecimalMap(values: Record<string, number>): Record<string, number> {
-  const sum = Object.values(values).reduce((a, b) => a + (Number(b) || 0), 0);
-  if (!sum) return Object.fromEntries(Object.keys(values).map((k) => [k, 0]));
-  return Object.fromEntries(
-    Object.entries(values).map(([k, v]) => [k, (Number(v) || 0) / sum])
   );
 }
 
@@ -52,8 +135,10 @@ function sortDesc(obj: Record<string, number>) {
 
 function codeToPShort(code?: string | null) {
   if (!code) return "";
+
   const m = code.match(/PROFILE_(\d+)/i);
   if (m) return `P${m[1]}`;
+
   const m2 = code.match(/P(\d+)/i);
   return m2 ? `P${m2[1]}` : code;
 }
@@ -73,12 +158,14 @@ function BarRow({
         <span className="font-medium">{label}</span>
         {note ? <span className="text-gray-500"> {note}</span> : null}
       </div>
-      <div className="flex-1 h-2 rounded bg-gray-200">
+
+      <div className="h-2 flex-1 rounded bg-gray-200">
         <div
           className="h-2 rounded bg-blue-600"
           style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
         />
       </div>
+
       <div className="w-10 text-right text-sm tabular-nums">{pct}%</div>
     </div>
   );
@@ -99,6 +186,7 @@ export default async function TakerDetail({
     .select("id, slug, name")
     .eq("slug", slug)
     .maybeSingle();
+
   if (!org) return notFound();
 
   const { data: taker } = await sb
@@ -108,7 +196,36 @@ export default async function TakerDetail({
     )
     .eq("id", takerId)
     .maybeSingle();
-  if (!taker || taker.org_id !== org.id) return notFound();
+
+  if (!taker) return notFound();
+
+  let allowed = taker.org_id === org.id;
+
+  if (!allowed) {
+    const { data: subs } = await sb
+      .from("test_submissions")
+      .select("test_id")
+      .eq("taker_id", taker.id)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    const testIds = Array.from(
+      new Set((subs || []).map((s: any) => s?.test_id).filter(Boolean))
+    ) as string[];
+
+    if (testIds.length) {
+      const { data: testsForSubs } = await sb
+        .from("tests")
+        .select("id, org_id")
+        .in("id", testIds);
+
+      allowed = (testsForSubs || []).some(
+        (testRow: any) => testRow?.org_id === org.id
+      );
+    }
+  }
+
+  if (!allowed) return notFound();
 
   const { data: test } = await sb
     .from("tests")
@@ -126,39 +243,41 @@ export default async function TakerDetail({
   const latest = (results ?? [])[0] || null;
   const totalsRaw = parseTotals(latest?.totals);
 
-  // ----- Meta + framework lookup ------------------------------------------
+  const isVisibility =
+    Boolean(totalsRaw?.visibility) ||
+    String(totalsRaw?.meta?.engine || "").toLowerCase().includes("visibility");
+
   const meta: any = (test?.meta as any) ?? {};
   const framework: any = meta?.framework || meta || {};
 
   const profilesSource: any[] = Array.isArray(framework?.profiles)
     ? framework.profiles
     : Array.isArray(meta?.profiles)
-    ? meta.profiles
-    : [];
+      ? meta.profiles
+      : [];
 
   const profiles: Array<{ name: string; code?: string; frequency?: string }> =
-    profilesSource.map((p: any) => ({
-      name: String(p?.name ?? ""),
-      code: p?.code ?? null,
-      frequency: p?.frequency ?? null,
+    profilesSource.map((profile: any) => ({
+      name: String(profile?.name ?? ""),
+      code: profile?.code ?? null,
+      frequency: profile?.frequency ?? null,
     }));
 
   const freqSource: any[] = Array.isArray(framework?.frequencies)
     ? framework.frequencies
     : Array.isArray(meta?.frequencies)
-    ? meta.frequencies
-    : [];
+      ? meta.frequencies
+      : [];
 
   const freqLabels: Record<string, string> = freqSource.length
     ? Object.fromEntries(
-        freqSource.map((f: any) => [
-          String(f?.code ?? "").toUpperCase(),
-          String(f?.label ?? ""),
+        freqSource.map((frequency: any) => [
+          String(frequency?.code ?? "").toUpperCase(),
+          String(frequency?.label ?? ""),
         ])
       )
     : { A: "A", B: "B", C: "C", D: "D" };
 
-  // --- Build frequency and profile score maps (raw points) ----------------
   let profileScores: Record<string, number> = {};
   let frequencyScores: Record<string, number> = {};
 
@@ -167,69 +286,82 @@ export default async function TakerDetail({
     typeof totalsRaw === "object" &&
     ("frequencies" in totalsRaw || "profiles" in totalsRaw)
   ) {
-    // New structured shape: { frequencies: {...}, profiles: {...} }
-    const tr: any = totalsRaw;
+    const totals: any = totalsRaw;
 
-    if (tr.frequencies && typeof tr.frequencies === "object") {
+    if (totals.frequencies && typeof totals.frequencies === "object") {
       frequencyScores = Object.fromEntries(
-        Object.entries(tr.frequencies).map(([k, v]) => [
-          String(k).toUpperCase(),
-          Number(v) || 0,
+        Object.entries(totals.frequencies).map(([key, value]) => [
+          String(key).toUpperCase(),
+          Number(value) || 0,
         ])
       );
     }
 
-    if (tr.profiles && typeof tr.profiles === "object") {
-      const rawProfiles = tr.profiles as Record<string, number>;
+    if (totals.profiles && typeof totals.profiles === "object") {
+      const rawProfiles = totals.profiles as Record<string, number>;
 
       const codeToName = new Map<string, string>();
-      for (const p of profiles) {
-        if (p.code) {
-          const upperCode = String(p.code).toUpperCase();
-          codeToName.set(upperCode, p.name);
-          codeToName.set(codeToPShort(upperCode), p.name);
+
+      for (const profile of profiles) {
+        if (profile.code) {
+          const upperCode = String(profile.code).toUpperCase();
+
+          codeToName.set(upperCode, profile.name);
+          codeToName.set(codeToPShort(upperCode), profile.name);
         }
       }
 
       profileScores = {};
+
       for (const [rawKey, value] of Object.entries(rawProfiles)) {
         const upperKey = String(rawKey).toUpperCase();
         const short = codeToPShort(upperKey);
+
         const mappedName =
           codeToName.get(upperKey) ||
           codeToName.get(short.toUpperCase()) ||
           rawKey;
+
         profileScores[mappedName] = Number(value) || 0;
       }
     }
   } else {
-    // Legacy flat totals
     const keys = Object.keys(totalsRaw || {});
+
     const isFreqTotals =
       keys.length &&
-      keys.every((k) => ["A", "B", "C", "D"].includes(k.toUpperCase()));
+      keys.every((key) => ["A", "B", "C", "D"].includes(key.toUpperCase()));
 
     if (isFreqTotals) {
       frequencyScores = Object.fromEntries(
-        Object.entries(totalsRaw).map(([k, v]) => [
-          k.toUpperCase(),
-          Number(v) || 0,
+        Object.entries(totalsRaw).map(([key, value]) => [
+          key.toUpperCase(),
+          Number(value) || 0,
         ])
       );
     } else {
-      // Assume these are profile scores keyed by profile name
       profileScores = Object.fromEntries(
-        Object.entries(totalsRaw).map(([k, v]) => [String(k), Number(v) || 0])
+        Object.entries(totalsRaw).map(([key, value]) => [
+          String(key),
+          Number(value) || 0,
+        ])
       );
 
-      const p2f = Object.fromEntries(
-        profiles.map((p) => [p.name, (p.frequency || "").toUpperCase()])
+      const profileToFrequency = Object.fromEntries(
+        profiles.map((profile) => [
+          profile.name,
+          (profile.frequency || "").toUpperCase(),
+        ])
       );
+
       frequencyScores = Object.entries(profileScores).reduce(
-        (acc, [pName, score]) => {
-          const f = p2f[pName] || "";
-          if (!f) return acc;
-          acc[f] = (acc[f] || 0) + (Number(score) || 0);
+        (acc, [profileName, score]) => {
+          const frequency = profileToFrequency[profileName] || "";
+
+          if (!frequency) return acc;
+
+          acc[frequency] = (acc[frequency] || 0) + (Number(score) || 0);
+
           return acc;
         },
         {} as Record<string, number>
@@ -237,110 +369,122 @@ export default async function TakerDetail({
     }
   }
 
-  // --- Percentages for display (0–100) ------------------------------------
   const freqPct = asPercentMap(frequencyScores);
   const profilePct = asPercentMap(profileScores);
-  const topProfile = sortDesc(profileScores)[0] as [string, number] | undefined;
 
-  // --- Decimals for coach summary (0–1) -----------------------------------
-  const freqDec = asDecimalMap(frequencyScores);
-  const profileDec = asDecimalMap(profileScores);
-
-  const freqLabelArray = (["A", "B", "C", "D"] as const).map((code) => ({
-    code,
-    name: freqLabels[code] || code,
-  }));
-
-  const topFreqEntry = sortDesc(freqDec)[0];
-  const topFreqCode = (topFreqEntry ? topFreqEntry[0].toUpperCase() : "A") as
-    | "A"
-    | "B"
-    | "C"
-    | "D";
-
-  const sortedProfileDec = sortDesc(profileDec);
-  const primaryDec = sortedProfileDec[0]
-    ? { code: "", name: sortedProfileDec[0][0], pct: sortedProfileDec[0][1] }
-    : undefined;
-  const secondaryDec = sortedProfileDec[1]
-    ? { code: "", name: sortedProfileDec[1][0], pct: sortedProfileDec[1][1] }
-    : undefined;
-  const tertiaryDec = sortedProfileDec[2]
-    ? { code: "", name: sortedProfileDec[2][0], pct: sortedProfileDec[2][1] }
-    : undefined;
-
-  const hasScores =
-    Object.values(frequencyScores).some((v) => v > 0) ||
-    Object.values(profileScores).some((v) => v > 0);
-
-  const coachSummary = hasScores
-    ? buildCoachSummary({
-        participant: {
-          firstName: taker.first_name || undefined,
-          role: taker.role_title || undefined,
-          company: taker.company || undefined,
-        },
-        organisation: {
-          name: org.name,
-        },
-        frequencies: {
-          labels: freqLabelArray,
-          percentages: freqDec as Record<"A" | "B" | "C" | "D", number>,
-          topCode: topFreqCode,
-        },
-        profiles: {
-          labels: profiles.map((p) => ({ code: p.code || "", name: p.name })),
-          percentages: profileDec,
-          primary: primaryDec,
-          secondary: secondaryDec,
-          tertiary: tertiaryDec,
-        },
-      })
-    : "";
+  const topProfile = sortDesc(profileScores)[0] as
+    | [string, number]
+    | undefined;
 
   const fullName =
     [taker.first_name, taker.last_name].filter(Boolean).join(" ").trim() || "—";
 
-  // Build top 3 profiles for cards (using percentage profile mix)
   const sortedProfilePct = sortDesc(profilePct);
+
   const topThreeProfiles = sortedProfilePct.slice(0, 3).map(([name, pct]) => {
-    const pMeta = profiles.find((p) => p.name === name);
-    const code = pMeta?.code || "";
+    const profileMeta = profiles.find((profile) => profile.name === name);
+    const code = profileMeta?.code || "";
+
     return { name, pct, code };
   });
 
   const labels = ["Primary profile", "Secondary", "Tertiary"];
+  // Standard-test chart data (mirrors the Frequencies bars + Personality Map
+  // radar the respondent's own report renders).
+  const freqChart = (["A", "B", "C", "D"] as const).map((code) => ({
+    code,
+    name:
+      (freqSource.find(
+        (x: any) => String(x?.code).toUpperCase() === code,
+      )?.label as string) ||
+      freqLabels[code] ||
+      code,
+    pct: freqPct[code] ?? 0,
+  }));
 
-  // --- QSC URLs (Portal-only Snapshot + Portal-only Extended + Public Strategic) ---
+  const profileRadarLabels = profiles.map((p) => ({
+    code: codeToPShort(p.code) || p.name,
+    name: p.name,
+  }));
+
+  const profileRadarPct: Record<string, number> = Object.fromEntries(
+    profiles.map((p) => [codeToPShort(p.code) || p.name, profilePct[p.name] ?? 0]),
+  );
+
+  const slugLower = String(test?.slug || "").toLowerCase();
+  const testNameLower = String(test?.name || "").toLowerCase();
+
+  const isGed =
+    meta?.is_ged === true ||
+    String(meta?.assessment_name || "").toLowerCase().trim() ===
+      "growth engine diagnostic" ||
+    slugLower.includes("growth-engine-diagnostic") ||
+    slugLower.startsWith("ged-") ||
+    testNameLower.includes("growth engine diagnostic") ||
+    testNameLower.startsWith("ged");
+
   const isQsc =
-    test?.slug === "qsc-core" ||
-    test?.slug === "qsc-leaders" ||
-    (typeof meta?.frameworkType === "string" &&
-      meta.frameworkType.toLowerCase() === "qsc");
+    !isGed &&
+    (test?.slug === "qsc-core" ||
+      test?.slug === "qsc-leaders" ||
+      (typeof meta?.frameworkType === "string" &&
+        meta.frameworkType.toLowerCase() === "qsc"));
+
+  let gedDiagnostics: GedDiagnostics | null = null;
+  let gedCompletedAt: string | null = null;
+
+  if (isGed) {
+    const { data: gedSubmission, error: gedSubmissionError } = await sb
+      .from("test_submissions")
+      .select("created_at, totals")
+      .eq("taker_id", taker.id)
+      .eq("test_id", taker.test_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (gedSubmissionError) {
+      console.warn(
+        "GED submission lookup failed on test-taker profile:",
+        gedSubmissionError.message
+      );
+    }
+
+    const fromSubmission = extractGedDiagnostics(gedSubmission?.totals);
+    const fromLatestResult = extractGedDiagnostics(latest?.totals);
+
+    gedDiagnostics = fromSubmission || fromLatestResult || null;
+
+    gedCompletedAt =
+      gedSubmission?.created_at || latest?.created_at || null;
+  }
 
   let qscSnapshotUrl: string | null = null;
   let qscExtendedUrl: string | null = null;
   let qscStrategicUrl: string | null = null;
 
-  // ✅ Determine QSC audience server-side so we build correct URLs (leader vs entrepreneur)
   let qscAudience: QscAudience | null = null;
+  // QSC and GED both read from qsc_results (same table/API). Fetch once.
+  let qscRow: any = null;
 
-  if (isQsc && taker.link_token) {
-    // Prefer the actual qsc_results.audience for THIS token+taker
-    const { data: qscRow } = await sb
+  if ((isQsc || isGed) && taker.link_token) {
+    const { data } = await sb
       .from("qsc_results")
-      .select("audience, created_at")
+      .select(
+        "audience, created_at, personality_percentages, mindset_percentages, primary_personality, secondary_personality, primary_mindset, secondary_mindset, combined_profile_code",
+      )
       .eq("token", taker.link_token)
       .eq("taker_id", taker.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    qscRow = data;
+  }
+
+  if (isQsc && taker.link_token) {
     const aud = (qscRow?.audience as QscAudience | null) ?? null;
 
-    // Fallbacks:
-    // - if this is the leaders test, treat null audience as leader (legacy rows)
-    // - otherwise default to entrepreneur
     if (aud === "leader" || aud === "entrepreneur") {
       qscAudience = aud;
     } else if (test?.slug === "qsc-leaders") {
@@ -352,37 +496,41 @@ export default async function TakerDetail({
     const base = `/qsc/${encodeURIComponent(taker.link_token)}`;
     const query = `?tid=${encodeURIComponent(taker.id)}`;
 
-    // 1) Snapshot (same viewer, audience decides what buttons should do)
     qscSnapshotUrl = `${base}${query}`;
 
-    // 2) ✅ Extended Source Code Snapshot (portal-only) — audience-aware
-    const extendedPath = qscAudience === "leader" ? "/extended-leader" : "/extended";
+    const extendedPath =
+      qscAudience === "leader" ? "/extended-leader" : "/extended";
+
     qscExtendedUrl = `${base}${extendedPath}${query}`;
 
-    // 3) ✅ Strategic report (public, taker-facing) — audience-aware
-    // This avoids relying on redirects and prevents landing on the wrong report.
-    const strategicPath = qscAudience === "leader" ? "/leader" : "/entrepreneur";
+    const strategicPath =
+      qscAudience === "leader" ? "/leader" : "/entrepreneur";
+
     qscStrategicUrl = `${base}${strategicPath}${query}`;
   }
 
-  // --- Main report URL (what "Open test-taker report" should open) ----------
-let reportUrl: string | null = null;
+  let gedExtendedUrl: string | null = null;
+  let gedStrategicUrl: string | null = null;
 
-if (isQsc) {
-  reportUrl = qscStrategicUrl;
-} else if (taker.link_token) {
-  reportUrl = `/t/${encodeURIComponent(
-    taker.link_token
-  )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
-} else if (taker.last_result_url) {
-  reportUrl = String(taker.last_result_url);
-}
+  if (isGed && taker.link_token) {
+    const base = `/ged/${encodeURIComponent(taker.link_token)}`;
+    const query = `?tid=${encodeURIComponent(taker.id)}`;
 
-  if (isQsc) {
-    // ✅ QSC: always open the public Strategic report
+    gedExtendedUrl = `${base}/extended${query}`;
+    gedStrategicUrl = `${base}/entrepreneur${query}`;
+  }
+
+  let reportUrl: string | null = null;
+
+  if (isVisibility && taker.link_token) {
+    reportUrl = `/t/${encodeURIComponent(
+      taker.link_token
+    )}/visibility/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
+  } else if (isGed) {
+    reportUrl = gedStrategicUrl;
+  } else if (isQsc) {
     reportUrl = qscStrategicUrl;
   } else if (taker.link_token) {
-    // ✅ Non-QSC: open the RESULT viewer (portal should NOT be subject to redirect_url/show_results)
     reportUrl = `/t/${encodeURIComponent(
       taker.link_token
     )}/report?tid=${encodeURIComponent(taker.id)}&src=portal`;
@@ -390,7 +538,14 @@ if (isQsc) {
     reportUrl = String(taker.last_result_url);
   }
 
-  const freqDefs: any[] = freqSource || [];
+  const profileExtendedReportUrl =
+    isVisibility && latest?.id
+      ? `/portal/${encodeURIComponent(
+          slug
+        )}/database/${encodeURIComponent(
+          taker.id
+        )}/profile-extended-report`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -399,6 +554,7 @@ if (isQsc) {
           <h1 className="text-2xl font-semibold">{fullName}</h1>
           <p className="text-sm text-gray-500">{org.name}</p>
         </div>
+
         <Link
           href={`/portal/${slug}/database`}
           className="rounded-md border px-3 py-2 text-sm"
@@ -407,73 +563,217 @@ if (isQsc) {
         </Link>
       </header>
 
-      {/* Contact */}
-      <section className="rounded-xl border p-4 bg-white">
-        <h2 className="font-medium mb-3">Contact</h2>
+      <section className="rounded-xl border bg-white p-4">
+        <h2 className="mb-3 font-medium">Contact</h2>
+
         <dl className="grid grid-cols-3 gap-2 text-sm">
           <dt className="text-gray-500">First name</dt>
           <dd className="col-span-2">{taker.first_name || "—"}</dd>
+
           <dt className="text-gray-500">Last name</dt>
           <dd className="col-span-2">{taker.last_name || "—"}</dd>
+
           <dt className="text-gray-500">Email</dt>
           <dd className="col-span-2">{taker.email || "—"}</dd>
+
           <dt className="text-gray-500">Phone</dt>
           <dd className="col-span-2">{taker.phone || "—"}</dd>
+
           <dt className="text-gray-500">Created at</dt>
           <dd className="col-span-2">
             {taker.created_at
               ? new Date(taker.created_at as any).toLocaleString()
               : "—"}
           </dd>
+
           <dt className="text-gray-500">Company</dt>
           <dd className="col-span-2">{taker.company || "—"}</dd>
+
           <dt className="text-gray-500">Role title</dt>
           <dd className="col-span-2">{taker.role_title || "—"}</dd>
         </dl>
       </section>
 
-      {/* Latest Result */}
-      <section className="rounded-xl border p-4 bg-white space-y-4">
+      {isGed && (
+        <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+          <div>
+            <h2 className="font-medium text-slate-900">
+              GED Qualifying Answers
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-600">
+              Internal diagnostic information captured during the Growth Engine
+              Diagnostic.
+            </p>
+          </div>
+
+          {gedCompletedAt && (
+            <p className="text-xs text-slate-500">
+              GED completed: {new Date(gedCompletedAt).toLocaleString()}
+            </p>
+          )}
+
+          {gedDiagnostics ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-emerald-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Current business stage
+                </p>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {gedDiagnostics.business_stage?.question_text ||
+                    "Which best describes your current business?"}
+                </p>
+
+                <p className="mt-2 font-medium text-slate-900">
+                  {gedAnswerText(gedDiagnostics.business_stage)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-emerald-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Core constraint
+                </p>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {gedDiagnostics.core_constraint?.question_text ||
+                    "Where is your biggest constraint right now?"}
+                </p>
+
+                <p className="mt-2 font-medium text-slate-900">
+                  {gedAnswerText(gedDiagnostics.core_constraint)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-emerald-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Scale readiness
+                </p>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {gedDiagnostics.scale_readiness?.question_text ||
+                    "If you stepped out of the business for 30 days, what would happen?"}
+                </p>
+
+                <p className="mt-2 font-medium text-slate-900">
+                  {gedAnswerText(gedDiagnostics.scale_readiness)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-emerald-100 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Strategic self-diagnosis
+                </p>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  In your own words, what is currently stopping your business
+                  from scaling without you?
+                </p>
+
+                <p className="mt-2 whitespace-pre-wrap font-medium text-slate-900">
+                  {gedDiagnostics.self_diagnosis || "—"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-emerald-200 bg-white p-4 text-sm text-slate-600">
+              No GED qualifying answers were found for this test taker. This
+              normally means they completed the assessment before these
+              diagnostic answers were added to the GED submission data.
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="space-y-4 rounded-xl border bg-white p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="font-medium">Latest Result</h2>
+
             <dl className="mt-1 grid grid-cols-3 gap-2 text-sm">
               <dt className="text-gray-500">Test</dt>
               <dd className="col-span-2">{test?.name || "—"}</dd>
+
               <dt className="text-gray-500">Completed</dt>
               <dd className="col-span-2">
                 {latest?.created_at
                   ? new Date(latest.created_at as any).toLocaleString()
                   : "—"}
               </dd>
-              <dt className="text-gray-500">Top profile</dt>
-              <dd className="col-span-2">
-                {topProfile ? `${topProfile[0]} (${topProfile[1]})` : "—"}
-              </dd>
+
+              {!isVisibility && !isQsc && !isGed && (
+                <>
+                  <dt className="text-gray-500">Top profile</dt>
+                  <dd className="col-span-2">
+                    {topProfile ? `${topProfile[0]} (${topProfile[1]})` : "—"}
+                  </dd>
+                </>
+              )}
             </dl>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             <div className="flex flex-wrap gap-2">
-              {reportUrl && (
+              {profileExtendedReportUrl ? (
+                <Link
+                  href={profileExtendedReportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-50 hover:bg-slate-800"
+                >
+                  Generate Profile Extended Report
+                </Link>
+              ) : null}
+
+              {reportUrl && !isGed && (
                 <Link
                   href={reportUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
                 >
-                  Open test-taker report
+                  {isVisibility
+                    ? "Open Visibility Report"
+                    : "Open test-taker report in new tab"}
                 </Link>
               )}
             </div>
           </div>
         </div>
 
+        {isGed && (gedExtendedUrl || gedStrategicUrl) && (
+          <div className="flex flex-wrap gap-2 pt-2">
+            {gedStrategicUrl && (
+              <Link
+                href={gedStrategicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-emerald-600 bg-emerald-500 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-emerald-400"
+              >
+                Strategic Growth Report
+              </Link>
+            )}
+
+            {gedExtendedUrl && (
+              <Link
+                href={gedExtendedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
+              >
+                Predictive Selling Playbook
+              </Link>
+            )}
+          </div>
+        )}
+
         {isQsc && (qscSnapshotUrl || qscExtendedUrl || qscStrategicUrl) && (
           <div className="flex flex-wrap gap-2 pt-2">
             {qscSnapshotUrl && (
               <Link
                 href={qscSnapshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100"
               >
                 Buyer Persona Snapshot
@@ -483,6 +783,8 @@ if (isQsc) {
             {qscExtendedUrl && (
               <Link
                 href={qscExtendedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-50 hover:bg-slate-800"
               >
                 Extended Source Code Snapshot
@@ -492,6 +794,8 @@ if (isQsc) {
             {qscStrategicUrl && (
               <Link
                 href={qscStrategicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-md border border-amber-600 bg-amber-500 px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-400"
               >
                 QSC — Strategic Growth Report
@@ -500,90 +804,146 @@ if (isQsc) {
           </div>
         )}
 
-        <div className="space-y-2 pt-4">
-          <h3 className="font-medium">Frequency mix</h3>
-          {["A", "B", "C", "D"].map((f) => (
-            <BarRow
-              key={f}
-              label={
-                (freqDefs.find(
-                  (x: any) => String(x?.code).toUpperCase() === f
-                )?.label as string) ||
-                freqLabels[f] ||
-                f
-              }
-              note={`(${f})`}
-              pct={freqPct[f] ?? 0}
-            />
-          ))}
-        </div>
+        {!isVisibility && !isGed && (
+          <>
+            <div className="space-y-2 pt-4">
+              <h3 className="font-medium">Frequency mix</h3>
 
-        <div className="space-y-2">
-          <h3 className="font-medium">Profile mix</h3>
-          {Object.keys(profilePct).length ? (
-            sortDesc(profilePct).map(([name, pct]) => {
-              const p = profiles.find((x) => x.name === name);
-              const short = codeToPShort(p?.code || "");
-              return (
+              {["A", "B", "C", "D"].map((frequency) => (
                 <BarRow
-                  key={name}
-                  label={name}
-                  note={short ? `(${short})` : undefined}
-                  pct={pct}
+                  key={frequency}
+                  label={
+                    (freqSource.find(
+                      (item: any) =>
+                        String(item?.code).toUpperCase() === frequency
+                    )?.label as string) ||
+                    freqLabels[frequency] ||
+                    frequency
+                  }
+                  note={`(${frequency})`}
+                  pct={freqPct[frequency] ?? 0}
                 />
-              );
-            })
-          ) : (
-            <p className="text-sm text-gray-500">
-              Profile-level scores aren’t available for this result (only
-              frequencies were stored).
-            </p>
-          )}
-        </div>
+              ))}
+            </div>
 
-        {/* Primary / Secondary / Tertiary cards for coaches */}
-        {topThreeProfiles.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-3 pt-4">
-            {topThreeProfiles.map((p, idx) => (
-              <div
-                key={p.name}
-                className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  {labels[idx] || "Profile"}
+            <div className="space-y-2">
+              <h3 className="font-medium">Profile mix</h3>
+
+              {Object.keys(profilePct).length ? (
+                sortDesc(profilePct).map(([name, pct]) => {
+                  const profile = profiles.find(
+                    (item) => item.name === name
+                  );
+
+                  const short = codeToPShort(profile?.code || "");
+
+                  return (
+                    <BarRow
+                      key={name}
+                      label={name}
+                      note={short ? `(${short})` : undefined}
+                      pct={pct}
+                    />
+                  );
+                })
+              ) : (
+                <p className="text-sm text-gray-500">
+                  Profile-level scores aren’t available for this result (only
+                  frequencies were stored).
                 </p>
-                <h3 className="mt-1 text-base font-semibold text-slate-900">
-                  {p.name}
-                </h3>
-                {p.code && (
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                    {p.code}
-                  </p>
-                )}
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  {p.pct}% match
-                </p>
+              )}
+            </div>
+
+            {topThreeProfiles.length > 0 && (
+              <div className="grid gap-4 pt-4 md:grid-cols-3">
+                {topThreeProfiles.map((profile, index) => (
+                  <div
+                    key={profile.name}
+                    className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      {labels[index] || "Profile"}
+                    </p>
+
+                    <h3 className="mt-1 text-base font-semibold text-slate-900">
+                      {profile.name}
+                    </h3>
+
+                    {profile.code && (
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        {profile.code}
+                      </p>
+                    )}
+
+                    <p className="mt-2 text-sm font-medium text-slate-800">
+                      {profile.pct}% match
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
 
-        {coachSummary && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <h3 className="font-medium mb-2">Coach summary</h3>
-            <div className="space-y-2 text-sm leading-relaxed text-gray-700">
-              {coachSummary
-                .split(/\n{2,}/)
-                .map((p) => p.trim())
-                .filter(Boolean)
-                .map((p, idx) => (
-                  <p key={idx}>{p}</p>
-                ))}
-            </div>
-          </div>
+        {!isVisibility && !isQsc && !isGed && (
+          <StandardResultGraphs
+            freq={freqChart}
+            profileLabels={profileRadarLabels}
+            profilePct={profileRadarPct}
+          />
+        )}
+
+        {(isQsc || isGed) && qscRow && (
+          <QscResultGraphs
+            variant={
+              isGed
+                ? "ged"
+                : qscAudience === "leader"
+                  ? "qsc-leader"
+                  : "qsc-entrepreneur"
+            }
+            personality={qscRow.personality_percentages ?? {}}
+            mindset={qscRow.mindset_percentages ?? {}}
+            primaryPersonality={qscRow.primary_personality}
+            secondaryPersonality={qscRow.secondary_personality}
+            primaryMindset={qscRow.primary_mindset}
+            secondaryMindset={qscRow.secondary_mindset}
+          />
         )}
       </section>
+
+      {reportUrl && (
+        <section className="overflow-hidden rounded-xl border bg-white">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <h2 className="font-medium">
+                {isVisibility
+                  ? "Embedded Visibility Report"
+                  : "Embedded Report"}
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                View the test-taker report directly inside this profile
+              </p>
+            </div>
+
+            <Link
+              href={reportUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium hover:bg-slate-100"
+            >
+              Open full report
+            </Link>
+          </div>
+
+          <iframe
+            src={reportUrl}
+            title="Test-taker report"
+            className="min-h-[1400px] w-full bg-white"
+          />
+        </section>
+      )}
     </div>
   );
 }
-

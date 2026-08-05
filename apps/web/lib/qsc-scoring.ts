@@ -1,6 +1,7 @@
 // apps/web/lib/qsc-scoring.ts
 
-// Basic types that match what we care about from the DB
+// apps/web/lib/qsc-scoring.ts
+
 export type QscProfileMapEntry = {
   points: number;
   profile: string; // e.g. "QSC_PERSONALITY_FIRE" or "QSC_MINDSET_VECTOR"
@@ -21,29 +22,28 @@ export type QscLayerTotals = Record<string, number>;
 export type QscLayerPercentages = Record<string, number>;
 
 export type QscScoringResult = {
-  // Raw point totals
   personalityTotals: QscLayerTotals;
   mindsetTotals: QscLayerTotals;
 
-  // Percentages within each layer
   personalityPercentages: QscLayerPercentages;
   mindsetPercentages: QscLayerPercentages;
 
-  // Primary + secondary labels
   primaryPersonality: string | null;
   secondaryPersonality: string | null;
   primaryMindset: string | null;
   secondaryMindset: string | null;
 
-  // Combined code we can use to look up portal.qsc_profiles
-  // e.g. FIRE + VECTOR => "FIRE_VECTOR"
   combinedProfileCode: string | null;
 };
 
 /**
- * Utility: normalises profile keys from "QSC_PERSONALITY_FIRE" => "FIRE"
+ * "QSC_PERSONALITY_FIRE" => { layer:"personality", key:"FIRE" }
+ * "QSC_MINDSET_VECTOR"   => { layer:"mindset", key:"VECTOR" }
  */
-function extractKey(raw: string): { layer: "personality" | "mindset" | null; key: string } {
+function extractKey(raw: string): {
+  layer: "personality" | "mindset" | null;
+  key: string;
+} {
   if (raw.startsWith("QSC_PERSONALITY_")) {
     return { layer: "personality", key: raw.replace("QSC_PERSONALITY_", "") };
   }
@@ -53,9 +53,6 @@ function extractKey(raw: string): { layer: "personality" | "mindset" | null; key
   return { layer: null, key: raw };
 }
 
-/**
- * Utility: turn totals into percentages.
- */
 function toPercentages(totals: QscLayerTotals): QscLayerPercentages {
   const result: QscLayerPercentages = {};
   const totalPoints = Object.values(totals).reduce((sum, v) => sum + v, 0);
@@ -65,15 +62,12 @@ function toPercentages(totals: QscLayerTotals): QscLayerPercentages {
   }
 
   for (const [key, value] of Object.entries(totals)) {
-    result[key] = +( (value / totalPoints) * 100 ).toFixed(1);
+    result[key] = +(((value / totalPoints) * 100).toFixed(1));
   }
 
   return result;
 }
 
-/**
- * Utility: find primary and secondary keys based on totals.
- */
 function findPrimaryAndSecondary(totals: QscLayerTotals): {
   primary: string | null;
   secondary: string | null;
@@ -84,26 +78,37 @@ function findPrimaryAndSecondary(totals: QscLayerTotals): {
     return { primary: null, secondary: null };
   }
 
-  entries.sort((a, b) => b[1] - a[1]); // highest first
+  entries.sort((a, b) => b[1] - a[1]);
 
-  const primary = entries[0]?.[0] ?? null;
-  const secondary = entries[1]?.[0] ?? null;
-
-  return { primary, secondary };
+  return {
+    primary: entries[0]?.[0] ?? null,
+    secondary: entries[1]?.[0] ?? null,
+  };
 }
 
 /**
- * Core scoring function for the Quantum Source Code test.
+ * Defensive index normaliser.
  *
- * It expects:
- * - All questions for the QSC test, including profile_map for each option.
- * - All answers for a single test taker (question_id + choice index).
+ * This is the key fix:
+ * - Some QSC personality questions only have 4 mapped options.
+ * - If the UI ever sends choice=4 for those rows, old logic skipped scoring entirely.
+ * - We now clamp out-of-range values to the last valid option.
  *
- * It returns:
- * - Total and percentage scores for Personality and Mindset layers.
- * - Primary + secondary labels.
- * - A combinedProfileCode (e.g. "FIRE_VECTOR") that we can join to portal.qsc_profiles.
+ * That means:
+ *   len=4 and choice=4  -> 3
+ *   len=5 and choice=4  -> 4
  */
+function normaliseChoiceIndex(choice: number, optionCount: number): number | null {
+  const n = Number(choice);
+
+  if (!Number.isFinite(n)) return null;
+  if (optionCount <= 0) return null;
+  if (n < 0) return null;
+
+  const whole = Math.trunc(n);
+  return Math.min(whole, optionCount - 1);
+}
+
 export function calculateQscScores(
   questions: QscQuestion[],
   answers: QscAnswer[]
@@ -111,20 +116,21 @@ export function calculateQscScores(
   const personalityTotals: QscLayerTotals = {};
   const mindsetTotals: QscLayerTotals = {};
 
-  // Index questions by id for quick lookup
   const questionsById = new Map<string, QscQuestion>();
   for (const q of questions) {
     questionsById.set(q.id, q);
   }
 
-  // Walk through each answer, look up the corresponding profile_map entry
   for (const answer of answers) {
     const question = questionsById.get(answer.question_id);
-    if (!question || !question.profile_map || !Array.isArray(question.profile_map)) {
+    if (!question || !Array.isArray(question.profile_map) || question.profile_map.length === 0) {
       continue;
     }
 
-    const mapEntry = question.profile_map[answer.choice];
+    const safeChoice = normaliseChoiceIndex(answer.choice, question.profile_map.length);
+    if (safeChoice == null) continue;
+
+    const mapEntry = question.profile_map[safeChoice];
     if (!mapEntry) continue;
 
     const { points, profile } = mapEntry;
@@ -144,13 +150,14 @@ export function calculateQscScores(
 
   const { primary: primaryPersonality, secondary: secondaryPersonality } =
     findPrimaryAndSecondary(personalityTotals);
+
   const { primary: primaryMindset, secondary: secondaryMindset } =
     findPrimaryAndSecondary(mindsetTotals);
 
-  let combinedProfileCode: string | null = null;
-  if (primaryPersonality && primaryMindset) {
-    combinedProfileCode = `${primaryPersonality}_${primaryMindset}`;
-  }
+  const combinedProfileCode =
+    primaryPersonality && primaryMindset
+      ? `${primaryPersonality}_${primaryMindset}`
+      : null;
 
   return {
     personalityTotals,
@@ -161,6 +168,6 @@ export function calculateQscScores(
     secondaryPersonality,
     primaryMindset,
     secondaryMindset,
-    combinedProfileCode
+    combinedProfileCode,
   };
 }

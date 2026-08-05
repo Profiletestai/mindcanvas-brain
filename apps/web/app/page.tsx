@@ -3,8 +3,7 @@ import Link from "next/link";
 
 const P = { c1: "#64bae2", c2: "#2d8fc4", c3: "#015a8b" }; // your palette
 
-const CREATE_ACCOUNT_URL =
-  "https://profiletest.ai/order-qsc?utm_source=profiletest.app&utm_medium=organic&utm_campaign=none&utm_term=clicked_create_account";
+const CREATE_ACCOUNT_URL = "https://profiletest.ai/invite-only-pilot-register-from-profiletestapp";
 
 export default function Landing() {
   return (
@@ -117,7 +116,7 @@ export default function Landing() {
       {/* --- FOOTER --- */}
       <footer className="relative z-10 pb-10 text-center text-xs text-slate-500 space-y-2">
         <div>
-          © {new Date().getFullYear()} MindCanvas. All rights reserved.
+          © {new Date().getFullYear()} Powered by Profiletest.ai. All rights reserved.
         </div>
         <div className="space-x-3">
           <a
