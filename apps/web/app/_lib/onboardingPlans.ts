@@ -1,5 +1,6 @@
 import "server-only";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
+import { getStripeMode } from "@/app/_lib/billing";
 
 export type OnboardingPlan = {
   tier: number;
@@ -12,15 +13,21 @@ export type OnboardingPlan = {
   stripe_price_id: string | null;
 };
 
-export async function listOnboardingPlans(): Promise<OnboardingPlan[]> {
+export type BillingInterval = "month" | "year";
+
+export async function listOnboardingPlans(
+  interval: BillingInterval = "month"
+): Promise<OnboardingPlan[]> {
   const admin = portalAdmin();
+  const stripeMode = getStripeMode();
 
   const { data: priceRows, error: priceErr } = await admin
     .from("tier_prices")
     .select("tier_definition_id, amount_cents, currency, interval, stripe_price_id")
     .eq("billing_type", "owner")
     .eq("active", true)
-    .eq("interval", "month")
+    .eq("stripe_mode", stripeMode)
+    .eq("interval", interval)
     .gt("amount_cents", 0)
     .not("tier_definition_id", "is", null);
   if (priceErr) {

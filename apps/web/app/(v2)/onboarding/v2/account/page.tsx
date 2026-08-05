@@ -1,3 +1,4 @@
+//apps/web/app/(v2)/onboarding/v2/account/page.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -31,6 +32,7 @@ const inputClass =
 
 export default function AccountPage() {
   const router = useRouter();
+
   const {
     register,
     control,
@@ -47,6 +49,8 @@ export default function AccountPage() {
       first_name: "",
       last_name: "",
       email: "",
+      password: "",
+      confirm_password: "",
       terms_accepted: false,
       privacy_accepted: false,
     },
@@ -55,13 +59,16 @@ export default function AccountPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     const res = await api.signup(values);
+
     if (isErr(res)) {
       setError("root", { message: res.error });
       return;
     }
+
     sessionStorage.setItem("onb_email", values.email);
     sessionStorage.setItem("onb_first_name", values.first_name);
     sessionStorage.setItem("onb_last_name", values.last_name);
+
     router.push("/onboarding/v2/verify");
   });
 
@@ -69,15 +76,19 @@ export default function AccountPage() {
     errors.first_name?.message ??
     errors.last_name?.message ??
     errors.email?.message ??
+    errors.password?.message ??
+    errors.confirm_password?.message ??
     errors.terms_accepted?.message ??
     errors.privacy_accepted?.message;
+
   const errMsg = firstFieldError ?? errors.root?.message;
 
   return (
     <StepCard
       title={
         <>
-          Create your <span style={{ color: "rgb(84, 175, 224)" }}>account</span>
+          Create your{" "}
+          <span style={{ color: "rgb(84, 175, 224)" }}>account</span>
         </>
       }
       subtitle="Let's get your organisation set up."
@@ -92,11 +103,12 @@ export default function AccountPage() {
           boxShadow: "0px 2px 12px 0px rgba(13,45,94,0.06)",
         }}
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
               First name
             </label>
+
             <input
               type="text"
               placeholder="e.g. Jane"
@@ -106,10 +118,12 @@ export default function AccountPage() {
               style={inputStyle}
             />
           </div>
+
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
               Last name
             </label>
+
             <input
               type="text"
               placeholder="e.g. Smith"
@@ -125,11 +139,53 @@ export default function AccountPage() {
           <label className="block mb-1.5" style={eyebrowStyle}>
             Email
           </label>
+
           <input
             type="email"
             placeholder="you@company.com"
             autoComplete="email"
             {...register("email")}
+            className={inputClass}
+            style={inputStyle}
+          />
+        </div>
+
+        <div className="mt-5">
+          <label className="block mb-1.5" style={eyebrowStyle}>
+            Password
+          </label>
+
+          <input
+            type="password"
+            placeholder="Minimum 8 characters"
+            autoComplete="new-password"
+            {...register("password")}
+            className={inputClass}
+            style={inputStyle}
+          />
+
+          <p
+            className="mt-1.5"
+            style={{
+              fontSize: "11px",
+              lineHeight: "16px",
+              color: "rgb(90,122,158)",
+            }}
+          >
+            Your password must contain at least 8 characters.
+          </p>
+        </div>
+
+        <div className="mt-5">
+          <label className="block mb-1.5" style={eyebrowStyle}>
+            Confirm password
+          </label>
+
+          <input
+            type="password"
+            placeholder="Enter your password again"
+            autoComplete="new-password"
+            {...register("confirm_password")}
             className={inputClass}
             style={inputStyle}
           />
@@ -160,6 +216,7 @@ export default function AccountPage() {
               />
             )}
           />
+
           <Controller
             control={control}
             name="privacy_accepted"
@@ -186,7 +243,9 @@ export default function AccountPage() {
           />
         </div>
 
-        {errMsg && <div className="mt-4 text-sm text-rose-500">{errMsg}</div>}
+        {errMsg && (
+          <div className="mt-4 text-sm text-rose-500">{errMsg}</div>
+        )}
 
         <button
           type="submit"
@@ -226,13 +285,17 @@ function CheckboxRow({
   label,
 }: {
   checked: boolean;
-  onChange: (v: boolean) => void;
+  onChange: (value: boolean) => void;
   label: React.ReactNode;
 }) {
   return (
     <label
       className="flex items-start gap-3 cursor-pointer select-none"
-      style={{ color: "rgb(24,44,62)", fontSize: "14px", lineHeight: "20px" }}
+      style={{
+        color: "rgb(24,44,62)",
+        fontSize: "14px",
+        lineHeight: "20px",
+      }}
     >
       <span
         className="inline-flex items-center justify-center rounded-[6px] mt-[2px] shrink-0"
@@ -265,12 +328,14 @@ function CheckboxRow({
           </svg>
         )}
       </span>
+
       <input
         type="checkbox"
         className="sr-only"
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
+        onChange={(event) => onChange(event.target.checked)}
       />
+
       <span>{label}</span>
     </label>
   );

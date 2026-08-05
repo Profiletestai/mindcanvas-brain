@@ -1,6 +1,5 @@
 import { OnboardingHeader } from "./_components/OnboardingHeader";
-import { MarketingPane } from "./_components/MarketingPane";
-import { StepGuard } from "./_components/StepGuard";
+import { OnboardingShell } from "./_components/OnboardingShell";
 
 export default function OnboardingV2Layout({
   children,
@@ -10,15 +9,20 @@ export default function OnboardingV2Layout({
   return (
     <div className="min-h-screen bg-white text-white flex flex-col">
       <OnboardingHeader />
-      <main className="flex-1 mc-bg">
-        <div className="mx-auto max-w-[1440px] px-6 lg:pl-[145px] lg:pr-[53px] pb-24 flex flex-col gap-8 lg:flex-row lg:gap-[150px] lg:items-start">
-          <div className="lg:flex-1 lg:pt-[100px]">
-            <MarketingPane />
-          </div>
-          <div className="flex lg:justify-end lg:pt-[52px]">
-            <StepGuard>{children}</StepGuard>
-          </div>
-        </div>
+      <main
+        className="flex-1"
+        style={{
+          backgroundColor: "#021824",
+          backgroundImage: [
+            "linear-gradient(rgba(34, 75, 94, 0.22) 1px, transparent 1px)",
+            "linear-gradient(90deg, rgba(34, 75, 94, 0.22) 1px, transparent 1px)",
+            "linear-gradient(90deg, #01151f 0%, #0f202c 100%)",
+          ].join(", "),
+          backgroundPosition: "-1px -1px, -1px -1px, 0 0",
+          backgroundSize: "64px 64px, 64px 64px, 100% 100%",
+        }}
+      >
+        <OnboardingShell>{children}</OnboardingShell>
       </main>
     </div>
   );

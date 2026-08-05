@@ -1,3 +1,4 @@
+//apps/web/app/api/onboarding/v2/progress/route.ts
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/app/_lib/portal";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
@@ -25,14 +26,22 @@ export async function GET() {
       .maybeSingle<{ org_id: string; orgs: OrgProgress | null }>();
 
     if (!membership?.org_id) {
-      return NextResponse.json({ ok: true, step: 3 });
+      // No org yet: the client is on step 3 (engines + plan) until a selection
+      // has been saved, then step 4 (organisation) creates the org.
+      const { data: selection } = await admin
+        .from("onboarding_selections")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle<{ user_id: string }>();
+
+      return NextResponse.json({ ok: true, step: selection ? 4 : 3 });
     }
 
     const org = membership.orgs;
     const last = org?.last_completed_step ?? 0;
     const org_slug = org?.slug ?? null;
 
-    if (last >= 6) {
+    if (last >= 10) {
       return NextResponse.json({ ok: true, step: "complete", org_id: membership.org_id, org_slug });
     }
 

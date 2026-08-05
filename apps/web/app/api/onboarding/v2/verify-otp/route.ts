@@ -1,3 +1,4 @@
+//apps/web/app/api/onboarding/v2/verify-otp/route.ts
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/app/_lib/portal";
 import { verifyOtpSchema } from "@/app/(v2)/onboarding/v2/_lib/schema";

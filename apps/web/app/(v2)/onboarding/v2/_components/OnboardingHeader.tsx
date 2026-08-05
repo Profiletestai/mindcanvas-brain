@@ -15,14 +15,7 @@ export function OnboardingHeader() {
           className="h-[68px] w-auto select-none"
         />
       </div>
-      <div
-        className="w-full h-[62px]"
-        style={{ background: "rgb(239,245,254)" }}
-      >
-        <div className="h-full mx-auto flex items-center gap-4 px-7 max-w-[1440px]">
-          <Stepper />
-        </div>
-      </div>
+      <Stepper />
     </header>
   );
 }

@@ -5,7 +5,12 @@ import type {
   ProgressResponse,
 } from "@/app/api/onboarding/v2/_lib/types";
 
-export const STEP_TO_PATH: Record<Exclude<OnboardingStep, "complete">, string> = {
+// The pilot flow keeps the six-step shape the v2 flow had before payment and
+// the closing screens were added to it, so it has its own step union: pilot
+// orgs are complete at 6 and never reach the v2 steps 7-9.
+export type PilotStep = 1 | 2 | 3 | 4 | 5 | 6;
+
+export const STEP_TO_PATH: Record<PilotStep, string> = {
   1: "/onboarding/pilot/account",
   2: "/onboarding/pilot/verify",
   3: "/onboarding/pilot/organisation",
@@ -25,7 +30,7 @@ export const FIRST_AUTH_STEP = 3;
 
 export function pathForStep(step: OnboardingStep): string {
   if (step === "complete") return COMPLETE_PATH;
-  return STEP_TO_PATH[step];
+  return STEP_TO_PATH[Math.min(step, TOTAL_STEPS) as PilotStep];
 }
 
 export const PATH_TO_STEP: Record<string, OnboardingStep> = {

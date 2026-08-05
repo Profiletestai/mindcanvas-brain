@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 type BillingSummary = {
   ok: boolean;
   billing: {
+    billing_source?: string | null;
     is_pilot?: boolean;
     pilot_end_date?: string | null;
     pilot_grace_ends_at?: string | null;
@@ -47,7 +48,17 @@ export default function PilotGracePopup() {
         .json()
         .catch(() => null)) as BillingSummary | null;
       const b = data?.billing;
-      if (!b?.is_pilot || !b.pilot_end_date) return;
+
+      // A converted legacy organisation follows the compulsory
+      // legacy billing flow, even if an old pilot entitlement remains.
+      if (
+        !b ||
+        b.billing_source === "legacy" ||
+        !b.is_pilot ||
+        !b.pilot_end_date
+      ) {
+        return;
+      }
 
       const now = Date.now();
       const end = new Date(b.pilot_end_date).getTime();
