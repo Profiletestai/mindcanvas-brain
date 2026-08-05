@@ -37,6 +37,20 @@ export const otpSchema = z
   .trim()
   .regex(OTP_RE, { message: "Enter the 6-digit code." });
 
+export const passwordSchema = z
+  .string()
+  .min(8, { message: "Password must be at least 8 characters." })
+  .regex(/[a-z]/, { message: "Password must contain a lowercase letter." })
+  .regex(/[A-Z]/, { message: "Password must contain an uppercase letter." })
+  .regex(/\d/, { message: "Password must contain a number." });
+
+export const resetPasswordSchema = z
+  .object({ password: passwordSchema, confirm_password: z.string() })
+  .refine((v) => v.password === v.confirm_password, {
+    message: "Passwords do not match.",
+    path: ["confirm_password"],
+  });
+
 export const tierSchema = z
   .number()
   .int()
@@ -121,6 +135,7 @@ export const uploadLogoSchema = z.object({
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type OrgInput = z.infer<typeof orgSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
