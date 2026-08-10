@@ -3,7 +3,14 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
+import {
+  getCareerVerticalDisplayCode,
+  getVerticalLabel,
+  MCAS_VERTICAL_LABELS,
+  replaceCareerVerticalCodesForDisplay,
+} from "@/lib/mcas/reportConstants";
 import type {
+  McasCareerVerticalCode,
   McasCoreCode,
   McasDistributionItem,
   McasOperatingStyleCode,
@@ -53,6 +60,29 @@ function safePercent(value: number | undefined) {
   return Math.round(value);
 }
 
+function operatingStyleDisplayLabel(
+  item: McasDistributionItem<McasOperatingStyleCode>,
+) {
+  return `${item.label} (${item.code})`;
+}
+
+function careerVerticalDisplayCode(code: McasCareerVerticalCode) {
+  return getCareerVerticalDisplayCode(code);
+}
+
+function careerVerticalDisplayLabel(code: McasCareerVerticalCode) {
+  return getVerticalLabel(code);
+}
+
+function careerVerticalDefinition(code: McasCareerVerticalCode) {
+  return MCAS_VERTICAL_LABELS[code].shortDescription;
+}
+
+function careerVerticalLevel(code: McasCareerVerticalCode) {
+  const level = Number(code.replace("V", ""));
+  return Number.isFinite(level) ? level : 1;
+}
+
 function SectionShell({
   id,
   eyebrow,
@@ -66,18 +96,18 @@ function SectionShell({
 }) {
   return (
     <section id={id} className="rounded-[28px] bg-[#6d4cff] p-3 shadow-xl">
-      <div className="rounded-[22px] bg-white p-6 md:p-8">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eee9ff] text-lg">
+      <div className="rounded-[22px] bg-white p-5 md:p-6">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eee9ff] text-base">
             ✉
           </div>
           <div>
             {eyebrow ? (
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#6d4cff]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6d4cff]">
                 {eyebrow}
               </p>
             ) : null}
-            <h2 className="text-xl font-bold text-slate-950 md:text-2xl">
+            <h2 className="text-[16px] font-bold leading-5 text-slate-950 md:text-[18px]">
               {title}
             </h2>
           </div>
@@ -97,19 +127,19 @@ function TopHeader({ payload }: { payload: McasReportPayload }) {
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-xl bg-[#d8ccff]" />
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.28em] text-[#5b45d6]">
-                Candidate Lite Career Report
+              <p className="text-[13px] font-bold uppercase tracking-[0.22em] text-[#5b45d6]">
+                Assessment Summary and Report
               </p>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-700">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700">
                 MindCanvas CORE Alignment System
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-2 text-xs md:grid-cols-3">
+        <div className="grid gap-2 text-[11px] md:grid-cols-3">
           <div className="rounded-2xl border border-[#d8ccff] bg-white px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">
               Prepared for
             </p>
             <p className="font-semibold text-slate-950">
@@ -118,7 +148,7 @@ function TopHeader({ payload }: { payload: McasReportPayload }) {
           </div>
 
           <div className="rounded-2xl border border-[#d8ccff] bg-white px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">
               Date
             </p>
             <p className="font-semibold text-slate-950">
@@ -127,10 +157,10 @@ function TopHeader({ payload }: { payload: McasReportPayload }) {
           </div>
 
           <div className="rounded-2xl border border-[#d8ccff] bg-white px-4 py-3">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">
               Framework
             </p>
-            <p className="font-semibold text-slate-950">Candidate Lite Report</p>
+            <p className="font-semibold text-slate-950">Assessment Summary and Report</p>
           </div>
         </div>
       </div>
@@ -148,12 +178,12 @@ function MetricCard({
   caption: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/8 p-5">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-violet-200">
+    <div className="rounded-2xl border border-white/10 bg-white/8 p-4">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-200">
         {label}
       </p>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      <p className="mt-1 text-sm text-violet-100">{caption}</p>
+      <p className="text-[18px] font-bold leading-6 text-white">{value}</p>
+      <p className="mt-1 text-[12px] leading-5 text-violet-100">{caption}</p>
     </div>
   );
 }
@@ -167,27 +197,27 @@ function Hero({ payload }: { payload: McasReportPayload }) {
     <section className="bg-[#100d25] px-5 py-8 text-white md:px-8 md:py-10">
       <div className="grid gap-8 lg:grid-cols-[1.05fr_1fr_260px]">
         <div>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.28em] text-violet-200">
-            Candidate Lite Career Report
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-violet-200">
+            Assessment Summary and Report
           </p>
-          <h1 className="text-3xl font-black tracking-tight md:text-5xl">
+          <h1 className="text-[28px] font-black leading-tight tracking-tight md:text-[34px]">
             {payload.candidate.fullName}
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-violet-100">
+          <p className="mt-3 max-w-2xl text-[13px] leading-6 text-violet-100">
             This is how you naturally work — a snapshot of your execution
             pattern, strengths, and best-fit environments.
           </p>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <MetricCard
               label="Your Profile"
-              value={primaryOs.label}
+              value={operatingStyleDisplayLabel(primaryOs)}
               caption="Natural execution style"
             />
             <MetricCard
-              label="Career Stage"
-              value={primaryVertical.code}
-              caption={primaryVertical.label}
+              label="Career Vertical"
+              value={careerVerticalDisplayCode(primaryVertical.code)}
+              caption={careerVerticalDisplayLabel(primaryVertical.code)}
             />
             <MetricCard
               label="Work Pattern"
@@ -210,22 +240,28 @@ function Hero({ payload }: { payload: McasReportPayload }) {
         <div className="space-y-4">
           <CoreBalanceMini items={payload.result.core.distribution} />
 
-          <div className="rounded-3xl bg-[#6d4cff] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-100">
+          <div className="rounded-3xl bg-[#6d4cff] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-100">
               Profile
             </p>
-            <p className="mt-2 text-2xl font-black">{primaryOs.label}</p>
-            <p className="text-sm text-violet-100">
+            <p className="mt-1.5 text-[18px] font-black leading-6">
+              {operatingStyleDisplayLabel(primaryOs)}
+            </p>
+            <p className="text-[12px] leading-5 text-violet-100">
               {primaryOs.percentage}% · {bandLabel(primaryOs.band)}
             </p>
           </div>
 
-          <div className="rounded-3xl bg-[#6d4cff] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-100">
-              Vertical
+          <div className="rounded-3xl bg-[#6d4cff] p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-100">
+              Career Vertical
             </p>
-            <p className="mt-2 text-2xl font-black">{primaryVertical.code}</p>
-            <p className="text-sm text-violet-100">{primaryVertical.label}</p>
+            <p className="mt-1.5 text-[18px] font-black leading-6">
+              {careerVerticalDisplayCode(primaryVertical.code)}
+            </p>
+            <p className="text-[12px] leading-5 text-violet-100">
+              {careerVerticalDisplayLabel(primaryVertical.code)}
+            </p>
           </div>
         </div>
       </div>
@@ -244,36 +280,36 @@ function OperatingStylePanel({
     <div
       className={
         compact
-          ? "rounded-3xl bg-white p-5 text-slate-950"
-          : "rounded-3xl border border-slate-200 bg-white p-5"
+          ? "rounded-3xl bg-white p-4 text-slate-950"
+          : "rounded-3xl border border-slate-200 bg-white p-4"
       }
     >
-      <div className="mb-5 flex items-center justify-between">
-        <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-600">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-600">
           Operating Style
         </h3>
-        <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">
+        <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold text-violet-700">
           Distribution
         </span>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {items.map((item) => (
           <div key={item.code}>
-            <div className="mb-1 flex items-center justify-between gap-4 text-sm">
+            <div className="mb-1 flex items-center justify-between gap-3 text-[12px]">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-xs font-black text-violet-700">
-                  {item.code.replace("OS", "")}
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-[9px] font-black text-violet-700">
+                  {item.code}
                 </span>
                 <span className="truncate font-semibold text-slate-900">
-                  {item.label}
+                  {operatingStyleDisplayLabel(item)}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="font-bold text-slate-900">
                   {item.percentage}%
                 </span>
-                <span className="hidden rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 sm:inline-flex">
+                <span className="hidden rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold uppercase text-slate-600 sm:inline-flex">
                   {bandLabel(item.band)}
                 </span>
               </div>
@@ -305,12 +341,12 @@ function CoreBalanceMini({
   const examine = byCode.get("EXAMINE")?.percentage ?? 0;
 
   return (
-    <div className="rounded-3xl bg-white p-5 text-slate-950">
-      <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+    <div className="rounded-3xl bg-white p-4 text-slate-950">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
         Work Cycle Coverage
       </p>
 
-      <div className="mx-auto grid h-44 w-44 grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-8 border-violet-100 text-center text-xs font-bold">
+      <div className="mx-auto grid h-40 w-40 grid-cols-2 grid-rows-2 overflow-hidden rounded-full border-8 border-violet-100 text-center text-[10px] font-bold">
         <div className="flex flex-col items-center justify-center bg-violet-50">
           <span>Create</span>
           <span className="text-violet-700">{create}%</span>
@@ -345,8 +381,10 @@ function TopStyleStrip({
           className="rounded-2xl border border-slate-200 bg-white p-4"
         >
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-bold text-slate-950">{item.label}</p>
-            <p className="text-sm font-bold text-slate-500">
+            <p className="text-[12px] font-bold text-slate-950">
+              {operatingStyleDisplayLabel(item)}
+            </p>
+            <p className="text-[11px] font-bold text-slate-500">
               {item.percentage}%
             </p>
           </div>
@@ -356,7 +394,7 @@ function TopStyleStrip({
               style={{ width: `${safePercent(item.percentage)}%` }}
             />
           </div>
-          <p className="mt-2 text-xs font-semibold text-slate-500">
+          <p className="mt-2 text-[10px] font-semibold uppercase text-slate-500">
             {bandLabel(item.band)}
           </p>
         </div>
@@ -369,6 +407,7 @@ function SidebarIndex() {
   const links = [
     ["welcome", "Welcome Snapshot"],
     ["style", "Your Operating Style Snapshot"],
+    ["career-vertical", "Your Career Vertical Fit Today"],
     ["strengths", "Your Natural Strengths"],
     ["environment", "Your Best Fit Work Environment"],
     ["roles", "Recommended Roles and Pathways"],
@@ -378,7 +417,7 @@ function SidebarIndex() {
 
   return (
     <aside className="rounded-3xl bg-[#211941] p-5 text-white lg:sticky lg:top-6">
-      <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-violet-200">
+      <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-200">
         Report Index
       </p>
 
@@ -387,7 +426,7 @@ function SidebarIndex() {
           <a
             key={href}
             href={`#${href}`}
-            className="block rounded-xl border border-white/10 px-3 py-2 text-sm text-violet-50 hover:bg-white/10"
+            className="block rounded-xl border border-white/10 px-3 py-2 text-[12px] leading-5 text-violet-50 hover:bg-white/10"
           >
             {index + 1}. {label}
           </a>
@@ -395,12 +434,12 @@ function SidebarIndex() {
       </nav>
 
       <div className="mt-6 space-y-2">
-        <button className="w-full rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">
+        <button className="w-full rounded-xl bg-white px-4 py-2 text-[12px] font-bold text-slate-950">
           Download PDF
         </button>
         <a
           href="#upgrade"
-          className="block w-full rounded-xl bg-[#6d4cff] px-4 py-2 text-center text-sm font-bold text-white"
+          className="block w-full rounded-xl bg-[#6d4cff] px-4 py-2 text-center text-[12px] font-bold text-white"
         >
           Next step
         </a>
@@ -413,7 +452,7 @@ function WelcomeSection() {
   return (
     <SectionShell id="welcome" title="Welcome Snapshot">
       <div className="space-y-6">
-        <p className="text-base leading-7 text-slate-700">
+        <p className="text-[13px] leading-6 text-slate-700">
           MCAS is not a personality test. It is a workforce alignment and career
           execution system designed to explain how you naturally execute work,
           where you are most likely to thrive, and what environments and roles
@@ -448,10 +487,10 @@ function InfoCard({
 }) {
   return (
     <div className="rounded-2xl border border-violet-100 bg-[#f5f1ff] p-5">
-      <p className="mb-2 text-xs font-black uppercase tracking-[0.2em] text-slate-700">
+      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-700">
         {title}
       </p>
-      <p className="text-sm leading-6 text-slate-700">{description}</p>
+      <p className="text-[12px] leading-5 text-slate-700">{description}</p>
     </div>
   );
 }
@@ -461,8 +500,8 @@ function OperatingStyleSnapshot({ payload }: { payload: McasReportPayload }) {
 
   return (
     <SectionShell id="style" title="Your Operating Style Snapshot">
-      <div className="space-y-8">
-        <p className="text-base leading-7 text-slate-700">
+      <div className="space-y-6">
+        <p className="text-[13px] leading-6 text-slate-700">
           The Operating Style reveals your natural execution pattern. The
           distribution below reflects scored pattern strength, not a ranking
           against other people.
@@ -470,7 +509,7 @@ function OperatingStyleSnapshot({ payload }: { payload: McasReportPayload }) {
 
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-            <div className="mx-auto grid max-w-sm grid-cols-3 gap-3 text-center text-xs font-bold text-slate-700">
+            <div className="mx-auto grid max-w-sm grid-cols-3 gap-3 text-center text-[10px] font-bold text-slate-700">
               {payload.result.operatingStyle.distribution.map((item) => (
                 <div
                   key={item.code}
@@ -481,22 +520,22 @@ function OperatingStyleSnapshot({ payload }: { payload: McasReportPayload }) {
                   }
                 >
                   <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-                    {item.code.replace("OS", "")}
+                    {item.code}
                   </div>
-                  <p>{item.label}</p>
+                  <p>{operatingStyleDisplayLabel(item)}</p>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#6d4cff]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#6d4cff]">
               Operating Style · {primary.code}
             </p>
-            <h3 className="mt-3 text-3xl font-black text-slate-950">
-              The {primary.label}
+            <h3 className="mt-2 text-[20px] font-black leading-7 text-slate-950">
+              The {operatingStyleDisplayLabel(primary)}
             </h3>
-            <p className="mt-4 text-base leading-7 text-slate-700">
+            <p className="mt-3 text-[13px] leading-6 text-slate-700">
               {payload.candidateFacing.operatingStyleNarrative}
             </p>
           </div>
@@ -515,7 +554,7 @@ function CoreCoverage({
 }) {
   return (
     <div>
-      <p className="mb-4 text-base leading-7 text-slate-700">
+      <p className="mb-4 text-[13px] leading-6 text-slate-700">
         The CORE system maps which parts of the work cycle you naturally drive,
         support, or under-cover.
       </p>
@@ -528,12 +567,12 @@ function CoreCoverage({
           >
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="font-black text-slate-950">{item.label}</p>
-                <p className="text-xs font-semibold text-slate-500">
+                <p className="text-[13px] font-black leading-5 text-slate-950">{item.label}</p>
+                <p className="text-[10px] font-semibold text-slate-500">
                   {item.percentage}% · {bandLabel(item.band)}
                 </p>
               </div>
-              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">
+              <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-bold text-violet-700">
                 {item.code}
               </span>
             </div>
@@ -545,7 +584,7 @@ function CoreCoverage({
               />
             </div>
 
-            <p className="text-sm leading-6 text-slate-600">
+            <p className="text-[12px] leading-5 text-slate-600">
               {item.description}
             </p>
           </div>
@@ -564,11 +603,11 @@ function StrengthsSection({ strengths }: { strengths: McasStrength[] }) {
             key={strength.title}
             className="rounded-2xl border border-teal-200 bg-white p-5"
           >
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-lg">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-base">
               {strength.icon ?? "✦"}
             </div>
-            <h3 className="font-black text-slate-950">{strength.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <h3 className="text-[13px] font-black leading-5 text-slate-950">{strength.title}</h3>
+            <p className="mt-2 text-[12px] leading-5 text-slate-600">
               {strength.description}
             </p>
           </div>
@@ -596,8 +635,8 @@ function EnvironmentSection({ payload }: { payload: McasReportPayload }) {
             key={title}
             className="rounded-2xl border border-slate-200 bg-white p-5"
           >
-            <p className="font-black text-slate-950">{title}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <p className="text-[13px] font-black leading-5 text-slate-950">{title}</p>
+            <p className="mt-2 text-[12px] leading-5 text-slate-600">
               {description}
             </p>
           </div>
@@ -636,14 +675,217 @@ function RolesSection({ roles }: { roles: McasRoleRecommendation[] }) {
 function RoleCard({ role }: { role: McasRoleRecommendation }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#6d4cff]">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#6d4cff]">
         {role.category}
       </p>
-      <h3 className="mt-2 font-black text-slate-950">{role.title}</h3>
-      <p className="mt-1 text-sm leading-6 text-slate-600">
+      <h3 className="mt-2 text-[13px] font-black leading-5 text-slate-950">{role.title}</h3>
+      <p className="mt-1 text-[12px] leading-5 text-slate-600">
         {role.description}
       </p>
     </div>
+  );
+}
+
+function careerVerticalStatusMeta(
+  level: number,
+  primaryLevel: number,
+  readinessPercentage?: number,
+) {
+  if (level < primaryLevel) {
+    return {
+      label: "Completed",
+      rowClass: "border-[#DDD8FF] bg-white",
+      codeClass: "border-[#DDD8FF] bg-[#F5F3FF] text-[#6D4CFF]",
+      pillClass: "border-[#DDD8FF] bg-[#F5F3FF] text-[#6D4CFF]",
+      barColor: "#7C5CFF",
+      barWidth: 100,
+    };
+  }
+
+  if (level === primaryLevel) {
+    return {
+      label: "Current fit",
+      rowClass: "border-[#6D4CFF] bg-[#F1EEFF]",
+      codeClass: "border-[#211941] bg-[#211941] text-white",
+      pillClass: "border-[#211941] bg-[#211941] text-white",
+      barColor: "#6D4CFF",
+      barWidth: 100,
+    };
+  }
+
+  if (level === primaryLevel + 1) {
+    return {
+      label: "Stretch with support",
+      rowClass: "border-[#37C8E7] bg-[#ECFBFE]",
+      codeClass: "border-[#37C8E7] bg-white text-[#147A93]",
+      pillClass: "border-[#37C8E7] bg-white text-[#147A93]",
+      barColor: "#37C8E7",
+      barWidth:
+        typeof readinessPercentage === "number"
+          ? Math.max(18, Math.min(100, Math.round(readinessPercentage)))
+          : 38,
+    };
+  }
+
+  return {
+    label: level === primaryLevel + 2 ? "Overreach risk" : "Not indicated",
+    rowClass:
+      level === primaryLevel + 2
+        ? "border-[#F4C84A] bg-[#FFF9E8]"
+        : "border-slate-200 bg-white",
+    codeClass:
+      level === primaryLevel + 2
+        ? "border-[#F4C84A] bg-white text-[#A85C00]"
+        : "border-slate-200 bg-white text-slate-500",
+    pillClass:
+      level === primaryLevel + 2
+        ? "border-[#F4C84A] bg-white text-[#A85C00]"
+        : "border-slate-200 bg-slate-50 text-slate-500",
+    barColor: level === primaryLevel + 2 ? "#F4C84A" : "#CBD5E1",
+    barWidth: level === primaryLevel + 2 ? 12 : 6,
+  };
+}
+
+function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
+  const primary = payload.result.careerVertical.primary;
+  const next = payload.result.careerVertical.next;
+  const primaryLevel = careerVerticalLevel(primary.code);
+  const readinessPercentage =
+    payload.result.careerVertical.readinessPercentage;
+
+  const order: McasCareerVerticalCode[] = [
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+  ];
+
+  const verticals = order.map((code) => {
+    const resultItem = payload.result.careerVertical.distribution.find(
+      (item) => item.code === code,
+    );
+
+    return {
+      code,
+      label: careerVerticalDisplayLabel(code),
+      description: careerVerticalDefinition(code),
+      percentage: resultItem?.percentage ?? 0,
+    };
+  });
+
+  const currentResultLabel = replaceCareerVerticalCodesForDisplay(
+    payload.result.careerVertical.readinessLabel ??
+      `${careerVerticalDisplayCode(primary.code)} fit indicated`,
+  );
+
+  const readinessDescription = next
+    ? `Current Career Vertical result indicates ${careerVerticalDisplayCode(
+        primary.code,
+      )} scope. Stretch indicators toward ${careerVerticalDisplayCode(
+        next.code,
+      )} with support.`
+    : `Current Career Vertical result indicates ${careerVerticalDisplayCode(
+        primary.code,
+      )} scope. Continue strengthening sustainable performance at this level.`;
+
+  return (
+    <SectionShell
+      id="career-vertical"
+      eyebrow="Career Career Vertical Readiness"
+      title="Your Career Vertical Fit Today"
+    >
+      <div className="space-y-5">
+        <div className="rounded-2xl border border-[#DDD8FF] bg-[#F7F5FF] px-5 py-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#6D4CFF]">
+            Current result
+          </p>
+          <p className="mt-2 text-[18px] font-black leading-6 text-[#211941]">
+            {currentResultLabel}
+          </p>
+          <p className="mt-2 text-[12px] leading-6 text-slate-600">
+            Progression changes work itself. Higher Career Verticals increase
+            ambiguity, scope, decision impact, and accountability. The next
+            level should be treated as a development horizon, not an automatic
+            promotion recommendation.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {verticals.map((item) => {
+            const level = careerVerticalLevel(item.code);
+            const meta = careerVerticalStatusMeta(
+              level,
+              primaryLevel,
+              readinessPercentage,
+            );
+
+            return (
+              <div
+                key={item.code}
+                className={`grid gap-4 rounded-2xl border px-4 py-4 md:grid-cols-[52px_minmax(0,1.45fr)_minmax(150px,0.85fr)_160px] md:items-center ${meta.rowClass}`}
+              >
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border text-[12px] font-black ${meta.codeClass}`}
+                >
+                  {careerVerticalDisplayCode(item.code)}
+                </div>
+
+                <div>
+                  <p className="text-[13px] font-black leading-5 text-[#211941]">
+                    {careerVerticalDisplayCode(item.code)} · {item.label}
+                  </p>
+                  <p className="mt-1 text-[12px] leading-5 text-slate-600">
+                    {item.description}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${meta.barWidth}%`,
+                        backgroundColor: meta.barColor,
+                      }}
+                    />
+                  </div>
+                  {item.percentage > 0 ? (
+                    <p className="mt-1 text-[9px] font-semibold text-slate-500">
+                      {item.percentage}% scored alignment
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="md:text-right">
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1.5 text-center text-[9px] font-black uppercase tracking-[0.12em] ${meta.pillClass}`}
+                  >
+                    {meta.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="rounded-2xl border border-[#6D4CFF] bg-[#EEEAFE] p-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6D4CFF] text-lg text-white">
+            ↗
+          </div>
+          <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+            Career Career Vertical Readiness
+          </p>
+          <p className="mt-2 text-[18px] font-black leading-6 text-[#211941]">
+            {careerVerticalDisplayCode(primary.code)} Ready
+          </p>
+          <p className="mt-2 text-[12px] leading-5 text-slate-600">
+            {readinessDescription}
+          </p>
+        </div>
+      </div>
+    </SectionShell>
   );
 }
 
@@ -657,18 +899,18 @@ function UpgradePanel({
   return (
     <section
       id="upgrade"
-      className="rounded-[28px] bg-gradient-to-br from-[#211941] to-[#100d25] p-8 text-center text-white shadow-xl md:p-12"
+      className="rounded-[28px] bg-gradient-to-br from-[#211941] to-[#100d25] p-7 text-center text-white shadow-xl md:p-9"
     >
       <div className="mx-auto max-w-3xl">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-2xl">
           🔒
         </div>
 
-        <h2 className="text-2xl font-black md:text-3xl">
+        <h2 className="text-[16px] font-bold leading-5 md:text-[18px]">
           Unlock Your Full Strategic Career Growth Report
         </h2>
 
-        <p className="mt-4 text-base leading-7 text-violet-100">
+        <p className="mt-3 text-[13px] leading-6 text-violet-100">
           Your snapshot is just the beginning. The full MCAS report covers blind
           spots, pressure patterns, decision style, 30/60/90-day success guide,
           and a complete career pathway roadmap.
@@ -677,14 +919,14 @@ function UpgradePanel({
         {payload.access.fullUnlocked ? (
           <a
             href={`/mcas/r/${token}/full`}
-            className="mt-6 inline-flex rounded-2xl bg-white px-6 py-3 text-sm font-black text-slate-950"
+            className="mt-6 inline-flex rounded-2xl bg-white px-6 py-3 text-[12px] font-black text-slate-950"
           >
             Open Full Report →
           </a>
         ) : (
           <a
             href={`/mcas/r/${token}/full`}
-            className="mt-6 inline-flex rounded-2xl bg-[#6d4cff] px-6 py-3 text-sm font-black text-white shadow-lg"
+            className="mt-6 inline-flex rounded-2xl bg-[#6d4cff] px-6 py-3 text-[12px] font-black text-white shadow-lg"
           >
             Get the Full Report →
           </a>
@@ -710,7 +952,7 @@ function FullReportPreview() {
     ],
     [
       "Your Next Step Pathway",
-      "Growth direction, next vertical preparation, and development areas.",
+      "Growth direction, next Career Vertical preparation, and development areas.",
     ],
   ];
 
@@ -726,8 +968,8 @@ function FullReportPreview() {
               🔒
             </div>
             <div>
-              <h3 className="font-black text-slate-950">{title}</h3>
-              <p className="mt-1 text-sm leading-6 text-slate-600">
+              <h3 className="text-[13px] font-black leading-5 text-slate-950">{title}</h3>
+              <p className="mt-1 text-[12px] leading-5 text-slate-600">
                 {description}
               </p>
             </div>
@@ -766,12 +1008,13 @@ export default async function McasSnapshotReportPage({ params }: PageProps) {
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
 
-        <div className="grid gap-6 px-5 py-8 md:px-8 lg:grid-cols-[240px_1fr]">
+        <div className="grid gap-6 px-5 py-7 md:px-8 lg:grid-cols-[240px_1fr]">
           <SidebarIndex />
 
-          <div className="space-y-8">
+          <div className="space-y-6">
             <WelcomeSection />
             <OperatingStyleSnapshot payload={payload} />
+            <CareerVerticalSection payload={payload} />
             <StrengthsSection strengths={payload.candidateFacing.strengths} />
             <EnvironmentSection payload={payload} />
             <RolesSection roles={payload.candidateFacing.roleRecommendations} />

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
@@ -9,6 +9,7 @@ import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { api, isErr } from "../_lib/api";
 import { orgSchema } from "../_lib/schema";
+import { CREATED_PATH } from "../_lib/progress";
 import { StepCard } from "../_components/StepCard";
 
 type OrgFormInput = z.input<typeof orgSchema>;
@@ -43,11 +44,18 @@ const EMPTY: OrgFormInput = {
   logo_url: "",
 };
 
+const POLL_INTERVAL_MS = 2000;
+const POLL_ATTEMPTS = 20;
+
 export default function OrganisationPage() {
   const router = useRouter();
+  const params = useSearchParams();
+  const status = params.get("status");
   const fileRef = useRef<HTMLInputElement>(null);
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+  const confirmStarted = useRef(false);
 
   const {
     register,
@@ -69,6 +77,36 @@ export default function OrganisationPage() {
 
   const logoUrl = (watch("logo_url") as string | undefined) ?? "";
 
+  const confirmPayment = useCallback(async () => {
+    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      const res = await fetch("/api/billing/summary", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+      const active =
+        json?.ok &&
+        json.billing?.stripe_status === "active" &&
+        json.billing?.is_pilot === false;
+      if (active) {
+        setReady(true);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    setConfirmError(
+      "Your payment went through but we are still waiting for confirmation. Refresh this page in a moment.",
+    );
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (status === "success" && !confirmStarted.current) {
+      confirmStarted.current = true;
+      void confirmPayment();
+    }
+  }, [status, confirmPayment]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -84,12 +122,12 @@ export default function OrganisationPage() {
           logo_url: res.org.logo_url ?? "",
         });
       }
-      setReady(true);
+      if (status !== "success") setReady(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [reset]);
+  }, [reset, status]);
 
   const countryOptions = useMemo(() => {
     const all = countries.getNames("en", { select: "official" }) as Record<
@@ -114,16 +152,40 @@ export default function OrganisationPage() {
   };
 
   const onSubmit = handleSubmit(async (values) => {
-    const res = await api.createOrg(values);
+    const res = await api.patchOrg(values);
     if (isErr(res)) {
       setError("root", { message: res.error });
       return;
     }
-    router.push("/onboarding/v2/contact");
+    const stepRes = await api.completeStep(5);
+    if (isErr(stepRes)) {
+      setError("root", { message: stepRes.error });
+      return;
+    }
+    router.push(CREATED_PATH);
   });
 
   if (!ready) {
-    return <div className="py-8 text-center text-white/70">Loading…</div>;
+    return (
+      <StepCard
+        titleNoWrap={false}
+        title={
+          <>
+            Confirming your{" "}
+            <span style={{ color: "rgb(84, 175, 224)" }}>subscription</span>
+          </>
+        }
+        subtitle="This only takes a moment."
+      >
+        <div className="mt-10 text-center text-white/70">
+          {confirmError ? (
+            <p className="text-rose-400">{confirmError}</p>
+          ) : (
+            <p>Waiting for Stripe to confirm your payment…</p>
+          )}
+        </div>
+      </StepCard>
+    );
   }
 
   const errMsg =
@@ -139,11 +201,11 @@ export default function OrganisationPage() {
     <StepCard
       title={
         <>
-          Tell us about your{" "}
+          Set up your{" "}
           <span style={{ color: "rgb(84, 175, 224)" }}>organisation</span>
         </>
       }
-      subtitle="Add the core details for your main organisation."
+      subtitle="Add your organisation details to create your MindCanvas workspace. You can update this information later in Profile Settings."
     >
       <form
         onSubmit={onSubmit}
@@ -232,9 +294,7 @@ export default function OrganisationPage() {
           <div className="mt-2 text-center">
             <button
               type="button"
-              onClick={() =>
-                setValue("logo_url", "", { shouldDirty: true })
-              }
+              onClick={() => setValue("logo_url", "", { shouldDirty: true })}
               className="text-[12px] font-semibold"
               style={{ color: "rgb(200,60,80)" }}
             >
@@ -259,7 +319,8 @@ export default function OrganisationPage() {
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
-              Address <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+              Address{" "}
+              <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
             </label>
             <input
               type="text"
@@ -297,7 +358,8 @@ export default function OrganisationPage() {
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
-              Website <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+              Website{" "}
+              <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
             </label>
             <input
               type="url"
@@ -309,7 +371,8 @@ export default function OrganisationPage() {
           </div>
           <div>
             <label className="block mb-1.5" style={eyebrowStyle}>
-              Industry <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
+              Industry{" "}
+              <span style={{ color: "rgb(140,160,185)" }}>(optional)</span>
             </label>
             <input
               type="text"
@@ -337,7 +400,7 @@ export default function OrganisationPage() {
             boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
           }}
         >
-          {isSubmitting ? "Saving…" : "Save and continue"}
+          {isSubmitting ? "Creating…" : "Create organisation"}
         </button>
       </form>
     </StepCard>

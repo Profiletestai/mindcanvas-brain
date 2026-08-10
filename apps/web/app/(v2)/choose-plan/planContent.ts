@@ -1,3 +1,4 @@
+//apps/web/app/(V2)/choose-plan/planContent.ts
 export type PlanFeature = { label: string; included: boolean };
 
 export type PlanCardContent = {
@@ -29,7 +30,7 @@ export const PLAN_CARDS: PlanCardContent[] = [
       inc("10 kickstart free tests"),
       inc("Bulk tests: $297 for 20"),
       inc("1:1 onboarding call"),
-      inc("Monthly group coaching call"),
+      inc("Monthly group coaching"),
       inc("Training library"),
       inc("Standard Support Level"),
       exc("Monthly Sales Strategy"),
@@ -37,7 +38,7 @@ export const PLAN_CARDS: PlanCardContent[] = [
       exc("Revenue licensing"),
       exc("White Label Versions"),
       exc("Additional Revenue Through Licensing"),
-      exc("API Integrations"),
+      exc("API integrations"),
     ],
   },
   {
@@ -55,15 +56,15 @@ export const PLAN_CARDS: PlanCardContent[] = [
       inc("10 kickstart free tests"),
       inc("Bulk tests: $247 for 20"),
       inc("1:1 onboarding call"),
-      inc("Monthly group coaching call"),
+      inc("Monthly group coaching"),
       inc("Training library"),
       inc("Standard Support Level"),
-      exc("Monthly Sales Strategy"),
+      inc("Monthly Sales Strategy"),
       exc("Customisation of IP"),
       exc("Revenue licensing"),
       exc("White Label Versions"),
       exc("Additional Revenue Through Licensing"),
-      exc("API Integrations"),
+      exc("API integrations"),
     ],
   },
   {
@@ -80,7 +81,7 @@ export const PLAN_CARDS: PlanCardContent[] = [
       inc("10 kickstart free tests"),
       inc("Bulk tests: $197 for 20"),
       inc("1:1 onboarding call"),
-      inc("Monthly group coaching call"),
+      inc("Monthly group coaching"),
       inc("Training library"),
       inc("Priority support"),
       inc("Niche IP customisation"),
@@ -104,7 +105,7 @@ export const PLAN_CARDS: PlanCardContent[] = [
       inc("10 kickstart free tests"),
       inc("Bulk tests: $147 for 20"),
       inc("1:1 onboarding call"),
-      inc("Monthly group coaching call"),
+      inc("Monthly group coaching"),
       inc("Training library"),
       inc("Priority support"),
       inc("Custom IP development"),

@@ -1,268 +1,782 @@
+//apps/web/app/portal/billing/BillingClient.tsx
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
-type OrgStatus = "pending_activation" | "active" | "past_due" | "suspended" | "archived";
+type BillingDisplayStatus =
+  | "active"
+  | "past_due"
+  | "payment_required"
+  | "cancelled";
+
+type Invoice = {
+  id: string;
+  number: string | null;
+  created_at: string;
+  status: string | null;
+  amount_cents: number;
+  currency: string;
+  hosted_invoice_url: string | null;
+  invoice_pdf: string | null;
+};
 
 type Summary = {
   ok: true;
-  org: { id: string; name: string; slug: string | null; status: OrgStatus };
+
+  org: {
+    id: string;
+    name: string;
+    slug: string | null;
+    status: string;
+  };
+
+  usage: {
+    allowance: number | null;
+    used: number;
+    remaining: number | null;
+    period_start: string | null;
+    period_end: string | null;
+  };
+
   billing: {
     tier: number | null;
     stripe_status: string | null;
-    stripe_customer_id: string | null;
-    stripe_subscription_id: string | null;
+    display_status: BillingDisplayStatus;
     period_start: string | null;
     period_end: string | null;
     past_due_since: string | null;
+    billing_source: string | null;
+    billing_interval: string | null;
+    included_trials_per_month:
+      | number
+      | null;
+
+    plan: {
+      name: string;
+      interval: string | null;
+      amount_cents: number | null;
+      currency: string | null;
+    };
+
+    payment_method: {
+      brand: string;
+      last4: string;
+      exp_month: number;
+      exp_year: number;
+    } | null;
+
+    invoices: Invoice[];
   } | null;
-  next_action: "checkout" | "reactivate" | "none";
+
+  next_action:
+    | "checkout"
+    | "reactivate"
+    | "none";
 };
 
-const STATUS_STYLE: Record<OrgStatus, { bg: string; text: string; dot: string; label: string }> = {
-  pending_activation: {
-    bg: "rgba(64,150,220,0.15)",
-    text: "rgb(170,210,250)",
-    dot: "rgb(80,160,230)",
-    label: "Pending activation",
-  },
+const STATUS_STYLE: Record<
+  BillingDisplayStatus,
+  {
+    label: string;
+    className: string;
+    dotClassName: string;
+  }
+> = {
   active: {
-    bg: "rgba(72,200,140,0.15)",
-    text: "rgb(160,240,200)",
-    dot: "rgb(64,210,140)",
     label: "Active",
+    className:
+      "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+    dotClassName: "bg-emerald-400",
   },
+
   past_due: {
-    bg: "rgba(240,160,60,0.15)",
-    text: "rgb(245,205,140)",
-    dot: "rgb(240,170,70)",
     label: "Past due",
+    className:
+      "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    dotClassName: "bg-amber-400",
   },
-  suspended: {
-    bg: "rgba(240,80,110,0.15)",
-    text: "rgb(255,180,200)",
-    dot: "rgb(240,90,120)",
-    label: "Suspended",
+
+  payment_required: {
+    label: "Payment required",
+    className:
+      "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    dotClassName: "bg-amber-400",
   },
-  archived: {
-    bg: "rgba(140,160,185,0.15)",
-    text: "rgb(190,205,230)",
-    dot: "rgb(160,180,210)",
-    label: "Archived",
+
+  cancelled: {
+    label: "Cancelled",
+    className:
+      "border-red-400/30 bg-red-400/10 text-red-100",
+    dotClassName: "bg-red-400",
   },
 };
 
-function fmtDate(iso: string | null) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
+function formatDate(
+  iso: string | null
+): string {
+  if (!iso) {
     return "—";
+  }
+
+  const date = new Date(iso);
+
+  if (!Number.isFinite(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString(
+    undefined,
+    {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }
+  );
+}
+
+function formatMoney(
+  amountCents: number | null,
+  currency: string | null
+): string {
+  if (
+    amountCents === null ||
+    !currency
+  ) {
+    return "—";
+  }
+
+  try {
+    return new Intl.NumberFormat(
+      undefined,
+      {
+        style: "currency",
+        currency:
+          currency.toUpperCase(),
+      }
+    ).format(amountCents / 100);
+  } catch {
+    return `${currency.toUpperCase()} ${(
+      amountCents / 100
+    ).toFixed(2)}`;
   }
 }
 
-export default function BillingClient({ orgId = null }: { orgId?: string | null }) {
-  const sp = useSearchParams();
-  const successFlag = sp?.get("status") === "success";
+function formatInterval(
+  interval: string | null
+): string {
+  if (
+    interval === "month" ||
+    interval === "monthly"
+  ) {
+    return "Monthly";
+  }
 
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string>("");
-  const [busy, setBusy] = useState(false);
-  const [actionErr, setActionErr] = useState<string>("");
+  if (
+    interval === "year" ||
+    interval === "annual"
+  ) {
+    return "Annual";
+  }
 
-  const pollAbort = useRef<{ stop: boolean }>({ stop: false });
+  return interval
+    ? interval.charAt(0).toUpperCase() +
+        interval.slice(1)
+    : "—";
+}
+
+function formatCardBrand(
+  brand: string
+): string {
+  if (brand.toLowerCase() === "amex") {
+    return "American Express";
+  }
+
+  return (
+    brand.charAt(0).toUpperCase() +
+    brand.slice(1)
+  );
+}
+
+export default function BillingClient({
+  orgId = null,
+}: {
+  orgId?: string | null;
+}) {
+  const [summary, setSummary] =
+    useState<Summary | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [actionBusy, setActionBusy] =
+    useState(false);
+
+  const [actionError, setActionError] =
+    useState("");
 
   const load = useCallback(async () => {
-    try {
-      const qs = orgId ? `?orgId=${encodeURIComponent(orgId)}` : "";
-      const res = await fetch(`/api/billing/summary${qs}`, { cache: "no-store" });
-      const j = await res.json();
-      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`);
-      setSummary(j as Summary);
-      return j as Summary;
-    } catch (e: any) {
-      setErr(String(e?.message || e));
-      return null;
+    const query = orgId
+      ? `?orgId=${encodeURIComponent(
+          orgId
+        )}`
+      : "";
+
+    const response = await fetch(
+      `/api/billing/summary${query}`,
+      {
+        cache: "no-store",
+        credentials: "include",
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data?.ok) {
+      throw new Error(
+        data?.error ||
+          "Unable to load billing information."
+      );
     }
+
+    setSummary(data as Summary);
   }, [orgId]);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
-      setLoading(true);
-      await load();
-      setLoading(false);
+      try {
+        setLoading(true);
+        setError("");
+
+        await load();
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load billing information."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
-  // Poll for up to 30s after a successful checkout return to catch webhook → active.
-  useEffect(() => {
-    if (!successFlag) return;
-    pollAbort.current.stop = false;
-    let elapsed = 0;
-    const id = setInterval(async () => {
-      if (pollAbort.current.stop) {
-        clearInterval(id);
-        return;
-      }
-      elapsed += 3000;
-      const s = await load();
-      if (s?.org.status === "active" || elapsed >= 30_000) {
-        pollAbort.current.stop = true;
-        clearInterval(id);
-      }
-    }, 3000);
-    return () => {
-      pollAbort.current.stop = true;
-      clearInterval(id);
-    };
-  }, [successFlag, load]);
-
-  async function startCheckout() {
-    setBusy(true);
-    setActionErr("");
+  async function activateSubscription() {
     try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(orgId ? { orgId } : {}),
-      });
-      const j = await res.json();
-      if (!res.ok || !j?.url) {
-        setActionErr(j?.error || "Could not start checkout");
-        setBusy(false);
-        return;
+      setActionBusy(true);
+      setActionError("");
+
+      const response = await fetch(
+        "/api/billing/legacy-checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            presentation: "hosted",
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        !response.ok ||
+        !data?.ok ||
+        !data?.url
+      ) {
+        throw new Error(
+          data?.error ||
+            "Unable to open secure subscription checkout."
+        );
       }
-      window.location.href = j.url as string;
-    } catch (e: any) {
-      setActionErr(String(e?.message || e));
-      setBusy(false);
+
+      window.location.assign(
+        data.url as string
+      );
+    } catch (checkoutError) {
+      setActionError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Unable to open secure subscription checkout."
+      );
+
+      setActionBusy(false);
+    }
+  }
+
+  async function managePaymentMethod() {
+    try {
+      setActionBusy(true);
+      setActionError("");
+
+      const response = await fetch(
+        "/api/billing/customer-portal",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify(
+            orgId ? { orgId } : {}
+          ),
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        !response.ok ||
+        !data?.url
+      ) {
+        throw new Error(
+          data?.error ||
+            "Unable to open secure billing management."
+        );
+      }
+
+      window.location.assign(
+        data.url as string
+      );
+    } catch (manageError) {
+      setActionError(
+        manageError instanceof Error
+          ? manageError.message
+          : "Unable to open secure billing management."
+      );
+
+      setActionBusy(false);
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen p-6 text-white">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-          <div className="text-white/70">Loading billing…</div>
+      <div className="p-6 text-white">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+          Loading billing information…
         </div>
       </div>
     );
   }
 
-  if (err || !summary) {
+  if (error || !summary) {
     return (
-      <div className="min-h-screen p-6 text-white">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-          <div className="text-red-300">Error: {err || "Failed to load billing"}</div>
+      <div className="p-6 text-white">
+        <div className="rounded-3xl border border-red-400/30 bg-red-400/10 p-6 text-red-100">
+          {error ||
+            "Unable to load billing information."}
         </div>
       </div>
     );
   }
 
-  const { org, billing, next_action } = summary;
-  const style = STATUS_STYLE[org.status] ?? STATUS_STYLE.pending_activation;
+  const { org, billing, usage } =
+    summary;
+
+  const displayStatus =
+    billing?.display_status ??
+    "payment_required";
+
+  const statusStyle =
+    STATUS_STYLE[displayStatus];
+
+  const allowance =
+    billing?.included_trials_per_month ??
+    usage.allowance;
+
+  const invoices =
+    billing?.invoices ?? [];
+
+  const isActive =
+    displayStatus === "active";
+
+  const canActivate =
+    displayStatus ===
+      "payment_required" &&
+    billing?.billing_source === "legacy";
+
+  const canManagePayment =
+    displayStatus === "active" ||
+    displayStatus === "past_due";
+
+  const recurringSuffix =
+    billing?.plan.interval === "month"
+      ? " / month"
+      : billing?.plan.interval ===
+          "year"
+        ? " / year"
+        : "";
 
   return (
-    <div className="min-h-screen p-6 space-y-6 text-white">
-      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6 p-6 text-white">
+      <header className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-widest text-white/60">MindCanvas</div>
-            <h1 className="text-2xl font-semibold">Billing</h1>
-            <p className="text-sm text-white/70">Subscription status, period, and activation.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64bae2]">
+              MindCanvas
+            </p>
+
+            <h1 className="mt-2 text-2xl font-semibold">
+              Billing
+            </h1>
+
+            <p className="mt-1 text-sm text-white/60">
+              Subscription, payment and
+              invoice details for {org.name}.
+            </p>
           </div>
+
           <span
-            className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-            style={{ background: style.bg, color: style.text, borderColor: style.dot }}
+            className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusStyle.className}`}
           >
             <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: style.dot }}
+              className={`h-1.5 w-1.5 rounded-full ${statusStyle.dotClassName}`}
             />
-            {style.label}
+
+            {statusStyle.label}
           </span>
         </div>
-      </div>
+      </header>
 
-      {successFlag && org.status !== "active" ? (
-        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100">
-          Payment received. Activating your account…
+      {displayStatus !== "active" && (
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+          {displayStatus === "past_due"
+            ? "Your latest payment is past due. Please update your payment method to restore normal billing."
+            : displayStatus === "cancelled"
+              ? "This subscription has been cancelled. Please contact MindCanvas support."
+              : "Payment is required to activate this subscription and its monthly test allocation."}
         </div>
-      ) : null}
+      )}
 
-      {successFlag && org.status === "active" ? (
-        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span>Payment successful. Your account is active.</span>
-          {org.slug ? (
+      <section className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+          <h2 className="text-base font-semibold">
+            Current subscription
+          </h2>
+
+          <div className="mt-5 space-y-4">
+            <DetailRow
+              label="Plan"
+              value={
+                billing?.plan.name ??
+                "MindCanvas subscription"
+              }
+            />
+
+            <DetailRow
+              label="Billing cycle"
+              value={formatInterval(
+                billing?.plan.interval ??
+                  billing?.billing_interval ??
+                  null
+              )}
+            />
+
+            <DetailRow
+              label="Amount"
+              value={
+                <>
+                  {formatMoney(
+                    billing?.plan
+                      .amount_cents ?? null,
+                    billing?.plan.currency ??
+                      null
+                  )}
+
+                  {recurringSuffix && (
+                    <span className="text-white/50">
+                      {recurringSuffix}
+                    </span>
+                  )}
+                </>
+              }
+            />
+
+            <DetailRow
+              label="Next payment"
+              value={
+                isActive
+                  ? formatDate(
+                      billing?.period_end ??
+                        null
+                    )
+                  : "—"
+              }
+            />
+
+            <DetailRow
+              label="Test allocation"
+              value={
+                allowance === null
+                  ? "Unlimited"
+                  : `${allowance} usages per month`
+              }
+            />
+
+            <DetailRow
+              label="Usage this period"
+              value={
+                !isActive
+                  ? "Starts after activation"
+                  : usage.remaining === null
+                    ? `${usage.used} used`
+                    : `${usage.used} used · ${usage.remaining} remaining`
+              }
+            />
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+          <h2 className="text-base font-semibold">
+            Payment method
+          </h2>
+
+          {billing?.payment_method ? (
+            <div className="mt-5 rounded-2xl border border-white/10 bg-[#06182a] p-5">
+              <p className="font-medium">
+                {formatCardBrand(
+                  billing.payment_method
+                    .brand
+                )}{" "}
+                ending in{" "}
+                {
+                  billing.payment_method
+                    .last4
+                }
+              </p>
+
+              <p className="mt-1 text-sm text-white/55">
+                Expires{" "}
+                {String(
+                  billing.payment_method
+                    .exp_month
+                ).padStart(2, "0")}
+                /
+                {
+                  billing.payment_method
+                    .exp_year
+                }
+              </p>
+            </div>
+          ) : (
+            <p className="mt-5 text-sm text-white/60">
+              {canActivate
+                ? "Your payment method will be added securely when you activate the subscription."
+                : "No saved card details are available yet."}
+            </p>
+          )}
+
+          {actionError && (
+            <div className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+              {actionError}
+            </div>
+          )}
+
+          {canActivate && (
+            <button
+              type="button"
+              onClick={
+                activateSubscription
+              }
+              disabled={actionBusy}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2d8fc4] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#247baa] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionBusy
+                ? "Opening secure checkout…"
+                : "Activate subscription"}
+            </button>
+          )}
+
+          {canManagePayment && (
+            <button
+              type="button"
+              onClick={
+                managePaymentMethod
+              }
+              disabled={actionBusy}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2d8fc4] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#247baa] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionBusy
+                ? "Opening secure billing…"
+                : displayStatus ===
+                    "past_due"
+                  ? "Update payment method"
+                  : "Manage payment method"}
+            </button>
+          )}
+
+          <p className="mt-3 text-xs leading-5 text-white/45">
+            Payment details are securely
+            managed by Stripe. Plan changes
+            and cancellation are not available
+            here.
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">
+              Invoice history
+            </h2>
+
+            <p className="mt-1 text-sm text-white/55">
+              View or download receipts
+              issued by Stripe.
+            </p>
+          </div>
+
+          {org.slug && (
             <Link
               href={`/portal/${org.slug}/dashboard`}
-              className="inline-flex items-center justify-center rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
-              }}
+              className="text-sm font-medium text-[#64bae2] hover:text-white"
             >
-              Go to dashboard
+              Back to dashboard
             </Link>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-        <h2 className="font-semibold mb-3">{org.name}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <Detail label="Tier" value={billing?.tier ? `Tier ${billing.tier}` : "—"} />
-          <Detail label="Stripe status" value={billing?.stripe_status ?? "—"} />
-          <Detail label="Period start" value={fmtDate(billing?.period_start ?? null)} />
-          <Detail label="Period end" value={fmtDate(billing?.period_end ?? null)} />
-          <Detail
-            label="Past due since"
-            value={billing?.past_due_since ? fmtDate(billing.past_due_since) : "—"}
-          />
+          )}
         </div>
 
-        {actionErr ? (
-          <div className="mt-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200">
-            {actionErr}
+        {invoices.length === 0 ? (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm text-white/55">
+            No invoices are available yet.
           </div>
-        ) : null}
+        ) : (
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
+                  <th className="px-3 py-3 font-medium">
+                    Invoice
+                  </th>
 
-        {next_action !== "none" ? (
-          <button
-            type="button"
-            onClick={startCheckout}
-            disabled={busy}
-            className="mt-5 w-full sm:w-auto rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow disabled:cursor-not-allowed disabled:opacity-70"
-            style={{
-              background:
-                "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
-            }}
-          >
-            {busy
-              ? "Starting checkout…"
-              : next_action === "reactivate"
-              ? "Pay outstanding balance"
-              : "Pay & activate"}
-          </button>
-        ) : null}
-      </div>
+                  <th className="px-3 py-3 font-medium">
+                    Date
+                  </th>
+
+                  <th className="px-3 py-3 font-medium">
+                    Amount
+                  </th>
+
+                  <th className="px-3 py-3 font-medium">
+                    Status
+                  </th>
+
+                  <th className="px-3 py-3 text-right font-medium">
+                    Receipt
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {invoices.map(
+                  (invoice) => (
+                    <tr
+                      key={invoice.id}
+                      className="border-b border-white/[0.07] last:border-0"
+                    >
+                      <td className="px-3 py-4 font-medium">
+                        {invoice.number ??
+                          invoice.id}
+                      </td>
+
+                      <td className="px-3 py-4 text-white/65">
+                        {formatDate(
+                          invoice.created_at
+                        )}
+                      </td>
+
+                      <td className="px-3 py-4">
+                        {formatMoney(
+                          invoice.amount_cents,
+                          invoice.currency
+                        )}
+                      </td>
+
+                      <td className="px-3 py-4 capitalize text-white/65">
+                        {invoice.status ??
+                          "—"}
+                      </td>
+
+                      <td className="px-3 py-4 text-right">
+                        <div className="flex justify-end gap-3">
+                          {invoice.hosted_invoice_url && (
+                            <a
+                              href={
+                                invoice.hosted_invoice_url
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-[#64bae2] hover:text-white"
+                            >
+                              View
+                            </a>
+                          )}
+
+                          {invoice.invoice_pdf && (
+                            <a
+                              href={
+                                invoice.invoice_pdf
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-[#64bae2] hover:text-white"
+                            >
+                              Download
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function Detail({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-      <div className="text-xs text-white/60">{label}</div>
-      <div className="mt-1 font-medium">{value}</div>
+    <div className="flex items-start justify-between gap-5 border-b border-white/[0.07] pb-4 last:border-0 last:pb-0">
+      <span className="text-sm text-white/55">
+        {label}
+      </span>
+
+      <span className="text-right text-sm font-medium">
+        {value}
+      </span>
     </div>
   );
 }

@@ -1,6 +1,13 @@
 // apps/web/app/api/mcas/reverse/[runId]/export/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  buildAtumaphireExternalPayload,
+  buildAtumaphireRoleSections,
+  buildAtumaphireScoringPayload,
+  formatAtumaphireNarrative,
+  normaliseAtumaphireOutputMode,
+} from "@/lib/mcas/atumaphireOutput";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +17,7 @@ function supa() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { db: { schema: "mcas" } }
+    { db: { schema: "mcas" } },
   );
 }
 
@@ -44,10 +51,13 @@ function buildIdealCandidateProfile(payload: any) {
 
   const careerVertical =
     scoring?.career_vertical?.label ||
+    scoring?.primary_career_vertical?.label ||
     wording?.career_vertical?.label ||
     "the required level of responsibility";
 
-  const operatingWords: string[] = Array.isArray(wording?.operating_style?.words)
+  const operatingWords: string[] = Array.isArray(
+    wording?.operating_style?.words,
+  )
     ? wording.operating_style.words
     : [];
 
@@ -99,8 +109,8 @@ function cleanExistingReport(report: any) {
 
   const cleanReport = { ...report };
 
-  // Prevent duplicated payload output:
-  // Keep this only at result.ideal_candidate_profile, not inside result.report.
+  // Keep the full internal intelligence in its canonical result-level location.
+  // The Atumaphire response formatter below exposes only the approved summaries.
   delete cleanReport.ideal_candidate_profile;
 
   return cleanReport;
@@ -115,7 +125,10 @@ async function fetchReportSections(sb: ReturnType<typeof supa>, payload: any) {
     payload?.result?.wording?.operating_style?.code ||
     null;
 
-  const careerVertical = payload?.result?.scoring?.career_vertical || null;
+  const careerVertical =
+    payload?.result?.scoring?.career_vertical ||
+    payload?.result?.scoring?.primary_career_vertical ||
+    null;
 
   const fallback = {
     operating_style_summary: null,
@@ -125,7 +138,8 @@ async function fetchReportSections(sb: ReturnType<typeof supa>, payload: any) {
           current_vertical: {
             code: careerVertical.code,
             label: careerVertical.label,
-            avg_score: careerVertical.avg_score,
+            pct: careerVertical.pct ?? null,
+            avg_score: careerVertical.avg_score ?? null,
             summary: null,
           },
         }
@@ -156,6 +170,7 @@ async function fetchReportSections(sb: ReturnType<typeof supa>, payload: any) {
   }
 
   const cvsContent = bySection.cvs || {};
+  const careerCode = careerVertical?.code || null;
 
   return {
     operating_style_summary: bySection.oss,
@@ -166,11 +181,15 @@ async function fetchReportSections(sb: ReturnType<typeof supa>, payload: any) {
         ? {
             code: careerVertical.code,
             label: careerVertical.label,
-            avg_score: careerVertical.avg_score,
+            pct: careerVertical.pct ?? null,
+            avg_score: careerVertical.avg_score ?? null,
             summary:
-              cvsContent?.levels?.[careerVertical.code] ||
+              cvsContent?.levels?.[careerCode] ||
               cvsContent?.levels?.[
-                `CV${String(careerVertical.code).replace("V", "")}`
+                `CV${String(careerCode).replace(/^CV|^V/, "")}`
+              ] ||
+              cvsContent?.levels?.[
+                `V${String(careerCode).replace(/^CV|^V/, "")}`
               ] ||
               null,
           }
@@ -194,11 +213,7 @@ async function enrichExportPayload(sb: ReturnType<typeof supa>, payload: any) {
     ...payload,
     result: {
       ...(payload.result || {}),
-
-      // Canonical location for this content.
-      // Do not also include this under result.report.
       ideal_candidate_profile: idealCandidateProfile,
-
       report: {
         ...cleanReport,
         operating_style_summary: reportSections.operating_style_summary,
@@ -211,15 +226,20 @@ async function enrichExportPayload(sb: ReturnType<typeof supa>, payload: any) {
 
 export async function GET(
   req: Request,
-  props: { params: Promise<{ runId: string }> }
+  props: { params: Promise<{ runId: string }> },
 ) {
   try {
     if (!isAuthorized(req)) {
       return NextResponse.json(
         { ok: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
+
+    const requestUrl = new URL(req.url);
+    const outputMode = normaliseAtumaphireOutputMode(
+      requestUrl.searchParams.get("output_mode"),
+    );
 
     const { runId } = await props.params;
     const sb = supa();
@@ -233,14 +253,14 @@ export async function GET(
     if (error) {
       return NextResponse.json(
         { ok: false, error: error.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!run) {
       return NextResponse.json(
         { ok: false, error: "Run not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -253,17 +273,50 @@ export async function GET(
           run_id: run.id,
           run_number: run.run_number,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const enrichedPayload = await enrichExportPayload(sb, run.export_payload);
+    const scoring = enrichedPayload?.result?.scoring || null;
+    const report = enrichedPayload?.result?.report || {};
+    const idealCandidateProfile =
+      enrichedPayload?.result?.ideal_candidate_profile || null;
+    const externalScoring = buildAtumaphireScoringPayload({
+      scoring,
+      modelVersion:
+        enrichedPayload?.scoring_model_version ||
+        scoring?.model_version ||
+        null,
+      careerVertical:
+        scoring?.career_vertical || scoring?.primary_career_vertical || null,
+    });
 
-    return NextResponse.json(enrichedPayload);
+    const threeSectionNarrative = buildAtumaphireRoleSections({
+      scoring: externalScoring,
+      operatingStyleSummary: report.operating_style_summary,
+      roleFitSummary: report.role_fit_summary,
+      careerVerticalSummary: report.career_vertical_summary,
+      idealCandidateProfile,
+    });
+
+    const narrative = formatAtumaphireNarrative(
+      threeSectionNarrative,
+      outputMode,
+    );
+
+    const responsePayload = buildAtumaphireExternalPayload({
+      sourcePayload: enrichedPayload,
+      scoring: externalScoring,
+      narrative,
+      outputMode,
+    });
+
+    return NextResponse.json(responsePayload);
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: String(error?.message || error) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

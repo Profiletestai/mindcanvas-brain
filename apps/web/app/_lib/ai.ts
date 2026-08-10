@@ -1,3 +1,4 @@
+//apps/web/app/_lib/ai.ts
 import "server-only";
 import OpenAI from "openai";
 

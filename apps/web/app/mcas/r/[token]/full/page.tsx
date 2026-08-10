@@ -3,10 +3,14 @@
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { buildMcasReportPayloadByToken } from "@/lib/mcas/reportPayload";
-import { getOperatingStyleDisplayLabel } from "@/lib/mcas/reportConstants";
+import {
+  getCareerVerticalDisplayCode,
+  getOperatingStyleDisplayLabel,
+} from "@/lib/mcas/reportConstants";
 import McasFullReportActions from "./McasFullReportActions";
 import type {
   McasBlindSpot,
+  McasCareerVerticalCode,
   McasCoreCode,
   McasDistributionItem,
   McasOperatingStyleCode,
@@ -105,6 +109,17 @@ function operatingStyleLabel(code: McasOperatingStyleCode): string {
   return getOperatingStyleDisplayLabel(code);
 }
 
+function careerVerticalDisplayCode(code: string): string {
+  return getCareerVerticalDisplayCode(code as McasCareerVerticalCode);
+}
+
+function careerVerticalDisplayText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\bV([1-6])\b/g, "CV$1")
+    .replace(/Career\s+Career\s+Vertical/gi, "Career Vertical")
+    .replace(/\bHigher Career Verticals\b/gi, "Higher Career Verticals");
+}
+
 type McasReportAccessWithNextSteps = McasReportPayload["access"] & {
   nextStepsUrl?: string | null;
 };
@@ -196,15 +211,15 @@ function ReportHeader({
   pdfFilename: string;
 }) {
   return (
-    <header className="rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+    <header className="mcas-full-report-header rounded-t-[30px] bg-[#EEEAFE] px-6 py-5 shadow-[0_14px_42px_rgba(0,0,0,0.32)] ring-1 ring-white/10 md:px-8">
+      <div className="mcas-full-report-header-layout flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-5">
           <div className="mt-2 h-10 w-12 rounded-2xl border border-white/20 bg-[#6F5CFF]/30" />
           <div>
-            <p className="max-w-xl text-2xl font-semibold uppercase leading-tight tracking-[0.14em] text-[#6F5CFF] md:text-[32px] md:leading-[35px]">
+            <p className="mcas-full-report-header-title max-w-xl text-2xl font-semibold uppercase leading-tight tracking-[0.14em] text-[#6F5CFF] md:text-[32px] md:leading-[35px]">
               Candidate Extensive Career Report
             </p>
-            <p className="mt-3 text-[13px] font-bold uppercase tracking-[0.28em] text-[#201E41]">
+            <p className="mcas-full-report-header-subtitle mt-3 text-[13px] font-bold uppercase tracking-[0.28em] text-[#201E41]">
               MindCanvas CORE Alignment System
             </p>
           </div>
@@ -217,7 +232,7 @@ function ReportHeader({
             nextStepsUrl={nextStepsUrl}
           />
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="mcas-full-report-header-meta grid gap-3 md:grid-cols-3">
             <MetaCard label="Prepared for" value={payload.candidate.fullName} />
             <MetaCard label="Date" value={formatDate(payload.assessment.completedAt)} />
             <MetaCard label="Framework" value="Candidate Extensive Career Report" />
@@ -240,7 +255,7 @@ function HeroMetric({ label, value, caption }: { label: string; value: string; c
 
 function OperatingStyleCard({ items, title = "Operating Style" }: { items: McasDistributionItem<McasOperatingStyleCode>[]; title?: string }) {
   return (
-    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
+    <div className="mcas-full-report-os-card self-start rounded-xl border border-[#E2E8F0] bg-white p-5 text-[#0D1B2A]">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-[12px] font-bold uppercase tracking-[0.25em] text-[#4A5568]">{title}</h3>
         <span className="rounded-full bg-[#6F5CFF]/10 px-3 py-1 text-xs font-bold text-[#6F5CFF]">Distribution</span>
@@ -291,7 +306,7 @@ function WorkCycleCoverage({
   ];
 
   return (
-    <div className="self-start rounded-xl border border-[#E2E8F0] bg-white px-4 pb-4 pt-4 text-[#0D1B2A]">
+    <div className="mcas-full-report-core-chart self-start rounded-xl border border-[#E2E8F0] bg-white px-4 pb-4 pt-4 text-[#0D1B2A]">
       <p className="mb-2 text-[10px] font-bold uppercase leading-4 tracking-[0.18em] text-[#8892A4]">
         {title}
       </p>
@@ -376,19 +391,19 @@ function Hero({ payload }: { payload: McasReportPayload }) {
   const readiness = payload.result.careerVertical.readinessPercentage;
 
   return (
-    <section className="overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-6 text-white md:px-8">
-      <div className="grid items-start gap-6 xl:grid-cols-[500px_minmax(500px,1fr)_254px]">
-        <div>
+    <section className="mcas-full-report-hero overflow-hidden border-b border-[#E8EBF4] bg-[linear-gradient(168deg,#232046_0%,#1A1836_60%,#0F0E1F_100%)] px-6 py-6 text-white md:px-8">
+      <div className="mcas-full-report-hero-grid grid items-start gap-6 xl:grid-cols-[500px_minmax(500px,1fr)_254px]">
+        <div className="mcas-full-report-hero-copy">
           <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#8E7BFF]">Candidate Extensive Career Report</p>
           <h1 className="mt-3 text-[36px] font-black leading-none tracking-[-0.04em] md:text-[42px]">{payload.candidate.fullName}</h1>
           <p className="mt-5 max-w-lg text-sm leading-7 text-white/55 md:text-[14px]">
             A practical career guide — grounded, honest, and actionable. This report explains how you naturally execute work and where you are most likely to thrive.
           </p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="mcas-full-report-hero-metrics mt-8 grid gap-4 sm:grid-cols-2">
             <HeroMetric label="Operating Style" value={operatingStyleLabel(primaryOs.code)} caption="Dominant pattern" />
             <HeroMetric label="CORE Balance" value={coreInitials(payload)} caption={coreLabels(payload)} />
-            <HeroMetric label="Vertical Fit" value={primaryVertical.code} caption={primaryVertical.label} />
-            <HeroMetric label="Next Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={payload.result.careerVertical.readinessLabel ?? "Growth readiness"} />
+            <HeroMetric label="Career Vertical" value={careerVerticalDisplayCode(primaryVertical.code)} caption={primaryVertical.label} />
+            <HeroMetric label="Career Vertical Readiness" value={readiness === undefined ? "In development" : `${readiness}%`} caption={careerVerticalDisplayText(payload.result.careerVertical.readinessLabel ?? "Growth readiness")} />
           </div>
         </div>
 
@@ -415,7 +430,7 @@ function HeroSummaryCard({ label, value, caption }: { label: string; value: stri
 
 function TopStyleStrip({ items }: { items: McasDistributionItem<McasOperatingStyleCode>[] }) {
   return (
-    <div className="grid gap-4 bg-white px-6 py-5 md:grid-cols-4 md:px-8">
+    <div className="mcas-full-report-top-strip grid gap-4 bg-white px-6 py-5 md:grid-cols-4 md:px-8">
       {items.slice(0, 4).map((item) => (
         <div key={item.code} className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -463,16 +478,16 @@ function AfterHeroSummary({ payload }: { payload: McasReportPayload }) {
         ];
 
   return (
-    <section className="bg-[#07111E] px-6 py-8 md:px-8">
+    <section className="mcas-full-report-after-hero bg-[#07111E] px-6 py-8 md:px-8">
       <div className="grid gap-7 lg:grid-cols-[460px_1fr] lg:items-center">
         <div className="grid gap-5 sm:grid-cols-2">
           <AfterHeroInfoCard
             icon="▥"
-            label="Vertical Fit"
-            value={`${primaryVertical.code} Now`}
+            label="Career Vertical"
+            value={`${careerVerticalDisplayCode(primaryVertical.code)} Now`}
             caption={
               nextVertical
-                ? `${nextVertical.code} in development`
+                ? `${careerVerticalDisplayCode(nextVertical.code)} in development`
                 : payload.result.careerVertical.readinessLabel ?? "Current fit"
             }
           />
@@ -541,6 +556,18 @@ function AfterHeroInfoCard({
   );
 }
 
+const REPORT_INDEX_LINKS = [
+  ["orientation", "Welcome and Orientation"],
+  ["plain-language", "Your Work Pattern in Plain Language"],
+  ["style-deep-dive", "Your Operating Style Deep Dive"],
+  ["pressure-strengths", "Your Strength Advantages Under Pressure"],
+  ["blind-spots", "Your Blind Spots and How to Manage Them"],
+  ["roles", "Your Best Fit Work and Roles"],
+  ["vertical", "Your Career Vertical Fit Today"],
+  ["success-guide", "Your 30 / 60 / 90 Day Success Guide"],
+  ["pathway", "Your Next Step Pathway"],
+] as const;
+
 function SidebarIndex({
   pdfFilename,
   nextStepsUrl,
@@ -548,24 +575,12 @@ function SidebarIndex({
   pdfFilename: string;
   nextStepsUrl: string | null;
 }) {
-  const links = [
-    ["orientation", "Welcome and Orientation"],
-    ["plain-language", "Your Work Pattern in Plain Language"],
-    ["style-deep-dive", "Your Operating Style Deep Dive"],
-    ["pressure-strengths", "Your Strength Advantages Under Pressure"],
-    ["blind-spots", "Your Blind Spots and How to Manage Them"],
-    ["roles", "Your Best Fit Work and Roles"],
-    ["vertical", "Your Career Vertical Fit Today"],
-    ["success-guide", "Your 30 / 60 / 90 Day Success Guide"],
-    ["pathway", "Your Next Step Pathway"],
-  ];
-
   return (
     <aside className="mcas-full-report-no-print rounded-3xl border border-white/10 bg-[#1D1B3B] p-5 text-white lg:sticky lg:top-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.24em]">Report Index</p>
 
       <nav className="space-y-2">
-        {links.map(([href, label], index) => (
+        {REPORT_INDEX_LINKS.map(([href, label], index) => (
           <a
             key={href}
             href={`#${href}`}
@@ -585,13 +600,37 @@ function SidebarIndex({
   );
 }
 
+function PrintableReportIndex() {
+  return (
+    <section className="mcas-full-report-print-only mcas-full-report-print-index">
+      <div className="rounded-xl border border-[#D9E2F1] bg-[#F8FAFC] p-4">
+        <p className="mb-3 text-[9px] font-black uppercase tracking-[0.22em] text-[#6F5CFF]">
+          Report Index
+        </p>
+
+        <div className="mcas-full-report-print-index-grid">
+          {REPORT_INDEX_LINKS.map(([, label], index) => (
+            <p
+              key={label}
+              className="text-[8px] leading-4 text-[#334155]"
+            >
+              <span className="font-black text-[#6F5CFF]">{index + 1}.</span>{" "}
+              {label}
+            </p>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SectionShell({ id, title, icon, children }: { id: string; title: string; icon: string; children: ReactNode }) {
   return (
-    <section id={id} className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
+    <section id={id} className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-3 shadow-[0_14px_42px_rgba(0,0,0,0.32)]">
       <div className="rounded-[18px] bg-white p-6 md:p-8">
         <div className="mb-7 flex items-center gap-4">
           <img src={icon} alt="" className="h-11 w-11 rounded-xl object-cover ring-1 ring-[#3B82F6]/20" />
-          <h2 className="text-2xl font-black leading-tight tracking-[-0.04em] text-[#0D0F1C]">{title}</h2>
+          <h2 className="text-[15px] font-bold leading-5 text-[#0D0F1C]">{title}</h2>
         </div>
         {children}
       </div>
@@ -632,7 +671,7 @@ function PlainLanguageSection({ payload }: { payload: McasReportPayload }) {
   return (
     <SectionShell id="plain-language" title="Your Work Pattern in Plain Language" icon="/mcas/report-icons/work-style.png">
       <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-6">
-        <p className="text-lg leading-9 text-[#0D1B2A]">{payload.candidateFacing.workPatternSummary}</p>
+        <p className="text-lg leading-9 text-[#0D1B2A]">{careerVerticalDisplayText(payload.candidateFacing.workPatternSummary)}</p>
       </div>
     </SectionShell>
   );
@@ -644,7 +683,7 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
   return (
     <section
       id="style-deep-dive"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -692,7 +731,7 @@ function OperatingStyleDeepDive({ payload }: { payload: McasReportPayload }) {
                 </h3>
 
                 <p className="mt-4 max-w-[470px] text-[13px] leading-7 text-[#5A5F7E]">
-                  {payload.candidateFacing.operatingStyleNarrative}
+                  {careerVerticalDisplayText(payload.candidateFacing.operatingStyleNarrative)}
                 </p>
               </div>
             </div>
@@ -719,7 +758,7 @@ function CoreBalanceSection({ payload }: { payload: McasReportPayload }) {
   return (
     <section
       id="core-balance"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -801,7 +840,7 @@ function CoreCompactCard({
       </div>
 
       <p className="text-[11px] leading-5 text-[#4A5568]">
-        {item.description}
+        {careerVerticalDisplayText(item.description)}
       </p>
     </div>
   );
@@ -817,7 +856,7 @@ function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) 
   return (
     <section
       id="pressure-strengths"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -843,7 +882,7 @@ function PressureStrengthsSection({ strengths }: { strengths: McasStrength[] }) 
 
 function StrengthCompactCard({ strength }: { strength: McasStrength }) {
   return (
-    <div className="min-h-[108px] rounded-xl border border-[#45E0D1] bg-[#F8FAFC] p-4">
+    <div className="mcas-print-avoid min-h-[108px] rounded-xl border border-[#45E0D1] bg-[#F8FAFC] p-4">
       <img
         src={strengthIcon(strength)}
         alt=""
@@ -855,7 +894,7 @@ function StrengthCompactCard({ strength }: { strength: McasStrength }) {
       </h3>
 
       <p className="mt-2 text-[11px] leading-5 text-[#4A5568]">
-        {strength.description}
+        {careerVerticalDisplayText(strength.description)}
       </p>
     </div>
   );
@@ -898,7 +937,7 @@ function BlindSpotsSection({
   return (
     <section
       id="blind-spots"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -925,7 +964,7 @@ function BlindSpotsSection({
             return (
               <div
                 key={`${blindSpot.title}-${index}`}
-                className="rounded-xl border bg-white px-5 py-4"
+                className="mcas-print-avoid rounded-xl border bg-white px-5 py-4"
                 style={{ borderColor: accent.border }}
               >
                 <p
@@ -940,7 +979,7 @@ function BlindSpotsSection({
                 </h3>
 
                 <p className="mt-2 text-[12px] leading-5 text-[#4A5568]">
-                  {blindSpot.description}
+                  {careerVerticalDisplayText(blindSpot.description)}
                 </p>
 
                 <p
@@ -951,7 +990,7 @@ function BlindSpotsSection({
                 </p>
 
                 <p className="mt-1 text-[11px] leading-5 text-[#4A5568]">
-                  {blindSpot.managementStrategy}
+                  {careerVerticalDisplayText(blindSpot.managementStrategy)}
                 </p>
               </div>
             );
@@ -986,7 +1025,7 @@ function RolesSection({
   return (
     <section
       id="roles"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -1051,14 +1090,14 @@ function RolesSection({
 
 function roleContextCopy(code: McasOperatingStyleCode): string {
   if (code === "OS8") {
-    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Vertical readiness should guide the level of responsibility considered.";
+    return "These role examples are most likely to suit an Optimiser pattern where systems already exist, measurable performance matters, and there is enough stability, feedback, and ownership to turn refinement into sustained improvement. Current Career Vertical Readiness should guide the level of responsibility considered.";
   }
 
   if (code === "OS4") {
-    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical readiness should guide the level of responsibility considered.";
+    return "These role examples are most likely to suit a Connector pattern where the work requires cross-functional coordination, stakeholder alignment, and visible ownership. Current Career Vertical Readiness should guide the level of responsibility considered.";
   }
 
-  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Vertical readiness should guide the level of responsibility considered.";
+  return "These role examples are most likely to suit this operating pattern where the work environment allows its natural contribution to create value. Current Career Vertical Readiness should guide the level of responsibility considered.";
 }
 
 function RoleDiagramCard({
@@ -1067,7 +1106,7 @@ function RoleDiagramCard({
   role: McasRoleRecommendation;
 }) {
   return (
-    <div className="flex min-h-[118px] w-full flex-col justify-center rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]">
+    <div className="mcas-print-avoid flex min-h-[118px] w-full flex-col justify-center rounded-xl border border-[#E2E8F0] bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.12)]">
       <p className="text-[10px] font-black uppercase leading-4 tracking-[0.22em] text-[#2F6FB8]">
         {role.category}
       </p>
@@ -1077,7 +1116,7 @@ function RoleDiagramCard({
       </h3>
 
       <p className="mt-2 text-[12px] leading-5 text-[#5A5F7E]">
-        {role.description}
+        {careerVerticalDisplayText(role.description)}
       </p>
     </div>
   );
@@ -1172,10 +1211,62 @@ function VerticalInfoChip({
   );
 }
 
+function CareerVerticalJourneyGraphic({
+  verticals,
+  primaryCode,
+}: {
+  verticals: McasDistributionItem<McasCareerVerticalCode>[];
+  primaryCode: McasCareerVerticalCode;
+}) {
+  const primaryLevel = verticalLevelNumber(primaryCode);
+
+  return (
+    <div className="mcas-print-avoid overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-5 md:p-7">
+      <div className="mb-6">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#6F5CFF]">
+          Career Vertical progression
+        </p>
+        <p className="mt-2 max-w-4xl text-[13px] leading-6 text-[#4A5568]">
+          Career Verticals describe the level and scope of responsibility — not
+          job status or personal worth. Each step increases decision impact,
+          ambiguity, accountability, and the number of people affected by the
+          work.
+        </p>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[#DDD8FF] bg-[#FCFCFF] p-4 md:p-5">
+        <img
+          src="/mcas/graphics/career-vertical-fit.png"
+          alt="Career vertical progression graphic"
+          className="w-full rounded-xl object-contain"
+        />
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <VerticalInfoChip
+          icon="↗"
+          title="Increasing Scope"
+          description="Wider impact and responsibility."
+        />
+        <VerticalInfoChip
+          icon="◎"
+          title="Increasing Complexity"
+          description="More variables and interdependencies."
+        />
+        <VerticalInfoChip
+          icon="★"
+          title="Increasing Accountability"
+          description="Greater ownership and consequences."
+        />
+      </div>
+    </div>
+  );
+}
+
 function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
   const primary = payload.result.careerVertical.primary;
   const readinessPercentage = payload.result.careerVertical.readinessPercentage;
-  const order = ["V1", "V2", "V3", "V4", "V5", "V6"] as const;
+  const order = ["V6", "V5", "V4", "V3", "V2", "V1"] as const;
   const primaryLevel = verticalLevelNumber(primary.code);
 
   const verticals = order.map((code) => {
@@ -1198,34 +1289,13 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
       icon="/mcas/report-icons/career-vertical-fit.png"
     >
       <div className="space-y-6">
-        <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#FCFCFF] p-4 md:p-5">
-          <img
-            src="/mcas/graphics/career-vertical-fit.png"
-            alt="Career vertical fit"
-            className="w-full rounded-xl object-contain"
-          />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <VerticalInfoChip
-            icon="↗"
-            title="Increasing Scope"
-            description="Wider impact and responsibility"
-          />
-          <VerticalInfoChip
-            icon="◎"
-            title="Increasing Complexity"
-            description="More variables and interdependencies."
-          />
-          <VerticalInfoChip
-            icon="★"
-            title="Increasing Accountability"
-            description="Greater ownership and outcomes."
-          />
-        </div>
+        <CareerVerticalJourneyGraphic
+          verticals={verticals}
+          primaryCode={primary.code}
+        />
 
         <p className="text-[14px] leading-7 text-[#4A5568]">
-          Progression changes work itself. Higher verticals increase ambiguity,
+          Progression changes work itself. Higher Career Verticals increase ambiguity,
           scope, and accountability.
         </p>
 
@@ -1242,7 +1312,7 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
               <div
                 key={item.code}
                 className={[
-                  "grid items-center gap-3 rounded-2xl border px-4 py-3 md:grid-cols-[auto_1.5fr_1fr_auto]",
+                  "mcas-print-row grid items-center gap-3 rounded-2xl border px-4 py-3 md:grid-cols-[auto_1.5fr_1fr_auto]",
                   level === primaryLevel
                     ? "border-[#5B5CFF] bg-[#F5F3FF]"
                     : "border-transparent bg-white",
@@ -1259,10 +1329,10 @@ function CareerVerticalSection({ payload }: { payload: McasReportPayload }) {
 
                 <div>
                   <p className="text-[14px] font-black text-[#0D0F1C]">
-                    {item.code} · {item.label}
+                    {careerVerticalDisplayCode(item.code)} · {item.label}
                   </p>
                   <p className="mt-1 text-[12px] leading-5 text-[#718096]">
-                    {item.description}
+                    {careerVerticalDisplayText(item.description)}
                   </p>
                 </div>
 
@@ -1353,7 +1423,7 @@ function SuccessGuideSection({
   return (
     <section
       id="success-guide"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -1390,7 +1460,7 @@ function SuccessGuideSection({
             return (
               <div
                 key={item.period}
-                className="min-h-[224px] p-6"
+                className="mcas-print-avoid min-h-[224px] p-6"
                 style={{ backgroundColor: tone.bg }}
               >
                 <p
@@ -1401,11 +1471,11 @@ function SuccessGuideSection({
                 </p>
 
                 <h3 className="mt-4 text-[17px] font-black leading-6 text-[#0D0F1C]">
-                  {item.title}
+                  {careerVerticalDisplayText(item.title)}
                 </h3>
 
                 <p className="mt-3 text-[13px] leading-6 text-[#4A5568]">
-                  {item.description}
+                  {careerVerticalDisplayText(item.description)}
                 </p>
               </div>
             );
@@ -1484,7 +1554,7 @@ function verticalSummaryForCode(payload: McasReportPayload, code: string) {
 
   if (item) {
     return {
-      code: item.code,
+      code: careerVerticalDisplayCode(item.code),
       label: item.label,
       description: item.description ?? `${item.code} — ${item.label}`,
     };
@@ -1492,34 +1562,40 @@ function verticalSummaryForCode(payload: McasReportPayload, code: string) {
 
   const fallback: Record<string, { label: string; description: string }> = {
     V1: {
-      label: "Entry / Foundational",
-      description: "Task-level execution with guided delivery.",
+      label: "Apprentice or Student",
+      description:
+        "An entry-level or learning stage where work is guided closely, responsibilities are clearly defined, and progress comes through structured practice, coaching, and dependable habit-building.",
     },
     V2: {
-      label: "Developing",
-      description: "Growing ownership with structured guidance.",
+      label: "Workforce Contributor",
+      description:
+        "A reliable individual-contributor stage where the focus is on consistent output, growing ownership, and delivering work independently within a defined role or function.",
     },
     V3: {
-      label: "Established",
-      description: "Established execution.",
+      label: "Team Lead or Junior Management",
+      description:
+        "A first-line leadership stage where responsibility expands into leading projects, coordinating people or workflows, and balancing personal delivery with supervision of others.",
     },
     V4: {
-      label: "Senior Scope",
-      description: "Senior cross-functional scope.",
+      label: "Middle Management",
+      description:
+        "A broader management stage where the role includes leading functions or teams, balancing multiple priorities, managing resources, and making decisions across a wider operational scope.",
     },
     V5: {
-      label: "Strategic Leadership",
-      description: "Strategic leadership.",
+      label: "Senior Management",
+      description:
+        "A senior leadership stage with accountability across larger functions or business units, requiring strategic judgement, cross-functional leadership, and responsibility for broader organisational outcomes.",
     },
     V6: {
-      label: "Executive / Enterprise",
-      description: "Enterprise leadership and long-horizon strategy.",
+      label: "Executive Leadership",
+      description:
+        "An executive stage focused on enterprise direction, long-range decision-making, organisational stewardship, and leading at scale with the highest level of consequence and accountability.",
     },
   };
 
   return {
-    code,
-    label: fallback[code]?.label ?? code,
+    code: careerVerticalDisplayCode(code),
+    label: fallback[code]?.label ?? careerVerticalDisplayCode(code),
     description: fallback[code]?.description ?? "Future growth pathway.",
   };
 }
@@ -1545,7 +1621,7 @@ function NextStepPathwaySection({ payload }: { payload: McasReportPayload }) {
   return (
     <section
       id="pathway"
-      className="rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
+      className="mcas-report-section rounded-3xl border border-white/10 bg-[#6F5CFF] p-4 shadow-[0_14px_42px_rgba(0,0,0,0.32)]"
     >
       <div className="mb-4 flex items-center gap-3 px-2 pt-1">
         <img
@@ -1736,6 +1812,7 @@ export default async function McasFullReportPage({ params }: PageProps) {
         <Hero payload={payload} />
         <TopStyleStrip items={payload.result.operatingStyle.distribution} />
         <AfterHeroSummary payload={payload} />
+        <PrintableReportIndex />
 
         <div className="mcas-full-report-content-grid grid gap-6 px-6 py-9 md:px-8 lg:grid-cols-[260px_1fr]">
           <SidebarIndex pdfFilename={pdfFilename} nextStepsUrl={nextStepsUrl} />

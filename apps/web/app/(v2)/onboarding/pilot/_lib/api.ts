@@ -1,5 +1,6 @@
 // Pilot onboarding client API — mirrors the v2 client but targets the pilot
 // route group (/api/onboarding/pilot/*) and adds the pilot activation call.
+
 import type {
   SignupRequestBody,
   SignupResponse,
@@ -32,7 +33,17 @@ export type ActivateResponse = {
   pilot_end_date: string;
 };
 
+export type ResendOtpRequestBody = {
+  email: string;
+};
+
+export type ResendOtpResponse = {
+  ok: true;
+  message: string;
+};
+
 const BASE = "/api/onboarding/pilot";
+const SHARED_BASE = "/api/onboarding/v2";
 
 async function send<TReq, TRes>(
   path: string,
@@ -46,39 +57,83 @@ async function send<TReq, TRes>(
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
   };
+
   const res = await fetch(`${BASE}${path}`, init);
+  return res.json();
+}
+
+async function sendShared<TReq, TRes>(
+  path: string,
+  method: "POST" | "PATCH" | "GET",
+  body?: TReq
+): Promise<TRes | ApiErrorResponse> {
+  const init: RequestInit = {
+    method,
+    credentials: "include",
+    headers: body ? { "content-type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+  };
+
+  const res = await fetch(`${SHARED_BASE}${path}`, init);
   return res.json();
 }
 
 export const api = {
   signup: (body: SignupRequestBody) =>
     send<SignupRequestBody, SignupResponse>("/signup", "POST", body),
+
   verifyOtp: (body: VerifyOtpRequestBody) =>
-    send<VerifyOtpRequestBody, VerifyOtpResponse>("/verify-otp", "POST", body),
+    send<VerifyOtpRequestBody, VerifyOtpResponse>(
+      "/verify-otp",
+      "POST",
+      body
+    ),
+
+  resendOtp: (body: ResendOtpRequestBody) =>
+    sendShared<ResendOtpRequestBody, ResendOtpResponse>(
+      "/resend-otp",
+      "POST",
+      body
+    ),
+
   createOrg: (body: CreateOrgRequestBody) =>
     send<CreateOrgRequestBody, CreateOrgResponse>("/org", "POST", body),
-  getOrg: () => send<undefined, GetOrgResponse>("/org", "GET"),
+
+  getOrg: () =>
+    send<undefined, GetOrgResponse>("/org", "GET"),
+
   patchContact: (body: ContactRequestBody) =>
     send<ContactRequestBody, ContactResponse>("/contact", "PATCH", body),
+
   patchBranding: (body: BrandingRequestBody) =>
     send<BrandingRequestBody, BrandingResponse>("/branding", "PATCH", body),
-  progress: () => send<undefined, ProgressResponse>("/progress", "GET"),
-  activate: () => send<undefined, ActivateResponse>("/activate", "POST"),
-  uploadLogo: async (file: File): Promise<UploadLogoResponse | ApiErrorResponse> => {
+
+  progress: () =>
+    send<undefined, ProgressResponse>("/progress", "GET"),
+
+  activate: () =>
+    send<undefined, ActivateResponse>("/activate", "POST"),
+
+  uploadLogo: async (
+    file: File
+  ): Promise<UploadLogoResponse | ApiErrorResponse> => {
     const fd = new FormData();
     fd.append("file", file);
+
     const res = await fetch(`${BASE}/upload-logo`, {
       method: "POST",
       body: fd,
       credentials: "include",
       cache: "no-store",
     });
+
     return res.json();
   },
 };
 
 export function isErr<T extends { ok: true }>(
-  r: T | ApiErrorResponse
-): r is ApiErrorResponse {
-  return r.ok === false;
+  response: T | ApiErrorResponse
+): response is ApiErrorResponse {
+  return response.ok === false;
 }
