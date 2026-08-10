@@ -8,6 +8,8 @@ import { useEffect, useState, type ReactNode } from "react";
 
 type Props = {
   orgSlug: string;
+  // Called after any nav link is followed — lets the mobile drawer close.
+  onNavigate?: () => void;
 };
 
 type Child = {
@@ -107,7 +109,7 @@ const RevenueIcon = (
   </svg>
 );
 
-export default function PortalSidebar({ orgSlug }: Props) {
+export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
   const pathname = usePathname() ?? "";
   const base = `/portal/${orgSlug}`;
 
@@ -147,7 +149,7 @@ export default function PortalSidebar({ orgSlug }: Props) {
         { label: "Organisation", href: `${base}/profile/organisation` },
         { label: "Logo", href: `${base}/profile/logo` },
         { label: "Email settings", href: `${base}/profile/email` },
-        { label: "Billing", href: `${base}/profile/billing` },
+        { label: "Billing", href: `${base}/billing` },
         { label: "Setup checklist", href: `${base}/profile/checklist` },
         { label: "Add users", href: `${base}/profile/users` },
       ],
@@ -158,25 +160,28 @@ export default function PortalSidebar({ orgSlug }: Props) {
       icon: ResourcesIcon,
       disabled: true,
     },
+    // No pages behind these yet — rendered through the disabled branch.
     {
       key: "affiliate",
       label: "Affiliate",
-      href: `${base}/affiliate`,
-      match: `${base}/affiliate`,
       icon: AffiliateIcon,
+      disabled: true,
     },
     {
       key: "revenue",
       label: "Revenue",
-      href: `${base}/revenue`,
-      match: `${base}/revenue`,
       icon: RevenueIcon,
+      disabled: true,
     },
   ];
 
   const isActive = (item: NavItem) => {
     if (item.match && pathname.startsWith(item.match)) return true;
     if (item.key === "tests" && pathname.startsWith(`${base}/links`)) return true;
+    // Billing lives at the org root, not under /profile, but reads as a
+    // Profile child in the nav.
+    if (item.key === "profile" && pathname.startsWith(`${base}/billing`))
+      return true;
     return false;
   };
 
@@ -240,6 +245,7 @@ export default function PortalSidebar({ orgSlug }: Props) {
                   className={rowClass}
                   onClick={() => {
                     setOpen(hasChildren && !expanded ? item.key : null);
+                    onNavigate?.();
                   }}
                 >
                   {inner}
@@ -267,7 +273,12 @@ export default function PortalSidebar({ orgSlug }: Props) {
                       );
                     }
                     return (
-                      <Link key={c.label} href={c.href} className={cClass}>
+                      <Link
+                        key={c.label}
+                        href={c.href}
+                        className={cClass}
+                        onClick={() => onNavigate?.()}
+                      >
                         {c.label}
                       </Link>
                     );

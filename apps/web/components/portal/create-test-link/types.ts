@@ -9,8 +9,20 @@ export type ModelOption = {
 
 export type Experience = "show" | "hide" | "host" | "review";
 export type LimitMode = "none" | "count" | "date";
+export type ReportVariant = "lite" | "full";
 
-export type CreateTestLinkFormValues = {
+// The link fields shared by the create wizard's advanced step and the
+// edit-link modal, which renders the same controls as one flat form.
+export type AdvancedLinkValues = {
+  nextStepsUrl: string;
+  redirectUrl: string;
+  hiddenResultsMessage: string;
+  contactOwner: string;
+  emailReport: boolean;
+  reportVariant: ReportVariant;
+};
+
+export type CreateTestLinkFormValues = AdvancedLinkValues & {
   modelId: string;
   name: string;
   experience: Experience;
@@ -70,5 +82,34 @@ export const LIMIT_OPTIONS: { value: LimitMode; title: string; hint: string }[] 
     },
   ];
 
-// 4 input steps + success.
-export const TOTAL_STEPS = 5;
+// Whether the chosen experience shows the report to the test taker.
+export function showsResults(experience: Experience): boolean {
+  return (
+    EXPERIENCE_OPTIONS.find((o) => o.value === experience)?.showResults ?? true
+  );
+}
+
+// The lite report only exists for WhatsWhats Global's Visibility Ladder.
+export function supportsLiteReport(
+  orgSlug: string,
+  testName?: string | null,
+): boolean {
+  return (
+    orgSlug === "whatswhats-global" &&
+    /visibility ladder/i.test(testName || "")
+  );
+}
+
+// Wizard step indexes — 5 input steps followed by the success screen.
+export const STEP_MODEL = 0;
+export const STEP_NAME = 1;
+export const STEP_EXPERIENCE = 2;
+export const STEP_LIMITS = 3;
+export const STEP_ADVANCED = 4;
+export const STEP_SUCCESS = 5;
+
+// The last step that still collects input (submitting happens here).
+export const LAST_INPUT_STEP = STEP_ADVANCED;
+
+// 5 input steps + success.
+export const TOTAL_STEPS = 6;

@@ -15,10 +15,20 @@ import StepChooseModel from "./create-test-link/StepChooseModel";
 import StepName from "./create-test-link/StepName";
 import StepExperience from "./create-test-link/StepExperience";
 import StepLimits from "./create-test-link/StepLimits";
+import StepAdvanced from "./create-test-link/StepAdvanced";
 import StepSuccess from "./create-test-link/StepSuccess";
+import { isValidUrl } from "@/lib/isValidUrl";
 import {
-  EXPERIENCE_OPTIONS,
+  LAST_INPUT_STEP,
+  STEP_ADVANCED,
+  STEP_LIMITS,
+  STEP_MODEL,
+  STEP_NAME,
+  STEP_EXPERIENCE,
+  STEP_SUCCESS,
   TOTAL_STEPS,
+  showsResults,
+  supportsLiteReport,
   type CreateTestLinkFormValues,
   type ModelOption,
 } from "./create-test-link/types";
@@ -35,13 +45,14 @@ type Props = {
 
 export default function CreateTestLinkModal({
   orgId,
+  orgSlug,
   models,
   initialModelId,
   onClose,
 }: Props) {
   const router = useRouter();
 
-  const { control, register, handleSubmit, watch } =
+  const { control, register, handleSubmit, watch, setValue } =
     useForm<CreateTestLinkFormValues>({
       defaultValues: {
         modelId: initialModelId || "",
@@ -50,12 +61,18 @@ export default function CreateTestLinkModal({
         limitMode: "none",
         maxUses: "",
         expiresDate: "",
+        nextStepsUrl: "",
+        redirectUrl: "",
+        hiddenResultsMessage: "",
+        contactOwner: "",
+        emailReport: true,
+        reportVariant: "full",
       },
     });
 
   // When a model is preselected (e.g. the card "Create test link" button),
   // skip the choose-model step and open straight on the name step.
-  const [step, setStep] = useState(initialModelId ? 1 : 0);
+  const [step, setStep] = useState(initialModelId ? STEP_NAME : STEP_MODEL);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
@@ -65,6 +82,9 @@ export default function CreateTestLinkModal({
   const limitMode = watch("limitMode");
   const maxUses = watch("maxUses");
   const expiresDate = watch("expiresDate");
+  const experience = watch("experience");
+  const nextStepsUrl = watch("nextStepsUrl");
+  const redirectUrl = watch("redirectUrl");
 
   // Close on Escape.
   useEffect(() => {
@@ -92,9 +112,13 @@ export default function CreateTestLinkModal({
     [models, modelId]
   );
 
+  // Lite reports only exist for specific org/test pairs.
+  const supportsLite = supportsLiteReport(orgSlug, selectedModel?.name);
+  const showResults = showsResults(experience);
+
   const canContinue = useMemo(() => {
-    if (step === 0) return !!modelId;
-    if (step === 3) {
+    if (step === STEP_MODEL) return !!modelId;
+    if (step === STEP_LIMITS) {
       if (limitMode === "count") {
         const n = parseInt(maxUses, 10);
         return Number.isInteger(n) && n >= 1;
@@ -102,23 +126,45 @@ export default function CreateTestLinkModal({
       if (limitMode === "date") return !!expiresDate;
       return true;
     }
+    if (step === STEP_ADVANCED) {
+      // Same rules the server enforces: a next-steps URL always, and a
+      // redirect URL whenever the taker never sees the report.
+      if (!isValidUrl(nextStepsUrl)) return false;
+      if (!showResults && !isValidUrl(redirectUrl)) return false;
+      return true;
+    }
     return true;
-  }, [step, modelId, limitMode, maxUses, expiresDate]);
+  }, [
+    step,
+    modelId,
+    limitMode,
+    maxUses,
+    expiresDate,
+    nextStepsUrl,
+    redirectUrl,
+    showResults,
+  ]);
 
   const submit = handleSubmit(async (values) => {
     setSubmitting(true);
     setError(null);
     try {
-      const showResults =
-        EXPERIENCE_OPTIONS.find((o) => o.value === values.experience)
-          ?.showResults ?? true;
+      const submitShowResults = showsResults(values.experience);
 
       const payload: Record<string, any> = {
         orgId,
         testId: values.modelId,
         testDisplayName: values.name.trim() || selectedModel?.name || null,
-        showResults,
-        emailReport: true,
+        showResults: submitShowResults,
+        emailReport: values.emailReport,
+        contactOwner: values.contactOwner.trim() || null,
+        nextStepsUrl: values.nextStepsUrl.trim(),
+        redirectUrl: submitShowResults ? null : values.redirectUrl.trim(),
+        hiddenResultsMessage:
+          !submitShowResults && values.hiddenResultsMessage.trim()
+            ? values.hiddenResultsMessage.trim()
+            : null,
+        report_variant: supportsLite ? values.reportVariant : "full",
         max_uses:
           values.limitMode === "count" ? parseInt(values.maxUses, 10) : null,
         expiresAt:
@@ -138,7 +184,7 @@ export default function CreateTestLinkModal({
       }
 
       setCreatedToken(data.token || null);
-      setStep(4);
+      setStep(STEP_SUCCESS);
       try {
         window.dispatchEvent(new CustomEvent("links:changed"));
       } catch {
@@ -179,7 +225,7 @@ export default function CreateTestLinkModal({
     URL.revokeObjectURL(a.href);
   };
 
-  const isSuccess = step === 4;
+  const isSuccess = step === STEP_SUCCESS;
 
   if (!mounted) return null;
 
@@ -238,17 +284,29 @@ export default function CreateTestLinkModal({
 
         {/* Body — scrolls when content exceeds the viewport-bounded card */}
         <div className="mt-6 min-h-[200px] flex-1 overflow-y-auto pr-1">
-          {step === 0 && <StepChooseModel control={control} models={models} />}
-          {step === 1 && <StepName register={register} />}
-          {step === 2 && <StepExperience control={control} />}
-          {step === 3 && (
+          {step === STEP_MODEL && (
+            <StepChooseModel control={control} models={models} />
+          )}
+          {step === STEP_NAME && <StepName register={register} />}
+          {step === STEP_EXPERIENCE && <StepExperience control={control} />}
+          {step === STEP_LIMITS && (
             <StepLimits control={control} register={register} />
+          )}
+          {step === STEP_ADVANCED && (
+            <StepAdvanced
+              watch={watch}
+              setValue={setValue}
+              supportsLite={supportsLite}
+            />
           )}
           {isSuccess && (
             <StepSuccess
               createdToken={createdToken}
               copied={copied}
               onCopy={copyLink}
+              orgId={orgId}
+              orgSlug={orgSlug}
+              testName={selectedModel?.name}
             />
           )}
         </div>
@@ -272,12 +330,12 @@ export default function CreateTestLinkModal({
                 type="button"
                 disabled={!canContinue || submitting}
                 onClick={() => {
-                  if (step < 3) setStep((s) => s + 1);
+                  if (step < LAST_INPUT_STEP) setStep((s) => s + 1);
                   else submit();
                 }}
                 className="inline-flex h-[38px] flex-1 items-center justify-center rounded-xl bg-[linear-gradient(101.83deg,#54AFE0_0%,#54AFE0_100%)] text-[13px] font-bold text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {step < 3
+                {step < LAST_INPUT_STEP
                   ? "Continue →"
                   : submitting
                   ? "Creating…"

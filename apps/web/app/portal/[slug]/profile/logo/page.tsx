@@ -6,12 +6,14 @@ import {
   primaryBtnClass,
   ghostBtnClass,
 } from "../_components/ui";
+import PreviewBanner from "../_components/PreviewBanner";
 
 export const dynamic = "force-dynamic";
 
 export default function Page() {
   return (
     <ProfileShell>
+      <PreviewBanner note="Logo upload is not wired up yet." />
       <ProfileCard
         title="Organisation logo"
         description="Appears across your organisation and client-facing pages."

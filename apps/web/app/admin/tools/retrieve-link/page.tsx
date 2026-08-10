@@ -11,6 +11,10 @@ export default function RetrieveLinkTool() {
   const [testId, setTestId] = useState("");
   const [showResults, setShowResults] = useState(true);
   const [message, setMessage] = useState("");
+  // Required by /api/admin/create-link: a link always needs a next-steps URL,
+  // and a redirect URL whenever the taker never sees the report.
+  const [nextStepsUrl, setNextStepsUrl] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -35,6 +39,8 @@ export default function RetrieveLinkTool() {
           testId,
           showResults,
           hiddenResultsMessage: showResults ? null : (message || null),
+          nextStepsUrl: nextStepsUrl.trim(),
+          redirectUrl: showResults ? null : redirectUrl.trim(),
         }),
       });
       const data = await res.json();
@@ -97,6 +103,34 @@ export default function RetrieveLinkTool() {
         Show results to test taker
       </label>
 
+      <label className="block text-sm">
+        <span className="mb-1 block">
+          Next steps URL <span className="text-red-600">*</span>
+        </span>
+        <input
+          type="url"
+          className="w-full rounded border p-2"
+          value={nextStepsUrl}
+          onChange={(e) => setNextStepsUrl(e.target.value)}
+          placeholder="https://your-site.com/book-a-call"
+        />
+      </label>
+
+      {!showResults && (
+        <label className="block text-sm">
+          <span className="mb-1 block">
+            Redirect URL <span className="text-red-600">*</span>
+          </span>
+          <input
+            type="url"
+            className="w-full rounded border p-2"
+            value={redirectUrl}
+            onChange={(e) => setRedirectUrl(e.target.value)}
+            placeholder="https://your-site.com/thank-you"
+          />
+        </label>
+      )}
+
       {!showResults && (
         <label className="block text-sm">
           <span className="mb-1 block">Message shown after completion</span>
@@ -112,7 +146,13 @@ export default function RetrieveLinkTool() {
 
       <button
         className="rounded bg-black px-3 py-2 text-white text-sm disabled:opacity-50"
-        disabled={!orgId || !testId || loading}
+        disabled={
+          !orgId ||
+          !testId ||
+          !nextStepsUrl.trim() ||
+          (!showResults && !redirectUrl.trim()) ||
+          loading
+        }
         onClick={generate}
       >
         {loading ? "Generating…" : "Generate Link"}

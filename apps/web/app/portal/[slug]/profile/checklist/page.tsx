@@ -1,6 +1,7 @@
 // apps/web/app/portal/[slug]/profile/checklist/page.tsx
 // Profile → Setup checklist (mockup: static, all items complete).
 import { ProfileShell, ProfileCard } from "../_components/ui";
+import PreviewBanner from "../_components/PreviewBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ const items = [
 export default function Page() {
   return (
     <ProfileShell>
+      <PreviewBanner note="Checklist items are not tracked against your account yet." />
       <ProfileCard
         title="Setup checklist"
         description="Your MindCanvas account is fully set up."

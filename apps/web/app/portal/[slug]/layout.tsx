@@ -6,10 +6,10 @@ import type { CSSProperties, ReactNode } from "react";
 import { getStripeMode } from "@/app/_lib/billing";
 import { getAdminClient, getServerSupabase } from "@/app/_lib/portal";
 import LegacyBillingCheckoutModal from "@/components/billing/LegacyBillingCheckoutModal";
-import PortalChrome from "@/components/portal/PortalChrome";
 import PortalHeader from "@/components/portal/PortalHeader";
 import PortalSidebar from "@/components/portal/PortalSidebar";
 import BackgroundGrid from "@/components/ui/BackgroundGrid";
+import { loadModels } from "@/lib/portal/loadModels";
 
 import PilotGracePopup from "./PilotGracePopup";
 
@@ -174,6 +174,7 @@ export default async function OrgLayout({
   // Logged-in user (for the welcome header) — always the current user, never the org owner
   let firstName: string | null = null;
   let fullName: string | null = null;
+  let isSuperadmin = false;
   try {
     const sb = await getServerSupabase();
     const { data } = await sb.auth.getUser();
@@ -188,9 +189,25 @@ export default async function OrgLayout({
 
     firstName = meta.first_name || (metaFull ? metaFull.split(/\s+/)[0] : null);
     fullName = metaFull;
+
+    // Same lookup as app/admin/layout.tsx — gates the "Back to admin" link.
+    if (user?.id) {
+      const admin = await getAdminClient();
+      const { data: adminRow } = await admin
+        .schema("portal")
+        .from("superadmin")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      isSuperadmin = Boolean(adminRow?.user_id);
+    }
   } catch {
     // ignore — header falls back to a generic greeting
   }
+
+  // Model list for the header's "Create test link" wizard.
+  const models = org ? await loadModels(org.id) : [];
 
   const brandVariables = {
     "--brand-primary": org?.brand_primary ?? "#2d8fc4",
@@ -244,19 +261,17 @@ export default async function OrgLayout({
           <PortalSidebar orgSlug={slug} />
         </div>
 
-        {/* Main column: welcome header + top tabs + page body */}
+        {/* Main column: welcome header + page body */}
         <div className="flex min-w-0 flex-1 flex-col">
           <PortalHeader
             orgSlug={slug}
+            orgId={org?.id ?? ""}
+            models={models}
             firstName={firstName}
             fullName={fullName}
+            isSuperadmin={isSuperadmin}
           />
-          <PortalChrome
-            orgSlug={slug}
-            orgName={org?.brand_name ?? org?.name ?? slug}
-          >
-            {children}
-          </PortalChrome>
+          <div className="px-5 pb-10 pt-4">{children}</div>
         </div>
       </div>
 

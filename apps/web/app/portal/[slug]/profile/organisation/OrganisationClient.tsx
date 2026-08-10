@@ -18,6 +18,16 @@ import {
 const COUNTRIES = ["Australia", "United Kingdom", "United States", "Canada", "New Zealand"];
 const ORG_TYPES = ["Coach or consultant", "Agency", "In-house team", "Enterprise"];
 
+// Only these two selects are mockups — the rest of the card is persisted, so
+// they are labelled inline rather than banner-ing the whole page.
+function PreviewHint() {
+  return (
+    <p className="mt-1.5 text-[11.5px] font-light text-amber-300/80">
+      Preview — this field isn&apos;t saved yet.
+    </p>
+  );
+}
+
 export default function OrganisationClient({ slug }: { slug: string }) {
   const { org, busy, error, saved, update, save } = useOrgProfile(slug);
 
@@ -77,6 +87,7 @@ export default function OrganisationClient({ slug }: { slug: string }) {
                 </option>
               ))}
             </select>
+            <PreviewHint />
           </Field>
         </div>
 
@@ -104,6 +115,7 @@ export default function OrganisationClient({ slug }: { slug: string }) {
                 </option>
               ))}
             </select>
+            <PreviewHint />
           </Field>
         </div>
 

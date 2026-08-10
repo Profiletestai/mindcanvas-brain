@@ -2,11 +2,20 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import CreateTestLinkButton from "./CreateTestLinkButton";
+import PortalSidebar from "./PortalSidebar";
+import type { ModelOption } from "./create-test-link/types";
 
 type Props = {
   orgSlug: string;
+  orgId: string;
+  models: ModelOption[];
   firstName?: string | null;
   fullName?: string | null;
+  // "Back to admin" is only meaningful for portal.superadmin users.
+  isSuperadmin?: boolean;
 };
 
 function initials(name?: string | null) {
@@ -80,11 +89,77 @@ const HelpIcon = (
   </svg>
 );
 
-export default function PortalHeader({ orgSlug, firstName, fullName }: Props) {
+export default function PortalHeader({
+  orgSlug,
+  orgId,
+  models,
+  firstName,
+  fullName,
+  isSuperadmin = false,
+}: Props) {
   const name = (firstName ?? "").trim() || "there";
 
+  // Mobile nav drawer — the sidebar is hidden below md, so this is the only
+  // navigation on small screens.
+  const [navOpen, setNavOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [navOpen]);
+
   return (
-    <header className="relative flex h-[87px] items-center border border-[rgba(255,255,255,0.05)] justify-between gap-4 pl-6 pr-[21px] bg-[rgba(14,42,69,1)] backdrop-blur-2xl">
+    <header className="relative flex h-[87px] items-center border border-[rgba(255,255,255,0.05)] justify-between gap-4 pl-4 pr-[21px] md:pl-6 bg-[rgba(14,42,69,1)] backdrop-blur-2xl">
+      <button
+        type="button"
+        aria-label="Open navigation"
+        aria-expanded={navOpen}
+        onClick={() => setNavOpen(true)}
+        className="mr-1 flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-white/70 transition-colors hover:bg-[rgba(255,255,255,0.08)] md:hidden"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+
+      {mounted &&
+        navOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[90] md:hidden">
+            <div
+              className="absolute inset-0 bg-[#050914]/75 backdrop-blur-md"
+              onClick={() => setNavOpen(false)}
+            />
+            <div className="absolute inset-y-0 left-0 w-56 overflow-y-auto shadow-2xl">
+              <PortalSidebar
+                orgSlug={orgSlug}
+                onNavigate={() => setNavOpen(false)}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
+
       <div className="min-w-0">
         <h1 className="truncate text-[20px] leading-[32px] font-extrabold tracking-[-0.4px] text-white">
           Welcome, {name}.
@@ -95,24 +170,23 @@ export default function PortalHeader({ orgSlug, firstName, fullName }: Props) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <Link
-          href={`/portal/${orgSlug}/links`}
-          style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-          className="mr-2 inline-flex h-[30px] items-center gap-[7px] rounded-md bg-[linear-gradient(101.83deg,#54AFE0_0%,#54AFE0_100%)] px-4 text-[12px] font-bold leading-none tracking-[0.1px] text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
+        {isSuperadmin && (
+          <Link
+            href="/admin"
+            className="mr-1 hidden text-[12px] font-medium text-white/40 underline-offset-2 transition-colors hover:text-white hover:underline sm:inline"
           >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Create test link
-        </Link>
+            Back to admin
+          </Link>
+        )}
+
+        <span className="mr-2">
+          <CreateTestLinkButton
+            orgId={orgId}
+            orgSlug={orgSlug}
+            models={models}
+            variant="header"
+          />
+        </span>
 
         <button
           type="button"

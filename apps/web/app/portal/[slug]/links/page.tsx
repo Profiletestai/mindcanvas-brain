@@ -2,52 +2,10 @@
 import { createClient } from "@/lib/server/supabaseAdmin";
 import PortalPageHeader from "@/components/portal/PortalPageHeader";
 import CreateTestLinkButton from "@/components/portal/CreateTestLinkButton";
-import LinksClient from "./LinksClient";
 import CreatedTestLinksTable from "./CreatedTestLinksTable";
-import { metaFor } from "@/lib/testModels";
+import { loadModels } from "@/lib/portal/loadModels";
 
 export const dynamic = "force-dynamic";
-
-// Resolve the tests this org can create links for — mirrors /api/admin/tests.
-async function loadModels(orgId: string) {
-  const sb = createClient().schema("portal");
-  let rows: any[] = [];
-
-  const { data: accessRows } = await sb
-    .from("org_test_access")
-    .select("test_id")
-    .eq("org_id", orgId)
-    .eq("status", "active");
-
-  const ids = (accessRows ?? []).map((r: any) => r.test_id).filter(Boolean);
-
-  if (ids.length) {
-    const { data } = await sb
-      .from("tests")
-      .select("id, name, created_at")
-      .in("id", ids)
-      .order("created_at", { ascending: false });
-    rows = data ?? [];
-  }
-
-  if (!rows.length) {
-    const { data } = await sb
-      .from("tests")
-      .select("id, name, created_at")
-      .eq("org_id", orgId)
-      .order("created_at", { ascending: false });
-    rows = data ?? [];
-  }
-
-  return (rows || [])
-    .map((r: any) => {
-      const id = r?.id ?? r?.test_id ?? null;
-      if (!id) return null;
-      const name = r?.name ?? "Untitled test";
-      return { id, name, category: metaFor(name).category };
-    })
-    .filter(Boolean) as { id: string; name: string; category: string }[];
-}
 
 export default async function OrgLinksPage({
   params,
@@ -82,27 +40,8 @@ export default async function OrgLinksPage({
         }
       />
 
-      {/* Redesigned links table */}
+      {/* Links table — create/edit both run through the wizard modal */}
       <CreatedTestLinksTable orgId={org.id} orgSlug={org.slug} models={models} />
-
-      {/* Advanced create form — offers options the quick modal doesn't
-          (recipient email, report variant, redirect URLs, contact owner). */}
-      <details className="group overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0e2a45]">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-6 py-4 text-[13px] font-semibold text-white/70 transition hover:text-white">
-          <span>Advanced: create with more options</span>
-          <span className="text-white/40 transition group-open:rotate-180">
-            ▾
-          </span>
-        </summary>
-        <div className="border-t border-white/[0.07] bg-white p-6 text-slate-900">
-          <LinksClient
-            orgId={org.id}
-            orgSlug={org.slug}
-            orgName={org.name ?? org.slug}
-            hideRecentLinks
-          />
-        </div>
-      </details>
     </div>
   );
 }

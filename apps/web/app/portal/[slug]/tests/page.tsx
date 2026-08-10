@@ -8,57 +8,10 @@ import { createClient } from "@/lib/server/supabaseAdmin";
 import PortalPageHeader from "@/components/portal/PortalPageHeader";
 import CreateTestLinkButton from "@/components/portal/CreateTestLinkButton";
 import { cardClass } from "@/components/portal/ui";
+import { loadModels } from "@/lib/portal/loadModels";
 import { metaFor } from "@/lib/testModels";
 
 export const dynamic = "force-dynamic";
-
-type Test = {
-  id: string;
-  name: string;
-};
-
-// Resolve the tests this org can create links for — mirrors
-// /api/admin/tests: access via portal.org_test_access, with a legacy
-// fallback to org-owned test rows.
-async function loadTests(orgId: string): Promise<Test[]> {
-  const sb = createClient().schema("portal");
-
-  let rows: any[] = [];
-
-  const { data: accessRows } = await sb
-    .from("org_test_access")
-    .select("test_id")
-    .eq("org_id", orgId)
-    .eq("status", "active");
-
-  const ids = (accessRows ?? []).map((r: any) => r.test_id).filter(Boolean);
-
-  if (ids.length) {
-    const { data: testRows } = await sb
-      .from("tests")
-      .select("id, name, created_at")
-      .in("id", ids)
-      .order("created_at", { ascending: false });
-    rows = testRows ?? [];
-  }
-
-  if (!rows.length) {
-    const { data } = await sb
-      .from("tests")
-      .select("id, name, created_at")
-      .eq("org_id", orgId)
-      .order("created_at", { ascending: false });
-    rows = data ?? [];
-  }
-
-  return (rows || [])
-    .map((r: any) => {
-      const id = r?.id ?? r?.test_id ?? null;
-      if (!id) return null;
-      return { id, name: r?.name ?? "Untitled test" } as Test;
-    })
-    .filter(Boolean) as Test[];
-}
 
 export default async function TestsPage({
   params,
@@ -80,14 +33,8 @@ export default async function TestsPage({
       throw new Error(orgErr?.message || "Organisation not found");
     }
 
-    const tests = await loadTests(org.id);
-
-    // Serializable model list for the create-link modal (client component).
-    const models = tests.map((t) => ({
-      id: t.id,
-      name: t.name,
-      category: metaFor(t.name).category,
-    }));
+    // Serializable model list — also feeds the create-link modal.
+    const models = await loadModels(org.id);
 
     return (
       <div className="space-y-6 text-slate-100">
@@ -110,7 +57,7 @@ export default async function TestsPage({
           </div>
 
           <div className="grid gap-x-2 gap-y-3.5 lg:grid-cols-2">
-            {tests.map((t) => {
+            {models.map((t) => {
               const meta = metaFor(t.name);
               return (
                 <div

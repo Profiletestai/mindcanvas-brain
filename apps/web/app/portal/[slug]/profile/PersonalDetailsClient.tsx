@@ -11,6 +11,7 @@ import {
   inputClass,
   primaryBtnClass,
 } from "./_components/ui";
+import PreviewBanner from "./_components/PreviewBanner";
 
 export default function PersonalDetailsClient() {
   const [firstName, setFirstName] = useState("Daniel");
@@ -20,6 +21,7 @@ export default function PersonalDetailsClient() {
 
   return (
     <ProfileShell>
+      <PreviewBanner note="There is no self-service profile endpoint yet, so changes are not persisted." />
       <ProfileCard title="Personal details" description="Your name and login email.">
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <Field label="First name" htmlFor="first-name">

@@ -10,6 +10,7 @@ import {
   smallBtnClass,
 } from "@/components/portal/ui";
 import { inputClass, primaryBtnClass, ghostBtnClass } from "../_components/ui";
+import PreviewBanner from "../_components/PreviewBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,8 @@ export default function Page() {
           </button>
         }
       />
+
+      <PreviewBanner note="This roster is example data — there is no invite backend yet." />
 
       {/* Roster card */}
       <div className={`${cardClass} p-5`}>

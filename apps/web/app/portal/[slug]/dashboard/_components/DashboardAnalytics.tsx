@@ -49,7 +49,7 @@ function UnlockOverlay({ slug }: { slug: string }) {
         Upgrade to see analytics and insights across all your submissions.
       </p>
       <Link
-        href={`/portal/${slug}/profile/billing`}
+        href={`/portal/${slug}/billing`}
         className="mt-1 inline-flex h-[30px] items-center rounded-md bg-[#54AFE0] px-4 text-[12px] font-bold text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90"
       >
         Upgrade to Pro →
@@ -291,7 +291,7 @@ function LockedMetricCard({
         </span>
         <span className="text-[12px] font-semibold text-white/80">Pro only</span>
         <Link
-          href={`/portal/${slug}/profile/billing`}
+          href={`/portal/${slug}/billing`}
           className="inline-flex h-[24px] items-center rounded-md bg-[#54AFE0] px-3 text-[11px] font-bold text-white transition-opacity hover:opacity-90"
         >
           Upgrade
@@ -367,7 +367,7 @@ export function ProUpsellBanner({ slug }: { slug: string }) {
         </div>
         <div className="text-[12px] text-white/45">Up to 35 submissions/mo</div>
         <Link
-          href={`/portal/${slug}/profile/billing`}
+          href={`/portal/${slug}/billing`}
           className="mt-2 inline-flex h-[34px] items-center rounded-md bg-[#54AFE0] px-4 text-[13px] font-bold text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90"
         >
           Upgrade to Pro →
@@ -406,7 +406,7 @@ export function ProStatusBanner({
       </div>
       {nextTier && (
         <Link
-          href={`/portal/${slug}/profile/billing`}
+          href={`/portal/${slug}/billing`}
           className="ml-auto inline-flex h-[28px] items-center rounded-md border border-white/[0.14] bg-white/[0.04] px-3 text-[12px] font-semibold text-white/75 transition-colors hover:bg-white/[0.08]"
         >
           Upgrade to {nextTier} →
