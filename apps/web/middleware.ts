@@ -33,7 +33,9 @@ function isPublicPortalRoute(pathname: string) {
     pathname === "/portal/login" ||
     pathname.startsWith("/portal/login/") ||
     pathname === "/portal/logout" ||
-    pathname.startsWith("/portal/logout/")
+    pathname.startsWith("/portal/logout/") ||
+    pathname === "/portal/forgot-password" ||
+    pathname === "/portal/reset-password"
   );
 }
 
