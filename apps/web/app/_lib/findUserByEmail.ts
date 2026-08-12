@@ -15,7 +15,7 @@ export async function findUserByEmail(
     process.env.SUPABASE_SERVICE_ROLE ||
     "";
   const res = await fetch(
-    `${url}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+    `${url}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&per_page=200`,
     {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       cache: "no-store",

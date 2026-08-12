@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { OtpInput } from "./_components/OtpInput";
 
 function safeNextPath(input: unknown, fallback: string) {
@@ -228,6 +229,14 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 required
               />
+              <div className="mt-1 text-right">
+                <Link
+                  href="/portal/forgot-password"
+                  className="text-xs text-white/60 hover:text-white"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <button
