@@ -1,4 +1,5 @@
-//apps/web/app/(v2)/onboarding/v2/_lib/schema.ts
+// apps/web/app/(v2)/onboarding/v2/_lib/schema.ts
+
 import { z } from "zod";
 import { isValidPhoneNumber } from "libphonenumber-js";
 import {
@@ -49,15 +50,25 @@ export const otpSchema = z
   .trim()
   .regex(OTP_RE, { message: "Enter the 6-digit code." });
 
-export const passwordSchema = z
+const resetPasswordValueSchema = z
   .string()
   .min(8, { message: "Password must be at least 8 characters." })
-  .regex(/[a-z]/, { message: "Password must contain a lowercase letter." })
-  .regex(/[A-Z]/, { message: "Password must contain an uppercase letter." })
-  .regex(/\d/, { message: "Password must contain a number." });
+  .max(72, { message: "Password must be 72 characters or fewer." })
+  .regex(/[a-z]/, {
+    message: "Password must contain a lowercase letter.",
+  })
+  .regex(/[A-Z]/, {
+    message: "Password must contain an uppercase letter.",
+  })
+  .regex(/\d/, {
+    message: "Password must contain a number.",
+  });
 
 export const resetPasswordSchema = z
-  .object({ password: passwordSchema, confirm_password: z.string() })
+  .object({
+    password: resetPasswordValueSchema,
+    confirm_password: z.string(),
+  })
   .refine((v) => v.password === v.confirm_password, {
     message: "Passwords do not match.",
     path: ["confirm_password"],
