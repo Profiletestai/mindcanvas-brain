@@ -1724,6 +1724,206 @@ function SectionCard({
     );
   }
 
+  if (
+    sectionIdentity.includes("overuse") ||
+    sectionIdentity.includes("blindspot") ||
+    sectionIdentity.includes("development_areas") ||
+    sectionIdentity.includes("development areas")
+  ) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/potential-overuse.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Potential overuse patterns and blindspots</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-6 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "cards" || blockType === "scorecard_row") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="grid gap-3 md:grid-cols-2">
+                    {items.map((item, itemIndex) => {
+                      const isProtective = itemIndex % 2 === 1;
+                      const itemBullets = Array.isArray(item?.bullets)
+                        ? item.bullets
+                        : Array.isArray(item?.items)
+                          ? item.items
+                          : [];
+                      return (
+                        <article
+                          key={itemIndex}
+                          className={`${isProtective ? "border-[#0fcd5e] bg-[#0fcd5e]/[0.09]" : "border-[#bc1823] bg-[#bc1823]/[0.09]"} flex min-h-[220px] items-start gap-3 rounded-[11px] border px-4 py-4 text-[#0e1726]`}
+                        >
+                          <span className={`${isProtective ? "bg-[#0fcd5e]" : "bg-[#bc1823]"} mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full`} />
+                          <div>
+                            {item?.title || item?.label ? <h3 className="text-[16px] font-semibold leading-[22px]">{safeText(item?.title || item?.label)}</h3> : null}
+                            {typeof item === "string" ? <p className="mt-2 whitespace-pre-line text-[13px] leading-6">{item}</p> : null}
+                            {item?.text || item?.value || item?.description ? (
+                              <p className="mt-2 whitespace-pre-line text-[13px] leading-6">{safeText(item?.text || item?.value || item?.description)}</p>
+                            ) : null}
+                            {itemBullets.length ? (
+                              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-6">
+                                {itemBullets.map((bullet: any, bulletIndex: number) => <li key={bulletIndex}>{safeText(bullet?.text || bullet)}</li>)}
+                              </ul>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              if (blockType === "ul" || blockType === "ol") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="grid gap-3 md:grid-cols-2">
+                    {items.map((item, itemIndex) => {
+                      const isProtective = itemIndex % 2 === 1;
+                      return (
+                        <article
+                          key={itemIndex}
+                          className={`${isProtective ? "border-[#0fcd5e] bg-[#0fcd5e]/[0.09]" : "border-[#bc1823] bg-[#bc1823]/[0.09]"} flex min-h-[120px] items-start gap-3 rounded-[11px] border px-4 py-4 text-[13px] leading-6 text-[#0e1726]`}
+                        >
+                          <span className={`${isProtective ? "bg-[#0fcd5e]" : "bg-[#bc1823]"} mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full`} />
+                          <span>{safeText(item)}</span>
+                        </article>
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="rounded-[11px] border border-[#bc1823] bg-[#bc1823]/[0.09] px-4 py-4 text-[#0e1726]">
+                    {block.title ? <h3 className="text-[16px] font-semibold leading-[22px]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-2 whitespace-pre-line text-[13px] leading-6">{safeText(block.text)}</p> : null}
+                    {Array.isArray(block.bullets) && block.bullets.length ? (
+                      <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-6">
+                        {block.bullets.map((bullet, bulletIndex) => <li key={bulletIndex}>{safeText(bullet)}</li>)}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("reflection")) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/reflection-questions.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Reflection questions</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "ul" || blockType === "ol" || blockType === "cards" || blockType === "scorecard_row") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {items.map((item, itemIndex) => (
+                      <div
+                        key={itemIndex}
+                        className={`${items.length % 2 === 1 && itemIndex === items.length - 1 ? "md:col-span-2" : ""} flex min-h-[54px] items-center gap-3 rounded-[11px] border border-[#7e95d5] bg-slate-100/[0.09] px-4 py-3 text-[14px] font-semibold leading-[22px] text-[#0e1726]`}
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7e95d5]" />
+                        <span>{typeof item === "string" ? item : safeText(item?.text || item?.title || item?.label || item?.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                const prompts = Array.isArray(block.bullets) ? block.bullets : [];
+                return prompts.length ? (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {prompts.map((prompt, promptIndex) => (
+                      <div
+                        key={promptIndex}
+                        className={`${prompts.length % 2 === 1 && promptIndex === prompts.length - 1 ? "md:col-span-2" : ""} flex min-h-[54px] items-center gap-3 rounded-[11px] border border-[#7e95d5] px-4 py-3 text-[14px] font-semibold leading-[22px] text-[#0e1726]`}
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7e95d5]" />
+                        <span>{safeText(prompt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div key={blockIndex} className="rounded-[11px] border border-[#7e95d5] px-4 py-3">
+                    {block.title ? <h3 className="font-semibold text-[#0e1726]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="whitespace-pre-line">{safeText(block.text)}</p> : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (sectionIdentity.includes("identity") || sectionIdentity.includes("essence")) {
     const topProfile = ranked[0] || {
       code: shortProfileCode(data.top_profile_code || "P1"),
