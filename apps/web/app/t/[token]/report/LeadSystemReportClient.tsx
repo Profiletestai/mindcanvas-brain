@@ -1,7 +1,6 @@
-//apps/web/app/t/[token]/report/LeadSystemReportClient.tsx
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 
 type AB = "A" | "B" | "C" | "D";
 
@@ -384,6 +383,53 @@ function findSection(sections: ReportSection[], terms: string[]) {
     const haystack = `${safeText(section.id)} ${safeText(section.title)}`.toLowerCase();
     return terms.some((term) => haystack.includes(term));
   });
+}
+
+function howToUseIcon(title: string) {
+  const normalised = title.toLowerCase();
+  if (normalised.includes("self-awareness")) return "/mps/how-to-use-this-report/self-awareness-tool.png";
+  if (normalised.includes("leadership development")) return "/mps/how-to-use-this-report/leadership-development-guide.png";
+  if (normalised.includes("conversation starter")) return "/mps/how-to-use-this-report/conversation-starter.png";
+  if (normalised.includes("decision") || normalised.includes("role sanity")) return "/mps/how-to-use-this-report/decision-role-sanity-check.png";
+  return "/mps/report-icons/how-to-use.png";
+}
+
+function extractHowToUseContent(blocks: ReportBlock[]) {
+  const intro: string[] = [];
+  const cards: Array<{ title: string; text: string }> = [];
+  let current: { title: string; text: string } | null = null;
+
+  function finishCurrent() {
+    if (current?.title) cards.push({ title: current.title, text: current.text.trim() });
+    current = null;
+  }
+
+  for (const block of blocks) {
+    const type = String(block?.type || "").toLowerCase().trim();
+    const text = safeText(block.text).trim();
+
+    if (["h1", "h2", "h3", "h4"].includes(type)) {
+      finishCurrent();
+      current = { title: text, text: "" };
+      continue;
+    }
+
+    if (type === "p" && text) {
+      if (current) current.text = `${current.text}${current.text ? " " : ""}${text}`;
+      else intro.push(text);
+      continue;
+    }
+
+    if (type === "callout") {
+      finishCurrent();
+      const calloutTitle = safeText(block.title).trim();
+      const calloutText = [safeText(block.text), ...(block.bullets || []).map(safeText)].filter(Boolean).join(" ").trim();
+      if (calloutTitle) cards.push({ title: calloutTitle, text: calloutText });
+    }
+  }
+
+  finishCurrent();
+  return { intro: intro.join(" "), cards: cards.filter((card) => card.title && card.text).slice(0, 4) };
 }
 
 function FrequencyChart({
@@ -788,6 +834,57 @@ function SectionCard({
     );
   }
 
+  if (sectionIdentity.includes("how_to_use") || sectionIdentity.includes("how to use")) {
+    const howToUse = extractHowToUseContent(blocks);
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-emerald-700/20 bg-white/65">
+            <img
+              src="/mps/report-icons/how-to-use.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#122c4d]">Before you dive in</p>
+            <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">How to Use This Report</h2>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]/95">
+            {howToUse.intro || "Think of this as a personal leadership manual, not something to skim once and forget. Return to it at different stages of your growth and you will see new layers each time."}
+          </p>
+
+          <div className="mt-7 grid gap-3 md:grid-cols-2">
+            {howToUse.cards.map((card) => (
+              <article key={card.title} className="rounded-[13px] bg-[linear-gradient(90deg,#7c94d7,#e8b15e)] p-px">
+                <div className="h-full min-h-[188px] rounded-[12px] bg-white px-4 py-4">
+                  <span className="flex h-[52px] w-[52px] items-center justify-center rounded-lg bg-[linear-gradient(90deg,#7c94d7,#e8b15e)]">
+                    <img
+                      src={howToUseIcon(card.title)}
+                      alt=""
+                      className="h-11 w-11 object-contain"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  </span>
+                  <h3 className="mt-2 text-[11px] font-bold uppercase leading-5 tracking-[0.03em] text-[#061938]">{card.title}</h3>
+                  <p className="mt-1 text-[12px] leading-[1.6] text-[#313c52]">{card.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id={id} className="report-section scroll-mt-6 rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
       <div className="rounded-[22px] bg-white px-5 py-6 text-slate-900 shadow-[0_18px_60px_rgba(0,0,0,0.12)] sm:px-8 sm:py-8">
@@ -828,6 +925,7 @@ export default function LeadSystemReportClient({
   void src;
 
   const reportRef = useRef<HTMLDivElement | null>(null);
+  const [indexOpen, setIndexOpen] = useState(false);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
   const reportDate = formatReportDate(data.report_date);
@@ -887,6 +985,18 @@ export default function LeadSystemReportClient({
   const dominantLabel = approachLabel(dominantName, dominantCode);
 
   const nextStepsUrl = getNextStepsUrl(data);
+  const indexItems = [
+    ...sections.map((section, index) => ({
+      id: sectionDomId(section, index),
+      title: safeText(section.title).trim() || fallbackSectionTitle(section, primary.name),
+    })),
+    { id: "lead-methodology", title: "Methodology" },
+  ];
+
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setIndexOpen(false);
+  }
 
   return (
     <div ref={reportRef} className="lead-report-shell pdf-report-shell report-shell min-h-screen overflow-x-hidden bg-[#07182f] text-white [background-image:radial-gradient(circle_at_12%_2%,rgba(64,104,154,.32),transparent_30%),radial-gradient(circle_at_92%_18%,rgba(215,169,40,.16),transparent_24%)]">
@@ -1132,7 +1242,60 @@ export default function LeadSystemReportClient({
           <div className="rounded-[30px] bg-white p-5 text-[#0b2545] sm:p-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Personality map</p><h2 className="mt-2 text-2xl font-bold">Your eight-profile pattern</h2><p className="mt-2 text-sm leading-6 text-slate-600">Higher points show patterns you access more naturally. Lower points identify areas that may benefit from support, structure or intentional practice.</p><div className="mt-5"><ProfileRadar ranked={ranked} values={data.profile_percentages} /></div></div>
         </section>
 
-        <main className="mt-6 space-y-5">
+        <div className="mt-6 grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
+          <aside className="no-print self-start lg:sticky lg:top-5">
+            <button
+              type="button"
+              onClick={() => setIndexOpen((open) => !open)}
+              aria-expanded={indexOpen}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-bold lg:hidden"
+            >
+              <span>Report index</span>
+              <span aria-hidden="true">{indexOpen ? "−" : "+"}</span>
+            </button>
+
+            <nav
+              aria-label="Report index"
+              className={`${indexOpen ? "block" : "hidden"} mt-3 rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.22)] lg:mt-0 lg:block`}
+            >
+              <p className="px-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/45">Report index</p>
+              <div className="mt-3 max-h-[68vh] space-y-1.5 overflow-y-auto pr-1">
+                {indexItems.map((item, index) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollTo(item.id)}
+                    className={`flex w-full items-start gap-1 rounded-lg border px-2 py-2 text-left text-[10px] leading-4 text-white/80 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#e8b75f] ${index === 0 ? "border-[#e8b75f] bg-white/[0.05]" : "border-white/[0.06] bg-[#081d39]/35"}`}
+                  >
+                    <span className="shrink-0">{index + 1}.</span>
+                    <span>{item.title}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 space-y-2 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-full rounded-lg border border-white/10 bg-[#08162b]/70 px-3 py-2 text-left text-[10px] font-semibold text-white hover:bg-[#08162b]"
+                >
+                  Download PDF
+                </button>
+                {nextStepsUrl ? (
+                  <a
+                    href={nextStepsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full rounded-lg bg-[linear-gradient(90deg,#45e0d1_0%,#4f7dff_50%,#8b5cf6_100%)] px-3 py-2 text-[10px] font-semibold text-[#071c36]"
+                  >
+                    Next step
+                  </a>
+                ) : null}
+              </div>
+            </nav>
+          </aside>
+
+          <main className="space-y-5">
             {sections.length ? sections.map((section, index) => <SectionCard key={`${sectionDomId(section, index)}-${index}`} section={section} index={index} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />) : <section className="rounded-[28px] bg-white p-7 text-slate-700"><h2 className="text-xl font-bold text-[#0b2545]">Report content is unavailable</h2><p className="mt-3 text-sm leading-6">The result loaded correctly, but the LEAD narrative content could not be loaded. Please refresh the page or contact support.</p></section>}
 
             <section id="lead-methodology" className="report-section rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
@@ -1140,7 +1303,8 @@ export default function LeadSystemReportClient({
             </section>
 
             {nextStepsUrl ? <div className="no-print flex justify-end"><a href={nextStepsUrl} target="_blank" rel="noreferrer" className="rounded-full bg-[#d7a928] px-6 py-3 text-sm font-bold text-[#0b2545] hover:bg-[#e4bd4d] focus:outline-none focus:ring-2 focus:ring-white">Next Step</a></div> : null}
-        </main>
+          </main>
+        </div>
 
         <footer className="mt-8 border-t border-white/10 py-5 text-center text-xs text-white/45">© {new Date().getFullYear()} MindCanvas LEAD System · Powered by Profiletest.ai</footer>
       </div>
