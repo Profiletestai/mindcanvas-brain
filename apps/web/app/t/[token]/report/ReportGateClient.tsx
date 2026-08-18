@@ -8,6 +8,7 @@ import LegacyReportClient from "./LegacyReportClient";
 import LegacyOrgReportClient from "./LegacyOrgReportClient";
 import OperatingFrameReportClient from "./OperatingFrameReportClient";
 import FiveDLeadershipReportClient from "./FiveDLeadershipReportClient";
+import LeadSystemReportClient from "./LeadSystemReportClient";
 
 type AB = "A" | "B" | "C" | "D";
 
@@ -32,6 +33,9 @@ type ResultData = {
   org_name?: string | null;
   org_logo_url?: string | null;
   test_name: string;
+  report_date?: string | null;
+  framework_id?: string | null;
+  framework_content_blocks?: any;
 
   taker: { id: string; first_name?: string | null; last_name?: string | null };
 
@@ -240,6 +244,21 @@ function isFiveDLeadership(data: ResultData | null) {
   );
 }
 
+function isLeadSystem(data: ResultData | null) {
+  if (!data || isFiveDLeadership(data) || isOperatingFrame(data)) return false;
+
+  const testName = String(data.test_name || "").toLowerCase().trim();
+  const frameworkPath = getStorageFrameworkPath(data).toLowerCase();
+
+  return (
+    frameworkPath.startsWith("lead/") ||
+    frameworkPath.includes("/lead/") ||
+    frameworkPath.includes("mindcanvas-lead") ||
+    testName.includes("mindcanvas lead") ||
+    testName.includes("lead system")
+  );
+}
+
 async function fetchPublicFramework(data: ResultData) {
   const storagePath = getStorageFrameworkPath(data);
   const bucket = getStorageFrameworkBucket(data);
@@ -316,8 +335,9 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
 
         const shouldUseBlocksEngine = json.data.debug?.useBlocksEngine === true;
         const shouldLoadOperatingFrame = isOperatingFrame(json.data);
+        const shouldLoadLeadFramework = isLeadSystem(json.data);
         const shouldLoadNativeBlocksFramework =
-          shouldUseBlocksEngine &&
+          (shouldUseBlocksEngine || shouldLoadLeadFramework) &&
           !shouldLoadOperatingFrame &&
           !!getStorageFrameworkPath(json.data) &&
           !hasUsableFrameworkProfileSections(json.data);
@@ -365,6 +385,7 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
   const forcedLegacy = useMemo(() => isLegacyOrgForced(data), [data]);
   const isOF = useMemo(() => isOperatingFrame(data), [data]);
   const isFiveD = useMemo(() => isFiveDLeadership(data), [data]);
+  const isLead = useMemo(() => isLeadSystem(data), [data]);
 
   const nativeBlocksData = useMemo(() => {
     if (!data) return null;
@@ -470,6 +491,17 @@ export default function ReportGateClient(props: { token: string; tid: string; sr
         src={src || ""}
         data={data as any}
         framework={ofFramework}
+      />
+    );
+  }
+
+  if (isLead) {
+    return (
+      <LeadSystemReportClient
+        token={token}
+        tid={tid}
+        src={src || ""}
+        data={(nativeBlocksData || data) as any}
       />
     );
   }

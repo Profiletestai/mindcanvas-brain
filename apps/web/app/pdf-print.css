@@ -53,4 +53,57 @@
   footer.no-print {
     display: none !important;
   }
+
+  /* MindCanvas LEAD System print layout */
+  .lead-report-shell {
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #0b2545 !important;
+  }
+
+  .lead-report-shell > div {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .lead-report-shell .report-section {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+    box-shadow: none !important;
+  }
+
+  .lead-report-shell .report-card,
+  .lead-report-shell .chart-card,
+  .lead-report-shell .summary-card,
+  .lead-report-shell figure,
+  .lead-report-shell blockquote {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .lead-report-shell h1,
+  .lead-report-shell h2,
+  .lead-report-shell h3,
+  .lead-report-shell h4,
+  .lead-report-shell h5 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .lead-report-shell section {
+    margin-top: 6mm !important;
+  }
+
+  .lead-report-shell section:first-of-type,
+  .lead-report-shell header + section {
+    margin-top: 5mm !important;
+  }
+
+  .lead-report-shell footer {
+    color: #667085 !important;
+  }
 }
