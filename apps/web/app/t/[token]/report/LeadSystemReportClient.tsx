@@ -151,6 +151,17 @@ const PROFILE_COPY: Record<string, string> = {
   P8: "Improves ideas, sharpens strategy and turns insight into better direction.",
 };
 
+const PROFILE_GUIDANCE: Record<string, string> = {
+  P1: "Lead with courage, create a pause before action, and build the alignment that lets momentum last.",
+  P2: "Lead with energy, add focus and follow-through, and turn enthusiasm into sustained progress.",
+  P3: "Lead with connection, protect your boundaries, and build the structure that lets your empathy last.",
+  P4: "Lead with connection, make ownership explicit, and protect momentum with clear decisions.",
+  P5: "Lead with steadiness, surface concerns earlier, and make space for necessary change.",
+  P6: "Lead with structure, keep people visible in the process, and leave room for adaptation.",
+  P7: "Lead with insight, share conclusions sooner, and balance rigour with timely action.",
+  P8: "Lead with refinement, define what is good enough, and let progress test the idea.",
+};
+
 function safeText(value: any): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value.map(String).join(" ");
@@ -179,6 +190,11 @@ function cleanProfileName(value: string) {
     .replace(/^P\d+\s*:\s*/i, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function approachLabel(name: string, code: AB) {
+  const cleanName = String(name || "").trim();
+  return new RegExp(`\\(${code}\\)`, "i").test(cleanName) ? cleanName : `${cleanName} (${code})`;
 }
 
 function shortProfileCode(value: any) {
@@ -792,6 +808,14 @@ export default function LeadSystemReportClient({
   const strengths = extractSectionItems(findSection(sections, ["strength"]), 3);
   const risks = extractSectionItems(findSection(sections, ["overuse", "blindspot", "risk", "development area"]), 3);
   const priorities = extractSectionItems(findSection(sections, ["development priorit", "next step", "action"]), 3);
+  const strengthSummary = strengths.length ? strengths.join(" ") : PROFILE_COPY[primary.code];
+  const riskSummary = risks.length
+    ? risks.join(" ")
+    : "Notice when a natural strength is being overused or when another approach needs more room.";
+  const developmentPriorities = priorities.length
+    ? priorities
+    : ["Choose one practical shift that protects your strengths while widening your range."];
+  const dominantLabel = approachLabel(dominantName, dominantCode);
 
   const nextStepsUrl = getNextStepsUrl(data);
 
@@ -982,19 +1006,68 @@ export default function LeadSystemReportClient({
           </aside>
         </section>
 
-        <section className="report-section mt-6 rounded-[30px] bg-[#f6f7f9] p-5 text-[#0b2545] sm:p-7 lg:p-9">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#a77d0f]">One-page LEAD profile</p><h2 className="mt-2 text-2xl font-bold sm:text-3xl">Your at-a-glance leadership pattern</h2></div><span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-500">{primary.name} · {primary.code}</span></div>
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            {[
-              { title: "Your strengths", items: strengths, fallback: PROFILE_COPY[primary.code] },
-              { title: "Watch-outs", items: risks, fallback: "Notice when a natural strength is being overused or when another approach needs more room." },
-              { title: "Development priorities", items: priorities, fallback: "Choose one practical shift that protects your strengths while widening your range." },
-            ].map((card) => (
-              <div key={card.title} className="summary-card rounded-[22px] border border-slate-200 bg-white p-5">
-                <h3 className="text-sm font-bold text-[#0b2545]">{card.title}</h3>
-                {card.items.length ? <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">{card.items.map((item, index) => <li key={index} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#d7a928]" /><span>{item}</span></li>)}</ul> : <p className="mt-3 text-sm leading-6 text-slate-600">{card.fallback}</p>}
+        <section className="report-section mt-3 rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-5 py-4 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-6 sm:py-5 lg:px-8">
+          <div>
+            <p className="text-[9px] font-bold uppercase leading-4 tracking-[0.26em] text-white/55">One-page LEAD profile</p>
+            <h2 className="mt-1 text-sm font-semibold leading-7 text-white/95">Your at-a-glance leadership profile</h2>
+          </div>
+
+          <div className="mt-4 grid gap-2.5 lg:grid-cols-3">
+            <article className="summary-card min-h-[304px] rounded-[17px] border-2 border-[#7c94d7] bg-[#061a3a] px-5 py-6 shadow-[0_6px_32px_rgba(58,110,212,.12)] sm:px-7">
+              <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">Your LEAD profile</p>
+              <h3 className="mt-7 text-[33px] font-semibold leading-none text-[#e8b75f]">{primary.name}</h3>
+
+              <dl className="mt-8 space-y-2.5">
+                <div className="grid min-h-[39px] grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border border-white/[0.07] bg-white/[0.05] px-4">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#e8b75f]" aria-hidden="true" />
+                  <dt className="text-[13px] font-medium text-[#c7ccde]">Top frequency</dt>
+                  <dd className="text-right text-[13px] font-bold text-[#e8b75f]">{dominantLabel}</dd>
+                </div>
+                <div className="grid min-h-[39px] grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border border-white/[0.07] bg-white/[0.05] px-4">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#8195d1]" aria-hidden="true" />
+                  <dt className="text-[13px] font-medium text-[#c7ccde]">Profile match</dt>
+                  <dd className="text-right text-[13px] font-bold text-[#8195d1]">{pct(primary.pct)}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="summary-card min-h-[304px] rounded-[17px] border-2 border-[#7c94d7] bg-[#061a3a] px-5 py-5 shadow-[0_6px_32px_rgba(58,110,212,.12)] sm:px-7">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#e8b75f] bg-[#e8b75f]/25">
+                  <img src="/mps/report-icons/strengths.png" alt="" className="h-4 w-4 object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                </span>
+                <h3 className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">Your strengths</h3>
               </div>
-            ))}
+              <p className="mt-3 text-[11px] leading-[1.45] text-[#7f8ca6]">{strengthSummary}</p>
+
+              <h3 className="mt-5 text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">Your risks</h3>
+              <p className="mt-3 text-[11px] leading-[1.45] text-[#7f8ca6]">{riskSummary}</p>
+              <p className="mt-4 text-[11px] italic leading-[1.45] text-[#7f8ca6]">
+                {PROFILE_GUIDANCE[primary.code] || "Lead with your strengths, notice overuse early, and widen your range intentionally."}
+              </p>
+            </article>
+
+            <article className="summary-card min-h-[304px] rounded-[17px] border-2 border-[#7c94d7] bg-[#061a3a] px-5 py-5 shadow-[0_6px_32px_rgba(58,110,212,.12)] sm:px-7">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#e8b75f] bg-[#e8b75f]/20">
+                  <img src="/mps/header/top-strategic-priorities.png" alt="" className="h-4 w-4 object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                </span>
+                <h3 className="text-[10px] font-medium uppercase leading-4 tracking-[0.2em] text-white">Top development priorities</h3>
+              </div>
+
+              <ul className="mt-5 space-y-4">
+                {developmentPriorities.slice(0, 3).map((priority, index) => (
+                  <li key={index} className="grid grid-cols-[18px_minmax(0,1fr)] gap-3 text-[11px] leading-[1.45] text-[#7f8ca6]">
+                    <span className="mt-px flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#e8b75f]" aria-hidden="true">
+                      <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 fill-none stroke-white" strokeWidth="1.8">
+                        <path d="M2.2 6.1 4.7 8.4 9.8 3.4" />
+                      </svg>
+                    </span>
+                    <span>{priority}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
           </div>
         </section>
 
