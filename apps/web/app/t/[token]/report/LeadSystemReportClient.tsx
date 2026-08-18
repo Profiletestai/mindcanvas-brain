@@ -115,6 +115,13 @@ const APPROACH_COPY: Record<AB, string> = {
   D: "Insight-focused energy that tests assumptions, sees risk and improves the quality of decisions.",
 };
 
+const APPROACH_SHORT_COPY: Record<AB, string> = {
+  A: "Future, possibility, momentum and activation.",
+  B: "People, connection, motivation and activation.",
+  C: "Structure, coordination, clarity and delivery.",
+  D: "Insight, perspective, quality and risk awareness.",
+};
+
 const APPROACH_COLOURS: Record<AB, { solid: string; soft: string; ring: string }> = {
   A: { solid: "#e35d5b", soft: "#fff2f1", ring: "#f3b3b1" },
   B: { solid: "#d9a521", soft: "#fff8e6", ring: "#edd181" },
@@ -306,12 +313,21 @@ function formatReportDate(value?: string | null) {
 
 function profileImage(code: string) {
   const short = shortProfileCode(code);
-  const filename = PROFILE_FALLBACKS[short]?.toLowerCase();
-  return filename ? `/images/mindCanvas-LEAD-system/profile-cards/${filename}.png` : "";
+  const filenames: Record<string, string> = {
+    P1: "p1-trailblazer.png",
+    P2: "p2-spark.png",
+    P3: "p3-uplifter.png",
+    P4: "p4-bridgebuilder.png",
+    P5: "p5-steadyhand.png",
+    P6: "p6-organiser.png",
+    P7: "p7-analyst.png",
+    P8: "p8-refiner.png",
+  };
+  return filenames[short] ? `/mps/profile-icons/${filenames[short]}` : "";
 }
 
 function approachImage(code: AB) {
-  return `/images/mindCanvas-LEAD-system/profile-cards/${APPROACH_FALLBACKS[code].toLowerCase()}.png`;
+  return `/mps/four-lead-approaches/${APPROACH_FALLBACKS[code].toLowerCase()}.png`;
 }
 
 function resolveImageSrc(rawValue: any, data: LeadSystemResultData, ranked: RankedProfile[]) {
@@ -363,19 +379,6 @@ function findSection(sections: ReportSection[], terms: string[]) {
     const haystack = `${safeText(section.id)} ${safeText(section.title)}`.toLowerCase();
     return terms.some((term) => haystack.includes(term));
   });
-}
-
-function LeadLogo({ className = "" }: { className?: string }) {
-  return (
-    <img
-      src="/images/mindCanvas-LEAD-system/logo.png"
-      alt="MindCanvas LEAD System"
-      className={className}
-      onError={(event) => {
-        event.currentTarget.style.display = "none";
-      }}
-    />
-  );
 }
 
 function FrequencyChart({
@@ -777,6 +780,9 @@ export default function LeadSystemReportClient({
   };
   const secondary = ranked[1];
   const tertiary = ranked[2];
+  const canonicalProfiles = [...ranked].sort(
+    (left, right) => Number(shortProfileCode(left.code).replace("P", "")) - Number(shortProfileCode(right.code).replace("P", ""))
+  );
 
   const dominantCode = data.top_freq || "A";
   const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
@@ -788,7 +794,6 @@ export default function LeadSystemReportClient({
   const priorities = extractSectionItems(findSection(sections, ["development priorit", "next step", "action"]), 3);
 
   const nextStepsUrl = getNextStepsUrl(data);
-  const profileHero = profileImage(primary.code);
 
   const indexItems = [
     ...sections.map((section, index) => ({
@@ -806,91 +811,175 @@ export default function LeadSystemReportClient({
   return (
     <div ref={reportRef} className="lead-report-shell pdf-report-shell report-shell min-h-screen overflow-x-hidden bg-[#07182f] text-white [background-image:radial-gradient(circle_at_12%_2%,rgba(64,104,154,.32),transparent_30%),radial-gradient(circle_at_92%_18%,rgba(215,169,40,.16),transparent_24%)]">
       <div className="mx-auto max-w-[1380px] px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
-        <header className="report-section rounded-[30px] border border-white/10 bg-[#0b2545]/95 p-5 shadow-[0_30px_90px_rgba(0,0,0,.28)] sm:p-7 lg:p-9">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <header className="lead-cover-block report-section rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-4 py-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-5">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
             <div className="min-w-0">
-              <LeadLogo className="h-10 w-auto max-w-[230px] object-contain object-left brightness-0 invert sm:h-12" />
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.26em] text-[#e8c65e]">Personalised report</p>
-              <h1 className="mt-2 max-w-4xl text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">{participant}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-white/70 sm:text-base">
-                How your four behavioural energies combine into a focused, practical way of leading and creating value.
-              </p>
+              <div className="flex items-center gap-2.5">
+                <span className="h-6 w-6 shrink-0 rounded-[9px] border border-white/10 bg-white/[0.06]" aria-hidden="true" />
+                <span className="text-xs font-semibold text-white">MindCanvas LEAD System</span>
+              </div>
+              <h1 className="mt-1.5 text-xl font-semibold uppercase leading-none tracking-[0.14em] text-white sm:text-2xl">
+                Personalised Report
+              </h1>
+              <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.18em] text-white/60">
+                Powered by Profiletest.ai
+              </span>
             </div>
 
-            <div className="no-print flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-full bg-white px-5 py-3 text-sm font-bold text-[#0b2545] transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#d7a928] focus:ring-offset-2 focus:ring-offset-[#0b2545]"
-              >
-                Download PDF
-              </button>
-              {nextStepsUrl ? (
-                <a
-                  href={nextStepsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full bg-[#d7a928] px-5 py-3 text-sm font-bold text-[#0b2545] transition hover:bg-[#e4bd4d] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#0b2545]"
+            <div className="min-w-0">
+              <div className="no-print flex flex-wrap justify-start gap-2 md:justify-end">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="rounded-lg border border-white/10 bg-[#08162b]/70 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:bg-[#08162b] focus:outline-none focus:ring-2 focus:ring-[#45e0d1]"
                 >
-                  Next Step
-                </a>
-              ) : null}
+                  Download PDF
+                </button>
+                {nextStepsUrl ? (
+                  <a
+                    href={nextStepsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-[linear-gradient(90deg,#45e0d1_0%,#4f7dff_50%,#8b5cf6_100%)] px-3 py-2 text-[11px] font-semibold text-[#071c36] transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-white"
+                  >
+                    Next steps
+                  </a>
+                ) : null}
+              </div>
+
+              <dl className="mt-2 grid gap-2 sm:grid-cols-[minmax(96px,1fr)_minmax(96px,1fr)_minmax(180px,1.65fr)]">
+                <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
+                  <dt className="text-[8px] text-white/55">Prepared for</dt>
+                  <dd className="mt-1 truncate text-xs font-semibold text-white">{participant}</dd>
+                </div>
+                {reportDate ? (
+                  <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
+                    <dt className="text-[8px] text-white/55">Date</dt>
+                    <dd className="mt-1 text-xs font-semibold text-white">{reportDate}</dd>
+                  </div>
+                ) : null}
+                <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
+                  <dt className="text-[8px] text-white/55">Framework</dt>
+                  <dd className="mt-1 text-xs font-semibold text-white">MindCanvas LEAD System</dd>
+                </div>
+              </dl>
             </div>
           </div>
-
-          <dl className="mt-7 grid gap-3 border-t border-white/10 pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <div><dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Prepared for</dt><dd className="mt-1 font-semibold">{participant}</dd></div>
-            <div><dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Organisation</dt><dd className="mt-1 font-semibold">{data.org_name || "Organisation"}</dd></div>
-            {reportDate ? <div><dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Date</dt><dd className="mt-1 font-semibold">{reportDate}</dd></div> : null}
-            <div><dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Framework</dt><dd className="mt-1 font-semibold">MindCanvas LEAD System</dd></div>
-          </dl>
         </header>
 
-        <section className="report-section mt-6 grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
-          <div className="relative overflow-hidden rounded-[30px] bg-white p-6 text-[#0b2545] shadow-[0_30px_90px_rgba(0,0,0,.2)] sm:p-8">
-            <div className="absolute right-0 top-0 h-44 w-44 rounded-bl-full bg-[#fff4cf]" />
-            <div className="relative grid gap-6 sm:grid-cols-[1fr_180px] sm:items-center">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#a77d0f]">Your LEAD profile</p>
-                <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{primary.name}</h2>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-[#0b2545] px-3 py-1.5 text-xs font-bold text-white">{primary.code} · {pct(primary.pct)}</span>
-                  <span className="rounded-full bg-[#fff4cf] px-3 py-1.5 text-xs font-bold text-[#76580b]">{dominantName} ({dominantCode}) · {pct(dominantPct)}</span>
+        <section className="lead-cover-block report-section mt-3 grid gap-2.5 md:grid-cols-[minmax(0,2.65fr)_minmax(190px,.9fr)]">
+          <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(230px,.86fr)]">
+              <div className="flex min-w-0 flex-col p-1 sm:p-2">
+                <p className="text-[8px] font-bold uppercase tracking-[0.26em] text-white/55">Personalised report for</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{participant}</h2>
+                <p className="mt-3 max-w-xl text-xs leading-5 text-white/75">
+                  How the four behavioural energies show up in you, and your pattern toward a more focused way of leading.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-[linear-gradient(90deg,#7c94d7,#e8b15e)] px-3 py-1.5 text-[10px] font-semibold text-[#192a44]">
+                    Top Profile: {primary.name} {primary.code}
+                  </span>
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                    {dominantName} ({dominantCode})
+                  </span>
+                  {secondary ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                      Secondary: {secondary.name}
+                    </span>
+                  ) : null}
+                  {tertiary ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                      Tertiary: {tertiary.name}
+                    </span>
+                  ) : null}
                 </div>
-                <p className="mt-5 max-w-xl text-sm leading-6 text-slate-600">{PROFILE_COPY[shortProfileCode(primary.code)] || "A distinctive operating pattern that describes how you most naturally create value."}</p>
-              </div>
-              {profileHero ? (
-                <img
-                  src={profileHero}
-                  alt={`${primary.name} profile illustration`}
-                  className="mx-auto h-44 w-44 rounded-[28px] border border-[#d7a928]/25 bg-[#fffaf0] object-contain p-2"
-                  onError={(event) => { event.currentTarget.style.display = "none"; }}
-                />
-              ) : null}
-            </div>
 
-            <div className="relative mt-7 grid gap-3 border-t border-slate-200 pt-5 sm:grid-cols-3">
-              <div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Primary</div><div className="mt-1 font-bold">{primary.name} · {pct(primary.pct)}</div></div>
-              {secondary ? <div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Secondary</div><div className="mt-1 font-bold">{secondary.name} · {pct(secondary.pct)}</div></div> : null}
-              {tertiary ? <div><div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Tertiary</div><div className="mt-1 font-bold">{tertiary.name} · {pct(tertiary.pct)}</div></div> : null}
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white/10 bg-white/5 p-5 sm:p-6">
-            <div className="flex items-center justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e8c65e]">Profile ranking</p><h2 className="mt-1 text-xl font-bold">All eight operating styles</h2></div><span className="text-xs text-white/50">Live result</span></div>
-            <div className="mt-5 space-y-3">
-              {ranked.map((profile, index) => (
-                <div key={profile.code} className="grid grid-cols-[28px_minmax(0,1fr)_44px] items-center gap-3">
-                  <span className="text-xs font-bold text-white/45">{index + 1}</span>
-                  <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-3 text-xs"><span className="truncate font-semibold">{profile.name} <span className="text-white/45">{profile.code}</span></span></div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#d7a928]" style={{ width: `${Math.max(profile.pct * 100, profile.pct > 0 ? 2 : 0)}%` }} /></div>
+                <div className="mt-4 grid overflow-hidden rounded-[14px] border border-white/[0.07] bg-[#061731]/45 sm:grid-cols-2">
+                  <div className="p-4 sm:border-r sm:border-white/[0.07]">
+                    <div className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Driver</div>
+                    <div className="mt-2 text-base font-semibold text-[#e8b75f]">{dominantName} ({dominantCode})</div>
+                    <p className="mt-2 text-[10px] leading-4 text-white/45">{APPROACH_SHORT_COPY[dominantCode]}</p>
                   </div>
-                  <span className="text-right text-xs font-bold text-[#e8c65e]">{pct(profile.pct)}</span>
+                  <div className="border-t border-white/[0.07] p-4 sm:border-t-0">
+                    <div className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Top profile</div>
+                    <div className="mt-2 text-base font-semibold text-[#e8b75f]">{primary.name}</div>
+                    <p className="mt-2 text-[10px] leading-4 text-white/45">A distinct operating pattern that describes how you most naturally create value.</p>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-2.5 shadow-[0_14px_42px_rgba(0,0,0,.24)]">
+                <div className="space-y-1.5">
+                  {canonicalProfiles.map((profile) => {
+                    const selected = shortProfileCode(profile.code) === shortProfileCode(primary.code);
+                    const imageSrc = profileImage(profile.code);
+                    return (
+                      <div
+                        key={profile.code}
+                        className={`grid min-h-8 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2 py-1.5 ${
+                          selected
+                            ? "border-[#e8b15e]/45 bg-[linear-gradient(90deg,#7c94d7,#e8b15e)] text-[#051227]"
+                            : "border-white/[0.05] bg-white/[0.03] text-[#e4eaf8]"
+                        }`}
+                      >
+                        <img
+                          src={imageSrc}
+                          alt=""
+                          className="h-[18px] w-[18px] object-contain"
+                          onError={(event) => { event.currentTarget.style.display = "none"; }}
+                        />
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-[10px] font-medium">{profile.name} ({profile.code})</span>
+                          {selected ? <span className="rounded-full bg-white/85 px-1.5 py-0.5 text-[7px] font-bold text-[#0e1726]">You</span> : null}
+                        </div>
+                        <div className="flex items-center gap-2 text-[8px]">
+                          {selected ? <span className="hidden sm:inline">{dominantName} ({dominantCode})</span> : null}
+                          <span className={selected ? "font-bold" : "text-white/35"}>{pct(profile.pct)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
+
+          <aside className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)]">
+            <div className="rounded-[18px] bg-[linear-gradient(135deg,#7c94d7,#e8b75f)] p-[2px] shadow-[0_6px_32px_rgba(58,110,212,.12)]">
+              <div className="rounded-[16px] bg-[#0a1e36] px-4 py-4 text-center">
+                <div className="text-[8px] text-white/70">Your Dominant Driver:</div>
+                <div className="mt-2 text-lg font-semibold text-[#e8b75f]">{dominantName} ({dominantCode})</div>
+                <p className="mx-auto mt-2 max-w-[180px] text-[10px] leading-4 text-white/80">{APPROACH_SHORT_COPY[dominantCode]}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Profile mix</div>
+            <div className="mt-2 space-y-2">
+              {[primary, secondary, tertiary].filter(Boolean).map((profile, index) => {
+                if (!profile) return null;
+                const role = index === 0 ? "Primary" : index === 1 ? "Secondary" : "Tertiary";
+                return (
+                  <div key={profile.code} className="rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] font-medium text-white">{profile.name}</span>
+                      <span className="text-[9px] font-medium text-white/80">{pct(profile.pct)}</span>
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                      <span className="text-[7px] text-white/35">{role} · {profile.code}</span>
+                      <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full bg-[linear-gradient(90deg,#7c94d7,#e8b15e)]"
+                          style={{ width: `${Math.max(profile.pct * 100, profile.pct > 0 ? 3 : 0)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
         </section>
 
         <section className="report-section mt-6 rounded-[30px] bg-[#f6f7f9] p-5 text-[#0b2545] sm:p-7 lg:p-9">

@@ -50,17 +50,23 @@
   button,
   nav,
   header.no-print,
-  footer.no-print {
+  footer.no-print,
+  iframe[src*="leadconnectorhq"],
+  iframe[src*="chat-widget"],
+  #chat-widget,
+  #chat-widget-container,
+  [id*="lc_text_widget"],
+  [class*="lc_text_widget"] {
     display: none !important;
   }
 
-  /* MindCanvas LEAD System print layout */
+  /* MindCanvas LEAD System: continuous web report -> controlled A4 output. */
   .lead-report-shell {
     min-height: 0 !important;
     overflow: visible !important;
     background: #ffffff !important;
-    background-image: none !important;
     color: #0b2545 !important;
+    background-image: none !important;
   }
 
   .lead-report-shell > div {
@@ -81,6 +87,11 @@
   .lead-report-shell .summary-card,
   .lead-report-shell figure,
   .lead-report-shell blockquote {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .lead-report-shell .lead-cover-block {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
