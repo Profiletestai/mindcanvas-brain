@@ -165,6 +165,17 @@ const PROFILE_OVERVIEW_COPY: Record<string, string> = {
   P8: "Refines what exists so it works better and faster.",
 };
 
+const PROFILE_COMBINATIONS: Record<string, string> = {
+  P1: "Launch dominant",
+  P2: "Launch + Energise",
+  P3: "Energise dominant",
+  P4: "Energise + Align",
+  P5: "Align dominant",
+  P6: "Align + Discern",
+  P7: "Discern dominant",
+  P8: "Discern + Launch",
+};
+
 const PROFILE_GUIDANCE: Record<string, string> = {
   P1: "Lead with courage, create a pause before action, and build the alignment that lets momentum last.",
   P2: "Lead with energy, add focus and follow-through, and turn enthusiasm into sustained progress.",
@@ -1014,7 +1025,7 @@ function SectionCard({
             </div>
           </div>
 
-          <div id="lead-system-operating-styles" className="mt-8 scroll-mt-6">
+          <div className="mt-8">
             <h3 className="text-base font-bold text-[#12203b]">The 8 Operating Styles</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
@@ -1137,7 +1148,84 @@ function SectionCard({
     );
   }
 
-  if (sectionIdentity.includes("eight operating styles")) return null;
+  if (sectionIdentity.includes("eight operating styles")) {
+    const primaryCode = shortProfileCode(ranked[0]?.code || data.top_profile_code || "P1");
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/eight-operating-styles.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#0e1726] sm:text-xl">The Eight Operating Styles at a Glance</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]/95">
+            The eight operating styles in the MindCanvas LEAD System are combinations of the four approaches above. Together they describe distinct ways of creating value.
+          </p>
+
+          <div className="mt-6 grid items-center gap-5 lg:grid-cols-2">
+            <img
+              src="/mps/eight-operating-styles-at-glance/eight-operating-styles.png"
+              alt="The eight MindCanvas LEAD operating styles"
+              className="mx-auto h-auto w-full max-w-[450px] object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+            <img
+              src="/mps/eight-operating-styles-at-glance/how-to-read.png"
+              alt="How to read the eight operating styles model"
+              className="mx-auto h-auto w-full max-w-[430px] object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </div>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
+              const profile = ranked.find((item) => shortProfileCode(item.code) === profileCode);
+              const selected = profileCode === primaryCode;
+
+              return (
+                <article
+                  key={profileCode}
+                  className={`relative min-h-[276px] rounded-[14px] border px-4 py-5 ${selected ? "border-[#061a3a] bg-[#061a3a] text-white" : "border-[#7c94d7] bg-[#fbfbfb] text-[#313c52]"}`}
+                >
+                  {selected ? (
+                    <span className="absolute -top-3 right-3 rounded-full bg-[#e8b75f] px-3 py-1 text-[8px] font-bold uppercase tracking-[0.04em] text-[#1d2025]">
+                      Your top profile
+                    </span>
+                  ) : null}
+                  <img
+                    src={profileImage(profileCode)}
+                    alt=""
+                    className="h-[52px] w-[52px] object-contain"
+                    onError={(event) => { event.currentTarget.style.display = "none"; }}
+                  />
+                  <h3 className={`mt-3 text-base font-semibold leading-6 ${selected ? "text-[#7c94d7]" : "text-[#061a3a]"}`}>
+                    {profile?.name || PROFILE_FALLBACKS[profileCode]}
+                  </h3>
+                  <p className={`mt-2 text-[11px] font-semibold uppercase leading-5 ${selected ? "text-white" : "text-[#313c52]"}`}>
+                    {PROFILE_COMBINATIONS[profileCode]}
+                  </p>
+                  <p className={`mt-4 text-[12px] leading-[1.55] ${selected ? "text-white/85" : "text-[#313c52]"}`}>
+                    {PROFILE_COPY[profileCode]}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id={id} className="report-section scroll-mt-6 rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
@@ -1243,7 +1331,7 @@ export default function LeadSystemReportClient({
     ...sections.flatMap((section, index) => {
       const title = safeText(section.title).trim() || fallbackSectionTitle(section, primary.name);
       const item = {
-        id: title.toLowerCase().includes("eight operating styles") ? "lead-system-operating-styles" : sectionDomId(section, index),
+        id: sectionDomId(section, index),
         title,
       };
       return title.toLowerCase().includes("four lead approaches")
