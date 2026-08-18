@@ -356,6 +356,10 @@ function profileImage(code: string) {
   return filenames[short] ? `/mps/profile-icons/${filenames[short]}` : "";
 }
 
+function approachImage(code: AB) {
+  return `/mps/four-lead-approaches/${APPROACH_FALLBACKS[code].toLowerCase()}.png`;
+}
+
 function resolveImageSrc(rawValue: any, data: LeadSystemResultData, ranked: RankedProfile[]) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
@@ -931,8 +935,9 @@ function SectionCard({
     ];
 
     return (
+      <>
       <section
-        id={id}
+        id="lead-system-measures"
         className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
       >
         <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
@@ -1051,6 +1056,84 @@ function SectionCard({
           </p>
         </div>
       </section>
+
+      <section
+        id={id}
+        className="report-section mt-5 scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/four-lead-approaches.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">The four LEAD approaches</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-6 text-[#313c52]/95">
+            How you naturally lead and operate. Before looking at any of your personal scores below, here is what each of the four underlying approaches actually measures - this framework gives you the vocabulary for everything that follows.
+          </p>
+
+          <img
+            src="/mps/What the Leader System Measures/the-four-behavioral-approaches.png"
+            alt="The four LEAD behavioural approaches"
+            className="mx-auto mt-6 h-auto w-full max-w-[390px] object-contain"
+            onError={(event) => { event.currentTarget.style.display = "none"; }}
+          />
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {([
+              {
+                code: "A" as AB,
+                border: "#6395ff",
+                background: "#edf5ff",
+                copy: "Launch is the energy of beginnings. It is future-focused, opportunity-driven and comfortable with uncertainty. People who lean into Launch naturally ask: What is next? What is possible? How could this be better?",
+              },
+              {
+                code: "B" as AB,
+                border: "#f09a68",
+                background: "#fff4ed",
+                copy: "Energise is the energy of people, emotion and motivation. It focuses on belonging, buy-in and momentum. People who lean into Energise ask: How are people experiencing this? Who needs encouragement? How do we build belief and commitment?",
+              },
+              {
+                code: "C" as AB,
+                border: "#54b995",
+                background: "#effbf7",
+                copy: "Align is the energy of structure, coordination and delivery. It turns intent into execution through clarity, process and rhythm. People who lean into Align ask: What are the steps? Who owns what? What does good look like? How do we keep this on track?",
+              },
+              {
+                code: "D" as AB,
+                border: "#6689e9",
+                background: "#f0f4ff",
+                copy: "Discern is the energy of depth, reflection and insight. It seeks understanding, risk awareness and quality thinking before action. People who lean into Discern ask: What are we missing? What is the root cause? What are the second-order effects? What needs to be true?",
+              },
+            ]).map((approach) => (
+              <article
+                key={approach.code}
+                className="flex min-h-[360px] flex-col rounded-lg border px-4 py-4"
+                style={{ borderColor: approach.border, backgroundColor: approach.background }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-[11px] font-bold uppercase text-[#12203b]">{APPROACH_FALLBACKS[approach.code]}</h3>
+                  <span className="text-[28px] font-semibold leading-none text-[#12203b]">{pct(data.frequency_percentages?.[approach.code])}</span>
+                </div>
+                <p className="mt-4 text-[11px] leading-[1.55] text-[#4b5875]">{approach.copy}</p>
+                <img
+                  src={approachImage(approach.code)}
+                  alt=""
+                  className="mx-auto mt-auto h-[130px] w-full max-w-[150px] object-contain pt-4"
+                  onError={(event) => { event.currentTarget.style.display = "none"; }}
+                />
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      </>
     );
   }
 
@@ -1157,12 +1240,15 @@ export default function LeadSystemReportClient({
 
   const nextStepsUrl = getNextStepsUrl(data);
   const indexItems = [
-    ...sections.map((section, index) => {
+    ...sections.flatMap((section, index) => {
       const title = safeText(section.title).trim() || fallbackSectionTitle(section, primary.name);
-      return {
+      const item = {
         id: title.toLowerCase().includes("eight operating styles") ? "lead-system-operating-styles" : sectionDomId(section, index),
         title,
       };
+      return title.toLowerCase().includes("four lead approaches")
+        ? [{ id: "lead-system-measures", title: "What the LEAD System measures" }, item]
+        : [item];
     }),
     { id: "lead-methodology", title: "Methodology" },
   ];
