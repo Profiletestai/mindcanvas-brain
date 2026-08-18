@@ -1363,23 +1363,15 @@ function buildSections(
 export function orderCoreRecord(value: unknown): unknown {
   if (!isRecord(value)) return value;
 
-  const ordered: JsonRecord = {};
-  const coreOrder = ["C", "O", "R", "E"] as const;
-
-  for (const code of coreOrder) {
-    if (Object.prototype.hasOwnProperty.call(value, code)) {
-      ordered[code] = value[code];
-    }
-  }
-
-  // Preserve any unexpected future keys after the standard CORE fields.
-  for (const [key, entry] of Object.entries(value)) {
-    if (!coreOrder.includes(key as (typeof coreOrder)[number])) {
-      ordered[key] = entry;
-    }
-  }
-
-  return ordered;
+  // Atumaphire consumes CORE positionally, so this must always emit
+  // exactly four fields in the canonical sequence: C, O, R, E.
+  // Missing values are sent as 0 so the positional contract can never shift.
+  return {
+    C: value.C ?? 0,
+    O: value.O ?? 0,
+    R: value.R ?? 0,
+    E: value.E ?? 0,
+  };
 }
 
 export function buildAtumaphireScoringPayload(input: {
@@ -1479,12 +1471,31 @@ export function buildAtumaphireExternalPayload(input: {
 }) {
   const source = isRecord(input.sourcePayload) ? input.sourcePayload : {};
   const sourceResult = isRecord(source.result) ? source.result : {};
+  const sourceScoring = input.scoring ?? sourceResult.scoring ?? null;
+
+  // Final outbound safeguard for Atumaphire.
+  // Their integration reads CORE positionally rather than by key mapping,
+  // so the serialized response must always contain C, O, R, E in that order.
+  const outboundScoring = isRecord(sourceScoring)
+    ? {
+        ...sourceScoring,
+        behavioural_approach_counts: orderCoreRecord(
+          sourceScoring.behavioural_approach_counts,
+        ),
+        behavioural_approach_distribution: orderCoreRecord(
+          sourceScoring.behavioural_approach_distribution,
+        ),
+        core_distribution: orderCoreRecord(
+          sourceScoring.core_distribution,
+        ),
+      }
+    : sourceScoring;
 
   return {
     ...source,
     output_mode: input.outputMode || "three_section",
     result: {
-      scoring: input.scoring ?? sourceResult.scoring ?? null,
+      scoring: outboundScoring,
       report: input.narrative,
     },
   };
