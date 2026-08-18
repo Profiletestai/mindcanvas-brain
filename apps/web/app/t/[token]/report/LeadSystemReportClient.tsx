@@ -1924,6 +1924,214 @@ function SectionCard({
     );
   }
 
+  if (sectionIdentity.includes("closing") || sectionIdentity.includes("conclusion")) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/closing-thoughts.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Closing thoughts</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                return <h3 key={blockIndex} className="text-[12px] font-bold uppercase leading-5 tracking-[0.05em] text-[#071a39]">{safeText(block.text)}</h3>;
+              }
+
+              if (blockType === "ul" || blockType === "ol") {
+                return (
+                  <ul key={blockIndex} className="space-y-2">
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => (
+                      <li key={itemIndex} className="flex items-start gap-3">
+                        <span className="mt-1 flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full bg-[#7d94d4] text-[11px] font-bold text-white">✓</span>
+                        <span>{safeText(item)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="border-l-[3px] border-[#7d94d4] bg-[#f4f7fd] px-4 py-3">
+                    {block.title ? <h3 className="font-semibold text-[#071a39]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                    {Array.isArray(block.bullets) && block.bullets.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {block.bullets.map((item, itemIndex) => (
+                          <li key={itemIndex} className="flex items-start gap-3">
+                            <span className="mt-1 flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full bg-[#7d94d4] text-[11px] font-bold text-white">✓</span>
+                            <span>{safeText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("next steps") ||
+    sectionIdentity.includes("next_step") ||
+    sectionIdentity.includes("next-step") ||
+    sectionIdentity.includes("cta_next_steps")
+  ) {
+    const stepIcons = [
+      "/mps/next-steps/highlight-2-3-sentences.png",
+      "/mps/next-steps/note-one-strength.png",
+      "/mps/next-steps/note-one-development-area.png",
+      "/mps/next-steps/if-you-are-a-leader.png",
+      "/mps/next-steps/if-you-are-working-with-a-coach.png",
+      "/mps/next-steps/use-the-button-in-the-report.png",
+    ];
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/next-steps.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Next steps</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-[#f4f7fd] px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[14px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                return <h3 key={blockIndex} className="text-[12px] font-bold uppercase leading-5 tracking-[0.05em] text-[#071a39]">{safeText(block.text)}</h3>;
+              }
+
+              if (blockType === "ul" || blockType === "ol" || blockType === "cards" || blockType === "scorecard_row") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-4 sm:px-5">
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
+                      <ol className="space-y-2.5">
+                        {items.map((item, itemIndex) => (
+                          <li key={itemIndex} className="grid grid-cols-[34px_34px_minmax(0,1fr)] items-center gap-3">
+                            <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#f0f3fb] text-[12px] font-bold text-[#071a39]">{itemIndex + 1}.</span>
+                            {stepIcons[itemIndex] ? (
+                              <img
+                                src={stepIcons[itemIndex]}
+                                alt=""
+                                className="h-[34px] w-[34px] rounded-full object-contain"
+                                onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+                              />
+                            ) : <span className="h-[34px] w-[34px]" />}
+                            <span className="text-[14px] leading-6 text-[#313c52]">
+                              {typeof item === "string" ? item : (
+                                <>
+                                  {item?.title || item?.label ? <strong>{safeText(item?.title || item?.label)} </strong> : null}
+                                  {safeText(item?.text || item?.value || item?.description)}
+                                </>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+
+                      <img
+                        src="/mps/next-steps/next-steps-roadmap.png"
+                        alt="Next steps roadmap"
+                        className="mx-auto h-auto w-full max-w-[323px] object-contain"
+                        onError={(event) => { event.currentTarget.style.display = "none"; }}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "cta") {
+                return (
+                  <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-5 py-4">
+                    {block.title ? <h3 className="font-semibold text-[#071a39]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                    {nextStepsUrl ? (
+                      <a
+                        href={nextStepsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="no-print mt-4 inline-flex rounded-lg bg-[linear-gradient(90deg,#45e0d1_0%,#4f7dff_50%,#8b5cf6_100%)] px-4 py-2.5 text-sm font-semibold text-[#071c36]"
+                      >
+                        {safeText(block.button_text || "Next step")}
+                      </a>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-5 py-4">
+                    {block.title ? <h3 className="font-semibold text-[#071a39]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (sectionIdentity.includes("identity") || sectionIdentity.includes("essence")) {
     const topProfile = ranked[0] || {
       code: shortProfileCode(data.top_profile_code || "P1"),
