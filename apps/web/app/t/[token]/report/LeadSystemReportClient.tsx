@@ -551,7 +551,7 @@ function FrequencyChart({
   );
 }
 
-function ProfileRadar({ ranked, values }: { ranked: RankedProfile[]; values: Record<string, number> }) {
+function ProfileRadar({ ranked, values, embedded = false }: { ranked: RankedProfile[]; values: Record<string, number>; embedded?: boolean }) {
   const labels = Array.from({ length: 8 }, (_, index) => `P${index + 1}`);
   const size = 390;
   const centre = size / 2;
@@ -573,7 +573,7 @@ function ProfileRadar({ ranked, values }: { ranked: RankedProfile[]; values: Rec
     .join(" ");
 
   return (
-    <div className="chart-card rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6">
+    <div className={embedded ? "chart-card bg-white p-0" : "chart-card rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6"}>
       <div className="mx-auto max-w-[430px]">
         <svg viewBox={`0 0 ${size} ${size}`} className="h-auto w-full" role="img" aria-label="Eight-profile personality map">
           {[0.2, 0.4, 0.6, 0.8, 1].map((ring) => (
@@ -1322,6 +1322,64 @@ function SectionCard({
               <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Key traits:</strong> {summaryCopy.traits}</p>
               <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Motivators:</strong> {summaryCopy.motivators}</p>
               <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Watch outs:</strong> {summaryCopy.watchOuts}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("personality map")) {
+    const strongestProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const supportProfiles = [...ranked]
+      .sort((left, right) => left.pct - right.pct || left.sourceIndex - right.sourceIndex)
+      .slice(0, 3)
+      .map((profile) => profile.name);
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/65">
+            <img
+              src="/mps/report-icons/personality-map.png"
+              alt=""
+              className="h-10 w-10 rounded-lg object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Personality Map</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]">
+            This visual map shows how your overall energy (Frequencies) and your more detailed style (Profiles) are distributed across the model. Higher values show patterns you use more often - points pulled toward the edge are strengths; points near the centre are areas that may need support or structure, not more effort alone.
+          </p>
+
+          <div className="mt-6 grid items-center gap-5 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
+            <div className="rounded-[14px] border border-[#e4e8f0] bg-white p-3">
+              <div className="flex items-center justify-between gap-3 px-2 pt-1">
+                <h3 className="text-[11px] font-bold text-[#12203b]">Your Personality Map (Profiles)</h3>
+                <span className="text-[9px] text-[#8892a6]">Higher = stronger pattern</span>
+              </div>
+              <div className="mt-1">
+                <ProfileRadar ranked={ranked} values={data.profile_percentages} embedded />
+              </div>
+            </div>
+
+            <div className="border-l-[7px] border-[#7e94d4] bg-[linear-gradient(90deg,rgba(124,148,215,.30),rgba(232,177,94,.30))] px-5 py-5">
+              <div className="space-y-5 text-[12px] leading-[1.65] text-[#313c52]">
+                <p><strong>Strength:</strong> the point pulled furthest out - {strongestProfile.name} - is the pattern you lean on most.</p>
+                <p><strong>Support or structure:</strong> points closer to the centre ({supportProfiles.join(", ")}) are patterns to borrow from others, not personal weaknesses.</p>
+                <p><strong>Layout:</strong> profiles are arranged in framework order, so neighbours share an approach and opposite points naturally counterbalance each other.</p>
+              </div>
             </div>
           </div>
         </div>
