@@ -910,7 +910,8 @@ function SectionCard({
   if (
     sectionIdentity.includes("lead_introduction") ||
     sectionIdentity.includes("what the leader system") ||
-    sectionIdentity.includes("what the lead system")
+    sectionIdentity.includes("what the lead system") ||
+    sectionIdentity.includes("four lead approaches")
   ) {
     const primary = ranked[0] || {
       code: shortProfileCode(data.top_profile_code || "P1"),
@@ -1008,7 +1009,7 @@ function SectionCard({
             </div>
           </div>
 
-          <div className="mt-8">
+          <div id="lead-system-operating-styles" className="mt-8 scroll-mt-6">
             <h3 className="text-base font-bold text-[#12203b]">The 8 Operating Styles</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
@@ -1052,6 +1053,8 @@ function SectionCard({
       </section>
     );
   }
+
+  if (sectionIdentity.includes("eight operating styles")) return null;
 
   return (
     <section id={id} className="report-section scroll-mt-6 rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
@@ -1154,10 +1157,13 @@ export default function LeadSystemReportClient({
 
   const nextStepsUrl = getNextStepsUrl(data);
   const indexItems = [
-    ...sections.map((section, index) => ({
-      id: sectionDomId(section, index),
-      title: safeText(section.title).trim() || fallbackSectionTitle(section, primary.name),
-    })),
+    ...sections.map((section, index) => {
+      const title = safeText(section.title).trim() || fallbackSectionTitle(section, primary.name);
+      return {
+        id: title.toLowerCase().includes("eight operating styles") ? "lead-system-operating-styles" : sectionDomId(section, index),
+        title,
+      };
+    }),
     { id: "lead-methodology", title: "Methodology" },
   ];
 
