@@ -1,7 +1,8 @@
-//apps/web/app/api/partners/mcas/applications/route.ts
+//apps/web/app/api/partners/mcas/applications/[applicationId]/result/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requirePartnerAuth } from "../_lib/auth";
+import { orderCoreRecord } from "@/lib/mcas/atumaphireOutput";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,103 +13,90 @@ function supa() {
   return createClient(url, key, { db: { schema: "mcas" } });
 }
 
-function portalSupa() {
-  // for looking up org_id by org_slug (portal schema)
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(url, key, { db: { schema: "portal" } });
-}
-
-export async function POST(req: Request) {
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ applicationId: string }> }
+) {
   try {
     const auth = await requirePartnerAuth(req);
-    const body = await req.json();
+    const { applicationId } = await ctx.params;
 
-    const application_id = String(body.application_id || "").trim();
-    const org_slug = String(body.org_slug || "").trim();
-    const framework_slug = String(body.framework_slug || "mcas-core-alignment").trim();
-    const framework_version = String(body.framework_version || "v1").trim();
-
-    const candidate = body.candidate || {};
-    const candidate_email = candidate.email ? String(candidate.email).trim() : null;
-    const candidate_first_name = candidate.first_name ? String(candidate.first_name).trim() : null;
-    const candidate_last_name = candidate.last_name ? String(candidate.last_name).trim() : null;
-
+    const application_id = decodeURIComponent(applicationId).trim();
     if (!application_id) {
-      return NextResponse.json({ error: "application_id is required" }, { status: 400 });
-    }
-    if (!org_slug) {
-      return NextResponse.json({ error: "org_slug is required" }, { status: 400 });
-    }
-
-    // Resolve org_id from portal.orgs
-    const portal = portalSupa();
-    const { data: orgRow, error: orgErr } = await portal
-      .from("orgs")
-      .select("id, slug")
-      .eq("slug", org_slug)
-      .maybeSingle();
-
-    if (orgErr || !orgRow) {
-      return NextResponse.json({ error: "org not found" }, { status: 404 });
-    }
-
-    if (auth.allowed_org_id && auth.allowed_org_id !== orgRow.id) {
-      return NextResponse.json({ error: "partner not allowed for this org" }, { status: 403 });
+      return NextResponse.json({ error: "application_id required" }, { status: 400 });
     }
 
     const sb = supa();
 
-    // Upsert application (idempotent)
-    const { data: existing, error: exErr } = await sb
+    // Load application
+    const { data: app, error: appErr } = await sb
       .from("partner_applications")
-      .select("id, public_token, status")
+      .select("id, status, partner_key, application_id, framework_slug, framework_version, created_at, started_at, completed_at")
       .eq("partner_key", auth.partner_key)
       .eq("application_id", application_id)
       .maybeSingle();
 
-    if (exErr) {
-      return NextResponse.json({ error: "db error" }, { status: 500 });
+    if (appErr) return NextResponse.json({ error: "db error" }, { status: 500 });
+    if (!app) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+    // If not completed, return status only
+    if (app.status !== "completed") {
+      return NextResponse.json({
+        partner_key: app.partner_key,
+        application_id: app.application_id,
+        status: app.status,
+        created_at: app.created_at,
+        started_at: app.started_at,
+        completed_at: app.completed_at,
+        framework: { slug: app.framework_slug, version: app.framework_version },
+      });
     }
 
-    let app = existing;
+    // Find the assessment + result
+    const { data: assessment, error: asErr } = await sb
+      .from("assessments")
+      .select("id, completed_at, framework_slug, framework_version")
+      .eq("partner_application_id", app.id)
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (!app) {
-      const { data: created, error: crErr } = await sb
-        .from("partner_applications")
-        .insert({
-          partner_key: auth.partner_key,
-          application_id,
-          org_id: orgRow.id,
-          framework_slug,
-          framework_version,
-          candidate_email,
-          candidate_first_name,
-          candidate_last_name,
-        })
-        .select("id, public_token, status")
-        .single();
-
-      if (crErr) return NextResponse.json({ error: "failed to create application" }, { status: 500 });
-      app = created;
+    if (asErr || !assessment) {
+      return NextResponse.json({ error: "completed but assessment missing" }, { status: 500 });
     }
 
-    // Start URL (you will build this route next)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const test_url = `${baseUrl}/mcas/t/${app.public_token}`;
+    const { data: result, error: rErr } = await sb
+      .from("results")
+      .select("scoring_model, core_distribution, os_distribution, vertical_readiness, confidence, flags, computed_at")
+      .eq("assessment_id", assessment.id)
+      .maybeSingle();
+
+    if (rErr || !result) {
+      return NextResponse.json({ error: "completed but result missing" }, { status: 500 });
+    }
 
     return NextResponse.json({
-      partner_key: auth.partner_key,
-      application_id,
+      partner_key: app.partner_key,
+      application_id: app.application_id,
       status: app.status,
-      test_url,
+      test: {
+        slug: assessment.framework_slug,
+        version: assessment.framework_version,
+        completed_at: assessment.completed_at,
+        computed_at: result.computed_at,
+        scoring_model: result.scoring_model,
+      },
+      scores: {
+        core: orderCoreRecord(result.core_distribution),
+        operating_styles: result.os_distribution,
+        vertical_readiness: result.vertical_readiness,
+      },
+      confidence: result.confidence,
+      flags: result.flags || [],
     });
   } catch (e: any) {
     const msg = String(e?.message || "");
-    const status =
-      msg.startsWith("AUTH_") ? 401 :
-      500;
-
+    const status = msg.startsWith("AUTH_") ? 401 : 500;
     return NextResponse.json({ error: msg || "unknown error" }, { status });
   }
 }
