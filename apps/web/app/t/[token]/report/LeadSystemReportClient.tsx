@@ -121,6 +121,29 @@ const APPROACH_COLOURS: Record<AB, { solid: string; soft: string; ring: string }
   D: { solid: "#5478bd", soft: "#eff3fb", ring: "#adc0e5" },
 };
 
+const FREQUENCY_SUMMARY_COPY: Record<AB, { traits: string; motivators: string; watchOuts: string }> = {
+  A: {
+    traits: "Bold, future-focused, decisive and opportunity-oriented. You spot possibilities early and create movement.",
+    motivators: "Autonomy, challenge, new ideas, visible progress and turning possibility into action.",
+    watchOuts: "Moving before alignment, overlooking important detail, impatience or starting more than can be finished.",
+  },
+  B: {
+    traits: "Warm, perceptive and people-focused. You read the room quickly and bring belief and momentum into a team.",
+    motivators: "Connection, trust, encouragement and seeing people feel supported and energised by the work.",
+    watchOuts: "Absorbing others' emotions, avoiding hard conversations or over-functioning for the team.",
+  },
+  C: {
+    traits: "Structured, reliable, coordinated and delivery-focused. You turn intent into clear plans and steady execution.",
+    motivators: "Clarity, order, ownership, dependable progress and tangible delivery.",
+    watchOuts: "Over-structuring, resisting necessary change, carrying too much coordination or prioritising process over people.",
+  },
+  D: {
+    traits: "Thoughtful, analytical, perceptive and quality-focused. You spot risk, test assumptions and improve decisions.",
+    motivators: "Understanding, accuracy, depth, evidence and solving the right problem.",
+    watchOuts: "Over-analysis, delaying action until certainty, focusing too heavily on risk or withdrawing into detail.",
+  },
+};
+
 const PROFILE_FALLBACKS: Record<string, string> = {
   P1: "Trailblazer",
   P2: "Spark",
@@ -1221,6 +1244,85 @@ function SectionCard({
                 </article>
               );
             })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("frequency summary")) {
+    const dominantCode = data.top_freq || "A";
+    const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+    const dominantLabel = approachLabel(dominantName, dominantCode);
+    const summaryCopy = FREQUENCY_SUMMARY_COPY[dominantCode];
+    const frequencies: Array<{ code: AB; colour: string }> = [
+      { code: "A", colour: "#ef4444" },
+      { code: "B", colour: "#f59e0b" },
+      { code: "C", colour: "#10b981" },
+      { code: "D", colour: "#3b82f6" },
+    ];
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/65">
+            <img
+              src="/mps/report-icons/four-lead-approaches-summary.png"
+              alt=""
+              className="h-10 w-10 rounded-lg object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Four LEAD Approaches summary</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-6 text-[#313c52]">
+            Your strongest overall driver is <strong className="text-[#d79b34]">{dominantLabel}</strong>, which shapes how you approach problems and make decisions. Higher percentages indicate where you naturally spend more energy; lower percentages highlight areas that may feel less comfortable or more draining.
+          </p>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-[18px] bg-white px-4 py-4 shadow-[0_6px_32px_rgba(58,110,212,.12)]">
+              <div className="space-y-5">
+                {frequencies.map((frequency) => {
+                  const value = clamp01(data.frequency_percentages?.[frequency.code] ?? 0);
+                  return (
+                    <div key={frequency.code} className="grid grid-cols-[88px_minmax(0,1fr)_36px] items-center gap-3">
+                      <span className="text-[11px] text-[#3d4163]">{APPROACH_FALLBACKS[frequency.code]} ({frequency.code})</span>
+                      <div className="h-[5px] overflow-hidden rounded-full bg-[#a0a5c0]/20">
+                        <div className="h-full rounded-full" style={{ width: `${Math.max(value * 100, value > 0 ? 2 : 0)}%`, backgroundColor: frequency.colour }} />
+                      </div>
+                      <span className="text-right text-[10px] font-medium text-[#3d4163]">{pct(value)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-l-[7px] border-[#7e94d4] bg-[linear-gradient(90deg,rgba(124,148,215,.30),rgba(232,177,94,.30))] px-5 py-4">
+              <h3 className="text-sm font-semibold text-[#334155]">How to read these scores</h3>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-[11px] leading-[1.55] text-[#313c52]">
+                <li>Higher percentages highlight patterns you use frequently and with ease.</li>
+                <li>Lower percentages highlight backup styles you can use when needed, but they may cost more energy.</li>
+                <li>Anything above roughly 30% will usually feel very natural for you.</li>
+                <li>Your primary profile is your strongest pattern. Your secondary and tertiary profiles show helpful support patterns around your core style.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-7 overflow-hidden rounded-[18px] border border-[#7c94d7] shadow-[0_6px_32px_rgba(58,110,212,.12)] lg:grid lg:grid-cols-[230px_minmax(0,1fr)]">
+            <div className="flex min-h-[144px] flex-col items-center justify-center bg-[#e8b75f] px-5 text-center text-white">
+              <div className="text-[11px]">Your Dominant Frequency:</div>
+              <div className="mt-1 text-[28px] font-semibold leading-9">{dominantLabel}</div>
+            </div>
+            <div className="grid gap-5 bg-white px-5 py-6 sm:grid-cols-3">
+              <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Key traits:</strong> {summaryCopy.traits}</p>
+              <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Motivators:</strong> {summaryCopy.motivators}</p>
+              <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Watch outs:</strong> {summaryCopy.watchOuts}</p>
+            </div>
           </div>
         </div>
       </section>
