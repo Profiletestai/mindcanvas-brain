@@ -1,7 +1,7 @@
 //apps/web/app/t/[token]/report/LeadSystemReportClient.tsx
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 
 type AB = "A" | "B" | "C" | "D";
 
@@ -106,13 +106,6 @@ const APPROACH_FALLBACKS: Record<AB, string> = {
   B: "Energise",
   C: "Align",
   D: "Discern",
-};
-
-const APPROACH_COPY: Record<AB, string> = {
-  A: "Future-focused energy that initiates movement, spots opportunity and opens new possibilities.",
-  B: "People-focused energy that builds belief, connection, motivation and shared momentum.",
-  C: "Delivery-focused energy that creates clarity, structure, coordination and reliable rhythm.",
-  D: "Insight-focused energy that tests assumptions, sees risk and improves the quality of decisions.",
 };
 
 const APPROACH_SHORT_COPY: Record<AB, string> = {
@@ -340,10 +333,6 @@ function profileImage(code: string) {
     P8: "p8-refiner.png",
   };
   return filenames[short] ? `/mps/profile-icons/${filenames[short]}` : "";
-}
-
-function approachImage(code: AB) {
-  return `/mps/four-lead-approaches/${APPROACH_FALLBACKS[code].toLowerCase()}.png`;
 }
 
 function resolveImageSrc(rawValue: any, data: LeadSystemResultData, ranked: RankedProfile[]) {
@@ -717,6 +706,87 @@ function SectionCard({
   const id = sectionDomId(section, index);
   const title = safeText(section.title).trim() || fallbackSectionTitle(section, ranked[0]?.name || data.top_profile_name);
   const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  const sectionIdentity = `${safeText(section.id)} ${title}`.toLowerCase();
+
+  if (sectionIdentity.includes("welcome")) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/welcome-note.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#122c4d]">Welcome</p>
+            <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">A note from Daniel Acutt</h2>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-5 py-5 text-[#313c52] sm:px-7 sm:py-6">
+          <div className="space-y-4">
+            {blocks.map((block, blockIndex) => {
+              const type = String(block?.type || "").toLowerCase().trim();
+              if (type === "image" || type === "images.pair" || type === "divider" || type === "spacer") return null;
+
+              const originalText = safeText(block.text);
+              const normalisedText = originalText.trim().toLowerCase();
+              if (
+                normalisedText === "warm regards" ||
+                normalisedText === "warm regards," ||
+                normalisedText === "daniel acutt" ||
+                normalisedText.includes("founder of profiletest")
+              ) return null;
+              const welcomeText = originalText.replace(/\s*warm regards[\s\S]*$/i, "").trim();
+
+              if (type === "p") {
+                return welcomeText ? (
+                  <p key={blockIndex} className="whitespace-pre-line text-[13px] leading-[25px] text-[#313c52]">
+                    {welcomeText}
+                  </p>
+                ) : null;
+              }
+
+              if (type === "ul" || type === "ol") {
+                const Tag = type === "ol" ? "ol" : "ul";
+                return (
+                  <Tag key={blockIndex} className={`${type === "ol" ? "list-decimal" : "list-disc"} space-y-2 pl-6 text-[13px] leading-[25px] text-[#313c52]`}>
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => <li key={itemIndex}>{safeText(item)}</li>)}
+                  </Tag>
+                );
+              }
+
+              if (type.startsWith("h") && welcomeText) {
+                return <h3 key={blockIndex} className="text-[13px] font-bold leading-[25px] text-[#111828]">{welcomeText}</h3>;
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+
+          <div className="mt-6">
+            <img
+              src="/images/mindCanvas-LEAD-system/bio-image.png"
+              alt="Daniel Acutt"
+              className="h-[63px] w-[63px] rounded-full border border-slate-200 object-cover"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+            <div className="mt-3 text-[13px] leading-7">
+              <p>Warm regards</p>
+              <p className="font-bold text-[#111828]">Daniel Acutt</p>
+              <p className="text-[#111828]">Founder of ProfileTest.ai, Creator of MindCanvas</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id={id} className="report-section scroll-mt-6 rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
@@ -758,7 +828,6 @@ export default function LeadSystemReportClient({
   void src;
 
   const reportRef = useRef<HTMLDivElement | null>(null);
-  const [indexOpen, setIndexOpen] = useState(false);
 
   const participant = fullName(data.taker?.first_name, data.taker?.last_name);
   const reportDate = formatReportDate(data.report_date);
@@ -818,19 +887,6 @@ export default function LeadSystemReportClient({
   const dominantLabel = approachLabel(dominantName, dominantCode);
 
   const nextStepsUrl = getNextStepsUrl(data);
-
-  const indexItems = [
-    ...sections.map((section, index) => ({
-      id: sectionDomId(section, index),
-      title: safeText(section.title).trim() || fallbackSectionTitle(section, primary.name),
-    })),
-    { id: "lead-methodology", title: "Methodology" },
-  ];
-
-  function scrollTo(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setIndexOpen(false);
-  }
 
   return (
     <div ref={reportRef} className="lead-report-shell pdf-report-shell report-shell min-h-screen overflow-x-hidden bg-[#07182f] text-white [background-image:radial-gradient(circle_at_12%_2%,rgba(64,104,154,.32),transparent_30%),radial-gradient(circle_at_92%_18%,rgba(215,169,40,.16),transparent_24%)]">
@@ -1076,37 +1132,7 @@ export default function LeadSystemReportClient({
           <div className="rounded-[30px] bg-white p-5 text-[#0b2545] sm:p-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Personality map</p><h2 className="mt-2 text-2xl font-bold">Your eight-profile pattern</h2><p className="mt-2 text-sm leading-6 text-slate-600">Higher points show patterns you access more naturally. Lower points identify areas that may benefit from support, structure or intentional practice.</p><div className="mt-5"><ProfileRadar ranked={ranked} values={data.profile_percentages} /></div></div>
         </section>
 
-        <section className="report-section mt-6 rounded-[30px] bg-white p-5 text-[#0b2545] sm:p-7 lg:p-9">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Framework overview</p>
-          <h2 className="mt-2 text-2xl font-bold sm:text-3xl">Four approaches. Eight operating styles.</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {(["A", "B", "C", "D"] as AB[]).map((code) => {
-              const label = data.frequency_labels.find((item) => item.code === code)?.name || APPROACH_FALLBACKS[code];
-              return <div key={code} className="report-card rounded-[22px] border p-5" style={{ borderColor: APPROACH_COLOURS[code].ring, backgroundColor: APPROACH_COLOURS[code].soft }}><img src={approachImage(code)} alt="" className="h-12 w-12 rounded-xl object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} /><div className="mt-4 flex items-center justify-between gap-3"><h3 className="font-bold">{label}</h3><span className="text-sm font-bold" style={{ color: APPROACH_COLOURS[code].solid }}>{pct(data.frequency_percentages?.[code])}</span></div><p className="mt-2 text-sm leading-6 text-slate-600">{APPROACH_COPY[code]}</p></div>;
-            })}
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 8 }, (_, index) => `P${index + 1}`).map((code) => {
-              const profile = ranked.find((item) => shortProfileCode(item.code) === code);
-              const selected = code === shortProfileCode(primary.code);
-              return <div key={code} className={`report-card rounded-2xl border p-4 ${selected ? "border-[#d7a928] bg-[#fff9e9]" : "border-slate-200 bg-slate-50"}`}><div className="flex items-center gap-3"><img src={profileImage(code)} alt="" className="h-11 w-11 rounded-xl object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} /><div className="min-w-0"><div className="text-xs font-bold text-[#a77d0f]">{code} · {pct(profile?.pct ?? 0)}</div><h3 className="truncate font-bold">{profile?.name || PROFILE_FALLBACKS[code]}</h3></div></div><p className="mt-3 text-xs leading-5 text-slate-600">{PROFILE_COPY[code]}</p>{selected ? <span className="mt-3 inline-flex rounded-full bg-[#0b2545] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Your top profile</span> : null}</div>;
-            })}
-          </div>
-        </section>
-
-        <div className="mt-6 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="no-print self-start lg:sticky lg:top-5">
-            <button type="button" onClick={() => setIndexOpen((open) => !open)} aria-expanded={indexOpen} className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-bold lg:hidden"><span>Report index</span><span aria-hidden="true">{indexOpen ? "−" : "+"}</span></button>
-            <nav aria-label="Report index" className={`${indexOpen ? "block" : "hidden"} mt-3 rounded-[24px] border border-white/10 bg-white/5 p-4 lg:mt-0 lg:block`}>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#e8c65e]">Report index</p>
-              <p className="mt-2 text-xs leading-5 text-white/55">Jump straight to what you need.</p>
-              <div className="mt-4 max-h-[70vh] space-y-1 overflow-y-auto pr-1">
-                {indexItems.map((item, index) => <button key={item.id} type="button" onClick={() => scrollTo(item.id)} className="group flex w-full items-start gap-3 rounded-xl px-2.5 py-2 text-left text-xs leading-5 text-white/70 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#d7a928]"><span className="mt-0.5 text-[10px] font-bold text-[#e8c65e]">{String(index + 1).padStart(2, "0")}</span><span>{item.title}</span></button>)}
-              </div>
-            </nav>
-          </aside>
-
-          <main className="space-y-5">
+        <main className="mt-6 space-y-5">
             {sections.length ? sections.map((section, index) => <SectionCard key={`${sectionDomId(section, index)}-${index}`} section={section} index={index} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />) : <section className="rounded-[28px] bg-white p-7 text-slate-700"><h2 className="text-xl font-bold text-[#0b2545]">Report content is unavailable</h2><p className="mt-3 text-sm leading-6">The result loaded correctly, but the LEAD narrative content could not be loaded. Please refresh the page or contact support.</p></section>}
 
             <section id="lead-methodology" className="report-section rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
@@ -1114,8 +1140,7 @@ export default function LeadSystemReportClient({
             </section>
 
             {nextStepsUrl ? <div className="no-print flex justify-end"><a href={nextStepsUrl} target="_blank" rel="noreferrer" className="rounded-full bg-[#d7a928] px-6 py-3 text-sm font-bold text-[#0b2545] hover:bg-[#e4bd4d] focus:outline-none focus:ring-2 focus:ring-white">Next Step</a></div> : null}
-          </main>
-        </div>
+        </main>
 
         <footer className="mt-8 border-t border-white/10 py-5 text-center text-xs text-white/45">© {new Date().getFullYear()} MindCanvas LEAD System · Powered by Profiletest.ai</footer>
       </div>
