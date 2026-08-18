@@ -199,6 +199,49 @@ const PROFILE_COMBINATIONS: Record<string, string> = {
   P8: "Discern + Launch",
 };
 
+const PROFILE_DETAIL_COPY: Record<string, { traits: string; motivators: string; watchOuts: string }> = {
+  P1: {
+    traits: "Initiates movement, challenges the status quo and spots the future early.",
+    motivators: "New possibility, momentum and the chance to push toward what is next.",
+    watchOuts: "May move on before the present is settled or underweight what stability requires.",
+  },
+  P2: {
+    traits: "Activates energy, rallies people and turns ideas into momentum with optimism and speed.",
+    motivators: "New beginnings, shared excitement, participation and visible movement.",
+    watchOuts: "Can overpromise, lose focus or move on when the initial energy drops.",
+  },
+  P3: {
+    traits: "Calming presence, restorative empathy, builds psychological safety and trust within teams.",
+    motivators: "Helping people feel supported, seen and energised - connection that makes teams feel like teams.",
+    watchOuts: "Absorbing others' emotions, avoiding conflict or struggling to say no when this style is over-used.",
+  },
+  P4: {
+    traits: "Connects people and plans, translating strategy into coordination across a team.",
+    motivators: "Seeing relationships and execution work together - clarity that keeps everyone moving as one.",
+    watchOuts: "Can over-mediate or blur ownership while trying to keep everyone aligned and included.",
+  },
+  P5: {
+    traits: "Holds structure, creates reliability and keeps momentum steady over time.",
+    motivators: "Stability, dependable delivery, clear expectations and protecting the team's rhythm.",
+    watchOuts: "May resist disruption, carry too much responsibility or avoid necessary change.",
+  },
+  P6: {
+    traits: "Designs systems, improves process and makes delivery more efficient.",
+    motivators: "Order, efficiency, clear process and measurable improvement.",
+    watchOuts: "Can over-engineer, become rigid or prioritise process over people and adaptation.",
+  },
+  P7: {
+    traits: "Clarifies truth, spots risk and increases the quality of decisions.",
+    motivators: "Accuracy, evidence, quality and well-reasoned decisions.",
+    watchOuts: "Can over-analyse, delay action or under-communicate conclusions while seeking certainty.",
+  },
+  P8: {
+    traits: "Improves ideas, sharpens strategy and turns insight into better direction.",
+    motivators: "Better answers, refinement, strategic clarity and stronger systems.",
+    watchOuts: "Perfectionism, reworking for too long or withholding ideas until they feel fully polished.",
+  },
+};
+
 const PROFILE_GUIDANCE: Record<string, string> = {
   P1: "Lead with courage, create a pause before action, and build the alignment that lets momentum last.",
   P2: "Lead with energy, add focus and follow-through, and turn enthusiasm into sustained progress.",
@@ -1381,6 +1424,203 @@ function SectionCard({
                 <p><strong>Layout:</strong> profiles are arranged in framework order, so neighbours share an approach and opposite points naturally counterbalance each other.</p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("profile mix")) {
+    const canonicalProfiles = Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
+      const profile = ranked.find((item) => shortProfileCode(item.code) === profileCode);
+      return profile || {
+        code: profileCode,
+        name: PROFILE_FALLBACKS[profileCode],
+        pct: getProfileValue(data.profile_percentages, profileCode),
+        sourceIndex: Number(profileCode.replace("P", "")) - 1,
+      };
+    });
+    const featuredProfiles = ranked.slice(0, 3);
+    const roles = ["Primary profile", "Secondary profile", "Tertiary profile"];
+    const borderColours = ["#6baed6", "#91c3f5", "#c6e1fc"];
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/65">
+            <img
+              src="/mps/report-icons/profile-mix.png"
+              alt=""
+              className="h-10 w-10 rounded-lg object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Profile mix</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]">
+            Your profile mix shows how strongly you match each of the eight profiles. Higher percentages show patterns you use more often; lower ones are backup styles you can lean on when needed.
+          </p>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {[canonicalProfiles.slice(0, 4), canonicalProfiles.slice(4, 8)].map((group, groupIndex) => (
+              <div key={groupIndex} className="rounded-[18px] bg-white px-4 py-4 shadow-[0_6px_32px_rgba(58,110,212,.12)]">
+                <div className="space-y-5">
+                  {group.map((profile) => {
+                    const value = clamp01(profile.pct);
+                    return (
+                      <div key={profile.code} className="grid grid-cols-[108px_minmax(0,1fr)_36px] items-center gap-3">
+                        <span className="truncate text-[10px] text-[#3d4163]">{profile.name} ({shortProfileCode(profile.code)})</span>
+                        <div className="h-[5px] overflow-hidden rounded-full bg-[#a0a5c0]/20">
+                          <div className="h-full rounded-full bg-[linear-gradient(90deg,#7c94d7,#e8b15e)]" style={{ width: `${Math.max(value * 100, value > 0 ? 2 : 0)}%` }} />
+                        </div>
+                        <span className="text-right text-[10px] font-medium text-[#3d4163]">{pct(value)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {featuredProfiles.length >= 3 ? (
+            <p className="mt-5 text-[12px] leading-6 text-[#313c52]">
+              Overall, your strongest profile pattern is <strong>{featuredProfiles[0].name} ({shortProfileCode(featuredProfiles[0].code)})</strong>, supported by <strong>{featuredProfiles[1].name} ({shortProfileCode(featuredProfiles[1].code)})</strong> and <strong>{featuredProfiles[2].name} ({shortProfileCode(featuredProfiles[2].code)})</strong>.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          {featuredProfiles.map((profile, profileIndex) => {
+            const profileCode = shortProfileCode(profile.code);
+            const detail = PROFILE_DETAIL_COPY[profileCode];
+            return (
+              <article
+                key={profile.code}
+                className="min-h-[303px] rounded-[18px] border-t-4 bg-[linear-gradient(180deg,rgba(232,183,95,.20),rgba(125,148,213,.20)),white] px-5 py-4"
+                style={{ borderTopColor: borderColours[profileIndex] }}
+              >
+                <div className="text-[9px] uppercase leading-4 tracking-[0.1em] text-[#313c52]">{roles[profileIndex]}</div>
+                <div className="mt-3 flex items-start justify-between gap-4">
+                  <img
+                    src={profileImage(profileCode)}
+                    alt=""
+                    className="h-[54px] w-[54px] object-contain"
+                    onError={(event) => { event.currentTarget.style.display = "none"; }}
+                  />
+                  <span className="text-[36px] font-semibold leading-none text-[#022b61]">{pct(profile.pct)}</span>
+                </div>
+                <h3 className="mt-2 text-sm font-semibold text-[#111828]">{profile.name}</h3>
+                <div className="mt-3 space-y-2 text-[10px] leading-[1.5] text-[#313c52]">
+                  <p><strong>Key traits:</strong> {detail?.traits || PROFILE_COPY[profileCode]}</p>
+                  <p><strong>Motivators:</strong> {detail?.motivators || "Using this pattern in work that feels meaningful and effective."}</p>
+                  <p><strong>Watch outs:</strong> {detail?.watchOuts || "Notice when this strength is being over-used or needs support from another style."}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("identity") || sectionIdentity.includes("essence")) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const profileCode = shortProfileCode(topProfile.code);
+    const dominantCode = data.top_freq || "A";
+    const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+    const dominantPercentage = data.frequency_percentages?.[dominantCode] ?? 0;
+    const narrativeBlocks = blocks.filter((block) => {
+      const blockType = String(block?.type || "").toLowerCase().trim();
+      return blockType !== "image" && blockType !== "images.pair" && !blockType.startsWith("chart.");
+    });
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/essence.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">The Essence of the {topProfile.name}</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="grid gap-7 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,.9fr)] lg:items-start">
+            <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+              {narrativeBlocks.length ? (
+                narrativeBlocks.map((block, blockIndex) => {
+                  const blockType = String(block?.type || "").toLowerCase().trim();
+
+                  if (blockType === "p") {
+                    return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+                  }
+
+                  if (blockType === "quote") {
+                    return (
+                      <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                        “{safeText(block.text)}”{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                      </blockquote>
+                    );
+                  }
+
+                  if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                    return <h3 key={blockIndex} className="text-base font-semibold text-[#061a3a]">{safeText(block.text)}</h3>;
+                  }
+
+                  if (blockType === "ul" || blockType === "ol") {
+                    const ListTag = blockType === "ol" ? "ol" : "ul";
+                    return (
+                      <ListTag key={blockIndex} className={`${blockType === "ol" ? "list-decimal" : "list-disc"} space-y-2 pl-5`}>
+                        {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => <li key={itemIndex}>{safeText(item)}</li>)}
+                      </ListTag>
+                    );
+                  }
+
+                  if (blockType === "callout") {
+                    return (
+                      <div key={blockIndex} className="border-l-[3px] border-[#7c94d7] bg-[#f7f8fc] px-4 py-3">
+                        {block.title ? <h3 className="font-semibold text-[#061a3a]">{safeText(block.title)}</h3> : null}
+                        {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                      </div>
+                    );
+                  }
+
+                  return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+                })
+              ) : (
+                <p>{PROFILE_COPY[profileCode]}</p>
+              )}
+            </div>
+
+            <aside className="flex flex-col items-center justify-start pt-1 text-center lg:sticky lg:top-6">
+              <img
+                src={profileImage(profileCode)}
+                alt={`${topProfile.name} profile illustration`}
+                className="h-auto w-full max-w-[307px] object-contain"
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+              />
+              <div className="mt-4 text-[28px] font-semibold leading-8 text-[#313c52]">{topProfile.name}</div>
+              <div className="mt-1 text-[28px] leading-[41px] text-[#313c52]">
+                {approachLabel(dominantName, dominantCode)} · {pct(dominantPercentage)}
+              </div>
+            </aside>
           </div>
         </div>
       </section>
