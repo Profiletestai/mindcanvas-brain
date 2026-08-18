@@ -143,6 +143,28 @@ const PROFILE_COPY: Record<string, string> = {
   P8: "Improves ideas, sharpens strategy and turns insight into better direction.",
 };
 
+const PROFILE_TAGLINES: Record<string, string> = {
+  P1: "Moves first",
+  P2: "Creates momentum",
+  P3: "Raises people",
+  P4: "Connects systems",
+  P5: "Stabilises delivery",
+  P6: "Builds structure",
+  P7: "Protects quality",
+  P8: "Improves systems",
+};
+
+const PROFILE_OVERVIEW_COPY: Record<string, string> = {
+  P1: "Big ideas, future focus, bold direction.",
+  P2: "Turns ideas into motion and activates people fast.",
+  P3: "Builds trust, lifts morale and strengthens culture.",
+  P4: "Aligns people, plans and priorities.",
+  P5: "Keeps day-to-day execution steady and dependable.",
+  P6: "Creates the plans and processes that keep work organised.",
+  P7: "Safeguards standards, accuracy and risk control.",
+  P8: "Refines what exists so it works better and faster.",
+};
+
 const PROFILE_GUIDANCE: Record<string, string> = {
   P1: "Lead with courage, create a pause before action, and build the alignment that lets momentum last.",
   P2: "Lead with energy, add focus and follow-through, and turn enthusiasm into sustained progress.",
@@ -880,6 +902,152 @@ function SectionCard({
               </article>
             ))}
           </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("lead_introduction") ||
+    sectionIdentity.includes("what the leader system") ||
+    sectionIdentity.includes("what the lead system")
+  ) {
+    const primary = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const dominantCode = data.top_freq || "A";
+    const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+    const dominantLabel = approachLabel(dominantName, dominantCode);
+    const profileArticle = /^[aeiou]/i.test(primary.name) ? "an" : "a";
+    const leadApproaches: Array<{ code: AB; letter: string; colour: string; copy: string }> = [
+      { code: "A", letter: "L", colour: "#ef4444", copy: "Starts things, innovates, brings direction." },
+      { code: "B", letter: "E", colour: "#f59e0b", copy: "Communicates, motivates, builds belief." },
+      { code: "C", letter: "A", colour: "#10b981", copy: "Organises, sets priorities, keeps progress steady." },
+      { code: "D", letter: "D", colour: "#3b82f6", copy: "Evaluates, checks detail, prevents problems." },
+    ];
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/four-lead-approaches.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#122c4d]">Introducing the MindCanvas LEAD Model</p>
+            <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">What the LEAD System measures</h2>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]/95">
+            MPS - the MindCanvas LEAD Profile System - connects two layers of leadership behaviour. Rather than reducing someone to a single label, it shows the underlying frequency that drives how they lead, and the operating style that frequency naturally produces. Read both together - not the headline profile alone - before using this in a coaching, recruitment or development conversation.
+          </p>
+
+          <div className="mt-6 border-l-[6px] border-[#7e94d4] bg-[linear-gradient(90deg,rgba(124,148,215,.30),rgba(232,177,94,.30))] px-5 py-4">
+            <h3 className="text-xs font-bold text-[#667fc4]">How to read what follows</h3>
+            <p className="mt-2 text-[13px] leading-5 text-[#313c52]/95">
+              Everything below - your scores, your profile mix, your placement on the map - is built from four underlying approaches. Before you look at any of your personal results, it helps to know what each approach actually measures. Think of these as four directions on a compass: you use all four, but you travel toward some more naturally than others.
+            </p>
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-[#f5f6fb] px-4 py-5 sm:px-7 sm:py-7">
+            <img
+              src="/mps/What the Leader System Measures/layer-1-layer-2.png"
+              alt="Two leadership layers: LEAD frequency and operating style"
+              className="mx-auto h-auto w-full max-w-[996px] object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              { number: "01", title: "Frequency", text: "Shows which of the four LEAD approaches - Launch, Energise, Align and Discern - a person naturally leads with most often." },
+              { number: "02", title: "Operating Style", text: "Combines the four frequencies into one of eight distinct leadership identity patterns - the clearest picture of how this person creates value." },
+            ].map((item) => (
+              <article key={item.number} className="rounded-[14px] bg-[#f2f4fa] px-5 py-5">
+                <span className="inline-flex h-[26px] min-w-[26px] items-center justify-center rounded-full bg-[#5a72b8] px-1.5 text-[10px] font-bold text-white">{item.number}</span>
+                <h3 className="mt-3 text-sm font-bold text-[#12203b]">{item.title}</h3>
+                <p className="mt-2 text-[12px] leading-[1.55] text-[#4b5875]">{item.text}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-base font-bold text-[#12203b]">What LEAD stands for</h3>
+            <p className="mt-2 text-[13px] leading-6 text-[#313c52]/95">
+              You use all four of these in different situations. However, as {profileArticle} {primary.name}, {dominantLabel} is your natural home - the approach you default to when you are being most yourself.
+            </p>
+
+            <div className="mt-5 grid items-center gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+              <img
+                src="/mps/What the Leader System Measures/the-four-behavioral-approaches.png"
+                alt="The four LEAD behavioural approaches"
+                className="mx-auto h-auto w-full max-w-[278px] object-contain"
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {leadApproaches.map((approach) => (
+                  <article key={approach.code} className="rounded-xl border border-[#e4e8f0] bg-[#f7f8fc] px-4 py-3.5">
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-sm text-white" style={{ backgroundColor: approach.colour }}>{approach.letter}</span>
+                    <h4 className="mt-2 text-[12px] font-bold text-[#12203b]">{APPROACH_FALLBACKS[approach.code]}</h4>
+                    <p className="mt-1 text-[11px] leading-4 text-[#4b5875]">{approach.copy}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-base font-bold text-[#12203b]">The 8 Operating Styles</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
+                const profile = ranked.find((item) => shortProfileCode(item.code) === profileCode);
+                return (
+                  <article key={profileCode} className="rounded-[14px] border border-[#e4e8f0] bg-[#f7f8fc] px-4 py-4">
+                    <img
+                      src={profileImage(profileCode)}
+                      alt=""
+                      className="h-[46px] w-[46px] object-contain"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                    <h4 className="mt-2 text-[13px] font-bold text-[#12203b]">{profile?.name || PROFILE_FALLBACKS[profileCode]}</h4>
+                    <p className="text-[10px] font-semibold text-[#8892a6]">{profileCode}</p>
+                    <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.06em] text-[#5a72b8]">{PROFILE_TAGLINES[profileCode]}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-[#4b5875]">{PROFILE_OVERVIEW_COPY[profileCode]}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-[14px] bg-[#f2f4fa] px-5 py-4">
+            <h3 className="text-[13px] font-bold text-[#12203b]">Reading the % below</h3>
+            <p className="mt-2 text-[12px] leading-5 text-[#4b5875]">
+              The number next to the dominant style - in this report, {pct(primary.pct)} - shows how this person&apos;s answers are distributed across all eight styles, not a score out of 100. The highest share is the dominant style even at a modest percentage. A low percentage elsewhere means that style is used less often, not that it is absent.
+            </p>
+          </div>
+
+          <div className="mt-3 flex gap-3 rounded-xl border border-[#e4e8f0] bg-[#f7f8fc] px-4 py-4">
+            <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-[#8892a6] text-xs text-[#8892a6]" aria-hidden="true">i</span>
+            <p className="text-[12px] leading-5 text-[#4b5875]">
+              Frequency and Operating Style are read together: the frequency explains <em>why</em> a style shows up the way it does, and the style shows <em>what</em> that looks like in practice. Neither is complete on its own.
+            </p>
+          </div>
+
+          <p className="mt-4 text-[10px] leading-4 text-[#8892a6]">
+            Methodology: Results are derived from this person&apos;s responses to the MindCanvas LEAD diagnostic and reflect observable leadership patterns, not fixed personality traits. Use alongside role context and a structured conversation - never as a standalone hiring, promotion or development decision.
+          </p>
         </div>
       </section>
     );
