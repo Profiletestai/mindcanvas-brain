@@ -1528,6 +1528,202 @@ function SectionCard({
     );
   }
 
+  if (
+    sectionIdentity.includes("sees the world") ||
+    sectionIdentity.includes("sees_world") ||
+    sectionIdentity.includes("sees-the-world") ||
+    sectionIdentity.includes("worldview")
+  ) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/sees-the-world.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">How the {topProfile.name} sees the world</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                return <h3 key={blockIndex} className="text-[12px] font-bold uppercase leading-5 tracking-[0.05em] text-[#071a39]">{safeText(block.text)}</h3>;
+              }
+
+              if (blockType === "ul" || blockType === "ol") {
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex min-h-[48px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[13px] leading-[21px] text-[#0e1726]">
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                        <span>{safeText(item)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "cards" || blockType === "scorecard_row") {
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex min-h-[48px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[13px] leading-[21px] text-[#0e1726]">
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                        <div>
+                          {item?.title || item?.label ? <strong className="block text-sm">{safeText(item?.title || item?.label)}</strong> : null}
+                          <span>{typeof item === "string" ? item : safeText(item?.text || item?.value)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7">
+                    “{safeText(block.text)}”{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3">
+                    {block.title ? <strong className="block text-sm text-[#0e1726]">{safeText(block.title)}</strong> : null}
+                    {block.text ? <p className="whitespace-pre-line">{safeText(block.text)}</p> : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("strength")) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/strengths.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Strengths of the {topProfile.name} style</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "cards" || blockType === "scorecard_row") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {items.map((item, itemIndex) => (
+                      <article
+                        key={itemIndex}
+                        className={`${items.length % 2 === 1 && itemIndex === items.length - 1 ? "md:col-span-2" : ""} flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[#0e1726]`}
+                      >
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                        <div>
+                          {item?.title || item?.label ? <h3 className="text-[15px] font-semibold leading-[22px]">{safeText(item?.title || item?.label)}</h3> : null}
+                          <p className="whitespace-pre-line text-[13px] leading-[21px]">{typeof item === "string" ? item : safeText(item?.text || item?.value || item?.description)}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "ul" || blockType === "ol") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {items.map((item, itemIndex) => (
+                      <article
+                        key={itemIndex}
+                        className={`${items.length % 2 === 1 && itemIndex === items.length - 1 ? "md:col-span-2" : ""} flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[13px] leading-[21px] text-[#0e1726]`}
+                      >
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                        <span>{safeText(item)}</span>
+                      </article>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <article key={blockIndex} className="flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[#0e1726]">
+                    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                    <div>
+                      {block.title ? <h3 className="text-[15px] font-semibold leading-[22px]">{safeText(block.title)}</h3> : null}
+                      {block.text ? <p className="whitespace-pre-line text-[13px] leading-[21px]">{safeText(block.text)}</p> : null}
+                    </div>
+                  </article>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (sectionIdentity.includes("identity") || sectionIdentity.includes("essence")) {
     const topProfile = ranked[0] || {
       code: shortProfileCode(data.top_profile_code || "P1"),
