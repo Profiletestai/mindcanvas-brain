@@ -1,0 +1,2740 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+
+type AB = "A" | "B" | "C" | "D";
+
+type LinkMeta = {
+  next_steps_url?: string | null;
+  show_results?: boolean | null;
+  redirect_url?: string | null;
+  hidden_results_message?: string | null;
+  email_report?: boolean | null;
+  meta?: {
+    redirect_url?: string | null;
+    next_steps_url?: string | null;
+    [key: string]: any;
+  } | null;
+  [key: string]: any;
+};
+
+type ReportBlock = {
+  type?: string;
+  text?: string;
+  title?: string;
+  cite?: string;
+  items?: any[];
+  bullets?: string[];
+  columns?: number;
+  tone?: string;
+  src?: string;
+  alt?: string;
+  caption?: string;
+  align?: "left" | "center" | "right";
+  max_h?: number;
+  rounded?: boolean;
+  size?: "sm" | "md" | "lg";
+  button_text?: string;
+  left?: any;
+  right?: any;
+  [key: string]: any;
+};
+
+type ReportSection = {
+  id?: string;
+  title?: string | null;
+  blocks?: ReportBlock[] | null;
+};
+
+type SectionsPayload = {
+  common?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+  profile?: ReportSection[] | { sections?: ReportSection[] | null } | null;
+  profiles?: Record<
+    string,
+    { title?: string; sections?: ReportSection[] | null } | ReportSection[] | null
+  > | null;
+  framework?: any;
+  reportFramework?: any;
+  framework_path?: string | null;
+  framework_bucket?: string | null;
+  [key: string]: any;
+};
+
+export type LeadSystemResultData = {
+  org_slug: string;
+  org_name?: string | null;
+  org_logo_url?: string | null;
+  test_name: string;
+  report_date?: string | null;
+  framework_id?: string | null;
+  framework_content_blocks?: SectionsPayload | null;
+
+  taker: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  };
+
+  link?: LinkMeta;
+
+  frequency_labels: Array<{ code: AB; name: string }>;
+  frequency_percentages: Record<AB, number>;
+  frequency_totals?: Record<AB, number>;
+
+  profile_labels: Array<{ code: string; name: string }>;
+  profile_percentages: Record<string, number>;
+  profile_totals?: Record<string, number>;
+
+  top_freq: AB;
+  top_profile_code: string;
+  top_profile_name: string;
+
+  sections?: SectionsPayload | null;
+  debug?: any;
+};
+
+type RankedProfile = {
+  code: string;
+  name: string;
+  pct: number;
+  sourceIndex: number;
+};
+
+const APPROACH_FALLBACKS: Record<AB, string> = {
+  A: "Launch",
+  B: "Energise",
+  C: "Align",
+  D: "Discern",
+};
+
+const APPROACH_SHORT_COPY: Record<AB, string> = {
+  A: "Future, possibility, momentum and activation.",
+  B: "People, connection, motivation and activation.",
+  C: "Structure, coordination, clarity and delivery.",
+  D: "Insight, perspective, quality and risk awareness.",
+};
+
+const APPROACH_COLOURS: Record<AB, { solid: string; soft: string; ring: string }> = {
+  A: { solid: "#e35d5b", soft: "#fff2f1", ring: "#f3b3b1" },
+  B: { solid: "#d9a521", soft: "#fff8e6", ring: "#edd181" },
+  C: { solid: "#3b9a7d", soft: "#edf8f4", ring: "#9dd2c0" },
+  D: { solid: "#5478bd", soft: "#eff3fb", ring: "#adc0e5" },
+};
+
+const FREQUENCY_SUMMARY_COPY: Record<AB, { traits: string; motivators: string; watchOuts: string }> = {
+  A: {
+    traits: "Bold, future-focused, decisive and opportunity-oriented. You spot possibilities early and create movement.",
+    motivators: "Autonomy, challenge, new ideas, visible progress and turning possibility into action.",
+    watchOuts: "Moving before alignment, overlooking important detail, impatience or starting more than can be finished.",
+  },
+  B: {
+    traits: "Warm, perceptive and people-focused. You read the room quickly and bring belief and momentum into a team.",
+    motivators: "Connection, trust, encouragement and seeing people feel supported and energised by the work.",
+    watchOuts: "Absorbing others' emotions, avoiding hard conversations or over-functioning for the team.",
+  },
+  C: {
+    traits: "Structured, reliable, coordinated and delivery-focused. You turn intent into clear plans and steady execution.",
+    motivators: "Clarity, order, ownership, dependable progress and tangible delivery.",
+    watchOuts: "Over-structuring, resisting necessary change, carrying too much coordination or prioritising process over people.",
+  },
+  D: {
+    traits: "Thoughtful, analytical, perceptive and quality-focused. You spot risk, test assumptions and improve decisions.",
+    motivators: "Understanding, accuracy, depth, evidence and solving the right problem.",
+    watchOuts: "Over-analysis, delaying action until certainty, focusing too heavily on risk or withdrawing into detail.",
+  },
+};
+
+const PROFILE_FALLBACKS: Record<string, string> = {
+  P1: "Trailblazer",
+  P2: "Spark",
+  P3: "Uplifter",
+  P4: "Bridgebuilder",
+  P5: "Steadyhand",
+  P6: "Organiser",
+  P7: "Analyst",
+  P8: "Refiner",
+};
+
+const PROFILE_COPY: Record<string, string> = {
+  P1: "Initiates movement, challenges the status quo and spots the future early.",
+  P2: "Activates energy, rallies people and brings enthusiasm to new beginnings.",
+  P3: "Builds morale, supports people and strengthens culture and connection.",
+  P4: "Connects people and plans, translating strategy into coordinated action.",
+  P5: "Holds structure, creates reliability and keeps momentum steady over time.",
+  P6: "Designs systems, improves process and makes delivery more efficient.",
+  P7: "Clarifies truth, spots risk and increases the quality of decisions.",
+  P8: "Improves ideas, sharpens strategy and turns insight into better direction.",
+};
+
+const PROFILE_TAGLINES: Record<string, string> = {
+  P1: "Moves first",
+  P2: "Creates momentum",
+  P3: "Raises people",
+  P4: "Connects systems",
+  P5: "Stabilises delivery",
+  P6: "Builds structure",
+  P7: "Protects quality",
+  P8: "Improves systems",
+};
+
+const PROFILE_OVERVIEW_COPY: Record<string, string> = {
+  P1: "Big ideas, future focus, bold direction.",
+  P2: "Turns ideas into motion and activates people fast.",
+  P3: "Builds trust, lifts morale and strengthens culture.",
+  P4: "Aligns people, plans and priorities.",
+  P5: "Keeps day-to-day execution steady and dependable.",
+  P6: "Creates the plans and processes that keep work organised.",
+  P7: "Safeguards standards, accuracy and risk control.",
+  P8: "Refines what exists so it works better and faster.",
+};
+
+const PROFILE_COMBINATIONS: Record<string, string> = {
+  P1: "Launch dominant",
+  P2: "Launch + Energise",
+  P3: "Energise dominant",
+  P4: "Energise + Align",
+  P5: "Align dominant",
+  P6: "Align + Discern",
+  P7: "Discern dominant",
+  P8: "Discern + Launch",
+};
+
+const PROFILE_DETAIL_COPY: Record<string, { traits: string; motivators: string; watchOuts: string }> = {
+  P1: {
+    traits: "Initiates movement, challenges the status quo and spots the future early.",
+    motivators: "New possibility, momentum and the chance to push toward what is next.",
+    watchOuts: "May move on before the present is settled or underweight what stability requires.",
+  },
+  P2: {
+    traits: "Activates energy, rallies people and turns ideas into momentum with optimism and speed.",
+    motivators: "New beginnings, shared excitement, participation and visible movement.",
+    watchOuts: "Can overpromise, lose focus or move on when the initial energy drops.",
+  },
+  P3: {
+    traits: "Calming presence, restorative empathy, builds psychological safety and trust within teams.",
+    motivators: "Helping people feel supported, seen and energised - connection that makes teams feel like teams.",
+    watchOuts: "Absorbing others' emotions, avoiding conflict or struggling to say no when this style is over-used.",
+  },
+  P4: {
+    traits: "Connects people and plans, translating strategy into coordination across a team.",
+    motivators: "Seeing relationships and execution work together - clarity that keeps everyone moving as one.",
+    watchOuts: "Can over-mediate or blur ownership while trying to keep everyone aligned and included.",
+  },
+  P5: {
+    traits: "Holds structure, creates reliability and keeps momentum steady over time.",
+    motivators: "Stability, dependable delivery, clear expectations and protecting the team's rhythm.",
+    watchOuts: "May resist disruption, carry too much responsibility or avoid necessary change.",
+  },
+  P6: {
+    traits: "Designs systems, improves process and makes delivery more efficient.",
+    motivators: "Order, efficiency, clear process and measurable improvement.",
+    watchOuts: "Can over-engineer, become rigid or prioritise process over people and adaptation.",
+  },
+  P7: {
+    traits: "Clarifies truth, spots risk and increases the quality of decisions.",
+    motivators: "Accuracy, evidence, quality and well-reasoned decisions.",
+    watchOuts: "Can over-analyse, delay action or under-communicate conclusions while seeking certainty.",
+  },
+  P8: {
+    traits: "Improves ideas, sharpens strategy and turns insight into better direction.",
+    motivators: "Better answers, refinement, strategic clarity and stronger systems.",
+    watchOuts: "Perfectionism, reworking for too long or withholding ideas until they feel fully polished.",
+  },
+};
+
+const PROFILE_GUIDANCE: Record<string, string> = {
+  P1: "Lead with courage, create a pause before action, and build the alignment that lets momentum last.",
+  P2: "Lead with energy, add focus and follow-through, and turn enthusiasm into sustained progress.",
+  P3: "Lead with connection, protect your boundaries, and build the structure that lets your empathy last.",
+  P4: "Lead with connection, make ownership explicit, and protect momentum with clear decisions.",
+  P5: "Lead with steadiness, surface concerns earlier, and make space for necessary change.",
+  P6: "Lead with structure, keep people visible in the process, and leave room for adaptation.",
+  P7: "Lead with insight, share conclusions sooner, and balance rigour with timely action.",
+  P8: "Lead with refinement, define what is good enough, and let progress test the idea.",
+};
+
+function safeText(value: any): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(String).join(" ");
+  if (value == null) return "";
+  return String(value);
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+function pct(value: number | undefined) {
+  const normalised = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return `${Math.round(clamp01(normalised) * 100)}%`;
+}
+
+function fullName(first?: string | null, last?: string | null) {
+  const name = `${String(first || "").trim()} ${String(last || "").trim()}`.trim();
+  return name || "Participant";
+}
+
+function cleanProfileName(value: string) {
+  return String(value || "")
+    .replace(/^PROFILE_\d+\s*:\s*/i, "")
+    .replace(/^P\d+\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function approachLabel(name: string, code: AB) {
+  const cleanName = String(name || "")
+    .replace(new RegExp(`(?:\\s*\\(${code}\\))+$`, "i"), "")
+    .trim() || APPROACH_FALLBACKS[code];
+  return `${cleanName} (${code})`;
+}
+
+function shortProfileCode(value: any) {
+  const code = String(value || "").trim().toUpperCase();
+  const match = code.match(/^(?:PROFILE[_\s-]?|P)?([1-8])$/i);
+  return match ? `P${match[1]}` : code;
+}
+
+function longProfileCode(value: any) {
+  const short = shortProfileCode(value);
+  const match = short.match(/^P([1-8])$/);
+  return match ? `PROFILE_${match[1]}` : short;
+}
+
+function getProfileValue(values: Record<string, number> | undefined, code: string) {
+  if (!values) return 0;
+  const short = shortProfileCode(code);
+  const long = longProfileCode(code);
+  const value = values[short] ?? values[long] ?? values[code] ?? 0;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function normaliseId(value: string) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function sectionDomId(section: ReportSection, index: number) {
+  const fromId = normaliseId(safeText(section.id));
+  if (fromId) return `lead-${fromId}`;
+  const fromTitle = normaliseId(safeText(section.title));
+  return fromTitle ? `lead-${fromTitle}` : `lead-section-${index + 1}`;
+}
+
+function getSectionsArray(value: any): ReportSection[] {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (Array.isArray(value?.sections)) return value.sections.filter(Boolean);
+  return [];
+}
+
+function getProfilePayload(root: any, profileCode: string) {
+  const profiles = root?.profiles;
+  if (!profiles || typeof profiles !== "object") return null;
+
+  const short = shortProfileCode(profileCode);
+  const long = longProfileCode(profileCode);
+  return profiles[long] || profiles[short] || profiles[profileCode] || null;
+}
+
+function isClosingSection(section: ReportSection) {
+  const haystack = `${safeText(section.id)} ${safeText(section.title)}`.toLowerCase();
+  return (
+    haystack.includes("closing") ||
+    haystack.includes("conclusion") ||
+    haystack.includes("next step") ||
+    haystack.includes("next_step") ||
+    haystack.includes("methodology")
+  );
+}
+
+function resolveSections(data: LeadSystemResultData): ReportSection[] {
+  const source = data.sections || data.framework_content_blocks;
+  const roots = [source?.framework, source?.reportFramework, source].filter(Boolean);
+
+  for (const root of roots) {
+    const common = getSectionsArray(root?.common);
+    const directProfile = getSectionsArray(root?.profile);
+    const selectedProfile = getSectionsArray(getProfilePayload(root, data.top_profile_code));
+
+    const intro = common.filter((section) => !isClosingSection(section));
+    const closing = common.filter(isClosingSection);
+    const merged = [...intro, ...directProfile, ...selectedProfile, ...closing].filter(Boolean);
+    if (merged.length) return merged;
+  }
+
+  return [];
+}
+
+function fallbackSectionTitle(section: ReportSection, topProfileName: string) {
+  const id = safeText(section.id).toLowerCase();
+  if (id.includes("welcome")) return "Welcome from Daniel Acutt";
+  if (id.includes("how_to_use")) return "How to Use This Report";
+  if (id.includes("lead_introduction") || id.includes("framework")) {
+    return "What the MindCanvas LEAD System Measures";
+  }
+  if (id.includes("identity")) return `The Essence of the ${topProfileName}`;
+  if (id.includes("next_step")) return "Your Next Steps";
+  if (id.includes("reflection")) return "Your Reflection Questions";
+
+  const stripped = id.replace(/^global\./, "").replace(/^profile\./, "").replaceAll("_", " ");
+  if (stripped) return stripped.replace(/\b\w/g, (char) => char.toUpperCase());
+  return "Your LEAD Report";
+}
+
+function getNextStepsUrl(data: LeadSystemResultData) {
+  const candidates = [
+    data.link?.redirect_url,
+    data.link?.next_steps_url,
+    data.link?.meta?.redirect_url,
+    data.link?.meta?.next_steps_url,
+  ];
+
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (!value) continue;
+    if (value.startsWith("/") && !value.startsWith("//")) return value;
+    try {
+      const url = new URL(value);
+      if (url.protocol === "http:" || url.protocol === "https:") return url.toString();
+    } catch {
+      // Invalid optional links are intentionally ignored.
+    }
+  }
+
+  return "";
+}
+
+function formatReportDate(value?: string | null) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function profileImage(code: string) {
+  const short = shortProfileCode(code);
+  const filenames: Record<string, string> = {
+    P1: "p1-trailblazer.png",
+    P2: "p2-spark.png",
+    P3: "p3-uplifter.png",
+    P4: "p4-bridgebuilder.png",
+    P5: "p5-steadyhand.png",
+    P6: "p6-organiser.png",
+    P7: "p7-analyst.png",
+    P8: "p8-refiner.png",
+  };
+  return filenames[short] ? `/mps/profile-icons/${filenames[short]}` : "";
+}
+
+function approachImage(code: AB) {
+  return `/mps/four-lead-approaches/${APPROACH_FALLBACKS[code].toLowerCase()}.png`;
+}
+
+function resolveImageSrc(rawValue: any, data: LeadSystemResultData, ranked: RankedProfile[]) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("/") || raw.startsWith("https://") || raw.startsWith("http://")) return raw;
+
+  const tokenMap: Record<string, string> = {
+    "{{FREQUENCY_GRID}}": "/images/mindCanvas-LEAD-system/frequency-grid.png",
+    "{{PROFILE_GRID}}": "/images/mindCanvas-LEAD-system/profile-grid.png",
+    "{{BIO_IMAGE}}": "/images/mindCanvas-LEAD-system/bio-image.png",
+    "{{DANIEL_IMAGE}}": "/images/mindCanvas-LEAD-system/bio-image.png",
+    "{{ORG_LOGO}}": String(data.org_logo_url || "").trim() || "/images/mindCanvas-LEAD-system/logo.png",
+    "{{PROFILE_IMAGE_PRIMARY}}": profileImage(ranked[0]?.code || data.top_profile_code),
+    "{{PROFILE_IMAGE_SECONDARY}}": profileImage(ranked[1]?.code || ""),
+    "{{PROFILE_IMAGE_TERTIARY}}": profileImage(ranked[2]?.code || ""),
+  };
+
+  if (tokenMap[raw]) return tokenMap[raw];
+  if (!raw.includes("/") && raw.toLowerCase().endsWith(".png")) {
+    return `/images/mindCanvas-LEAD-system/profile-cards/${raw}`;
+  }
+  return raw;
+}
+
+function extractSectionItems(section: ReportSection | undefined, limit = 3) {
+  if (!section) return [];
+  const output: string[] = [];
+
+  for (const block of section.blocks || []) {
+    if (Array.isArray(block.items)) {
+      for (const item of block.items) {
+        const value = typeof item === "string" ? item : safeText(item?.text || item?.title);
+        if (value.trim()) output.push(value.trim());
+      }
+    }
+    if (Array.isArray(block.bullets)) {
+      output.push(...block.bullets.map(safeText).map((item) => item.trim()).filter(Boolean));
+    }
+    if (["h1", "h2", "h3", "h4"].includes(String(block.type || "").toLowerCase()) && block.text) {
+      output.push(safeText(block.text).trim());
+    }
+    if (block.type === "p" && block.text) output.push(safeText(block.text).trim());
+    if (output.length >= limit) break;
+  }
+
+  return output.slice(0, limit);
+}
+
+function findSection(sections: ReportSection[], terms: string[]) {
+  return sections.find((section) => {
+    const haystack = `${safeText(section.id)} ${safeText(section.title)}`.toLowerCase();
+    return terms.some((term) => haystack.includes(term));
+  });
+}
+
+function splitIdentitySection(section: ReportSection | undefined, topProfileName: string) {
+  if (!section) return { identity: undefined, worldview: undefined };
+  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  const markerIndex = blocks.findIndex((block) => {
+    const text = `${safeText(block.title)} ${safeText(block.text)}`.toLowerCase();
+    return text.includes("how you see the world") || text.includes("sees the world") || text.includes("see the world");
+  });
+
+  if (markerIndex < 0) return { identity: section, worldview: undefined };
+
+  return {
+    identity: { ...section, blocks: blocks.slice(0, markerIndex) },
+    worldview: {
+      id: "profile.sees_world",
+      title: `How the ${topProfileName} sees the world`,
+      blocks: blocks.slice(markerIndex + 1),
+    },
+  };
+}
+
+function buildDesignerSections(source: ReportSection[], topProfileName: string) {
+  const welcome = findSection(source, ["welcome"]);
+  const howToUse = findSection(source, ["how_to_use", "how to use"]);
+  const leadIntroduction: ReportSection = {
+    id: "global.lead_introduction",
+    title: "What the LEAD System measures",
+    blocks: [],
+  };
+  const eightStyles = findSection(source, ["eight operating styles"]);
+  const identitySource = findSection(source, ["profile.identity", "essence"]);
+  const separateWorldview = findSection(source, ["sees_world", "sees the world", "worldview"]);
+  const strengths = findSection(source, ["profile.strengths", "strengths of the", "your strengths"]);
+  const overuse = findSection(source, ["development_areas", "development areas", "overuse", "blindspot"]);
+  const reflection = findSection(source, ["reflection"]);
+  const closing = findSection(source, ["closing", "conclusion"]);
+  const nextSteps = findSection(source, ["cta_next_steps", "next_step", "next steps", "next-step"]);
+  const splitIdentity = splitIdentitySection(identitySource, topProfileName);
+
+  return [
+    welcome,
+    howToUse,
+    leadIntroduction,
+    eightStyles || { id: "global.eight_operating_styles", title: "The Eight Operating Styles at a Glance", blocks: [] },
+    { id: "global.frequency_summary", title: "Four LEAD Approaches summary", blocks: [] },
+    { id: "global.personality_map", title: "Personality Map", blocks: [] },
+    { id: "global.profile_mix", title: "Profile mix", blocks: [] },
+    splitIdentity.identity,
+    separateWorldview || splitIdentity.worldview,
+    strengths,
+    overuse,
+    reflection,
+    closing,
+    nextSteps,
+  ].filter(Boolean) as ReportSection[];
+}
+
+function extractTitledCardContent(blocks: ReportBlock[]) {
+  const intro: string[] = [];
+  const cards: Array<{ title: string; text: string; bullets: string[] }> = [];
+  const quotes: Array<{ text: string; cite: string }> = [];
+  let current: { title: string; text: string; bullets: string[] } | null = null;
+
+  function finishCurrent() {
+    if (current?.title) cards.push({ ...current, text: current.text.trim() });
+    current = null;
+  }
+
+  for (const block of blocks) {
+    const type = String(block?.type || "").toLowerCase().trim();
+    const text = safeText(block.text).trim();
+
+    if (["h1", "h2", "h3", "h4"].includes(type)) {
+      finishCurrent();
+      current = { title: text, text: "", bullets: [] };
+      continue;
+    }
+
+    if (type === "p" && text) {
+      if (current) current.text = `${current.text}${current.text ? "\n" : ""}${text}`;
+      else intro.push(text);
+      continue;
+    }
+
+    if (type === "quote" && text) {
+      finishCurrent();
+      quotes.push({ text, cite: safeText(block.cite).trim() });
+      continue;
+    }
+
+    if (type === "cards" || type === "scorecard_row") {
+      finishCurrent();
+      for (const item of Array.isArray(block.items) ? block.items : []) {
+        if (typeof item === "string") {
+          cards.push({ title: item, text: "", bullets: [] });
+          continue;
+        }
+        cards.push({
+          title: safeText(item?.title || item?.label).trim(),
+          text: safeText(item?.text || item?.value || item?.description).trim(),
+          bullets: (Array.isArray(item?.bullets) ? item.bullets : Array.isArray(item?.items) ? item.items : [])
+            .map((value: any) => safeText(value?.text || value).trim())
+            .filter(Boolean),
+        });
+      }
+      continue;
+    }
+
+    if ((type === "ul" || type === "ol") && current) {
+      current.bullets.push(...(Array.isArray(block.items) ? block.items : []).map(safeText).map((item) => item.trim()).filter(Boolean));
+      continue;
+    }
+
+    if (type === "callout") {
+      finishCurrent();
+      cards.push({
+        title: safeText(block.title).trim(),
+        text,
+        bullets: (Array.isArray(block.bullets) ? block.bullets : []).map(safeText).map((item) => item.trim()).filter(Boolean),
+      });
+    }
+  }
+
+  finishCurrent();
+  return { intro, cards: cards.filter((card) => card.title || card.text || card.bullets.length), quotes };
+}
+
+function howToUseIcon(title: string) {
+  const normalised = title.toLowerCase();
+  if (normalised.includes("self-awareness")) return "/mps/how-to-use-this-report/self-awareness-tool.png";
+  if (normalised.includes("leadership development")) return "/mps/how-to-use-this-report/leadership-development-guide.png";
+  if (normalised.includes("conversation starter")) return "/mps/how-to-use-this-report/conversation-starter.png";
+  if (normalised.includes("decision") || normalised.includes("role sanity")) return "/mps/how-to-use-this-report/decision-role-sanity-check.png";
+  return "/mps/report-icons/how-to-use.png";
+}
+
+function extractHowToUseContent(blocks: ReportBlock[]) {
+  const intro: string[] = [];
+  const cards: Array<{ title: string; text: string }> = [];
+  let current: { title: string; text: string } | null = null;
+
+  function finishCurrent() {
+    if (current?.title) cards.push({ title: current.title, text: current.text.trim() });
+    current = null;
+  }
+
+  for (const block of blocks) {
+    const type = String(block?.type || "").toLowerCase().trim();
+    const text = safeText(block.text).trim();
+
+    if (["h1", "h2", "h3", "h4"].includes(type)) {
+      finishCurrent();
+      current = { title: text, text: "" };
+      continue;
+    }
+
+    if (type === "p" && text) {
+      if (current) current.text = `${current.text}${current.text ? " " : ""}${text}`;
+      else intro.push(text);
+      continue;
+    }
+
+    if (type === "callout") {
+      finishCurrent();
+      const calloutTitle = safeText(block.title).trim();
+      const calloutText = [safeText(block.text), ...(block.bullets || []).map(safeText)].filter(Boolean).join(" ").trim();
+      if (calloutTitle) cards.push({ title: calloutTitle, text: calloutText });
+    }
+  }
+
+  finishCurrent();
+  return { intro: intro.join(" "), cards: cards.filter((card) => card.title && card.text).slice(0, 4) };
+}
+
+function FrequencyChart({
+  labels,
+  values,
+  dominant,
+}: {
+  labels: Array<{ code: AB; name: string }>;
+  values: Record<AB, number>;
+  dominant: AB;
+}) {
+  const ordered = (["A", "B", "C", "D"] as AB[]).map((code) => ({
+    code,
+    name: labels.find((item) => item.code === code)?.name || APPROACH_FALLBACKS[code],
+    value: clamp01(values?.[code] ?? 0),
+  }));
+
+  return (
+    <div className="chart-card rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6">
+      <div className="grid h-[270px] grid-cols-4 items-end gap-3 border-b border-slate-200 sm:gap-5">
+        {ordered.map((item) => {
+          const height = Math.max(item.value * 100, item.value > 0 ? 3 : 0);
+          const colours = APPROACH_COLOURS[item.code];
+          return (
+            <div key={item.code} className="flex h-full min-w-0 flex-col items-center justify-end">
+              <span className="mb-2 text-sm font-bold text-[#0b2545]">{pct(item.value)}</span>
+              <div className="relative flex h-[205px] w-full max-w-[58px] items-end overflow-hidden rounded-t-xl bg-slate-100">
+                <div
+                  className="w-full rounded-t-xl transition-[height] duration-500"
+                  style={{ height: `${height}%`, backgroundColor: colours.solid }}
+                />
+              </div>
+              <span
+                className="-mb-3 mt-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white ring-4 ring-white"
+                style={{ backgroundColor: colours.solid }}
+              >
+                {item.code}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {ordered.map((item) => (
+          <div key={item.code} className="min-w-0 text-center">
+            <div className={`text-xs font-bold ${item.code === dominant ? "text-[#b18414]" : "text-[#0b2545]"}`}>
+              {item.name}
+            </div>
+            {item.code === dominant ? <div className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-[#b18414]">Dominant</div> : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="sr-only">
+        {ordered.map((item) => `${item.name} (${item.code}): ${pct(item.value)}`).join("; ")}
+      </div>
+    </div>
+  );
+}
+
+function ProfileRadar({ ranked, values, embedded = false }: { ranked: RankedProfile[]; values: Record<string, number>; embedded?: boolean }) {
+  const labels = Array.from({ length: 8 }, (_, index) => `P${index + 1}`);
+  const size = 390;
+  const centre = size / 2;
+  const radius = 142;
+  const maxValue = Math.max(0.5, ...labels.map((code) => getProfileValue(values, code)));
+
+  function point(index: number, value: number) {
+    const angle = (Math.PI * 2 * index) / labels.length - Math.PI / 2;
+    const scaled = clamp01(value / maxValue);
+    return {
+      x: centre + Math.cos(angle) * radius * scaled,
+      y: centre + Math.sin(angle) * radius * scaled,
+    };
+  }
+
+  const polygon = labels
+    .map((code, index) => point(index, getProfileValue(values, code)))
+    .map((item) => `${item.x},${item.y}`)
+    .join(" ");
+
+  return (
+    <div className={embedded ? "chart-card bg-white p-0" : "chart-card rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6"}>
+      <div className="mx-auto max-w-[430px]">
+        <svg viewBox={`0 0 ${size} ${size}`} className="h-auto w-full" role="img" aria-label="Eight-profile personality map">
+          {[0.2, 0.4, 0.6, 0.8, 1].map((ring) => (
+            <polygon
+              key={ring}
+              points={labels
+                .map((_, index) => {
+                  const p = point(index, maxValue * ring);
+                  return `${p.x},${p.y}`;
+                })
+                .join(" ")}
+              fill="none"
+              stroke="rgba(11,37,69,0.13)"
+            />
+          ))}
+
+          {labels.map((code, index) => {
+            const outer = point(index, maxValue);
+            return <line key={code} x1={centre} y1={centre} x2={outer.x} y2={outer.y} stroke="rgba(11,37,69,0.13)" />;
+          })}
+
+          <polygon points={polygon} fill="rgba(215,169,40,0.2)" stroke="#d7a928" strokeWidth="3" />
+
+          {labels.map((code, index) => {
+            const value = getProfileValue(values, code);
+            const p = point(index, value);
+            return <circle key={code} cx={p.x} cy={p.y} r="4.5" fill="#0b2545" stroke="white" strokeWidth="2" />;
+          })}
+
+          {labels.map((code, index) => {
+            const angle = (Math.PI * 2 * index) / labels.length - Math.PI / 2;
+            const labelRadius = radius + 30;
+            const x = centre + Math.cos(angle) * labelRadius;
+            const y = centre + Math.sin(angle) * labelRadius;
+            const profile = ranked.find((item) => shortProfileCode(item.code) === code);
+            return (
+              <g key={`label-${code}`}>
+                <text x={x} y={y - 5} textAnchor="middle" fontSize="12" fontWeight="700" fill="#0b2545">
+                  {code}
+                </text>
+                <text x={x} y={y + 10} textAnchor="middle" fontSize="10" fill="#667085">
+                  {pct(profile?.pct ?? 0)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div className="sr-only">
+        {ranked.map((profile) => `${profile.name} (${shortProfileCode(profile.code)}): ${pct(profile.pct)}`).join("; ")}
+      </div>
+    </div>
+  );
+}
+
+function BlockRenderer({
+  block,
+  data,
+  ranked,
+  nextStepsUrl,
+}: {
+  block: ReportBlock;
+  data: LeadSystemResultData;
+  ranked: RankedProfile[];
+  nextStepsUrl: string;
+}) {
+  const type = String(block?.type || "").toLowerCase().trim();
+
+  if (type === "divider") return <hr className="my-7 border-slate-200" />;
+  if (type === "spacer") return <div className={block.size === "lg" ? "h-10" : block.size === "sm" ? "h-3" : "h-6"} />;
+
+  if (type === "h1") return <h3 className="pt-2 text-2xl font-bold tracking-tight text-[#0b2545]">{safeText(block.text)}</h3>;
+  if (type === "h2") return <h3 className="pt-2 text-xl font-bold tracking-tight text-[#0b2545]">{safeText(block.text)}</h3>;
+  if (type === "h3") return <h4 className="pt-2 text-base font-bold text-[#0b2545]">{safeText(block.text)}</h4>;
+  if (type === "h4") return <h5 className="pt-2 text-xs font-bold uppercase tracking-[0.16em] text-[#9a7410]">{safeText(block.text)}</h5>;
+  if (type === "p") return <p className="whitespace-pre-line text-[15px] leading-7 text-slate-700">{safeText(block.text)}</p>;
+
+  if (type === "ul" || type === "ol") {
+    const Tag = type === "ol" ? "ol" : "ul";
+    const items = Array.isArray(block.items) ? block.items : [];
+    return (
+      <Tag className={`${type === "ol" ? "list-decimal" : "list-disc"} space-y-2 pl-6 text-[15px] leading-7 text-slate-700`}>
+        {items.map((item, index) => <li key={index}>{safeText(item)}</li>)}
+      </Tag>
+    );
+  }
+
+  if (type === "quote") {
+    return (
+      <blockquote className="rounded-r-2xl border-l-4 border-[#d7a928] bg-[#fff9e9] px-5 py-4">
+        <p className="text-[15px] italic leading-7 text-[#0b2545]">“{safeText(block.text)}”</p>
+        {block.cite ? <footer className="mt-2 text-xs font-semibold text-slate-500">— {safeText(block.cite)}</footer> : null}
+      </blockquote>
+    );
+  }
+
+  if (type === "image") {
+    const src = resolveImageSrc(block.src, data, ranked);
+    if (!src) return null;
+    const justify = block.align === "left" ? "justify-start" : block.align === "right" ? "justify-end" : "justify-center";
+    return (
+      <figure className="my-6">
+        <div className={`flex ${justify}`}>
+          <img
+            src={src}
+            alt={safeText(block.alt)}
+            className={`${block.rounded === false ? "rounded-lg" : "rounded-2xl"} h-auto max-w-full border border-slate-200 bg-white object-contain`}
+            style={{ maxHeight: typeof block.max_h === "number" ? block.max_h : 420 }}
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
+        {block.caption ? <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText(block.caption)}</figcaption> : null}
+      </figure>
+    );
+  }
+
+  if (type === "callout") {
+    const toneClass =
+      block.tone === "warning"
+        ? "border-amber-200 bg-amber-50"
+        : block.tone === "success"
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-[#d7a928]/30 bg-[#fff9e9]";
+    return (
+      <div className={`rounded-2xl border p-5 ${toneClass}`}>
+        {block.title ? <h4 className="font-bold text-[#0b2545]">{safeText(block.title)}</h4> : null}
+        {block.text ? <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{safeText(block.text)}</p> : null}
+        {Array.isArray(block.bullets) && block.bullets.length ? (
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
+            {block.bullets.map((item, index) => <li key={index}>{safeText(item)}</li>)}
+          </ul>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (type === "chips") {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {(Array.isArray(block.items) ? block.items : []).map((item, index) => (
+          <span key={index} className="rounded-full border border-[#d7a928]/35 bg-[#fff9e9] px-3 py-1.5 text-xs font-bold text-[#76580b]">
+            {safeText(item)}
+          </span>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "cards" || type === "scorecard_row") {
+    const items = Array.isArray(block.items) ? block.items : [];
+    const columns = type === "scorecard_row" ? 3 : Number(block.columns || 2);
+    const grid = columns === 3 ? "md:grid-cols-3" : columns === 1 ? "md:grid-cols-1" : "md:grid-cols-2";
+    return (
+      <div className={`grid gap-3 ${grid}`}>
+        {items.map((item: any, index) => (
+          <div key={index} className="report-card rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#9a7410]">
+              {safeText(item?.title || item?.label)}
+            </div>
+            <div className={`${item?.value ? "mt-2 text-lg font-bold text-[#0b2545]" : "mt-2 text-sm leading-6 text-slate-700"}`}>
+              {safeText(item?.value || item?.text)}
+            </div>
+            {item?.hint ? <div className="mt-1 text-xs text-slate-500">{safeText(item.hint)}</div> : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "chart.frequency_bars") {
+    return <FrequencyChart labels={data.frequency_labels} values={data.frequency_percentages} dominant={data.top_freq} />;
+  }
+  if (type === "chart.profile_radar" || type === "chart.profile_bars") {
+    return <ProfileRadar ranked={ranked} values={data.profile_percentages} />;
+  }
+
+  if (type === "images.pair") {
+    const pair = [block.left, block.right].filter(Boolean);
+    return (
+      <div className="grid gap-4 md:grid-cols-2">
+        {pair.map((item, index) => {
+          const src = resolveImageSrc(item?.src, data, ranked);
+          if (!src) return null;
+          return (
+            <figure key={index} className="report-card rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <img
+                src={src}
+                alt={safeText(item?.alt)}
+                className="mx-auto h-auto max-w-full rounded-xl object-contain"
+                style={{ maxHeight: typeof item?.max_h === "number" ? item.max_h : 320 }}
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                }}
+              />
+              {item?.caption ? <figcaption className="mt-2 text-center text-xs text-slate-500">{safeText(item.caption)}</figcaption> : null}
+            </figure>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (type === "cta") {
+    return (
+      <div className="report-card rounded-2xl bg-[#0b2545] p-5 text-white">
+        <h4 className="font-bold">{safeText(block.title || "Your Next Steps")}</h4>
+        {block.text ? <p className="mt-2 text-sm leading-6 text-white/75">{safeText(block.text)}</p> : null}
+        {nextStepsUrl ? (
+          <a href={nextStepsUrl} target="_blank" rel="noreferrer" className="no-print mt-4 inline-flex rounded-full bg-[#d7a928] px-5 py-2.5 text-sm font-bold text-[#0b2545] hover:bg-[#e4bd4d] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#0b2545]">
+            {safeText(block.button_text || "Next Step")}
+          </a>
+        ) : null}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function SectionCard({
+  section,
+  index,
+  data,
+  ranked,
+  nextStepsUrl,
+}: {
+  section: ReportSection;
+  index: number;
+  data: LeadSystemResultData;
+  ranked: RankedProfile[];
+  nextStepsUrl: string;
+}) {
+  const id = sectionDomId(section, index);
+  const title = safeText(section.title).trim() || fallbackSectionTitle(section, ranked[0]?.name || data.top_profile_name);
+  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  const sectionIdentity = `${safeText(section.id)} ${title}`.toLowerCase();
+
+  if (sectionIdentity.includes("welcome")) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/welcome-note.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#122c4d]">Welcome</p>
+            <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">A note from Daniel Acutt</h2>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-5 py-5 text-[#313c52] sm:px-7 sm:py-6">
+          <div className="space-y-4">
+            {blocks.map((block, blockIndex) => {
+              const type = String(block?.type || "").toLowerCase().trim();
+              if (type === "image" || type === "images.pair" || type === "divider" || type === "spacer") return null;
+
+              const originalText = safeText(block.text);
+              const normalisedText = originalText.trim().toLowerCase();
+              if (
+                normalisedText === "warm regards" ||
+                normalisedText === "warm regards," ||
+                normalisedText === "daniel acutt" ||
+                normalisedText.includes("founder of profiletest")
+              ) return null;
+              const welcomeText = originalText.replace(/\s*warm regards[\s\S]*$/i, "").trim();
+
+              if (type === "p") {
+                return welcomeText ? (
+                  <p key={blockIndex} className="whitespace-pre-line text-[13px] leading-[25px] text-[#313c52]">
+                    {welcomeText}
+                  </p>
+                ) : null;
+              }
+
+              if (type === "ul" || type === "ol") {
+                const Tag = type === "ol" ? "ol" : "ul";
+                return (
+                  <Tag key={blockIndex} className={`${type === "ol" ? "list-decimal" : "list-disc"} space-y-2 pl-6 text-[13px] leading-[25px] text-[#313c52]`}>
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => <li key={itemIndex}>{safeText(item)}</li>)}
+                  </Tag>
+                );
+              }
+
+              if (type.startsWith("h") && welcomeText) {
+                return <h3 key={blockIndex} className="text-[13px] font-bold leading-[25px] text-[#111828]">{welcomeText}</h3>;
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+
+          <div className="mt-6">
+            <img
+              src="/images/mindCanvas-LEAD-system/bio-image.png"
+              alt="Daniel Acutt"
+              className="h-[63px] w-[63px] rounded-full border border-slate-200 object-cover"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+            <div className="mt-3 text-[13px] leading-7">
+              <p>Warm regards</p>
+              <p className="font-bold text-[#111828]">Daniel Acutt</p>
+              <p className="text-[#111828]">Founder of ProfileTest.ai, Creator of MindCanvas</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("how_to_use") || sectionIdentity.includes("how to use")) {
+    const howToUse = extractHowToUseContent(blocks);
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-emerald-700/20 bg-white/65">
+            <img
+              src="/mps/report-icons/how-to-use.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#122c4d]">Before you dive in</p>
+            <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">How to Use This Report</h2>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]/95">
+            {howToUse.intro || "Think of this as a personal leadership manual, not something to skim once and forget. Return to it at different stages of your growth and you will see new layers each time."}
+          </p>
+
+          <div className="mt-7 grid gap-3 md:grid-cols-2">
+            {howToUse.cards.map((card) => (
+              <article key={card.title} className="rounded-[13px] bg-[linear-gradient(90deg,#7c94d7,#e8b15e)] p-px">
+                <div className="h-full min-h-[188px] rounded-[12px] bg-white px-4 py-4">
+                  <span className="flex h-[52px] w-[52px] items-center justify-center rounded-lg bg-[linear-gradient(90deg,#7c94d7,#e8b15e)]">
+                    <img
+                      src={howToUseIcon(card.title)}
+                      alt=""
+                      className="h-11 w-11 object-contain"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  </span>
+                  <h3 className="mt-2 text-[11px] font-bold uppercase leading-5 tracking-[0.03em] text-[#061938]">{card.title}</h3>
+                  <p className="mt-1 text-[12px] leading-[1.6] text-[#313c52]">{card.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("lead_introduction") ||
+    sectionIdentity.includes("what the leader system") ||
+    sectionIdentity.includes("what the lead system")
+  ) {
+    const primary = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const dominantCode = data.top_freq || "A";
+    const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+    const dominantLabel = approachLabel(dominantName, dominantCode);
+    const profileArticle = /^[aeiou]/i.test(primary.name) ? "an" : "a";
+    const leadApproaches: Array<{ code: AB; letter: string; colour: string; copy: string }> = [
+      { code: "A", letter: "L", colour: "#ef4444", copy: "Starts things, innovates, brings direction." },
+      { code: "B", letter: "E", colour: "#f59e0b", copy: "Communicates, motivates, builds belief." },
+      { code: "C", letter: "A", colour: "#10b981", copy: "Organises, sets priorities, keeps progress steady." },
+      { code: "D", letter: "D", colour: "#3b82f6", copy: "Evaluates, checks detail, prevents problems." },
+    ];
+
+    return (
+      <>
+      <section
+        id="lead-system-measures"
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/four-lead-approaches.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#122c4d]">Introducing the MindCanvas LEAD Model</p>
+            <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">What the LEAD System measures</h2>
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]/95">
+            MPS - the MindCanvas LEAD Profile System - connects two layers of leadership behaviour. Rather than reducing someone to a single label, it shows the underlying frequency that drives how they lead, and the operating style that frequency naturally produces. Read both together - not the headline profile alone - before using this in a coaching, recruitment or development conversation.
+          </p>
+
+          <div className="mt-6 border-l-[6px] border-[#7e94d4] bg-[linear-gradient(90deg,rgba(124,148,215,.30),rgba(232,177,94,.30))] px-5 py-4">
+            <h3 className="text-xs font-bold text-[#667fc4]">How to read what follows</h3>
+            <p className="mt-2 text-[13px] leading-5 text-[#313c52]/95">
+              Everything below - your scores, your profile mix, your placement on the map - is built from four underlying approaches. Before you look at any of your personal results, it helps to know what each approach actually measures. Think of these as four directions on a compass: you use all four, but you travel toward some more naturally than others.
+            </p>
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-[#f5f6fb] px-4 py-5 sm:px-7 sm:py-7">
+            <img
+              src="/mps/What the Leader System Measures/layer-1-layer-2.png"
+              alt="Two leadership layers: LEAD frequency and operating style"
+              className="mx-auto h-auto w-full max-w-[996px] object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              { number: "01", title: "Frequency", text: "Shows which of the four LEAD approaches - Launch, Energise, Align and Discern - a person naturally leads with most often." },
+              { number: "02", title: "Operating Style", text: "Combines the four frequencies into one of eight distinct leadership identity patterns - the clearest picture of how this person creates value." },
+            ].map((item) => (
+              <article key={item.number} className="rounded-[14px] bg-[#f2f4fa] px-5 py-5">
+                <span className="inline-flex h-[26px] min-w-[26px] items-center justify-center rounded-full bg-[#5a72b8] px-1.5 text-[10px] font-bold text-white">{item.number}</span>
+                <h3 className="mt-3 text-sm font-bold text-[#12203b]">{item.title}</h3>
+                <p className="mt-2 text-[12px] leading-[1.55] text-[#4b5875]">{item.text}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-base font-bold text-[#12203b]">What LEAD stands for</h3>
+            <p className="mt-2 text-[13px] leading-6 text-[#313c52]/95">
+              You use all four of these in different situations. However, as {profileArticle} {primary.name}, {dominantLabel} is your natural home - the approach you default to when you are being most yourself.
+            </p>
+
+            <div className="lead-print-measures-grid mt-5 grid items-center gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+              <img
+                src="/mps/What the Leader System Measures/the-four-behavioral-approaches.png"
+                alt="The four LEAD behavioural approaches"
+                className="mx-auto h-auto w-full max-w-[278px] object-contain"
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {leadApproaches.map((approach) => (
+                  <article key={approach.code} className="rounded-xl border border-[#e4e8f0] bg-[#f7f8fc] px-4 py-3.5">
+                    <span className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-sm text-white" style={{ backgroundColor: approach.colour }}>{approach.letter}</span>
+                    <h4 className="mt-2 text-[12px] font-bold text-[#12203b]">{APPROACH_FALLBACKS[approach.code]}</h4>
+                    <p className="mt-1 text-[11px] leading-4 text-[#4b5875]">{approach.copy}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-base font-bold text-[#12203b]">The 8 Operating Styles</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
+                const profile = ranked.find((item) => shortProfileCode(item.code) === profileCode);
+                return (
+                  <article key={profileCode} className="rounded-[14px] border border-[#e4e8f0] bg-[#f7f8fc] px-4 py-4">
+                    <img
+                      src={profileImage(profileCode)}
+                      alt=""
+                      className="h-[46px] w-[46px] object-contain"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                    <h4 className="mt-2 text-[13px] font-bold text-[#12203b]">{profile?.name || PROFILE_FALLBACKS[profileCode]}</h4>
+                    <p className="text-[10px] font-semibold text-[#8892a6]">{profileCode}</p>
+                    <p className="mt-2 text-[9px] font-bold uppercase tracking-[0.06em] text-[#5a72b8]">{PROFILE_TAGLINES[profileCode]}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-[#4b5875]">{PROFILE_OVERVIEW_COPY[profileCode]}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-[14px] bg-[#f2f4fa] px-5 py-4">
+            <h3 className="text-[13px] font-bold text-[#12203b]">Reading the % below</h3>
+            <p className="mt-2 text-[12px] leading-5 text-[#4b5875]">
+              The number next to the dominant style - in this report, {pct(primary.pct)} - shows how this person&apos;s answers are distributed across all eight styles, not a score out of 100. The highest share is the dominant style even at a modest percentage. A low percentage elsewhere means that style is used less often, not that it is absent.
+            </p>
+          </div>
+
+          <div className="mt-3 flex gap-3 rounded-xl border border-[#e4e8f0] bg-[#f7f8fc] px-4 py-4">
+            <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-[#8892a6] text-xs text-[#8892a6]" aria-hidden="true">i</span>
+            <p className="text-[12px] leading-5 text-[#4b5875]">
+              Frequency and Operating Style are read together: the frequency explains <em>why</em> a style shows up the way it does, and the style shows <em>what</em> that looks like in practice. Neither is complete on its own.
+            </p>
+          </div>
+
+          <p className="mt-4 text-[10px] leading-4 text-[#8892a6]">
+            Methodology: Results are derived from this person&apos;s responses to the MindCanvas LEAD diagnostic and reflect observable leadership patterns, not fixed personality traits. Use alongside role context and a structured conversation - never as a standalone hiring, promotion or development decision.
+          </p>
+        </div>
+      </section>
+
+      <section
+        id={id}
+        className="report-section mt-5 scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/four-lead-approaches.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#122c4d] sm:text-xl">The four LEAD approaches</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-6 text-[#313c52]/95">
+            How you naturally lead and operate. Before looking at any of your personal scores below, here is what each of the four underlying approaches actually measures - this framework gives you the vocabulary for everything that follows.
+          </p>
+
+          <img
+            src="/mps/What the Leader System Measures/the-four-behavioral-approaches.png"
+            alt="The four LEAD behavioural approaches"
+            className="mx-auto mt-6 h-auto w-full max-w-[390px] object-contain"
+            onError={(event) => { event.currentTarget.style.display = "none"; }}
+          />
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {([
+              {
+                code: "A" as AB,
+                border: "#6395ff",
+                background: "#edf5ff",
+                copy: "Launch is the energy of beginnings. It is future-focused, opportunity-driven and comfortable with uncertainty. People who lean into Launch naturally ask: What is next? What is possible? How could this be better?",
+              },
+              {
+                code: "B" as AB,
+                border: "#f09a68",
+                background: "#fff4ed",
+                copy: "Energise is the energy of people, emotion and motivation. It focuses on belonging, buy-in and momentum. People who lean into Energise ask: How are people experiencing this? Who needs encouragement? How do we build belief and commitment?",
+              },
+              {
+                code: "C" as AB,
+                border: "#54b995",
+                background: "#effbf7",
+                copy: "Align is the energy of structure, coordination and delivery. It turns intent into execution through clarity, process and rhythm. People who lean into Align ask: What are the steps? Who owns what? What does good look like? How do we keep this on track?",
+              },
+              {
+                code: "D" as AB,
+                border: "#6689e9",
+                background: "#f0f4ff",
+                copy: "Discern is the energy of depth, reflection and insight. It seeks understanding, risk awareness and quality thinking before action. People who lean into Discern ask: What are we missing? What is the root cause? What are the second-order effects? What needs to be true?",
+              },
+            ]).map((approach) => (
+              <article
+                key={approach.code}
+                className="flex min-h-[360px] flex-col rounded-lg border px-4 py-4"
+                style={{ borderColor: approach.border, backgroundColor: approach.background }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-[11px] font-bold uppercase text-[#12203b]">{APPROACH_FALLBACKS[approach.code]}</h3>
+                  <span className="text-[28px] font-semibold leading-none text-[#12203b]">{pct(data.frequency_percentages?.[approach.code])}</span>
+                </div>
+                <p className="mt-4 text-[11px] leading-[1.55] text-[#4b5875]">{approach.copy}</p>
+                <img
+                  src={approachImage(approach.code)}
+                  alt=""
+                  className="mx-auto mt-auto h-[130px] w-full max-w-[150px] object-contain pt-4"
+                  onError={(event) => { event.currentTarget.style.display = "none"; }}
+                />
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      </>
+    );
+  }
+
+  if (sectionIdentity.includes("eight operating styles")) {
+    const primaryCode = shortProfileCode(ranked[0]?.code || data.top_profile_code || "P1");
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] border border-white/10 bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-blue-500/20 bg-white/65">
+            <img
+              src="/mps/report-icons/eight-operating-styles.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#0e1726] sm:text-xl">The Eight Operating Styles at a Glance</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]/95">
+            The eight operating styles in the MindCanvas LEAD System are combinations of the four approaches above. Together they describe distinct ways of creating value.
+          </p>
+
+          <div className="mt-6 grid items-center gap-5 lg:grid-cols-2">
+            <img
+              src="/mps/eight-operating-styles-at-glance/eight-operating-styles.png"
+              alt="The eight MindCanvas LEAD operating styles"
+              className="mx-auto h-auto w-full max-w-[450px] object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+            <img
+              src="/mps/eight-operating-styles-at-glance/how-to-read.png"
+              alt="How to read the eight operating styles model"
+              className="mx-auto h-auto w-full max-w-[430px] object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </div>
+
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
+              const profile = ranked.find((item) => shortProfileCode(item.code) === profileCode);
+              const selected = profileCode === primaryCode;
+
+              return (
+                <article
+                  key={profileCode}
+                  className={`relative min-h-[276px] rounded-[14px] border px-4 py-5 ${selected ? "border-[#061a3a] bg-[#061a3a] text-white" : "border-[#7c94d7] bg-[#fbfbfb] text-[#313c52]"}`}
+                >
+                  {selected ? (
+                    <span className="absolute -top-3 right-3 rounded-full bg-[#e8b75f] px-3 py-1 text-[8px] font-bold uppercase tracking-[0.04em] text-[#1d2025]">
+                      Your top profile
+                    </span>
+                  ) : null}
+                  <img
+                    src={profileImage(profileCode)}
+                    alt=""
+                    className="h-[52px] w-[52px] object-contain"
+                    onError={(event) => { event.currentTarget.style.display = "none"; }}
+                  />
+                  <h3 className={`mt-3 text-base font-semibold leading-6 ${selected ? "text-[#7c94d7]" : "text-[#061a3a]"}`}>
+                    {profile?.name || PROFILE_FALLBACKS[profileCode]}
+                  </h3>
+                  <p className={`mt-2 text-[11px] font-semibold uppercase leading-5 ${selected ? "text-white" : "text-[#313c52]"}`}>
+                    {PROFILE_COMBINATIONS[profileCode]}
+                  </p>
+                  <p className={`mt-4 text-[12px] leading-[1.55] ${selected ? "text-white/85" : "text-[#313c52]"}`}>
+                    {PROFILE_COPY[profileCode]}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("frequency summary") ||
+    sectionIdentity.includes("frequency_summary") ||
+    sectionIdentity.includes("approaches summary")
+  ) {
+    const dominantCode = data.top_freq || "A";
+    const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+    const dominantLabel = approachLabel(dominantName, dominantCode);
+    const summaryCopy = FREQUENCY_SUMMARY_COPY[dominantCode];
+    const frequencies: Array<{ code: AB; colour: string }> = [
+      { code: "A", colour: "#ef4444" },
+      { code: "B", colour: "#f59e0b" },
+      { code: "C", colour: "#10b981" },
+      { code: "D", colour: "#3b82f6" },
+    ];
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/65">
+            <img
+              src="/mps/report-icons/four-lead-approaches-summary.png"
+              alt=""
+              className="h-10 w-10 rounded-lg object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Four LEAD Approaches summary</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-6 text-[#313c52]">
+            Your strongest overall driver is <strong className="text-[#d79b34]">{dominantLabel}</strong>, which shapes how you approach problems and make decisions. Higher percentages indicate where you naturally spend more energy; lower percentages highlight areas that may feel less comfortable or more draining.
+          </p>
+
+          <div className="lead-print-dominant-grid mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-[18px] bg-white px-4 py-4 shadow-[0_6px_32px_rgba(58,110,212,.12)]">
+              <div className="space-y-5">
+                {frequencies.map((frequency) => {
+                  const value = clamp01(data.frequency_percentages?.[frequency.code] ?? 0);
+                  return (
+                    <div key={frequency.code} className="grid grid-cols-[88px_minmax(0,1fr)_36px] items-center gap-3">
+                      <span className="text-[11px] text-[#3d4163]">{APPROACH_FALLBACKS[frequency.code]} ({frequency.code})</span>
+                      <div className="h-[5px] overflow-hidden rounded-full bg-[#a0a5c0]/20">
+                        <div className="h-full rounded-full" style={{ width: `${Math.max(value * 100, value > 0 ? 2 : 0)}%`, backgroundColor: frequency.colour }} />
+                      </div>
+                      <span className="text-right text-[10px] font-medium text-[#3d4163]">{pct(value)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-l-[7px] border-[#7e94d4] bg-[linear-gradient(90deg,rgba(124,148,215,.30),rgba(232,177,94,.30))] px-5 py-4">
+              <h3 className="text-sm font-semibold text-[#334155]">How to read these scores</h3>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-[11px] leading-[1.55] text-[#313c52]">
+                <li>Higher percentages highlight patterns you use frequently and with ease.</li>
+                <li>Lower percentages highlight backup styles you can use when needed, but they may cost more energy.</li>
+                <li>Anything above roughly 30% will usually feel very natural for you.</li>
+                <li>Your primary profile is your strongest pattern. Your secondary and tertiary profiles show helpful support patterns around your core style.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-7 overflow-hidden rounded-[18px] border border-[#7c94d7] shadow-[0_6px_32px_rgba(58,110,212,.12)] lg:grid lg:grid-cols-[230px_minmax(0,1fr)]">
+            <div className="flex min-h-[144px] flex-col items-center justify-center bg-[#e8b75f] px-5 text-center text-white">
+              <div className="text-[11px]">Your Dominant Frequency:</div>
+              <div className="mt-1 text-[28px] font-semibold leading-9">{dominantLabel}</div>
+            </div>
+            <div className="grid gap-5 bg-white px-5 py-6 sm:grid-cols-3">
+              <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Key traits:</strong> {summaryCopy.traits}</p>
+              <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Motivators:</strong> {summaryCopy.motivators}</p>
+              <p className="text-[11px] leading-[1.55] text-[#313c52]"><strong>Watch outs:</strong> {summaryCopy.watchOuts}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("personality map")) {
+    const strongestProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const supportProfiles = [...ranked]
+      .sort((left, right) => left.pct - right.pct || left.sourceIndex - right.sourceIndex)
+      .slice(0, 3)
+      .map((profile) => profile.name);
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/65">
+            <img
+              src="/mps/report-icons/personality-map.png"
+              alt=""
+              className="h-10 w-10 rounded-lg object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Personality Map</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]">
+            This visual map shows how your overall energy (Frequencies) and your more detailed style (Profiles) are distributed across the model. Higher values show patterns you use more often - points pulled toward the edge are strengths; points near the centre are areas that may need support or structure, not more effort alone.
+          </p>
+
+          <div className="lead-print-personality-grid mt-6 grid items-center gap-5 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
+            <div className="rounded-[14px] border border-[#e4e8f0] bg-white p-3">
+              <div className="flex items-center justify-between gap-3 px-2 pt-1">
+                <h3 className="text-[11px] font-bold text-[#12203b]">Your Personality Map (Profiles)</h3>
+                <span className="text-[9px] text-[#8892a6]">Higher = stronger pattern</span>
+              </div>
+              <div className="mt-1">
+                <ProfileRadar ranked={ranked} values={data.profile_percentages} embedded />
+              </div>
+            </div>
+
+            <div className="border-l-[7px] border-[#7e94d4] bg-[linear-gradient(90deg,rgba(124,148,215,.30),rgba(232,177,94,.30))] px-5 py-5">
+              <div className="space-y-5 text-[12px] leading-[1.65] text-[#313c52]">
+                <p><strong>Strength:</strong> the point pulled furthest out - {strongestProfile.name} - is the pattern you lean on most.</p>
+                <p><strong>Support or structure:</strong> points closer to the centre ({supportProfiles.join(", ")}) are patterns to borrow from others, not personal weaknesses.</p>
+                <p><strong>Layout:</strong> profiles are arranged in framework order, so neighbours share an approach and opposite points naturally counterbalance each other.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("profile mix")) {
+    const canonicalProfiles = Array.from({ length: 8 }, (_, profileIndex) => `P${profileIndex + 1}`).map((profileCode) => {
+      const profile = ranked.find((item) => shortProfileCode(item.code) === profileCode);
+      return profile || {
+        code: profileCode,
+        name: PROFILE_FALLBACKS[profileCode],
+        pct: getProfileValue(data.profile_percentages, profileCode),
+        sourceIndex: Number(profileCode.replace("P", "")) - 1,
+      };
+    });
+    const featuredProfiles = ranked.slice(0, 3);
+    const roles = ["Primary profile", "Secondary profile", "Tertiary profile"];
+    const borderColours = ["#6baed6", "#91c3f5", "#c6e1fc"];
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/65">
+            <img
+              src="/mps/report-icons/profile-mix.png"
+              alt=""
+              className="h-10 w-10 rounded-lg object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Profile mix</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <p className="text-[13px] leading-7 text-[#313c52]">
+            Your profile mix shows how strongly you match each of the eight profiles. Higher percentages show patterns you use more often; lower ones are backup styles you can lean on when needed.
+          </p>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {[canonicalProfiles.slice(0, 4), canonicalProfiles.slice(4, 8)].map((group, groupIndex) => (
+              <div key={groupIndex} className="rounded-[18px] bg-white px-4 py-4 shadow-[0_6px_32px_rgba(58,110,212,.12)]">
+                <div className="space-y-5">
+                  {group.map((profile) => {
+                    const value = clamp01(profile.pct);
+                    return (
+                      <div key={profile.code} className="grid grid-cols-[108px_minmax(0,1fr)_36px] items-center gap-3">
+                        <span className="truncate text-[10px] text-[#3d4163]">{profile.name} ({shortProfileCode(profile.code)})</span>
+                        <div className="h-[5px] overflow-hidden rounded-full bg-[#a0a5c0]/20">
+                          <div className="h-full rounded-full bg-[linear-gradient(90deg,#7c94d7,#e8b15e)]" style={{ width: `${Math.max(value * 100, value > 0 ? 2 : 0)}%` }} />
+                        </div>
+                        <span className="text-right text-[10px] font-medium text-[#3d4163]">{pct(value)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {featuredProfiles.length >= 3 ? (
+            <p className="mt-5 text-[12px] leading-6 text-[#313c52]">
+              Overall, your strongest profile pattern is <strong>{featuredProfiles[0].name} ({shortProfileCode(featuredProfiles[0].code)})</strong>, supported by <strong>{featuredProfiles[1].name} ({shortProfileCode(featuredProfiles[1].code)})</strong> and <strong>{featuredProfiles[2].name} ({shortProfileCode(featuredProfiles[2].code)})</strong>.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          {featuredProfiles.map((profile, profileIndex) => {
+            const profileCode = shortProfileCode(profile.code);
+            const detail = PROFILE_DETAIL_COPY[profileCode];
+            return (
+              <article
+                key={profile.code}
+                className="min-h-[303px] rounded-[18px] border border-[#dfe6f2] border-t-4 bg-white px-5 py-4 shadow-[0_6px_24px_rgba(58,110,212,.08)]"
+                style={{ borderTopColor: borderColours[profileIndex] }}
+              >
+                <div className="text-[9px] uppercase leading-4 tracking-[0.1em] text-[#313c52]">{roles[profileIndex]}</div>
+                <div className="mt-3 flex items-start justify-between gap-4">
+                  <img
+                    src={profileImage(profileCode)}
+                    alt=""
+                    className="h-[54px] w-[54px] object-contain"
+                    onError={(event) => { event.currentTarget.style.display = "none"; }}
+                  />
+                  <span className="text-[36px] font-semibold leading-none text-[#022b61]">{pct(profile.pct)}</span>
+                </div>
+                <h3 className="mt-2 text-sm font-semibold text-[#111828]">{profile.name}</h3>
+                <div className="mt-3 space-y-2 text-[10px] leading-[1.5] text-[#313c52]">
+                  <p><strong>Key traits:</strong> {detail?.traits || PROFILE_COPY[profileCode]}</p>
+                  <p><strong>Motivators:</strong> {detail?.motivators || "Using this pattern in work that feels meaningful and effective."}</p>
+                  <p><strong>Watch outs:</strong> {detail?.watchOuts || "Notice when this strength is being over-used or needs support from another style."}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("sees the world") ||
+    sectionIdentity.includes("sees_world") ||
+    sectionIdentity.includes("sees-the-world") ||
+    sectionIdentity.includes("worldview")
+  ) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/sees-the-world.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">How the {topProfile.name} sees the world</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                return <h3 key={blockIndex} className="text-[12px] font-bold uppercase leading-5 tracking-[0.05em] text-[#071a39]">{safeText(block.text)}</h3>;
+              }
+
+              if (blockType === "ul" || blockType === "ol") {
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex min-h-[48px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[13px] leading-[21px] text-[#0e1726]">
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                        <span>{safeText(item)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "cards" || blockType === "scorecard_row") {
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex min-h-[48px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[13px] leading-[21px] text-[#0e1726]">
+                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                        <div>
+                          {item?.title || item?.label ? <strong className="block text-sm">{safeText(item?.title || item?.label)}</strong> : null}
+                          <span>{typeof item === "string" ? item : safeText(item?.text || item?.value)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7">
+                    “{safeText(block.text)}”{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3">
+                    {block.title ? <strong className="block text-sm text-[#0e1726]">{safeText(block.title)}</strong> : null}
+                    {block.text ? <p className="whitespace-pre-line">{safeText(block.text)}</p> : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("strength")) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const content = extractTitledCardContent(blocks);
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/strengths.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Strengths of the {topProfile.name} style</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {content.intro.map((paragraph, paragraphIndex) => <p key={`intro-${paragraphIndex}`} className="whitespace-pre-line">{paragraph}</p>)}
+            {content.cards.length ? (
+              <div className="grid gap-2 md:grid-cols-2">
+                {content.cards.map((card, cardIndex) => (
+                  <article
+                    key={`${card.title}-${cardIndex}`}
+                    className={`${content.cards.length % 2 === 1 && cardIndex === content.cards.length - 1 ? "md:col-span-2" : ""} flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[#0e1726]`}
+                  >
+                    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
+                    <div>
+                      {card.title ? <h3 className="text-[15px] font-semibold leading-[22px]">{card.title}</h3> : null}
+                      {card.text ? <p className="whitespace-pre-line text-[13px] leading-[21px]">{card.text}</p> : null}
+                      {card.bullets.length ? <ul className="mt-2 list-disc pl-5 text-[13px] leading-[21px]">{card.bullets.map((bullet, bulletIndex) => <li key={bulletIndex}>{bullet}</li>)}</ul> : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            {content.quotes.map((quote, quoteIndex) => (
+              <blockquote key={`quote-${quoteIndex}`} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                {quote.text}{quote.cite ? <span> — {quote.cite}</span> : null}
+              </blockquote>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("overuse") ||
+    sectionIdentity.includes("blindspot") ||
+    sectionIdentity.includes("development_areas") ||
+    sectionIdentity.includes("development areas")
+  ) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const content = extractTitledCardContent(blocks);
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/potential-overuse.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Potential overuse patterns and blindspots</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-6 text-[13px] leading-7 text-[#313c52]">
+            {content.intro.map((paragraph, paragraphIndex) => <p key={`intro-${paragraphIndex}`} className="whitespace-pre-line">{paragraph}</p>)}
+            <div className="grid gap-3 md:grid-cols-2">
+              <article className="min-h-[220px] rounded-[11px] border border-[#bc1823] bg-[#bc1823]/[0.09] px-4 py-4 text-[#0e1726]">
+                <div className="space-y-4">
+                  {content.cards.map((card, cardIndex) => (
+                    <div key={`${card.title}-${cardIndex}`} className="flex items-start gap-3">
+                      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#bc1823]" />
+                      <div>
+                        {card.title ? <h3 className="text-[15px] font-semibold leading-[22px]">{card.title}</h3> : null}
+                        {card.text ? <p className="mt-1 whitespace-pre-line text-[13px] leading-6">{card.text}</p> : null}
+                        {card.bullets.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] leading-6">{card.bullets.map((bullet, bulletIndex) => <li key={bulletIndex}>{bullet}</li>)}</ul> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+              <article className="min-h-[220px] rounded-[11px] border border-[#0fcd5e] bg-[#0fcd5e]/[0.09] px-4 py-4 text-[#0e1726]">
+                <div className="flex items-start gap-3">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#0fcd5e]" />
+                  <div>
+                    <h3 className="text-[16px] font-semibold leading-[22px]">Development focus</h3>
+                    <p className="mt-3 whitespace-pre-line text-[13px] leading-6">
+                      {PROFILE_GUIDANCE[shortProfileCode(topProfile.code)] || "Protect the strengths that fuel your leadership, notice overuse early, and borrow deliberately from complementary styles."}
+                    </p>
+                    <p className="mt-3 text-[13px] leading-6">Notice these patterns early, name the support you need, and protect the energy that makes your contribution sustainable.</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+            {content.quotes.map((quote, quoteIndex) => (
+              <blockquote key={`quote-${quoteIndex}`} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                {quote.text}{quote.cite ? <span> — {quote.cite}</span> : null}
+              </blockquote>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("reflection")) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/reflection-questions.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Reflection questions</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "ul" || blockType === "ol" || blockType === "cards" || blockType === "scorecard_row") {
+                const items = Array.isArray(block.items) ? block.items : [];
+                return (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {items.map((item, itemIndex) => (
+                      <div
+                        key={itemIndex}
+                        className={`${items.length % 2 === 1 && itemIndex === items.length - 1 ? "md:col-span-2" : ""} flex min-h-[54px] items-center gap-3 rounded-[11px] border border-[#7e95d5] bg-slate-100/[0.09] px-4 py-3 text-[14px] font-semibold leading-[22px] text-[#0e1726]`}
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7e95d5]" />
+                        <span>{typeof item === "string" ? item : safeText(item?.text || item?.title || item?.label || item?.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                const prompts = Array.isArray(block.bullets) ? block.bullets : [];
+                return prompts.length ? (
+                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
+                    {prompts.map((prompt, promptIndex) => (
+                      <div
+                        key={promptIndex}
+                        className={`${prompts.length % 2 === 1 && promptIndex === prompts.length - 1 ? "md:col-span-2" : ""} flex min-h-[54px] items-center gap-3 rounded-[11px] border border-[#7e95d5] px-4 py-3 text-[14px] font-semibold leading-[22px] text-[#0e1726]`}
+                      >
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7e95d5]" />
+                        <span>{safeText(prompt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div key={blockIndex} className="rounded-[11px] border border-[#7e95d5] px-4 py-3">
+                    {block.title ? <h3 className="font-semibold text-[#0e1726]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="whitespace-pre-line">{safeText(block.text)}</p> : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("closing") || sectionIdentity.includes("conclusion")) {
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/closing-thoughts.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Closing thoughts</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                return <h3 key={blockIndex} className="text-[12px] font-bold uppercase leading-5 tracking-[0.05em] text-[#071a39]">{safeText(block.text)}</h3>;
+              }
+
+              if (blockType === "ul" || blockType === "ol") {
+                return (
+                  <ul key={blockIndex} className="space-y-2">
+                    {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => (
+                      <li key={itemIndex} className="flex items-start gap-3">
+                        <span className="mt-1 flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full bg-[#7d94d4] text-[11px] font-bold text-white">✓</span>
+                        <span>{safeText(item)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="border-l-[3px] border-[#7d94d4] bg-[#f4f7fd] px-4 py-3">
+                    {block.title ? <h3 className="font-semibold text-[#071a39]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                    {Array.isArray(block.bullets) && block.bullets.length ? (
+                      <ul className="mt-3 space-y-2">
+                        {block.bullets.map((item, itemIndex) => (
+                          <li key={itemIndex} className="flex items-start gap-3">
+                            <span className="mt-1 flex h-[21px] w-[21px] shrink-0 items-center justify-center rounded-full bg-[#7d94d4] text-[11px] font-bold text-white">✓</span>
+                            <span>{safeText(item)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (
+    sectionIdentity.includes("next steps") ||
+    sectionIdentity.includes("next_step") ||
+    sectionIdentity.includes("next-step") ||
+    sectionIdentity.includes("cta_next_steps")
+  ) {
+    const stepIcons = [
+      "/mps/next-steps/highlight-2-3-sentences.png",
+      "/mps/next-steps/note-one-strength.png",
+      "/mps/next-steps/note-one-development-area.png",
+      "/mps/next-steps/if-you-are-a-leader.png",
+      "/mps/next-steps/if-you-are-working-with-a-coach.png",
+      "/mps/next-steps/use-the-button-in-the-report.png",
+    ];
+    const trailingAction = blocks
+      .filter((block) => String(block?.type || "").toLowerCase() === "p")
+      .map((block) => safeText(block.text).trim())
+      .find((text) => /next step.*button|button.*next step/i.test(text));
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/next-steps.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">Next steps</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-[#f4f7fd] px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="space-y-5 text-[14px] leading-7 text-[#313c52]">
+            {blocks.map((block, blockIndex) => {
+              const blockType = String(block?.type || "").toLowerCase().trim();
+
+              if (blockType === "p") {
+                if (trailingAction && safeText(block.text).trim() === trailingAction) return null;
+                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+              }
+
+              if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                return <h3 key={blockIndex} className="text-[12px] font-bold uppercase leading-5 tracking-[0.05em] text-[#071a39]">{safeText(block.text)}</h3>;
+              }
+
+              if (blockType === "ul" || blockType === "ol" || blockType === "cards" || blockType === "scorecard_row") {
+                const baseItems = Array.isArray(block.items) ? block.items : [];
+                const items = trailingAction && !baseItems.some((item) => safeText(item?.text || item).trim() === trailingAction)
+                  ? [...baseItems, trailingAction]
+                  : baseItems;
+                return (
+                  <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-4 sm:px-5">
+                    <div className="lead-print-next-grid grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
+                      <ol className="space-y-2.5">
+                        {items.map((item, itemIndex) => (
+                          <li key={itemIndex} className="grid grid-cols-[34px_34px_minmax(0,1fr)] items-center gap-3">
+                            <span className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#f0f3fb] text-[12px] font-bold text-[#071a39]">{itemIndex + 1}.</span>
+                            {stepIcons[itemIndex] ? (
+                              <img
+                                src={stepIcons[itemIndex]}
+                                alt=""
+                                className="h-[34px] w-[34px] rounded-full object-contain"
+                                onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+                              />
+                            ) : <span className="h-[34px] w-[34px]" />}
+                            <span className="text-[14px] leading-6 text-[#313c52]">
+                              {typeof item === "string" ? item : (
+                                <>
+                                  {item?.title || item?.label ? <strong>{safeText(item?.title || item?.label)} </strong> : null}
+                                  {safeText(item?.text || item?.value || item?.description)}
+                                </>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+
+                      <img
+                        src="/mps/next-steps/next-steps-roadmap.png"
+                        alt="Next steps roadmap"
+                        className="mx-auto h-auto w-full max-w-[323px] object-contain"
+                        onError={(event) => { event.currentTarget.style.display = "none"; }}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              if (blockType === "quote") {
+                return (
+                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                  </blockquote>
+                );
+              }
+
+              if (blockType === "cta") {
+                return (
+                  <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-5 py-4">
+                    {block.title ? <h3 className="font-semibold text-[#071a39]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                    {nextStepsUrl ? (
+                      <a
+                        href={nextStepsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="no-print mt-4 inline-flex rounded-lg bg-[linear-gradient(90deg,#45e0d1_0%,#4f7dff_50%,#8b5cf6_100%)] px-4 py-2.5 text-sm font-semibold text-[#071c36]"
+                      >
+                        {safeText(block.button_text || "Next step")}
+                      </a>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              if (blockType === "callout") {
+                return (
+                  <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-5 py-4">
+                    {block.title ? <h3 className="font-semibold text-[#071a39]">{safeText(block.title)}</h3> : null}
+                    {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                  </div>
+                );
+              }
+
+              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (sectionIdentity.includes("identity") || sectionIdentity.includes("essence")) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const profileCode = shortProfileCode(topProfile.code);
+    const dominantCode = data.top_freq || "A";
+    const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+    const dominantPercentage = data.frequency_percentages?.[dominantCode] ?? 0;
+    const narrativeBlocks = blocks.filter((block) => {
+      const blockType = String(block?.type || "").toLowerCase().trim();
+      return blockType !== "image" && blockType !== "images.pair" && !blockType.startsWith("chart.");
+    });
+
+    return (
+      <section
+        id={id}
+        className="report-section scroll-mt-6 rounded-[24px] bg-[linear-gradient(90deg,#7c94d7_0%,#e8b15e_100%)] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:p-5"
+      >
+        <div className="flex items-center gap-3 px-1 pb-4 sm:px-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-white/65">
+            <img
+              src="/mps/report-icons/essence.png"
+              alt=""
+              className="h-8 w-8 object-contain"
+              onError={(event) => { event.currentTarget.style.display = "none"; }}
+            />
+          </span>
+          <h2 className="text-lg font-semibold leading-6 text-[#061a3a] sm:text-xl">The Essence of the {topProfile.name}</h2>
+        </div>
+
+        <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
+          <div className="lead-print-essence-grid grid gap-7 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,.9fr)] lg:items-start">
+            <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
+              {narrativeBlocks.length ? (
+                narrativeBlocks.map((block, blockIndex) => {
+                  const blockType = String(block?.type || "").toLowerCase().trim();
+
+                  if (blockType === "p") {
+                    return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
+                  }
+
+                  if (blockType === "quote") {
+                    return (
+                      <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                        “{safeText(block.text)}”{block.cite ? <span> — {safeText(block.cite)}</span> : null}
+                      </blockquote>
+                    );
+                  }
+
+                  if (blockType === "h1" || blockType === "h2" || blockType === "h3" || blockType === "h4") {
+                    return <h3 key={blockIndex} className="text-base font-semibold text-[#061a3a]">{safeText(block.text)}</h3>;
+                  }
+
+                  if (blockType === "ul" || blockType === "ol") {
+                    const ListTag = blockType === "ol" ? "ol" : "ul";
+                    return (
+                      <ListTag key={blockIndex} className={`${blockType === "ol" ? "list-decimal" : "list-disc"} space-y-2 pl-5`}>
+                        {(Array.isArray(block.items) ? block.items : []).map((item, itemIndex) => <li key={itemIndex}>{safeText(item)}</li>)}
+                      </ListTag>
+                    );
+                  }
+
+                  if (blockType === "callout") {
+                    return (
+                      <div key={blockIndex} className="border-l-[3px] border-[#7c94d7] bg-[#f7f8fc] px-4 py-3">
+                        {block.title ? <h3 className="font-semibold text-[#061a3a]">{safeText(block.title)}</h3> : null}
+                        {block.text ? <p className="mt-1 whitespace-pre-line">{safeText(block.text)}</p> : null}
+                      </div>
+                    );
+                  }
+
+                  return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
+                })
+              ) : (
+                <p>{PROFILE_COPY[profileCode]}</p>
+              )}
+            </div>
+
+            <aside className="flex min-h-[280px] flex-col items-center justify-center text-center lg:sticky lg:top-6">
+              <div className="text-[28px] font-semibold leading-8 text-[#313c52]">{topProfile.name}</div>
+              <div className="mt-1 text-[28px] leading-[41px] text-[#313c52]">
+                {approachLabel(dominantName, dominantCode)} · {pct(dominantPercentage)}
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section id={id} className="report-section scroll-mt-6 rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
+      <div className="rounded-[22px] bg-white px-5 py-6 text-slate-900 shadow-[0_18px_60px_rgba(0,0,0,0.12)] sm:px-8 sm:py-8">
+        <div className="mb-5 flex items-start gap-4">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff4cf] text-xs font-bold text-[#8a680c]">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <h2 className="min-w-0 text-xl font-bold tracking-tight text-[#0b2545] sm:text-2xl">{title}</h2>
+        </div>
+
+        {blocks.length ? (
+          <div className="space-y-4">
+            {blocks.map((block, blockIndex) => (
+              <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">This section has not been populated yet.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export default function LeadSystemReportClient({
+  token,
+  tid,
+  src,
+  data,
+}: {
+  token: string;
+  tid: string;
+  src: string;
+  data: LeadSystemResultData;
+}) {
+  void token;
+  void tid;
+  void src;
+
+  const reportRef = useRef<HTMLDivElement | null>(null);
+  const [indexOpen, setIndexOpen] = useState(false);
+
+  const participant = fullName(data.taker?.first_name, data.taker?.last_name);
+  const reportDate = formatReportDate(data.report_date);
+
+  const ranked = useMemo<RankedProfile[]>(() => {
+    const storedTopCode = shortProfileCode(data.top_profile_code);
+    const source = data.profile_labels?.length
+      ? data.profile_labels
+      : Array.from({ length: 8 }, (_, index) => ({ code: `P${index + 1}`, name: PROFILE_FALLBACKS[`P${index + 1}`] }));
+
+    return source
+      .map((profile, sourceIndex) => {
+        const code = shortProfileCode(profile.code || `P${sourceIndex + 1}`);
+        return {
+          code,
+          name: cleanProfileName(profile.name) || PROFILE_FALLBACKS[code] || code,
+          pct: getProfileValue(data.profile_percentages, code),
+          sourceIndex,
+        };
+      })
+      .sort((left, right) => {
+        const scoreDifference = right.pct - left.pct;
+        if (scoreDifference !== 0) return scoreDifference;
+        if (left.code === storedTopCode && right.code !== storedTopCode) return -1;
+        if (right.code === storedTopCode && left.code !== storedTopCode) return 1;
+        return left.sourceIndex - right.sourceIndex;
+      });
+  }, [data.profile_labels, data.profile_percentages, data.top_profile_code]);
+
+  const primary = ranked[0] || {
+    code: shortProfileCode(data.top_profile_code || "P1"),
+    name: cleanProfileName(data.top_profile_name) || "Top profile",
+    pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+    sourceIndex: 0,
+  };
+  const secondary = ranked[1];
+  const tertiary = ranked[2];
+  const canonicalProfiles = [...ranked].sort(
+    (left, right) => Number(shortProfileCode(left.code).replace("P", "")) - Number(shortProfileCode(right.code).replace("P", ""))
+  );
+
+  const dominantCode = data.top_freq || "A";
+  const dominantLabel = approachLabel(
+    data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode],
+    dominantCode
+  );
+  const dominantName = dominantLabel.replace(/\s*\([A-D]\)\s*$/i, "");
+  const dominantPct = data.frequency_percentages?.[dominantCode] ?? 0;
+
+  const rawSections = useMemo(() => resolveSections(data), [data]);
+  const sections = useMemo(() => buildDesignerSections(rawSections, primary.name), [rawSections, primary.name]);
+  const developmentSource = findSection(rawSections, ["growth and development", "development recommendation", "development priorit"]);
+  const extractedPriorities = extractSectionItems(developmentSource, 3);
+  const profileDetail = PROFILE_DETAIL_COPY[primary.code];
+  const strengthSummary = profileDetail?.traits || PROFILE_COPY[primary.code];
+  const riskSummary = profileDetail?.watchOuts || "Notice when a natural strength is being overused or when another approach needs more room.";
+  const developmentPriorities = extractedPriorities.length
+    ? extractedPriorities
+    : [PROFILE_GUIDANCE[primary.code] || "Choose one practical shift that protects your strengths while widening your range."];
+
+  const nextStepsUrl = getNextStepsUrl(data);
+  const indexItems = [
+    ...sections.flatMap((section, index) => {
+      const title = safeText(section.title).trim() || fallbackSectionTitle(section, primary.name);
+      const item = {
+        id: sectionDomId(section, index),
+        title,
+      };
+      return safeText(section.id).toLowerCase().includes("lead_introduction")
+        ? [
+            { id: "lead-system-measures", title: "What the LEAD System measures" },
+            { ...item, title: "The four LEAD approaches" },
+          ]
+        : [item];
+    }),
+  ];
+
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setIndexOpen(false);
+  }
+
+  return (
+    <div ref={reportRef} className="lead-report-shell pdf-report-shell report-shell min-h-screen overflow-x-hidden bg-[#07182f] text-white [background-image:radial-gradient(circle_at_12%_2%,rgba(64,104,154,.32),transparent_30%),radial-gradient(circle_at_92%_18%,rgba(215,169,40,.16),transparent_24%)]">
+      <div className="mx-auto max-w-[1380px] px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+        <header className="lead-report-header lead-cover-block report-section rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-4 py-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-5">
+          <div className="lead-print-header-grid grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/profiletest.ai%20Insignia%20white.png"
+                  alt="Profiletest.ai"
+                  className="h-7 w-7 shrink-0 object-contain"
+                />
+                <span className="text-xs font-semibold text-white">MindCanvas LEAD System</span>
+              </div>
+              <h1 className="mt-1.5 text-xl font-semibold uppercase leading-none tracking-[0.14em] text-white sm:text-2xl">
+                Personalised Report
+              </h1>
+              <span className="mt-2 inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.18em] text-white/60">
+                Powered by Profiletest.ai
+              </span>
+            </div>
+
+            <div className="min-w-0">
+              <div className="no-print flex flex-wrap justify-start gap-2 md:justify-end">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="rounded-lg border border-white/10 bg-[#08162b]/70 px-3 py-2 text-[11px] font-semibold text-slate-50 transition hover:bg-[#08162b] focus:outline-none focus:ring-2 focus:ring-[#45e0d1]"
+                >
+                  Download PDF
+                </button>
+                {nextStepsUrl ? (
+                  <a
+                    href={nextStepsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-[linear-gradient(90deg,#45e0d1_0%,#4f7dff_50%,#8b5cf6_100%)] px-3 py-2 text-[11px] font-semibold text-[#071c36] transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-white"
+                  >
+                    Next steps
+                  </a>
+                ) : null}
+              </div>
+
+              <dl className="lead-print-meta-grid mt-2 grid gap-2 sm:grid-cols-[minmax(96px,1fr)_minmax(96px,1fr)_minmax(180px,1.65fr)]">
+                <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
+                  <dt className="text-[8px] text-white/55">Prepared for</dt>
+                  <dd className="mt-1 truncate text-xs font-semibold text-white">{participant}</dd>
+                </div>
+                {reportDate ? (
+                  <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
+                    <dt className="text-[8px] text-white/55">Date</dt>
+                    <dd className="mt-1 text-xs font-semibold text-white">{reportDate}</dd>
+                  </div>
+                ) : null}
+                <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
+                  <dt className="text-[8px] text-white/55">Framework</dt>
+                  <dd className="mt-1 text-xs font-semibold text-white">MindCanvas LEAD System</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </header>
+
+        <section className="lead-hero-section lead-cover-block report-section lead-print-hero-grid mt-3 grid gap-2.5 md:grid-cols-[minmax(0,2.65fr)_minmax(190px,.9fr)]">
+          <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)]">
+            <div className="lead-print-hero-content-grid grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(230px,.86fr)]">
+              <div className="flex min-w-0 flex-col p-1 sm:p-2">
+                <p className="text-[8px] font-bold uppercase tracking-[0.26em] text-white/55">Personalised report for</p>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{participant}</h2>
+                <p className="mt-3 max-w-xl text-xs leading-5 text-white/75">
+                  How the four behavioural energies show up in you, and your pattern toward a more focused way of leading.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  <span className="rounded-full bg-[linear-gradient(90deg,#7c94d7,#e8b15e)] px-3 py-1.5 text-[10px] font-semibold text-[#192a44]">
+                    Top Profile: {primary.name} {primary.code}
+                  </span>
+                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                    {dominantLabel}
+                  </span>
+                  {secondary ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                      Secondary: {secondary.name}
+                    </span>
+                  ) : null}
+                  {tertiary ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
+                      Tertiary: {tertiary.name}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-4 grid overflow-hidden rounded-[14px] border border-white/[0.07] bg-[#061731]/45 sm:grid-cols-2">
+                  <div className="p-4 sm:border-r sm:border-white/[0.07]">
+                    <div className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Driver</div>
+                    <div className="mt-2 text-base font-semibold text-[#e8b75f]">{dominantLabel}</div>
+                    <p className="mt-2 text-[10px] leading-4 text-white/45">{APPROACH_SHORT_COPY[dominantCode]}</p>
+                  </div>
+                  <div className="border-t border-white/[0.07] p-4 sm:border-t-0">
+                    <div className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Top profile</div>
+                    <div className="mt-2 text-base font-semibold text-[#e8b75f]">{primary.name}</div>
+                    <p className="mt-2 text-[10px] leading-4 text-white/45">A distinct operating pattern that describes how you most naturally create value.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-2.5 shadow-[0_14px_42px_rgba(0,0,0,.24)]">
+                <div className="space-y-1.5">
+                  {canonicalProfiles.map((profile) => {
+                    const selected = shortProfileCode(profile.code) === shortProfileCode(primary.code);
+                    const imageSrc = profileImage(profile.code);
+                    return (
+                      <div
+                        key={profile.code}
+                        className={`grid min-h-8 grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2 py-1.5 ${
+                          selected
+                            ? "border-[#e8b15e]/45 bg-[linear-gradient(90deg,#7c94d7,#e8b15e)] text-[#051227]"
+                            : "border-white/[0.05] bg-white/[0.03] text-[#e4eaf8]"
+                        }`}
+                      >
+                        <img
+                          src={imageSrc}
+                          alt=""
+                          className="h-[18px] w-[18px] object-contain"
+                          onError={(event) => { event.currentTarget.style.display = "none"; }}
+                        />
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-[10px] font-medium">{profile.name} ({profile.code})</span>
+                          {selected ? <span className="rounded-full bg-white/85 px-1.5 py-0.5 text-[7px] font-bold text-[#0e1726]">You</span> : null}
+                        </div>
+                        <div className="flex items-center gap-2 text-[8px]">
+                          {selected ? <span className="hidden sm:inline">{dominantLabel}</span> : null}
+                          <span className={selected ? "font-bold" : "text-white/35"}>{pct(profile.pct)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)]">
+            <div className="rounded-[18px] bg-[linear-gradient(135deg,#7c94d7,#e8b75f)] p-[2px] shadow-[0_6px_32px_rgba(58,110,212,.12)]">
+              <div className="rounded-[16px] bg-[#0a1e36] px-4 py-4 text-center">
+                <div className="text-[8px] text-white/70">Your Dominant Driver:</div>
+                <div className="mt-2 text-lg font-semibold text-[#e8b75f]">{dominantLabel}</div>
+                <p className="mx-auto mt-2 max-w-[180px] text-[10px] leading-4 text-white/80">{APPROACH_SHORT_COPY[dominantCode]}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Profile mix</div>
+            <div className="mt-2 space-y-2">
+              {[primary, secondary, tertiary].filter(Boolean).map((profile, index) => {
+                if (!profile) return null;
+                const role = index === 0 ? "Primary" : index === 1 ? "Secondary" : "Tertiary";
+                return (
+                  <div key={profile.code} className="rounded-lg border border-white/[0.05] bg-white/[0.03] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] font-medium text-white">{profile.name}</span>
+                      <span className="text-[9px] font-medium text-white/80">{pct(profile.pct)}</span>
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+                      <span className="text-[7px] text-white/35">{role} · {profile.code}</span>
+                      <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div
+                          className="h-full rounded-full bg-[linear-gradient(90deg,#7c94d7,#e8b15e)]"
+                          style={{ width: `${Math.max(profile.pct * 100, profile.pct > 0 ? 3 : 0)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+        </section>
+
+        <section className="lead-one-page-section report-section mt-3 rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-5 py-4 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-6 sm:py-5 lg:px-8">
+          <div>
+            <p className="text-[9px] font-bold uppercase leading-4 tracking-[0.26em] text-white/55">One-page LEAD profile</p>
+            <h2 className="mt-1 text-sm font-semibold leading-7 text-white/95">Your at-a-glance leadership profile</h2>
+          </div>
+
+          <div className="mt-4 grid gap-2.5 lg:grid-cols-3">
+            <article className="summary-card min-h-[304px] rounded-[17px] border-2 border-[#7c94d7] bg-[#061a3a] px-5 py-6 shadow-[0_6px_32px_rgba(58,110,212,.12)] sm:px-7">
+              <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">Your LEAD profile</p>
+              <h3 className="mt-7 text-[33px] font-semibold leading-none text-[#e8b75f]">{primary.name}</h3>
+
+              <dl className="mt-8 space-y-2.5">
+                <div className="grid min-h-[39px] grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border border-white/[0.07] bg-white/[0.05] px-4">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#e8b75f]" aria-hidden="true" />
+                  <dt className="text-[13px] font-medium text-[#c7ccde]">Top frequency</dt>
+                  <dd className="text-right text-[13px] font-bold text-[#e8b75f]">{dominantLabel}</dd>
+                </div>
+                <div className="grid min-h-[39px] grid-cols-[10px_minmax(0,1fr)_auto] items-center gap-3 rounded-[10px] border border-white/[0.07] bg-white/[0.05] px-4">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#8195d1]" aria-hidden="true" />
+                  <dt className="text-[13px] font-medium text-[#c7ccde]">Profile match</dt>
+                  <dd className="text-right text-[13px] font-bold text-[#8195d1]">{pct(primary.pct)}</dd>
+                </div>
+              </dl>
+            </article>
+
+            <article className="summary-card min-h-[304px] rounded-[17px] border-2 border-[#7c94d7] bg-[#061a3a] px-5 py-5 shadow-[0_6px_32px_rgba(58,110,212,.12)] sm:px-7">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#e8b75f] bg-[#e8b75f]/25">
+                  <img src="/mps/report-icons/strengths.png" alt="" className="h-4 w-4 object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                </span>
+                <h3 className="text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">Your strengths</h3>
+              </div>
+              <p className="mt-3 text-[11px] leading-[1.45] text-[#7f8ca6]">{strengthSummary}</p>
+
+              <h3 className="mt-5 text-[10px] font-semibold uppercase leading-4 tracking-[0.2em] text-white">Your risks</h3>
+              <p className="mt-3 text-[11px] leading-[1.45] text-[#7f8ca6]">{riskSummary}</p>
+              <p className="mt-4 text-[11px] italic leading-[1.45] text-[#7f8ca6]">
+                {PROFILE_GUIDANCE[primary.code] || "Lead with your strengths, notice overuse early, and widen your range intentionally."}
+              </p>
+            </article>
+
+            <article className="summary-card min-h-[304px] rounded-[17px] border-2 border-[#7c94d7] bg-[#061a3a] px-5 py-5 shadow-[0_6px_32px_rgba(58,110,212,.12)] sm:px-7">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#e8b75f] bg-[#e8b75f]/20">
+                  <img src="/mps/header/top-strategic-priorities.png" alt="" className="h-4 w-4 object-contain" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                </span>
+                <h3 className="text-[10px] font-medium uppercase leading-4 tracking-[0.2em] text-white">Top development priorities</h3>
+              </div>
+
+              <ul className="mt-5 space-y-4">
+                {developmentPriorities.slice(0, 3).map((priority, index) => (
+                  <li key={index} className="grid grid-cols-[18px_minmax(0,1fr)] gap-3 text-[11px] leading-[1.45] text-[#7f8ca6]">
+                    <span className="mt-px flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#e8b75f]" aria-hidden="true">
+                      <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 fill-none stroke-white" strokeWidth="1.8">
+                        <path d="M2.2 6.1 4.7 8.4 9.8 3.4" />
+                      </svg>
+                    </span>
+                    <span>{priority}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section
+          id="lead-results-overview"
+          className="lead-graphs-section report-section mt-5 grid gap-5 lg:grid-cols-2"
+        >
+          <article className="chart-card rounded-[30px] bg-white p-5 text-[#0b2545] shadow-[0_14px_42px_rgba(0,0,0,.22)] sm:p-7">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Frequency summary</p>
+            <h2 className="mt-2 text-2xl font-bold">The four LEAD approaches</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              All four approaches are available to you. The shape of your scores shows which energies you access most naturally.
+            </p>
+            <div className="mt-5">
+              <FrequencyChart labels={data.frequency_labels} values={data.frequency_percentages} dominant={dominantCode} />
+            </div>
+          </article>
+
+          <article className="chart-card rounded-[30px] bg-white p-5 text-[#0b2545] shadow-[0_14px_42px_rgba(0,0,0,.22)] sm:p-7">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Personality map</p>
+            <h2 className="mt-2 text-2xl font-bold">Your eight-profile pattern</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Higher points show patterns you access more naturally. Lower points identify areas that may benefit from support, structure or intentional practice.
+            </p>
+            <div className="mt-5">
+              <ProfileRadar ranked={ranked} values={data.profile_percentages} />
+            </div>
+          </article>
+        </section>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
+          <aside className="no-print self-start lg:sticky lg:top-5">
+            <button
+              type="button"
+              onClick={() => setIndexOpen((open) => !open)}
+              aria-expanded={indexOpen}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-bold lg:hidden"
+            >
+              <span>Report index</span>
+              <span aria-hidden="true">{indexOpen ? "−" : "+"}</span>
+            </button>
+
+            <nav
+              aria-label="Report index"
+              className={`${indexOpen ? "block" : "hidden"} mt-3 rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.22)] lg:mt-0 lg:block`}
+            >
+              <p className="px-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/45">Report index</p>
+              <div className="mt-3 max-h-[68vh] space-y-1.5 overflow-y-auto pr-1">
+                {indexItems.map((item, index) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollTo(item.id)}
+                    className={`flex w-full items-start gap-1 rounded-lg border px-2 py-2 text-left text-[10px] leading-4 text-white/80 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#e8b75f] ${index === 0 ? "border-[#e8b75f] bg-white/[0.05]" : "border-white/[0.06] bg-[#081d39]/35"}`}
+                  >
+                    <span className="shrink-0">{index + 1}.</span>
+                    <span>{item.title}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 space-y-2 border-t border-white/10 pt-4">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-full rounded-lg border border-white/10 bg-[#08162b]/70 px-3 py-2 text-left text-[10px] font-semibold text-white hover:bg-[#08162b]"
+                >
+                  Download PDF
+                </button>
+                {nextStepsUrl ? (
+                  <a
+                    href={nextStepsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full rounded-lg bg-[linear-gradient(90deg,#45e0d1_0%,#4f7dff_50%,#8b5cf6_100%)] px-3 py-2 text-[10px] font-semibold text-[#071c36]"
+                  >
+                    Next step
+                  </a>
+                ) : null}
+              </div>
+            </nav>
+          </aside>
+
+          <main className="space-y-5">
+            {sections.length ? sections.map((section, index) => <SectionCard key={`${sectionDomId(section, index)}-${index}`} section={section} index={index} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />) : <section className="rounded-[28px] bg-white p-7 text-slate-700"><h2 className="text-xl font-bold text-[#0b2545]">Report content is unavailable</h2><p className="mt-3 text-sm leading-6">The result loaded correctly, but the LEAD narrative content could not be loaded. Please refresh the page or contact support.</p></section>}
+
+            {nextStepsUrl ? <div className="no-print flex justify-end"><a href={nextStepsUrl} target="_blank" rel="noreferrer" className="rounded-full bg-[#d7a928] px-6 py-3 text-sm font-bold text-[#0b2545] hover:bg-[#e4bd4d] focus:outline-none focus:ring-2 focus:ring-white">Next Step</a></div> : null}
+          </main>
+        </div>
+
+        <footer className="mt-8 border-t border-white/10 py-5 text-center text-xs text-white/45">© {new Date().getFullYear()} MindCanvas LEAD System · Powered by Profiletest.ai</footer>
+      </div>
+    </div>
+  );
+}
