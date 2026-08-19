@@ -1635,7 +1635,7 @@ function SectionCard({
             return (
               <article
                 key={profile.code}
-                className="min-h-[303px] rounded-[18px] border-t-4 bg-[linear-gradient(180deg,rgba(232,183,95,.20),rgba(125,148,213,.20)),white] px-5 py-4"
+                className="min-h-[303px] rounded-[18px] border border-[#dfe6f2] border-t-4 bg-white px-5 py-4 shadow-[0_6px_24px_rgba(58,110,212,.08)]"
                 style={{ borderTopColor: borderColours[profileIndex] }}
               >
                 <div className="text-[9px] uppercase leading-4 tracking-[0.1em] text-[#313c52]">{roles[profileIndex]}</div>
@@ -2268,14 +2268,8 @@ function SectionCard({
               )}
             </div>
 
-            <aside className="flex flex-col items-center justify-start pt-1 text-center lg:sticky lg:top-6">
-              <img
-                src={profileImage(profileCode)}
-                alt={`${topProfile.name} profile illustration`}
-                className="h-auto w-full max-w-[307px] object-contain"
-                onError={(event) => { event.currentTarget.style.display = "none"; }}
-              />
-              <div className="mt-4 text-[28px] font-semibold leading-8 text-[#313c52]">{topProfile.name}</div>
+            <aside className="flex min-h-[280px] flex-col items-center justify-center text-center lg:sticky lg:top-6">
+              <div className="text-[28px] font-semibold leading-8 text-[#313c52]">{topProfile.name}</div>
               <div className="mt-1 text-[28px] leading-[41px] text-[#313c52]">
                 {approachLabel(dominantName, dominantCode)} · {pct(dominantPercentage)}
               </div>
@@ -2416,7 +2410,11 @@ export default function LeadSystemReportClient({
           <div className="lead-print-header-grid grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
-                <span className="h-6 w-6 shrink-0 rounded-[9px] border border-white/10 bg-white/[0.06]" aria-hidden="true" />
+                <img
+                  src="/profiletest.ai%20Insignia%20white.png"
+                  alt="Profiletest.ai"
+                  className="h-7 w-7 shrink-0 object-contain"
+                />
                 <span className="text-xs font-semibold text-white">MindCanvas LEAD System</span>
               </div>
               <h1 className="mt-1.5 text-xl font-semibold uppercase leading-none tracking-[0.14em] text-white sm:text-2xl">
