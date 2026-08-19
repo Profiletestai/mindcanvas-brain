@@ -1,7 +1,7 @@
 @media print {
   @page {
-    size: A4;
-    margin: 14mm;
+    size: A4 landscape;
+    margin: 10mm;
   }
 
   html,
@@ -77,8 +77,8 @@
   }
 
   .lead-report-shell .report-section {
-    break-inside: auto !important;
-    page-break-inside: auto !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
     box-shadow: none !important;
   }
 
@@ -94,6 +94,82 @@
   .lead-report-shell .lead-cover-block {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+
+  .lead-report-shell .lead-report-header {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  .lead-report-shell .lead-hero-section {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .lead-report-shell .lead-one-page-section {
+    break-before: page !important;
+    page-break-before: always !important;
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .lead-report-shell main > .report-section {
+    margin-top: 0 !important;
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .lead-report-shell [class*="sm:grid-cols-2"],
+  .lead-report-shell [class*="md:grid-cols-2"],
+  .lead-report-shell [class*="lg:grid-cols-2"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .lead-report-shell [class*="sm:grid-cols-3"],
+  .lead-report-shell [class*="md:grid-cols-3"],
+  .lead-report-shell [class*="lg:grid-cols-3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .lead-report-shell [class*="sm:grid-cols-4"],
+  .lead-report-shell [class*="xl:grid-cols-4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .lead-report-shell .lead-print-header-grid {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+
+  .lead-report-shell .lead-print-meta-grid {
+    grid-template-columns: minmax(96px, 1fr) minmax(96px, 1fr) minmax(180px, 1.65fr) !important;
+  }
+
+  .lead-report-shell .lead-print-hero-grid {
+    grid-template-columns: minmax(0, 2.65fr) minmax(190px, .9fr) !important;
+  }
+
+  .lead-report-shell .lead-print-hero-content-grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(230px, .86fr) !important;
+  }
+
+  .lead-report-shell .lead-print-measures-grid {
+    grid-template-columns: 280px minmax(0, 1fr) !important;
+  }
+
+  .lead-report-shell .lead-print-dominant-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  }
+
+  .lead-report-shell .lead-print-personality-grid {
+    grid-template-columns: minmax(0, 430px) minmax(0, 1fr) !important;
+  }
+
+  .lead-report-shell .lead-print-next-grid {
+    grid-template-columns: minmax(0, 1fr) 300px !important;
+  }
+
+  .lead-report-shell .lead-print-essence-grid {
+    grid-template-columns: minmax(0, 1.65fr) minmax(280px, .9fr) !important;
   }
 
   .lead-report-shell h1,
@@ -112,6 +188,11 @@
   .lead-report-shell section:first-of-type,
   .lead-report-shell header + section {
     margin-top: 5mm !important;
+  }
+
+  body iframe,
+  body > div[style*="position: fixed"] {
+    display: none !important;
   }
 
   .lead-report-shell footer {

@@ -284,8 +284,10 @@ function cleanProfileName(value: string) {
 }
 
 function approachLabel(name: string, code: AB) {
-  const cleanName = String(name || "").trim();
-  return new RegExp(`\\(${code}\\)`, "i").test(cleanName) ? cleanName : `${cleanName} (${code})`;
+  const cleanName = String(name || "")
+    .replace(new RegExp(`(?:\\s*\\(${code}\\))+$`, "i"), "")
+    .trim() || APPROACH_FALLBACKS[code];
+  return `${cleanName} (${code})`;
 }
 
 function shortProfileCode(value: any) {
@@ -474,6 +476,9 @@ function extractSectionItems(section: ReportSection | undefined, limit = 3) {
     if (Array.isArray(block.bullets)) {
       output.push(...block.bullets.map(safeText).map((item) => item.trim()).filter(Boolean));
     }
+    if (["h1", "h2", "h3", "h4"].includes(String(block.type || "").toLowerCase()) && block.text) {
+      output.push(safeText(block.text).trim());
+    }
     if (block.type === "p" && block.text) output.push(safeText(block.text).trim());
     if (output.length >= limit) break;
   }
@@ -486,6 +491,128 @@ function findSection(sections: ReportSection[], terms: string[]) {
     const haystack = `${safeText(section.id)} ${safeText(section.title)}`.toLowerCase();
     return terms.some((term) => haystack.includes(term));
   });
+}
+
+function splitIdentitySection(section: ReportSection | undefined, topProfileName: string) {
+  if (!section) return { identity: undefined, worldview: undefined };
+  const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+  const markerIndex = blocks.findIndex((block) => {
+    const text = `${safeText(block.title)} ${safeText(block.text)}`.toLowerCase();
+    return text.includes("how you see the world") || text.includes("sees the world") || text.includes("see the world");
+  });
+
+  if (markerIndex < 0) return { identity: section, worldview: undefined };
+
+  return {
+    identity: { ...section, blocks: blocks.slice(0, markerIndex) },
+    worldview: {
+      id: "profile.sees_world",
+      title: `How the ${topProfileName} sees the world`,
+      blocks: blocks.slice(markerIndex + 1),
+    },
+  };
+}
+
+function buildDesignerSections(source: ReportSection[], topProfileName: string) {
+  const welcome = findSection(source, ["welcome"]);
+  const howToUse = findSection(source, ["how_to_use", "how to use"]);
+  const leadIntroduction = findSection(source, ["lead_introduction", "what the lead system", "what the leader system", "four lead approaches"]);
+  const eightStyles = findSection(source, ["eight operating styles"]);
+  const identitySource = findSection(source, ["profile.identity", "essence"]);
+  const separateWorldview = findSection(source, ["sees_world", "sees the world", "worldview"]);
+  const strengths = findSection(source, ["profile.strengths", "strengths of the", "your strengths"]);
+  const overuse = findSection(source, ["development_areas", "development areas", "overuse", "blindspot"]);
+  const reflection = findSection(source, ["reflection"]);
+  const closing = findSection(source, ["closing", "conclusion"]);
+  const nextSteps = findSection(source, ["cta_next_steps", "next_step", "next steps", "next-step"]);
+  const splitIdentity = splitIdentitySection(identitySource, topProfileName);
+
+  return [
+    welcome,
+    howToUse,
+    leadIntroduction || { id: "global.lead_introduction", title: "What the LEAD System measures", blocks: [] },
+    eightStyles || { id: "global.eight_operating_styles", title: "The Eight Operating Styles at a Glance", blocks: [] },
+    { id: "global.frequency_summary", title: "Four LEAD Approaches summary", blocks: [] },
+    { id: "global.personality_map", title: "Personality Map", blocks: [] },
+    { id: "global.profile_mix", title: "Profile mix", blocks: [] },
+    splitIdentity.identity,
+    separateWorldview || splitIdentity.worldview,
+    strengths,
+    overuse,
+    reflection,
+    closing,
+    nextSteps,
+  ].filter(Boolean) as ReportSection[];
+}
+
+function extractTitledCardContent(blocks: ReportBlock[]) {
+  const intro: string[] = [];
+  const cards: Array<{ title: string; text: string; bullets: string[] }> = [];
+  const quotes: Array<{ text: string; cite: string }> = [];
+  let current: { title: string; text: string; bullets: string[] } | null = null;
+
+  function finishCurrent() {
+    if (current?.title) cards.push({ ...current, text: current.text.trim() });
+    current = null;
+  }
+
+  for (const block of blocks) {
+    const type = String(block?.type || "").toLowerCase().trim();
+    const text = safeText(block.text).trim();
+
+    if (["h1", "h2", "h3", "h4"].includes(type)) {
+      finishCurrent();
+      current = { title: text, text: "", bullets: [] };
+      continue;
+    }
+
+    if (type === "p" && text) {
+      if (current) current.text = `${current.text}${current.text ? "\n" : ""}${text}`;
+      else intro.push(text);
+      continue;
+    }
+
+    if (type === "quote" && text) {
+      finishCurrent();
+      quotes.push({ text, cite: safeText(block.cite).trim() });
+      continue;
+    }
+
+    if (type === "cards" || type === "scorecard_row") {
+      finishCurrent();
+      for (const item of Array.isArray(block.items) ? block.items : []) {
+        if (typeof item === "string") {
+          cards.push({ title: item, text: "", bullets: [] });
+          continue;
+        }
+        cards.push({
+          title: safeText(item?.title || item?.label).trim(),
+          text: safeText(item?.text || item?.value || item?.description).trim(),
+          bullets: (Array.isArray(item?.bullets) ? item.bullets : Array.isArray(item?.items) ? item.items : [])
+            .map((value: any) => safeText(value?.text || value).trim())
+            .filter(Boolean),
+        });
+      }
+      continue;
+    }
+
+    if ((type === "ul" || type === "ol") && current) {
+      current.bullets.push(...(Array.isArray(block.items) ? block.items : []).map(safeText).map((item) => item.trim()).filter(Boolean));
+      continue;
+    }
+
+    if (type === "callout") {
+      finishCurrent();
+      cards.push({
+        title: safeText(block.title).trim(),
+        text,
+        bullets: (Array.isArray(block.bullets) ? block.bullets : []).map(safeText).map((item) => item.trim()).filter(Boolean),
+      });
+    }
+  }
+
+  finishCurrent();
+  return { intro, cards: cards.filter((card) => card.title || card.text || card.bullets.length), quotes };
 }
 
 function howToUseIcon(title: string) {
@@ -991,8 +1118,7 @@ function SectionCard({
   if (
     sectionIdentity.includes("lead_introduction") ||
     sectionIdentity.includes("what the leader system") ||
-    sectionIdentity.includes("what the lead system") ||
-    sectionIdentity.includes("four lead approaches")
+    sectionIdentity.includes("what the lead system")
   ) {
     const primary = ranked[0] || {
       code: shortProfileCode(data.top_profile_code || "P1"),
@@ -1072,7 +1198,7 @@ function SectionCard({
               You use all four of these in different situations. However, as {profileArticle} {primary.name}, {dominantLabel} is your natural home - the approach you default to when you are being most yourself.
             </p>
 
-            <div className="mt-5 grid items-center gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="lead-print-measures-grid mt-5 grid items-center gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
               <img
                 src="/mps/What the Leader System Measures/the-four-behavioral-approaches.png"
                 alt="The four LEAD behavioural approaches"
@@ -1327,7 +1453,7 @@ function SectionCard({
             Your strongest overall driver is <strong className="text-[#d79b34]">{dominantLabel}</strong>, which shapes how you approach problems and make decisions. Higher percentages indicate where you naturally spend more energy; lower percentages highlight areas that may feel less comfortable or more draining.
           </p>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="lead-print-dominant-grid mt-6 grid gap-4 lg:grid-cols-2">
             <div className="rounded-[18px] bg-white px-4 py-4 shadow-[0_6px_32px_rgba(58,110,212,.12)]">
               <div className="space-y-5">
                 {frequencies.map((frequency) => {
@@ -1406,7 +1532,7 @@ function SectionCard({
             This visual map shows how your overall energy (Frequencies) and your more detailed style (Profiles) are distributed across the model. Higher values show patterns you use more often - points pulled toward the edge are strengths; points near the centre are areas that may need support or structure, not more effort alone.
           </p>
 
-          <div className="mt-6 grid items-center gap-5 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
+          <div className="lead-print-personality-grid mt-6 grid items-center gap-5 lg:grid-cols-[minmax(0,430px)_minmax(0,1fr)]">
             <div className="rounded-[14px] border border-[#e4e8f0] bg-white p-3">
               <div className="flex items-center justify-between gap-3 px-2 pt-1">
                 <h3 className="text-[11px] font-bold text-[#12203b]">Your Personality Map (Profiles)</h3>
@@ -1632,6 +1758,7 @@ function SectionCard({
       pct: getProfileValue(data.profile_percentages, data.top_profile_code),
       sourceIndex: 0,
     };
+    const content = extractTitledCardContent(blocks);
 
     return (
       <section
@@ -1652,72 +1779,29 @@ function SectionCard({
 
         <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
           <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
-            {blocks.map((block, blockIndex) => {
-              const blockType = String(block?.type || "").toLowerCase().trim();
-
-              if (blockType === "p") {
-                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
-              }
-
-              if (blockType === "cards" || blockType === "scorecard_row") {
-                const items = Array.isArray(block.items) ? block.items : [];
-                return (
-                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
-                    {items.map((item, itemIndex) => (
-                      <article
-                        key={itemIndex}
-                        className={`${items.length % 2 === 1 && itemIndex === items.length - 1 ? "md:col-span-2" : ""} flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[#0e1726]`}
-                      >
-                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
-                        <div>
-                          {item?.title || item?.label ? <h3 className="text-[15px] font-semibold leading-[22px]">{safeText(item?.title || item?.label)}</h3> : null}
-                          <p className="whitespace-pre-line text-[13px] leading-[21px]">{typeof item === "string" ? item : safeText(item?.text || item?.value || item?.description)}</p>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                );
-              }
-
-              if (blockType === "ul" || blockType === "ol") {
-                const items = Array.isArray(block.items) ? block.items : [];
-                return (
-                  <div key={blockIndex} className="grid gap-2 md:grid-cols-2">
-                    {items.map((item, itemIndex) => (
-                      <article
-                        key={itemIndex}
-                        className={`${items.length % 2 === 1 && itemIndex === items.length - 1 ? "md:col-span-2" : ""} flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[13px] leading-[21px] text-[#0e1726]`}
-                      >
-                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
-                        <span>{safeText(item)}</span>
-                      </article>
-                    ))}
-                  </div>
-                );
-              }
-
-              if (blockType === "quote") {
-                return (
-                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
-                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
-                  </blockquote>
-                );
-              }
-
-              if (blockType === "callout") {
-                return (
-                  <article key={blockIndex} className="flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[#0e1726]">
+            {content.intro.map((paragraph, paragraphIndex) => <p key={`intro-${paragraphIndex}`} className="whitespace-pre-line">{paragraph}</p>)}
+            {content.cards.length ? (
+              <div className="grid gap-2 md:grid-cols-2">
+                {content.cards.map((card, cardIndex) => (
+                  <article
+                    key={`${card.title}-${cardIndex}`}
+                    className={`${content.cards.length % 2 === 1 && cardIndex === content.cards.length - 1 ? "md:col-span-2" : ""} flex min-h-[86px] items-start gap-3 rounded-[11px] border border-[#7c94d7] bg-[linear-gradient(90deg,rgba(124,148,215,.11),rgba(232,177,94,.11))] px-4 py-3 text-[#0e1726]`}
+                  >
                     <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#e8b75f]" />
                     <div>
-                      {block.title ? <h3 className="text-[15px] font-semibold leading-[22px]">{safeText(block.title)}</h3> : null}
-                      {block.text ? <p className="whitespace-pre-line text-[13px] leading-[21px]">{safeText(block.text)}</p> : null}
+                      {card.title ? <h3 className="text-[15px] font-semibold leading-[22px]">{card.title}</h3> : null}
+                      {card.text ? <p className="whitespace-pre-line text-[13px] leading-[21px]">{card.text}</p> : null}
+                      {card.bullets.length ? <ul className="mt-2 list-disc pl-5 text-[13px] leading-[21px]">{card.bullets.map((bullet, bulletIndex) => <li key={bulletIndex}>{bullet}</li>)}</ul> : null}
                     </div>
                   </article>
-                );
-              }
-
-              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
-            })}
+                ))}
+              </div>
+            ) : null}
+            {content.quotes.map((quote, quoteIndex) => (
+              <blockquote key={`quote-${quoteIndex}`} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                {quote.text}{quote.cite ? <span> — {quote.cite}</span> : null}
+              </blockquote>
+            ))}
           </div>
         </div>
       </section>
@@ -1730,6 +1814,14 @@ function SectionCard({
     sectionIdentity.includes("development_areas") ||
     sectionIdentity.includes("development areas")
   ) {
+    const topProfile = ranked[0] || {
+      code: shortProfileCode(data.top_profile_code || "P1"),
+      name: cleanProfileName(data.top_profile_name) || "Top profile",
+      pct: getProfileValue(data.profile_percentages, data.top_profile_code),
+      sourceIndex: 0,
+    };
+    const content = extractTitledCardContent(blocks);
+
     return (
       <section
         id={id}
@@ -1749,93 +1841,40 @@ function SectionCard({
 
         <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
           <div className="space-y-6 text-[13px] leading-7 text-[#313c52]">
-            {blocks.map((block, blockIndex) => {
-              const blockType = String(block?.type || "").toLowerCase().trim();
-
-              if (blockType === "p") {
-                return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
-              }
-
-              if (blockType === "cards" || blockType === "scorecard_row") {
-                const items = Array.isArray(block.items) ? block.items : [];
-                return (
-                  <div key={blockIndex} className="grid gap-3 md:grid-cols-2">
-                    {items.map((item, itemIndex) => {
-                      const isProtective = itemIndex % 2 === 1;
-                      const itemBullets = Array.isArray(item?.bullets)
-                        ? item.bullets
-                        : Array.isArray(item?.items)
-                          ? item.items
-                          : [];
-                      return (
-                        <article
-                          key={itemIndex}
-                          className={`${isProtective ? "border-[#0fcd5e] bg-[#0fcd5e]/[0.09]" : "border-[#bc1823] bg-[#bc1823]/[0.09]"} flex min-h-[220px] items-start gap-3 rounded-[11px] border px-4 py-4 text-[#0e1726]`}
-                        >
-                          <span className={`${isProtective ? "bg-[#0fcd5e]" : "bg-[#bc1823]"} mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full`} />
-                          <div>
-                            {item?.title || item?.label ? <h3 className="text-[16px] font-semibold leading-[22px]">{safeText(item?.title || item?.label)}</h3> : null}
-                            {typeof item === "string" ? <p className="mt-2 whitespace-pre-line text-[13px] leading-6">{item}</p> : null}
-                            {item?.text || item?.value || item?.description ? (
-                              <p className="mt-2 whitespace-pre-line text-[13px] leading-6">{safeText(item?.text || item?.value || item?.description)}</p>
-                            ) : null}
-                            {itemBullets.length ? (
-                              <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-6">
-                                {itemBullets.map((bullet: any, bulletIndex: number) => <li key={bulletIndex}>{safeText(bullet?.text || bullet)}</li>)}
-                              </ul>
-                            ) : null}
-                          </div>
-                        </article>
-                      );
-                    })}
+            {content.intro.map((paragraph, paragraphIndex) => <p key={`intro-${paragraphIndex}`} className="whitespace-pre-line">{paragraph}</p>)}
+            <div className="grid gap-3 md:grid-cols-2">
+              <article className="min-h-[220px] rounded-[11px] border border-[#bc1823] bg-[#bc1823]/[0.09] px-4 py-4 text-[#0e1726]">
+                <div className="space-y-4">
+                  {content.cards.map((card, cardIndex) => (
+                    <div key={`${card.title}-${cardIndex}`} className="flex items-start gap-3">
+                      <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#bc1823]" />
+                      <div>
+                        {card.title ? <h3 className="text-[15px] font-semibold leading-[22px]">{card.title}</h3> : null}
+                        {card.text ? <p className="mt-1 whitespace-pre-line text-[13px] leading-6">{card.text}</p> : null}
+                        {card.bullets.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] leading-6">{card.bullets.map((bullet, bulletIndex) => <li key={bulletIndex}>{bullet}</li>)}</ul> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+              <article className="min-h-[220px] rounded-[11px] border border-[#0fcd5e] bg-[#0fcd5e]/[0.09] px-4 py-4 text-[#0e1726]">
+                <div className="flex items-start gap-3">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#0fcd5e]" />
+                  <div>
+                    <h3 className="text-[16px] font-semibold leading-[22px]">Development focus</h3>
+                    <p className="mt-3 whitespace-pre-line text-[13px] leading-6">
+                      {PROFILE_GUIDANCE[shortProfileCode(topProfile.code)] || "Protect the strengths that fuel your leadership, notice overuse early, and borrow deliberately from complementary styles."}
+                    </p>
+                    <p className="mt-3 text-[13px] leading-6">Notice these patterns early, name the support you need, and protect the energy that makes your contribution sustainable.</p>
                   </div>
-                );
-              }
-
-              if (blockType === "ul" || blockType === "ol") {
-                const items = Array.isArray(block.items) ? block.items : [];
-                return (
-                  <div key={blockIndex} className="grid gap-3 md:grid-cols-2">
-                    {items.map((item, itemIndex) => {
-                      const isProtective = itemIndex % 2 === 1;
-                      return (
-                        <article
-                          key={itemIndex}
-                          className={`${isProtective ? "border-[#0fcd5e] bg-[#0fcd5e]/[0.09]" : "border-[#bc1823] bg-[#bc1823]/[0.09]"} flex min-h-[120px] items-start gap-3 rounded-[11px] border px-4 py-4 text-[13px] leading-6 text-[#0e1726]`}
-                        >
-                          <span className={`${isProtective ? "bg-[#0fcd5e]" : "bg-[#bc1823]"} mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full`} />
-                          <span>{safeText(item)}</span>
-                        </article>
-                      );
-                    })}
-                  </div>
-                );
-              }
-
-              if (blockType === "quote") {
-                return (
-                  <blockquote key={blockIndex} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
-                    {safeText(block.text)}{block.cite ? <span> — {safeText(block.cite)}</span> : null}
-                  </blockquote>
-                );
-              }
-
-              if (blockType === "callout") {
-                return (
-                  <div key={blockIndex} className="rounded-[11px] border border-[#bc1823] bg-[#bc1823]/[0.09] px-4 py-4 text-[#0e1726]">
-                    {block.title ? <h3 className="text-[16px] font-semibold leading-[22px]">{safeText(block.title)}</h3> : null}
-                    {block.text ? <p className="mt-2 whitespace-pre-line text-[13px] leading-6">{safeText(block.text)}</p> : null}
-                    {Array.isArray(block.bullets) && block.bullets.length ? (
-                      <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-6">
-                        {block.bullets.map((bullet, bulletIndex) => <li key={bulletIndex}>{safeText(bullet)}</li>)}
-                      </ul>
-                    ) : null}
-                  </div>
-                );
-              }
-
-              return <BlockRenderer key={blockIndex} block={block} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />;
-            })}
+                </div>
+              </article>
+            </div>
+            {content.quotes.map((quote, quoteIndex) => (
+              <blockquote key={`quote-${quoteIndex}`} className="border-l-[3px] border-[#e8b75f] pl-4 text-[17px] font-semibold italic leading-7 text-[#313c52]">
+                {quote.text}{quote.cite ? <span> — {quote.cite}</span> : null}
+              </blockquote>
+            ))}
           </div>
         </div>
       </section>
@@ -2017,6 +2056,10 @@ function SectionCard({
       "/mps/next-steps/if-you-are-working-with-a-coach.png",
       "/mps/next-steps/use-the-button-in-the-report.png",
     ];
+    const trailingAction = blocks
+      .filter((block) => String(block?.type || "").toLowerCase() === "p")
+      .map((block) => safeText(block.text).trim())
+      .find((text) => /next step.*button|button.*next step/i.test(text));
 
     return (
       <section
@@ -2041,6 +2084,7 @@ function SectionCard({
               const blockType = String(block?.type || "").toLowerCase().trim();
 
               if (blockType === "p") {
+                if (trailingAction && safeText(block.text).trim() === trailingAction) return null;
                 return <p key={blockIndex} className="whitespace-pre-line">{safeText(block.text)}</p>;
               }
 
@@ -2049,10 +2093,13 @@ function SectionCard({
               }
 
               if (blockType === "ul" || blockType === "ol" || blockType === "cards" || blockType === "scorecard_row") {
-                const items = Array.isArray(block.items) ? block.items : [];
+                const baseItems = Array.isArray(block.items) ? block.items : [];
+                const items = trailingAction && !baseItems.some((item) => safeText(item?.text || item).trim() === trailingAction)
+                  ? [...baseItems, trailingAction]
+                  : baseItems;
                 return (
                   <div key={blockIndex} className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-4 sm:px-5">
-                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
+                    <div className="lead-print-next-grid grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
                       <ol className="space-y-2.5">
                         {items.map((item, itemIndex) => (
                           <li key={itemIndex} className="grid grid-cols-[34px_34px_minmax(0,1fr)] items-center gap-3">
@@ -2166,7 +2213,7 @@ function SectionCard({
         </div>
 
         <div className="rounded-[18px] border border-white/[0.08] bg-white px-4 py-5 text-[#313c52] sm:px-5 sm:py-6">
-          <div className="grid gap-7 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,.9fr)] lg:items-start">
+          <div className="lead-print-essence-grid grid gap-7 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,.9fr)] lg:items-start">
             <div className="space-y-5 text-[13px] leading-7 text-[#313c52]">
               {narrativeBlocks.length ? (
                 narrativeBlocks.map((block, blockIndex) => {
@@ -2314,21 +2361,23 @@ export default function LeadSystemReportClient({
   );
 
   const dominantCode = data.top_freq || "A";
-  const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
+  const dominantLabel = approachLabel(
+    data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode],
+    dominantCode
+  );
+  const dominantName = dominantLabel.replace(/\s*\([A-D]\)\s*$/i, "");
   const dominantPct = data.frequency_percentages?.[dominantCode] ?? 0;
 
-  const sections = useMemo(() => resolveSections(data), [data]);
-  const strengths = extractSectionItems(findSection(sections, ["strength"]), 3);
-  const risks = extractSectionItems(findSection(sections, ["overuse", "blindspot", "risk", "development area"]), 3);
-  const priorities = extractSectionItems(findSection(sections, ["development priorit", "next step", "action"]), 3);
-  const strengthSummary = strengths.length ? strengths.join(" ") : PROFILE_COPY[primary.code];
-  const riskSummary = risks.length
-    ? risks.join(" ")
-    : "Notice when a natural strength is being overused or when another approach needs more room.";
-  const developmentPriorities = priorities.length
-    ? priorities
-    : ["Choose one practical shift that protects your strengths while widening your range."];
-  const dominantLabel = approachLabel(dominantName, dominantCode);
+  const rawSections = useMemo(() => resolveSections(data), [data]);
+  const sections = useMemo(() => buildDesignerSections(rawSections, primary.name), [rawSections, primary.name]);
+  const developmentSource = findSection(rawSections, ["growth and development", "development recommendation", "development priorit"]);
+  const extractedPriorities = extractSectionItems(developmentSource, 3);
+  const profileDetail = PROFILE_DETAIL_COPY[primary.code];
+  const strengthSummary = profileDetail?.traits || PROFILE_COPY[primary.code];
+  const riskSummary = profileDetail?.watchOuts || "Notice when a natural strength is being overused or when another approach needs more room.";
+  const developmentPriorities = extractedPriorities.length
+    ? extractedPriorities
+    : [PROFILE_GUIDANCE[primary.code] || "Choose one practical shift that protects your strengths while widening your range."];
 
   const nextStepsUrl = getNextStepsUrl(data);
   const indexItems = [
@@ -2338,11 +2387,10 @@ export default function LeadSystemReportClient({
         id: sectionDomId(section, index),
         title,
       };
-      return title.toLowerCase().includes("four lead approaches")
+      return safeText(section.id).toLowerCase().includes("lead_introduction")
         ? [{ id: "lead-system-measures", title: "What the LEAD System measures" }, item]
         : [item];
     }),
-    { id: "lead-methodology", title: "Methodology" },
   ];
 
   function scrollTo(id: string) {
@@ -2353,8 +2401,8 @@ export default function LeadSystemReportClient({
   return (
     <div ref={reportRef} className="lead-report-shell pdf-report-shell report-shell min-h-screen overflow-x-hidden bg-[#07182f] text-white [background-image:radial-gradient(circle_at_12%_2%,rgba(64,104,154,.32),transparent_30%),radial-gradient(circle_at_92%_18%,rgba(215,169,40,.16),transparent_24%)]">
       <div className="mx-auto max-w-[1380px] px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
-        <header className="lead-cover-block report-section rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-4 py-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-5">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+        <header className="lead-report-header lead-cover-block report-section rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-4 py-3 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-5">
+          <div className="lead-print-header-grid grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
                 <span className="h-6 w-6 shrink-0 rounded-[9px] border border-white/10 bg-white/[0.06]" aria-hidden="true" />
@@ -2389,7 +2437,7 @@ export default function LeadSystemReportClient({
                 ) : null}
               </div>
 
-              <dl className="mt-2 grid gap-2 sm:grid-cols-[minmax(96px,1fr)_minmax(96px,1fr)_minmax(180px,1.65fr)]">
+              <dl className="lead-print-meta-grid mt-2 grid gap-2 sm:grid-cols-[minmax(96px,1fr)_minmax(96px,1fr)_minmax(180px,1.65fr)]">
                 <div className="rounded-[14px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(35,62,97,.72),rgba(18,38,64,.78))] px-3 py-2">
                   <dt className="text-[8px] text-white/55">Prepared for</dt>
                   <dd className="mt-1 truncate text-xs font-semibold text-white">{participant}</dd>
@@ -2409,9 +2457,9 @@ export default function LeadSystemReportClient({
           </div>
         </header>
 
-        <section className="lead-cover-block report-section mt-3 grid gap-2.5 md:grid-cols-[minmax(0,2.65fr)_minmax(190px,.9fr)]">
+        <section className="lead-hero-section lead-cover-block report-section lead-print-hero-grid mt-3 grid gap-2.5 md:grid-cols-[minmax(0,2.65fr)_minmax(190px,.9fr)]">
           <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] p-3 shadow-[0_14px_42px_rgba(0,0,0,.32)]">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(230px,.86fr)]">
+            <div className="lead-print-hero-content-grid grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(230px,.86fr)]">
               <div className="flex min-w-0 flex-col p-1 sm:p-2">
                 <p className="text-[8px] font-bold uppercase tracking-[0.26em] text-white/55">Personalised report for</p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{participant}</h2>
@@ -2424,7 +2472,7 @@ export default function LeadSystemReportClient({
                     Top Profile: {primary.name} {primary.code}
                   </span>
                   <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
-                    {dominantName} ({dominantCode})
+                    {dominantLabel}
                   </span>
                   {secondary ? (
                     <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white">
@@ -2441,7 +2489,7 @@ export default function LeadSystemReportClient({
                 <div className="mt-4 grid overflow-hidden rounded-[14px] border border-white/[0.07] bg-[#061731]/45 sm:grid-cols-2">
                   <div className="p-4 sm:border-r sm:border-white/[0.07]">
                     <div className="text-[8px] font-semibold uppercase tracking-[0.2em] text-white/35">Driver</div>
-                    <div className="mt-2 text-base font-semibold text-[#e8b75f]">{dominantName} ({dominantCode})</div>
+                    <div className="mt-2 text-base font-semibold text-[#e8b75f]">{dominantLabel}</div>
                     <p className="mt-2 text-[10px] leading-4 text-white/45">{APPROACH_SHORT_COPY[dominantCode]}</p>
                   </div>
                   <div className="border-t border-white/[0.07] p-4 sm:border-t-0">
@@ -2477,7 +2525,7 @@ export default function LeadSystemReportClient({
                           {selected ? <span className="rounded-full bg-white/85 px-1.5 py-0.5 text-[7px] font-bold text-[#0e1726]">You</span> : null}
                         </div>
                         <div className="flex items-center gap-2 text-[8px]">
-                          {selected ? <span className="hidden sm:inline">{dominantName} ({dominantCode})</span> : null}
+                          {selected ? <span className="hidden sm:inline">{dominantLabel}</span> : null}
                           <span className={selected ? "font-bold" : "text-white/35"}>{pct(profile.pct)}</span>
                         </div>
                       </div>
@@ -2492,7 +2540,7 @@ export default function LeadSystemReportClient({
             <div className="rounded-[18px] bg-[linear-gradient(135deg,#7c94d7,#e8b75f)] p-[2px] shadow-[0_6px_32px_rgba(58,110,212,.12)]">
               <div className="rounded-[16px] bg-[#0a1e36] px-4 py-4 text-center">
                 <div className="text-[8px] text-white/70">Your Dominant Driver:</div>
-                <div className="mt-2 text-lg font-semibold text-[#e8b75f]">{dominantName} ({dominantCode})</div>
+                <div className="mt-2 text-lg font-semibold text-[#e8b75f]">{dominantLabel}</div>
                 <p className="mx-auto mt-2 max-w-[180px] text-[10px] leading-4 text-white/80">{APPROACH_SHORT_COPY[dominantCode]}</p>
               </div>
             </div>
@@ -2524,7 +2572,7 @@ export default function LeadSystemReportClient({
           </aside>
         </section>
 
-        <section className="report-section mt-3 rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-5 py-4 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-6 sm:py-5 lg:px-8">
+        <section className="lead-one-page-section report-section mt-3 rounded-[24px] border border-white/10 bg-[linear-gradient(165deg,rgba(252,178,118,.16),rgba(22,85,157,.16)),linear-gradient(180deg,rgba(27,60,99,.78),rgba(12,32,58,.84))] px-5 py-4 shadow-[0_14px_42px_rgba(0,0,0,.32)] sm:px-6 sm:py-5 lg:px-8">
           <div>
             <p className="text-[9px] font-bold uppercase leading-4 tracking-[0.26em] text-white/55">One-page LEAD profile</p>
             <h2 className="mt-1 text-sm font-semibold leading-7 text-white/95">Your at-a-glance leadership profile</h2>
@@ -2589,11 +2637,6 @@ export default function LeadSystemReportClient({
           </div>
         </section>
 
-        <section className="report-section mt-6 grid gap-5 lg:grid-cols-2">
-          <div className="rounded-[30px] bg-white p-5 text-[#0b2545] sm:p-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Frequency summary</p><h2 className="mt-2 text-2xl font-bold">The four LEAD approaches</h2><p className="mt-2 text-sm leading-6 text-slate-600">All four approaches are available to you. The shape of your scores shows which energies you access most naturally.</p><div className="mt-5"><FrequencyChart labels={data.frequency_labels} values={data.frequency_percentages} dominant={dominantCode} /></div></div>
-          <div className="rounded-[30px] bg-white p-5 text-[#0b2545] sm:p-7"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Personality map</p><h2 className="mt-2 text-2xl font-bold">Your eight-profile pattern</h2><p className="mt-2 text-sm leading-6 text-slate-600">Higher points show patterns you access more naturally. Lower points identify areas that may benefit from support, structure or intentional practice.</p><div className="mt-5"><ProfileRadar ranked={ranked} values={data.profile_percentages} /></div></div>
-        </section>
-
         <div className="mt-6 grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
           <aside className="no-print self-start lg:sticky lg:top-5">
             <button
@@ -2649,10 +2692,6 @@ export default function LeadSystemReportClient({
 
           <main className="space-y-5">
             {sections.length ? sections.map((section, index) => <SectionCard key={`${sectionDomId(section, index)}-${index}`} section={section} index={index} data={data} ranked={ranked} nextStepsUrl={nextStepsUrl} />) : <section className="rounded-[28px] bg-white p-7 text-slate-700"><h2 className="text-xl font-bold text-[#0b2545]">Report content is unavailable</h2><p className="mt-3 text-sm leading-6">The result loaded correctly, but the LEAD narrative content could not be loaded. Please refresh the page or contact support.</p></section>}
-
-            <section id="lead-methodology" className="report-section rounded-[28px] border border-white/10 bg-white/5 p-2 sm:p-3">
-              <div className="rounded-[22px] bg-[#fff9e9] px-5 py-6 text-[#0b2545] sm:px-8 sm:py-8"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#9a7410]">Methodology</p><h2 className="mt-2 text-xl font-bold sm:text-2xl">Use this report as insight, not a verdict</h2><p className="mt-4 text-sm leading-7 text-slate-700">Your results reflect patterns in how you responded at the time of the assessment. They describe preferences and tendencies, not fixed personality traits. This report should be used as one source of insight and not as a standalone hiring, promotion or development decision.</p></div>
-            </section>
 
             {nextStepsUrl ? <div className="no-print flex justify-end"><a href={nextStepsUrl} target="_blank" rel="noreferrer" className="rounded-full bg-[#d7a928] px-6 py-3 text-sm font-bold text-[#0b2545] hover:bg-[#e4bd4d] focus:outline-none focus:ring-2 focus:ring-white">Next Step</a></div> : null}
           </main>
