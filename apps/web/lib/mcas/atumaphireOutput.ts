@@ -778,38 +778,155 @@ function roleCapacitySentence(
   )}.`;
 }
 
-const STYLE_ACTIONS: Record<string, string> = {
-  OS1: "spot future possibilities, set direction and move work toward emerging opportunities",
-  OS2: "build momentum through clear communication, engagement and visible action",
-  OS3: "strengthen commitment, morale and sustainable team performance",
+const STYLE_SNAPSHOT_ACTIONS: Record<string, string> = {
+  OS1: "spot future possibilities and set direction",
+  OS2: "build momentum through clear communication and engagement",
+  OS3: "strengthen commitment and sustainable team performance",
   OS4: "connect people, information and dependencies across teams",
-  OS5: "protect delivery, resolve practical obstacles and keep commitments moving",
-  OS6: "turn complexity into structure, clear ownership and repeatable ways of working",
+  OS5: "keep important work moving and resolve practical obstacles",
+  OS6: "bring structure, clear ownership and repeatable ways of working",
   OS7: "test evidence, identify risk and protect quality",
-  OS8: "refine systems, remove friction and improve quality or efficiency",
+  OS8: "improve systems, remove friction and strengthen efficiency",
+};
+
+const STYLE_WORK_BEHAVIOURS: Record<string, string> = {
+  OS1: "spot emerging opportunities, frame direction and help others move towards it",
+  OS2: "communicate clearly, engage others and turn ideas into visible action",
+  OS3: "pay attention to trust, morale and whether people can sustain performance under pressure",
+  OS4: "connect people and information across teams, align priorities and make dependencies visible",
+  OS5: "remain practical under pressure, resolve obstacles and follow through on commitments",
+  OS6: "break complex work into clear steps, define ownership and build reliable operating routines",
+  OS7: "examine evidence, challenge assumptions and make important risks visible before action is taken",
+  OS8: "look for ways to remove friction, improve efficiency and strengthen how work is delivered",
+};
+
+const STYLE_DECISION_CLAUSES: Record<string, string> = {
+  OS1: "move towards future opportunities while making priorities and ownership clear",
+  OS2: "favour movement and participation while balancing pace with structure and follow-through",
+  OS3: "consider the effect of choices on people, trust and commitment",
+  OS4: "consider different perspectives but recognise when consultation must end and action must begin",
+  OS5: "favour practical choices that protect delivery and continuity",
+  OS6: "clarify process, ownership, dependencies and sequence before acting",
+  OS7: "use evidence, standards and risk as the basis for measured judgement",
+  OS8: "focus on practical improvements to quality, effort and workflow",
+};
+
+const STYLE_INTERVIEW_CHECKS: Record<string, string> = {
+  OS1: "translate a broad vision into clear priorities, ownership and sustained delivery",
+  OS2: "maintain focus and follow-through when work is repetitive, detailed or less visible",
+  OS3: "hold firm performance expectations, set healthy boundaries and handle difficult conversations",
+  OS4: "make clear decisions when full agreement has not been reached and prevent consultation from delaying action",
+  OS5: "make workload and capacity visible, challenge weak direction and retain a wider strategic perspective",
+  OS6: "adjust plans and processes when circumstances change rather than adding more structure automatically",
+  OS7: "make timely decisions with incomplete information and balance risk control with useful opportunity",
+  OS8: "distinguish essential improvement from perfection and protect delivery momentum",
+};
+
+const CORE_REQUIREMENT_ACTIONS: Record<string, string> = {
+  C: "generate options, take initiative and adapt when no established method exists",
+  O: "plan work, clarify ownership and coordinate dependencies",
+  R: "remove obstacles, sustain follow-through and carry work to completion",
+  E: "test assumptions, identify important risks and protect quality",
+};
+
+const CORE_SHORT_ACTIONS: Record<string, string> = {
+  C: "create direction",
+  O: "organise priorities, ownership and dependencies",
+  R: "sustain follow-through",
+  E: "test evidence and risk",
+};
+
+const CORE_EMPHASIS_LANGUAGE: Record<string, string> = {
+  C: "generating options, taking initiative and adapting when no established method exists",
+  O: "planning work, clarifying ownership and coordinating dependencies",
+  R: "removing obstacles, sustaining follow-through and carrying work to completion",
+  E: "testing assumptions, identifying important risks and protecting quality",
+};
+
+const CORE_PAIR_ACTIONS: Record<string, string> = {
+  "C,E": "generate options while testing assumptions, risks and quality",
+  "C,O": "create direction and turn it into clear priorities, ownership and coordinated delivery",
+  "C,R": "generate options, take initiative and carry work through obstacles to completion",
+  "E,O": "organise work carefully while testing evidence, risks and quality",
+  "E,R": "resolve obstacles while protecting quality and managing risk",
+  "O,R": "organise priorities and dependencies while sustaining follow-through to completion",
+};
+
+const LOWER_CORE_LANGUAGE: Record<
+  string,
+  { focus: string; check: string; evidence: string }
+> = {
+  C: {
+    focus: "creating direction from a blank page",
+    check: "generate options, take initiative and adapt when no established method exists",
+    evidence:
+      "generated options, taken initiative and adapted when no established method existed",
+  },
+  O: {
+    focus: "planning and coordinating complex work",
+    check: "plan and sequence work, clarify ownership and manage dependencies",
+    evidence:
+      "planned and sequenced work, clarified ownership and managed dependencies",
+  },
+  R: {
+    focus: "sustaining effort through obstacles",
+    check: "remove obstacles, maintain follow-through and carry difficult work to completion",
+    evidence:
+      "removed obstacles, maintained follow-through and carried difficult work to completion",
+  },
+  E: {
+    focus: "detailed analysis and risk control",
+    check: "test assumptions, identify important risks and protect quality",
+    evidence:
+      "tested assumptions, identified important risks and protected quality",
+  },
 };
 
 const RESPONSIBILITY_REQUIREMENTS: Record<string, string> = {
-  CV1_2: "reliable individual ownership with growing independence",
-  CV3: "broader outcomes and coordination beyond individual tasks",
-  CV4: "senior cross-functional outcomes requiring judgement across teams, priorities and trade-offs",
-  CV5_6: "strategic or enterprise-wide outcomes shaped through multiple functions, long-term decisions and delivery through others",
-  V1: "reliable individual contribution",
-  V2: "growing independence and wider responsibility",
-  V3: "broader outcomes beyond individual tasks",
-  V4: "cross-functional outcomes requiring wider judgement and trade-offs",
-  V5: "strategic outcomes delivered through others",
-  V6: "enterprise stewardship and long-horizon organisational responsibility",
+  CV1_2: "take reliable ownership of their own work with growing independence",
+  CV3: "take responsibility for broader outcomes and coordinate beyond individual tasks",
+  CV4: "exercise sound judgement across teams, priorities and trade-offs",
+  CV5_6:
+    "shape strategic or enterprise-wide outcomes through long-term decisions and delivery through others",
+  V1: "take reliable ownership of their own contribution",
+  V2: "work with growing independence and wider responsibility",
+  V3: "take responsibility for broader outcomes beyond individual tasks",
+  V4: "exercise sound cross-functional judgement and manage trade-offs",
+  V5: "shape strategic outcomes through others",
+  V6: "provide enterprise stewardship and long-horizon organisational direction",
 };
 
-function styleAction(value: any): string | null {
+const RESPONSIBILITY_PAIR_REQUIREMENTS: Record<string, string> = {
+  "CV1_2,CV3":
+    "take reliable ownership of their own work while growing into broader outcomes and coordination",
+  "CV3,CV4":
+    "take responsibility for broader outcomes and exercise sound judgement across teams, priorities and trade-offs",
+  "CV4,CV5_6":
+    "exercise senior cross-functional judgement and shape strategic outcomes through others",
+  "V1,V2": "take reliable ownership while growing in independence and responsibility",
+  "V2,V3":
+    "work independently while taking increasing responsibility for broader outcomes",
+  "V3,V4":
+    "take responsibility for broader outcomes and exercise cross-functional judgement",
+  "V4,V5":
+    "exercise senior cross-functional judgement and shape strategic outcomes through others",
+  "V5,V6":
+    "shape strategic outcomes through others while providing enterprise stewardship",
+};
+
+function styleSnapshotAction(value: any): string | null {
   const code = getCode(value);
-  return code ? STYLE_ACTIONS[code] || null : null;
+  return code ? STYLE_SNAPSHOT_ACTIONS[code] || null : null;
 }
 
-function styleValue(value: any): string | null {
+function styleWorkBehaviour(value: any): string | null {
   const code = getCode(value);
-  return code ? STYLE_BLEND_VALUE[code] || null : null;
+  return code ? STYLE_WORK_BEHAVIOURS[code] || null : null;
+}
+
+function styleDecisionClause(value: any): string | null {
+  const code = getCode(value);
+  return code ? STYLE_DECISION_CLAUSES[code] || null : null;
 }
 
 function narrativeStyles(scoring: any): any[] {
@@ -818,13 +935,14 @@ function narrativeStyles(scoring: any): any[] {
     OPERATING_NEAR_TIE_POINTS,
   );
 
-  const selected = analysis.mode === "single"
-    ? [
-        getPrimaryOperatingStyle(scoring) || analysis.top,
-        getSecondaryOperatingStyle(scoring) || analysis.supporting,
-        getTertiaryOperatingStyle(scoring),
-      ]
-    : [...analysis.nearTop, analysis.supporting];
+  const selected =
+    analysis.mode === "single"
+      ? [
+          getPrimaryOperatingStyle(scoring) || analysis.top,
+          getSecondaryOperatingStyle(scoring) || analysis.supporting,
+          getTertiaryOperatingStyle(scoring),
+        ]
+      : [...analysis.nearTop, analysis.supporting];
 
   const seen = new Set<string>();
   return selected
@@ -838,119 +956,155 @@ function narrativeStyles(scoring: any): any[] {
     .slice(0, 3);
 }
 
-function coreActions(items: any[]): string | null {
+function selectedCoreAreas(scoring: any): any[] {
+  const analysis = analyseBlend(getCoreRanking(scoring), CORE_NEAR_TIE_POINTS);
+  if (!analysis.top) return [];
+
+  return analysis.mode === "tie"
+    ? analysis.exactTop
+    : analysis.mode === "near"
+      ? analysis.nearTop.slice(0, 2)
+      : [analysis.top];
+}
+
+function coreRequirementPhrase(items: any[]): string | null {
+  const codes = items
+    .map(getCode)
+    .filter((code): code is string => Boolean(code));
+
+  if (!codes.length) return null;
+
+  if (codes.length === 1) {
+    return CORE_REQUIREMENT_ACTIONS[codes[0]] || null;
+  }
+
+  if (codes.length === 2) {
+    const key = [...codes].sort().join(",");
+    return CORE_PAIR_ACTIONS[key] || null;
+  }
+
   return naturalList(
-    items
-      .map((item) => {
-        const code = getCode(item);
-        return code ? CORE_CAPABILITY[code] || null : null;
-      })
-      .filter((item): item is string => Boolean(item)),
+    codes
+      .map((code) => CORE_SHORT_ACTIONS[code] || null)
+      .filter((value): value is string => Boolean(value)),
   );
 }
 
-function coreNouns(items: any[]): string | null {
-  return naturalList(
-    items
-      .map((item) => {
-        const code = getCode(item);
-        return code ? CORE_NOUN_PHRASE[code] || null : null;
-      })
-      .filter((item): item is string => Boolean(item)),
-  );
+function coreEmphasisPhrase(items: any[]): string | null {
+  const codes = items
+    .map(getCode)
+    .filter((code): code is string => Boolean(code));
+
+  if (!codes.length) return null;
+
+  if (codes.length === 1) {
+    return CORE_EMPHASIS_LANGUAGE[codes[0]] || null;
+  }
+
+  const requirement = coreRequirementPhrase(items);
+  return requirement ? `a blend of work that requires ${requirement}` : null;
 }
 
-function responsibilityScope(scoring: any): string | null {
+function responsibilityItems(scoring: any): any[] {
   const analysis = analyseBlend(
     getCareerRanking(scoring),
     VERTICAL_NEAR_TIE_POINTS,
   );
 
-  const selected = analysis.mode === "tie"
-    ? analysis.exactTop
-    : analysis.mode === "near"
-      ? analysis.nearTop.slice(0, 2)
-      : [analysis.top || getCareerVertical(scoring)];
-
-  return naturalList(
-    selected
-      .filter(Boolean)
-      .map((item) => {
-        const code = getCode(item);
-        return code ? RESPONSIBILITY_REQUIREMENTS[code] || null : null;
-      })
-      .filter((item): item is string => Boolean(item)),
-  );
+  if (analysis.mode === "tie") return analysis.exactTop;
+  if (analysis.mode === "near") return analysis.nearTop.slice(0, 2);
+  return [analysis.top || getCareerVertical(scoring)].filter(Boolean);
 }
 
-function toRoleExpectationSentence(value: string | null): string | null {
-  const cleaned = cleanText(value);
-  if (!cleaned) return null;
+function responsibilityDescription(scoring: any): string | null {
+  const items = responsibilityItems(scoring);
+  const codes = items
+    .map(getCode)
+    .filter((code): code is string => Boolean(code));
 
-  return cleaned
-    .replace(/^They are likely to\b/i, "They should")
-    .replace(/^They tend to\b/i, "They should")
-    .replace(/^In teams, they tend to\b/i, "In teams, they should be able to");
+  if (!codes.length) return null;
+
+  if (codes.length === 1) {
+    return RESPONSIBILITY_REQUIREMENTS[codes[0]] || null;
+  }
+
+  if (codes.length === 2) {
+    const key = [...codes].sort((a, b) => {
+      const order = ["CV1_2", "CV3", "CV4", "CV5_6", "V1", "V2", "V3", "V4", "V5", "V6"];
+      return order.indexOf(a) - order.indexOf(b);
+    }).join(",");
+    const combined = RESPONSIBILITY_PAIR_REQUIREMENTS[key];
+    if (combined) return combined;
+  }
+
+  return naturalList(
+    codes
+      .map((code) => RESPONSIBILITY_REQUIREMENTS[code] || null)
+      .filter((value): value is string => Boolean(value)),
+  );
 }
 
 function operatingProfileSentence(
   perspective: NarrativePerspective,
   scoring: any,
 ): string {
-  const styles = narrativeStyles(scoring);
-  const actions = styles
-    .map(styleAction)
-    .filter((item): item is string => Boolean(item));
-  const values = styles
-    .map(styleValue)
-    .filter((item): item is string => Boolean(item));
+  const actions = narrativeStyles(scoring)
+    .map(styleSnapshotAction)
+    .filter((value): value is string => Boolean(value));
 
-  if (perspective === "role") {
-    return actions.length
-      ? `The ideal candidate is someone who can ${naturalList(actions)}.`
-      : "The ideal candidate should be able to work effectively across people, priorities and delivery demands.";
+  if (!actions.length) {
+    return perspective === "role"
+      ? "The ideal candidate should work effectively across people, priorities and delivery demands."
+      : "This applicant is likely to bring a practical mix of workplace strengths to the role.";
   }
 
-  return values.length
-    ? `This applicant is likely to bring ${naturalList(values)} to the role.`
-    : "This applicant is likely to bring a practical mix of workplace strengths to the role.";
+  const first = actions[0];
+  const second = actions[1] || null;
+  const third = actions[2] || null;
+  const opening = perspective === "role"
+    ? `The ideal candidate should ${first}.`
+    : `This applicant is likely to ${first}.`;
+
+  if (!second) return opening;
+
+  const supporting = third
+    ? perspective === "role"
+      ? `They should also ${second}; they should be able to ${third}.`
+      : `They may also ${second}; they may ${third}.`
+    : perspective === "role"
+      ? `They should also ${second}.`
+      : `They may also ${second}.`;
+
+  return joinSentences([opening, supporting]);
 }
 
 function strongestCoreSentence(
   perspective: NarrativePerspective,
   scoring: any,
 ): string | null {
-  const analysis = analyseBlend(getCoreRanking(scoring), CORE_NEAR_TIE_POINTS);
-  if (!analysis.top) return null;
-
-  const selected = analysis.mode === "tie"
-    ? analysis.exactTop
-    : analysis.mode === "near"
-      ? analysis.nearTop.slice(0, 2)
-      : [analysis.top];
-  const actions = coreActions(selected);
-  if (!actions) return null;
+  const phrase = coreRequirementPhrase(selectedCoreAreas(scoring));
+  if (!phrase) return null;
 
   return perspective === "role"
-    ? `The role particularly requires someone who can ${actions}.`
-    : `Their results suggest a likely strength in the ability to ${actions}.`;
+    ? `The role also needs someone who can ${phrase}.`
+    : `Their results suggest they may be particularly comfortable with work that requires them to ${phrase}.`;
 }
 
 function careerVerticalSentence(
   perspective: NarrativePerspective,
   scoring: any,
 ): string {
-  const scope = responsibilityScope(scoring);
+  const description = responsibilityDescription(scoring);
 
-  if (!scope) {
+  if (!description) {
     return perspective === "role"
       ? "The required level of responsibility should be confirmed through evidence from the role and hiring team."
-      : "The level of responsibility indicated by the results should be confirmed through examples of work the applicant has genuinely owned.";
+      : "The level of responsibility suggested by the results should be confirmed through examples of work the applicant has genuinely owned.";
   }
 
   return perspective === "role"
-    ? `This role requires responsibility for ${scope}.`
-    : `Their results suggest they may be suited to work involving ${scope}.`;
+    ? `This role requires someone who can ${description}.`
+    : `They may be suited to work that requires them to ${description}.`;
 }
 
 function readinessTraitSentence(
@@ -958,28 +1112,20 @@ function readinessTraitSentence(
   scoring: any,
 ): string | null {
   const signal = getReadinessSignal(scoring);
-  if (!cleanText(signal?.label)) return null;
+  if (!cleanText(signal?.label) || perspective === "role") return null;
 
-  return perspective === "role"
-    ? "The role may require broader responsibility than a job title alone can prove, so the required scope should be confirmed through candidate evidence."
-    : "They may also be ready for broader responsibility, but this should be confirmed through examples of what they have actually owned and delivered.";
+  return "They may also be ready for broader responsibility, but this should be confirmed through examples of what they have actually owned and delivered.";
 }
 
 function buildTraitSnapshot(
   perspective: NarrativePerspective,
   input: BuildSectionsInput,
 ): string {
-  const primary = getPrimaryOperatingStyle(input.scoring);
-  const primaryCode = getCode(primary);
-
   return joinSentences([
     operatingProfileSentence(perspective, input.scoring),
     strongestCoreSentence(perspective, input.scoring),
     careerVerticalSentence(perspective, input.scoring),
     readinessTraitSentence(perspective, input.scoring),
-    perspective === "role"
-      ? roleCapacitySentence(null, primaryCode)
-      : candidateCapacitySentence(null, primaryCode),
   ]);
 }
 
@@ -988,67 +1134,81 @@ function buildHowTheyWork(
   input: BuildSectionsInput,
 ): string {
   const styles = narrativeStyles(input.scoring);
+  const behaviours = styles
+    .map(styleWorkBehaviour)
+    .filter((value): value is string => Boolean(value));
   const primary = styles[0] || getPrimaryOperatingStyle(input.scoring);
-  const primaryAction = styleAction(primary);
-  const supportingActions = styles
-    .slice(1)
-    .map(styleAction)
-    .filter((item): item is string => Boolean(item));
-  const primaryBlueprint = styleBlueprint(primary);
+  const decisionClause = styleDecisionClause(primary);
 
-  const opening = primaryAction
-    ? perspective === "role"
-      ? `The ideal candidate should ${primaryAction}.`
-      : `This applicant is likely to create value by being able to ${primaryAction}.`
-    : perspective === "role"
-      ? "The ideal candidate should bring clarity to complex work and turn expectations into practical action."
-      : "This applicant is likely to create value by bringing clarity to complex work and turning expectations into practical action.";
+  const parts: Array<string | null> = [];
 
-  const supporting = supportingActions.length
-    ? supportingActions
-        .map((action) =>
-          perspective === "role"
-            ? `They should also be able to ${action}.`
-            : `They may also ${action}.`,
-        )
-        .join(" ")
-    : null;
+  if (behaviours[0]) {
+    parts.push(
+      perspective === "role"
+        ? `The ideal candidate should ${behaviours[0]}.`
+        : `This applicant is likely to ${behaviours[0]}.`,
+    );
+  }
 
-  const candidateDecision =
-    primaryBlueprint?.decision ||
-    firstSentences(getDecisionStyle(input.operatingStyleSummary), 1);
-  const candidateTeam =
-    primaryBlueprint?.team ||
-    firstSentences(getTeamContribution(input.operatingStyleSummary), 1);
+  if (behaviours[1]) {
+    parts.push(
+      perspective === "role"
+        ? `They will also need to ${behaviours[1]}.`
+        : `They may also ${behaviours[1]}.`,
+    );
+  }
 
-  const decision = perspective === "role"
-    ? toRoleExpectationSentence(candidateDecision)
-    : normaliseSubjectSentence(candidateDecision);
-  const team = perspective === "role"
-    ? toRoleExpectationSentence(candidateTeam)
-    : normaliseSubjectSentence(candidateTeam);
+  if (behaviours[2]) {
+    parts.push(
+      perspective === "role"
+        ? `They should also ${behaviours[2]}.`
+        : `They are also likely to ${behaviours[2]}.`,
+    );
+  }
 
-  return joinSentences([
-    opening,
-    supporting,
-    decision,
-    team,
-  ]);
+  if (decisionClause) {
+    parts.push(
+      perspective === "role"
+        ? `When making decisions, they should ${decisionClause}.`
+        : `When making decisions, they are likely to ${decisionClause}.`,
+    );
+  }
+
+  return joinSentences(parts);
+}
+
+function operatingRiskSentences(
+  perspective: NarrativePerspective,
+  scoring: any,
+): string[] {
+  const checks = narrativeStyles(scoring)
+    .map((style) => {
+      const code = getCode(style);
+      return code ? STYLE_INTERVIEW_CHECKS[code] || null : null;
+    })
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 2);
+
+  if (!checks.length) {
+    return [
+      perspective === "role"
+        ? "Confirm how the candidate handles pressure, ambiguity, competing priorities and accountability at the required level."
+        : "Confirm how the applicant handles pressure, ambiguity, competing priorities and accountability at the indicated level.",
+    ];
+  }
+
+  const subject = perspective === "role" ? "candidate" : "applicant";
+  return checks.map((check, index) =>
+    index === 0
+      ? `Confirm that the ${subject} can ${check}.`
+      : `Check that they can ${check}.`,
+  );
 }
 
 function dominantCoreVerificationSentence(scoring: any): string | null {
-  const analysis = analyseBlend(getCoreRanking(scoring), CORE_NEAR_TIE_POINTS);
-  if (!analysis.top) return null;
-
-  const selected = analysis.mode === "tie"
-    ? analysis.exactTop
-    : analysis.mode === "near"
-      ? analysis.nearTop.slice(0, 2)
-      : [analysis.top];
-  const actions = coreActions(selected);
-
-  return actions
-    ? `Prioritise examples showing that the candidate can ${actions}.`
+  const phrase = coreRequirementPhrase(selectedCoreAreas(scoring));
+  return phrase
+    ? `Ask for examples showing how the candidate can ${phrase}.`
     : null;
 }
 
@@ -1060,83 +1220,97 @@ function lowestCoreSentence(
   const lowest = getLowestCores(scoring);
   if (!lowest.length || lowest.length === ranking.length) return null;
 
-  const nouns = coreNouns(lowest);
-  const capabilityItems = lowest
+  const language = lowest
     .map((item) => {
       const code = getCode(item);
-      return code ? CORE_CAPABILITY[code] || null : null;
+      return code ? LOWER_CORE_LANGUAGE[code] || null : null;
     })
-    .filter((item): item is string => Boolean(item));
-  if (!capabilityItems.length && !nouns) return null;
+    .filter(
+      (value): value is { focus: string; check: string; evidence: string } =>
+        Boolean(value),
+    );
+
+  if (!language.length) return null;
+
+  const focuses = language.map((item) => item.focus);
+  const checks = language.map((item) => item.check);
+  const evidence = language.map((item) => item.evidence);
 
   if (perspective === "role") {
+    if (language.length === 1) {
+      return `Although this role does not primarily focus on ${focuses[0]}, confirm that the candidate can ${checks[0]} when needed.`;
+    }
+
     return joinSentences([
-      `Although capability in ${nouns || "these areas"} is not the main focus of this role, it should not be treated as irrelevant.`,
-      ...capabilityItems.map(
-        (capability) =>
-          `Confirm that candidates can still ${capability} when the work requires it.`,
+      `Although this role does not primarily focus on ${naturalList(focuses) || focuses[0]}, these capabilities should not be treated as irrelevant.`,
+      ...checks.map((check, index) =>
+        index === 0
+          ? `Confirm that the candidate can ${check} when needed.`
+          : `Also verify that they can ${check} when needed.`,
       ),
     ]);
   }
 
+  const strongestAreas = selectedCoreAreas(scoring);
+  const strongestPhrase = coreEmphasisPhrase(strongestAreas);
+  const evidenceChecks = evidence.map((example, index) => {
+    if (index === 0) {
+      return `Ask for examples showing how they have ${example}.`;
+    }
+    if (index === 1) {
+      return `Check for evidence that they have ${example}.`;
+    }
+    return `Also ask how they have ${example}.`;
+  });
+
+  const focusSummary = naturalList(focuses) || focuses[0];
+  const capitalisedFocusSummary = focusSummary
+    ? `${focusSummary.charAt(0).toUpperCase()}${focusSummary.slice(1)}`
+    : null;
+
   return joinSentences([
-    `Do not assume that ${nouns || "these capabilities"} will come naturally to the applicant.`,
-    ...capabilityItems.map(
-      (capability) =>
-        `Ask for examples showing how they can ${capability} when no established method or routine is available.`,
-    ),
+    strongestPhrase
+      ? `The applicant's strongest natural emphasis appears to be ${strongestPhrase}.`
+      : null,
+    capitalisedFocusSummary
+      ? `${capitalisedFocusSummary} should be verified through evidence rather than treated as weaknesses.`
+      : null,
+    ...evidenceChecks,
   ]);
 }
 
-function operatingRiskSentence(
-  perspective: NarrativePerspective,
-  input: BuildSectionsInput,
-): string {
-  const styles = narrativeStyles(input.scoring);
-  const focuses = styles
-    .map((style) => {
-      const code = getCode(style);
-      return code ? STYLE_VERIFICATION[code] || null : null;
-    })
-    .filter((item): item is string => Boolean(item))
-    .slice(0, 2);
+function scopeExampleLabel(scoring: any): string {
+  const codes = responsibilityItems(scoring)
+    .map(getCode)
+    .filter((code): code is string => Boolean(code));
 
-  if (focuses.length === 1) {
-    return perspective === "role"
-      ? `Confirm that the candidate can ${focuses[0]}.`
-      : `Confirm that the applicant can ${focuses[0]}.`;
+  if (codes.some((code) => ["CV5_6", "V5", "V6"].includes(code))) {
+    return "a strategic outcome they shaped through others";
   }
 
-  if (focuses.length > 1) {
-    return perspective === "role"
-      ? `Confirm that the candidate can ${focuses[0]}. Also check that they can ${focuses[1]}.`
-      : `Confirm that the applicant can ${focuses[0]}. Also check that they can ${focuses[1]}.`;
+  if (codes.some((code) => ["CV4", "V4"].includes(code))) {
+    return "a cross-functional outcome they personally owned";
   }
 
-  const fallback = [
-    ...getFrictionPoints(input.operatingStyleSummary),
-    ...getRoleRisks(input.roleFitSummary),
-  ]
-    .map((item) => item.description || item.title)
-    .filter((item): item is string => Boolean(item))
-    .slice(0, 2);
+  if (codes.some((code) => ["CV3", "V3"].includes(code))) {
+    return "a broader outcome they personally owned beyond their own tasks";
+  }
 
-  return fallback.length
-    ? `Explore these points directly: ${naturalList(fallback) || "the documented risks"}.`
-    : perspective === "role"
-      ? "Confirm how the candidate handles pressure, ambiguity, competing priorities and accountability at the required level."
-      : "Confirm how the applicant handles pressure, ambiguity, competing priorities and accountability at the indicated level.";
+  return "a piece of work they personally owned";
 }
 
 function verticalEvidenceSentence(
   perspective: NarrativePerspective,
   scoring: any,
 ): string {
-  const scope = responsibilityScope(scoring);
-
-  return perspective === "role"
-    ? `Ask for recent examples showing that the candidate has genuinely held responsibility for ${scope || "the required outcomes"}. Have them explain what they were personally responsible for, the decisions and trade-offs they made, the people or teams they influenced and the measurable results they achieved.`
-    : `Ask for a recent example where the applicant was personally accountable for ${scope || "a significant outcome"}. Have them explain the decisions they made, the trade-offs they considered, the people or teams they influenced and the measurable result.`;
+  const example = scopeExampleLabel(scoring);
+  return joinSentences([
+    `Ask for a recent example of ${example}.`,
+    "Have them explain the decisions and trade-offs they made, the people or teams they influenced and the measurable results achieved.",
+    perspective === "role"
+      ? "Do not infer the required level of responsibility from job title alone."
+      : null,
+  ]);
 }
 
 function readinessVerificationSentence(
@@ -1144,15 +1318,13 @@ function readinessVerificationSentence(
   scoring: any,
 ): string | null {
   const signal = getReadinessSignal(scoring);
-  if (!cleanText(signal?.label)) return null;
+  if (!cleanText(signal?.label) || perspective === "role") return null;
 
   const vertical = getCareerVertical(scoring);
   const code = getCode(vertical);
   const evidence = code ? READINESS_EVIDENCE[code] || null : null;
 
-  return perspective === "role"
-    ? `Do not assume that a previous job title proves the required level of responsibility. Confirm that the candidate has genuinely demonstrated ${evidence || "sustained accountability for broader outcomes"}.`
-    : `The results suggest possible readiness for greater responsibility, but this is only something to investigate. Confirm it through evidence of ${evidence || "sound judgement, influence and responsibility for outcomes"}, not ambition or job title.`;
+  return `The results suggest possible readiness for greater responsibility, but this is only something to investigate. Confirm it through evidence of ${evidence || "sound judgement, influence across teams and responsibility for outcomes"}, not ambition or job title.`;
 }
 
 function buildWhatToVerify(
@@ -1160,7 +1332,7 @@ function buildWhatToVerify(
   input: BuildSectionsInput,
 ): string {
   const parts: Array<string | null> = [
-    operatingRiskSentence(perspective, input),
+    ...operatingRiskSentences(perspective, input.scoring),
   ];
 
   if (perspective === "role") {
@@ -1187,26 +1359,19 @@ function buildSections(
   };
 }
 
-function orderCoreRecord(value: unknown): unknown {
+
+export function orderCoreRecord(value: unknown): unknown {
   if (!isRecord(value)) return value;
 
-  const ordered: JsonRecord = {};
-  const coreOrder = ["C", "O", "R", "E"] as const;
-
-  for (const code of coreOrder) {
-    if (Object.prototype.hasOwnProperty.call(value, code)) {
-      ordered[code] = value[code];
-    }
-  }
-
-  // Preserve any unexpected future keys after the standard CORE fields.
-  for (const [key, entry] of Object.entries(value)) {
-    if (!coreOrder.includes(key as (typeof coreOrder)[number])) {
-      ordered[key] = entry;
-    }
-  }
-
-  return ordered;
+  // Atumaphire consumes CORE positionally, so this must always emit
+  // exactly four fields in the canonical sequence: C, O, R, E.
+  // Missing values are sent as 0 so the positional contract can never shift.
+  return {
+    C: value.C ?? 0,
+    O: value.O ?? 0,
+    R: value.R ?? 0,
+    E: value.E ?? 0,
+  };
 }
 
 export function buildAtumaphireScoringPayload(input: {
@@ -1306,12 +1471,31 @@ export function buildAtumaphireExternalPayload(input: {
 }) {
   const source = isRecord(input.sourcePayload) ? input.sourcePayload : {};
   const sourceResult = isRecord(source.result) ? source.result : {};
+  const sourceScoring = input.scoring ?? sourceResult.scoring ?? null;
+
+  // Final outbound safeguard for Atumaphire.
+  // Their integration reads CORE positionally rather than by key mapping,
+  // so the serialized response must always contain C, O, R, E in that order.
+  const outboundScoring = isRecord(sourceScoring)
+    ? {
+        ...sourceScoring,
+        behavioural_approach_counts: orderCoreRecord(
+          sourceScoring.behavioural_approach_counts,
+        ),
+        behavioural_approach_distribution: orderCoreRecord(
+          sourceScoring.behavioural_approach_distribution,
+        ),
+        core_distribution: orderCoreRecord(
+          sourceScoring.core_distribution,
+        ),
+      }
+    : sourceScoring;
 
   return {
     ...source,
     output_mode: input.outputMode || "three_section",
     result: {
-      scoring: input.scoring ?? sourceResult.scoring ?? null,
+      scoring: outboundScoring,
       report: input.narrative,
     },
   };

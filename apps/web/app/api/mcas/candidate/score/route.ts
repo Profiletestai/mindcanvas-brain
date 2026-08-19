@@ -11,6 +11,7 @@ import {
   buildAtumaphireExternalPayload,
   formatAtumaphireNarrative,
   normaliseAtumaphireOutputMode,
+  orderCoreRecord,
 } from "@/lib/mcas/atumaphireOutput";
 
 export const runtime = "nodejs";
@@ -559,12 +560,15 @@ export async function POST(req: Request) {
       secondary_operating_style: scoring.secondary_operating_style,
       tertiary_operating_style: scoring.tertiary_operating_style,
 
-      behavioural_approach_counts: scoring.behavioural_approach_counts,
-      behavioural_approach_distribution:
+      behavioural_approach_counts: orderCoreRecord(
+        scoring.behavioural_approach_counts,
+      ),
+      behavioural_approach_distribution: orderCoreRecord(
         scoring.behavioural_approach_distribution,
+      ),
       behavioural_approach_ranking: scoring.behavioural_approach_ranking,
 
-      core_distribution: scoring.core_distribution,
+      core_distribution: orderCoreRecord(scoring.core_distribution),
 
       career_vertical_counts: scoring.career_vertical_counts,
       career_vertical_distribution: scoring.career_vertical_distribution,
