@@ -113,6 +113,14 @@
     page-break-after: always !important;
   }
 
+  .lead-report-shell .lead-graphs-section {
+    margin-top: 0 !important;
+    break-before: page !important;
+    page-break-before: always !important;
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
   .lead-report-shell main > .report-section {
     margin-top: 0 !important;
     break-before: page !important;

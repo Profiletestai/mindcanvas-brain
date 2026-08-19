@@ -516,7 +516,11 @@ function splitIdentitySection(section: ReportSection | undefined, topProfileName
 function buildDesignerSections(source: ReportSection[], topProfileName: string) {
   const welcome = findSection(source, ["welcome"]);
   const howToUse = findSection(source, ["how_to_use", "how to use"]);
-  const leadIntroduction = findSection(source, ["lead_introduction", "what the lead system", "what the leader system", "four lead approaches"]);
+  const leadIntroduction: ReportSection = {
+    id: "global.lead_introduction",
+    title: "What the LEAD System measures",
+    blocks: [],
+  };
   const eightStyles = findSection(source, ["eight operating styles"]);
   const identitySource = findSection(source, ["profile.identity", "essence"]);
   const separateWorldview = findSection(source, ["sees_world", "sees the world", "worldview"]);
@@ -530,7 +534,7 @@ function buildDesignerSections(source: ReportSection[], topProfileName: string) 
   return [
     welcome,
     howToUse,
-    leadIntroduction || { id: "global.lead_introduction", title: "What the LEAD System measures", blocks: [] },
+    leadIntroduction,
     eightStyles || { id: "global.eight_operating_styles", title: "The Eight Operating Styles at a Glance", blocks: [] },
     { id: "global.frequency_summary", title: "Four LEAD Approaches summary", blocks: [] },
     { id: "global.personality_map", title: "Personality Map", blocks: [] },
@@ -1419,7 +1423,11 @@ function SectionCard({
     );
   }
 
-  if (sectionIdentity.includes("frequency summary")) {
+  if (
+    sectionIdentity.includes("frequency summary") ||
+    sectionIdentity.includes("frequency_summary") ||
+    sectionIdentity.includes("approaches summary")
+  ) {
     const dominantCode = data.top_freq || "A";
     const dominantName = data.frequency_labels?.find((item) => item.code === dominantCode)?.name || APPROACH_FALLBACKS[dominantCode];
     const dominantLabel = approachLabel(dominantName, dominantCode);
@@ -2388,7 +2396,10 @@ export default function LeadSystemReportClient({
         title,
       };
       return safeText(section.id).toLowerCase().includes("lead_introduction")
-        ? [{ id: "lead-system-measures", title: "What the LEAD System measures" }, item]
+        ? [
+            { id: "lead-system-measures", title: "What the LEAD System measures" },
+            { ...item, title: "The four LEAD approaches" },
+          ]
         : [item];
     }),
   ];
@@ -2635,6 +2646,33 @@ export default function LeadSystemReportClient({
               </ul>
             </article>
           </div>
+        </section>
+
+        <section
+          id="lead-results-overview"
+          className="lead-graphs-section report-section mt-5 grid gap-5 lg:grid-cols-2"
+        >
+          <article className="chart-card rounded-[30px] bg-white p-5 text-[#0b2545] shadow-[0_14px_42px_rgba(0,0,0,.22)] sm:p-7">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Frequency summary</p>
+            <h2 className="mt-2 text-2xl font-bold">The four LEAD approaches</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              All four approaches are available to you. The shape of your scores shows which energies you access most naturally.
+            </p>
+            <div className="mt-5">
+              <FrequencyChart labels={data.frequency_labels} values={data.frequency_percentages} dominant={dominantCode} />
+            </div>
+          </article>
+
+          <article className="chart-card rounded-[30px] bg-white p-5 text-[#0b2545] shadow-[0_14px_42px_rgba(0,0,0,.22)] sm:p-7">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#a77d0f]">Personality map</p>
+            <h2 className="mt-2 text-2xl font-bold">Your eight-profile pattern</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Higher points show patterns you access more naturally. Lower points identify areas that may benefit from support, structure or intentional practice.
+            </p>
+            <div className="mt-5">
+              <ProfileRadar ranked={ranked} values={data.profile_percentages} />
+            </div>
+          </article>
         </section>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
