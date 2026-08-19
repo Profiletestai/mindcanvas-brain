@@ -1,5 +1,5 @@
 // apps/web/app/api/stripe/webhook/route.ts
-// POST — canonical Stripe webhook for onboarding and legacy billing.
+// POST — canonical Stripe webhook for subscriptions and one-off purchases.
 
 import "server-only";
 
@@ -41,7 +41,22 @@ type InvoiceWithSubscription = Stripe.Invoice & {
   } | null;
 };
 
-const HANDLED = new Set([
+type DisputeWithPaymentIntent = Stripe.Dispute & {
+  payment_intent?: string | Stripe.PaymentIntent | null;
+};
+
+type OneOffPurchaseRow = {
+  id: string;
+  purchase_type: "usage_bundle" | "paid_test" | "report_upgrade";
+  stripe_mode: "sandbox" | "live";
+};
+
+type OneOffEventResult = {
+  handled: boolean;
+  result?: unknown;
+};
+
+const SUBSCRIPTION_HANDLED = new Set([
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
@@ -285,6 +300,221 @@ async function extractMeta(
   return meta;
 }
 
+async function lookupOneOffPurchase(
+  stripe: Stripe,
+  paymentIntentId: string,
+): Promise<OneOffPurchaseRow | null> {
+  const { data, error } = await portalAdmin()
+    .from("purchases")
+    .select("id, purchase_type, stripe_mode")
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`purchase_lookup_failed:${error.message}`);
+  }
+
+  if (data) return data as OneOffPurchaseRow;
+
+  // Stripe does not guarantee event ordering. A refund/dispute can arrive
+  // before checkout.session.completed has stored the Payment Intent on the
+  // purchase, so recover the purchase ID from server-authored PI metadata.
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+  const metadataPurchaseId = paymentIntent.metadata?.purchase_id?.trim();
+
+  if (!metadataPurchaseId) return null;
+
+  const fallback = await portalAdmin()
+    .from("purchases")
+    .select("id, purchase_type, stripe_mode")
+    .eq("id", metadataPurchaseId)
+    .maybeSingle();
+
+  if (fallback.error) {
+    throw new Error(`purchase_metadata_lookup_failed:${fallback.error.message}`);
+  }
+
+  return (fallback.data as OneOffPurchaseRow | null) ?? null;
+}
+
+function assertPurchaseMode(purchase: OneOffPurchaseRow): void {
+  if (purchase.stripe_mode !== getStripeMode()) {
+    throw new Error("purchase_stripe_mode_mismatch");
+  }
+}
+
+async function callPurchaseRpc(
+  functionName:
+    | "fn_fulfill_one_off_purchase"
+    | "fn_fail_one_off_purchase"
+    | "fn_refund_one_off_purchase"
+    | "fn_dispute_one_off_purchase",
+  parameters: Record<string, unknown>,
+): Promise<unknown> {
+  const { data, error } = await portalAdmin().rpc(
+    functionName,
+    parameters as never,
+  );
+
+  if (error) {
+    throw new Error(`${functionName}_failed:${error.message}`);
+  }
+
+  return data;
+}
+
+async function handleOneOffCheckoutEvent(
+  event: Stripe.Event,
+): Promise<OneOffEventResult> {
+  if (
+    event.type !== "checkout.session.completed" &&
+    event.type !== "checkout.session.async_payment_succeeded" &&
+    event.type !== "checkout.session.async_payment_failed" &&
+    event.type !== "checkout.session.expired"
+  ) {
+    return { handled: false };
+  }
+
+  const session = event.data.object as Stripe.Checkout.Session;
+
+  if (session.mode !== "payment") return { handled: false };
+
+  const purchaseId = session.metadata?.purchase_id?.trim();
+  const purchaseType = session.metadata?.purchase_type?.trim();
+
+  // Never send an unrelated payment-mode Checkout Session through the
+  // subscription entitlement RPC.
+  if (!purchaseId || purchaseType !== "usage_bundle") {
+    return {
+      handled: true,
+      result: { ignored: "unmanaged_payment_checkout" },
+    };
+  }
+
+  if (
+    event.type === "checkout.session.async_payment_failed" ||
+    event.type === "checkout.session.expired"
+  ) {
+    const result = await callPurchaseRpc("fn_fail_one_off_purchase", {
+      p_purchase_id: purchaseId,
+      p_stripe_event_id: event.id,
+      p_checkout_session_id: session.id,
+      p_failure_reason: event.type,
+    });
+
+    return { handled: true, result };
+  }
+
+  // Some delayed payment methods complete Checkout before their payment is
+  // final. The later async_payment_succeeded event is authoritative.
+  if (session.payment_status !== "paid") {
+    return {
+      handled: true,
+      result: { pending: true, payment_status: session.payment_status },
+    };
+  }
+
+  const paymentIntentId = getExpandableId(session.payment_intent);
+
+  if (!paymentIntentId) throw new Error("payment_intent_unresolved");
+  if (session.amount_total === null) throw new Error("amount_total_unresolved");
+  if (!session.currency) throw new Error("currency_unresolved");
+
+  const result = await callPurchaseRpc("fn_fulfill_one_off_purchase", {
+    p_purchase_id: purchaseId,
+    p_stripe_event_id: event.id,
+    p_stripe_mode: getStripeMode(),
+    p_checkout_session_id: session.id,
+    p_payment_intent_id: paymentIntentId,
+    p_amount: session.amount_total,
+    p_currency: session.currency,
+  });
+
+  return { handled: true, result };
+}
+
+async function handleRefundEvent(
+  stripe: Stripe,
+  event: Stripe.Event,
+): Promise<OneOffEventResult> {
+  if (event.type !== "charge.refunded") return { handled: false };
+
+  const charge = event.data.object as Stripe.Charge;
+  const paymentIntentId = getExpandableId(charge.payment_intent);
+
+  if (!paymentIntentId) {
+    return { handled: true, result: { ignored: "no_payment_intent" } };
+  }
+
+  const purchase = await lookupOneOffPurchase(stripe, paymentIntentId);
+
+  if (!purchase) {
+    return { handled: true, result: { ignored: "not_one_off_purchase" } };
+  }
+
+  assertPurchaseMode(purchase);
+
+  const result = await callPurchaseRpc("fn_refund_one_off_purchase", {
+    p_purchase_id: purchase.id,
+    p_stripe_event_id: event.id,
+    p_refunded_amount: charge.amount_refunded,
+    p_currency: charge.currency,
+  });
+
+  return { handled: true, result };
+}
+
+async function handleDisputeEvent(
+  stripe: Stripe,
+  event: Stripe.Event,
+): Promise<OneOffEventResult> {
+  if (event.type !== "charge.dispute.created") return { handled: false };
+
+  const dispute = event.data.object as DisputeWithPaymentIntent;
+  let paymentIntentId = getExpandableId(dispute.payment_intent);
+
+  if (!paymentIntentId) {
+    const chargeId = getExpandableId(dispute.charge);
+
+    if (chargeId) {
+      const charge = await stripe.charges.retrieve(chargeId);
+      paymentIntentId = getExpandableId(charge.payment_intent);
+    }
+  }
+
+  if (!paymentIntentId) {
+    return { handled: true, result: { ignored: "no_payment_intent" } };
+  }
+
+  const purchase = await lookupOneOffPurchase(stripe, paymentIntentId);
+
+  if (!purchase) {
+    return { handled: true, result: { ignored: "not_one_off_purchase" } };
+  }
+
+  assertPurchaseMode(purchase);
+
+  const result = await callPurchaseRpc("fn_dispute_one_off_purchase", {
+    p_purchase_id: purchase.id,
+    p_stripe_event_id: event.id,
+  });
+
+  return { handled: true, result };
+}
+
+async function handleOneOffEvent(
+  stripe: Stripe,
+  event: Stripe.Event,
+): Promise<OneOffEventResult> {
+  const checkoutResult = await handleOneOffCheckoutEvent(event);
+  if (checkoutResult.handled) return checkoutResult;
+
+  const refundResult = await handleRefundEvent(stripe, event);
+  if (refundResult.handled) return refundResult;
+
+  return handleDisputeEvent(stripe, event);
+}
+
 function isDuplicateInsert(error: {
   code?: string;
   message?: string;
@@ -418,7 +648,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, duplicate: true });
     }
 
-    if (!HANDLED.has(event.type)) {
+    const oneOff = await handleOneOffEvent(stripe, event);
+
+    if (oneOff.handled) {
+      await finishEvent(event.id, "ok");
+      return NextResponse.json({ ok: true, one_off: true, result: oneOff.result });
+    }
+
+    if (!SUBSCRIPTION_HANDLED.has(event.type)) {
       await finishEvent(event.id, "ok");
       return NextResponse.json({ ok: true, ignored: event.type });
     }
@@ -455,9 +692,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // The RPC marks the event complete transactionally. This is a harmless
-    // second write and preserves compatibility if an older RPC is still live
-    // during a rolling deployment.
+    // The subscription RPC marks the event complete transactionally. This is
+    // a harmless second write and preserves rolling-deployment compatibility.
     await finishEvent(event.id, "ok");
 
     return NextResponse.json({ ok: true });
