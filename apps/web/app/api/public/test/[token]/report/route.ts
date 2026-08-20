@@ -1612,6 +1612,9 @@ export async function GET(req: Request, { params }: { params: { token: string } 
           effectiveTestRow?.name ||
           testMeta?.test ||
           "Profile Test",
+        report_date: sub.created_at || null,
+        framework_id: frameworkId || sections?.framework_id || null,
+        framework_content_blocks: isLead ? sections : null,
 
         taker: {
           id: takerId,

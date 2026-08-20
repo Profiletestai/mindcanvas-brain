@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { orderCoreRecord } from "@/lib/mcas/atumaphireOutput";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -239,8 +240,8 @@ export async function GET(
       ? {
           scoring_model: result.scoring_model || null,
 
-          core_distribution: result.core_distribution || null,
-          core_labels: coreLabels,
+          core_distribution: orderCoreRecord(result.core_distribution),
+          core_labels: orderCoreRecord(coreLabels),
 
           operating_style_distribution: result.os_distribution || null,
           operating_style_enriched: osEnriched,

@@ -1,3 +1,5 @@
+//apps/web/app/(v2)/onboarding/v2/layout.tsx
+import { OnboardingAnalytics } from "./_components/OnboardingAnalytics";
 import { OnboardingHeader } from "./_components/OnboardingHeader";
 import { OnboardingShell } from "./_components/OnboardingShell";
 
@@ -8,7 +10,9 @@ export default function OnboardingV2Layout({
 }) {
   return (
     <div className="min-h-screen bg-white text-white flex flex-col">
+      <OnboardingAnalytics />
       <OnboardingHeader />
+
       <main
         className="flex-1"
         style={{
