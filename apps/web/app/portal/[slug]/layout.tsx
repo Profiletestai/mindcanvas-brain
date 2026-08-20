@@ -5,6 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { getStripeMode } from "@/app/_lib/billing";
 import { getAdminClient } from "@/app/_lib/portal";
+import { MCAS_TEST_SLUG, orgHasTestAccess } from "@/lib/portal/authz";
 import LegacyBillingCheckoutModal from "@/components/billing/LegacyBillingCheckoutModal";
 import PortalChrome from "@/components/portal/PortalChrome";
 import BackgroundGrid from "@/components/ui/BackgroundGrid";
@@ -169,6 +170,10 @@ export default async function OrgLayout({
     ? await requiresLegacyBilling(org)
     : false;
 
+  // Decides whether the MCAS tabs render. Server-side so the chrome does not
+  // need a client round trip on every portal page.
+  const showMcas = org ? await orgHasTestAccess(org.id, MCAS_TEST_SLUG) : false;
+
   const brandVariables = {
     "--brand-primary": org?.brand_primary ?? "#2d8fc4",
     "--brand-secondary": org?.brand_secondary ?? "#015a8b",
@@ -210,6 +215,7 @@ export default async function OrgLayout({
         <PortalChrome
           orgSlug={slug}
           orgName={org?.brand_name ?? org?.name ?? slug}
+          showMcas={showMcas}
         >
           {children}
         </PortalChrome>

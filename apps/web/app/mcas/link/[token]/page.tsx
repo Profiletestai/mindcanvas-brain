@@ -12,17 +12,41 @@ type PageProps = {
   params: {
     token: string;
   };
+  searchParams?: {
+    error?: string;
+  };
 };
 
-export default async function McasReusableLinkPage({ params }: PageProps) {
+export default async function McasReusableLinkPage({
+  params,
+  searchParams,
+}: PageProps) {
   const status = await getMcasPublicTestLinkStatus(params.token);
+
+  const startError = searchParams?.error?.trim() || null;
 
   async function startAssessmentAction() {
     "use server";
 
-    const result = await createMcasApplicationFromReusableLink(params.token);
+    let applicationPublicToken: string;
 
-    redirect(buildMcasCandidateApplicationUrl(result.applicationPublicToken));
+    try {
+      const result = await createMcasApplicationFromReusableLink(params.token);
+      applicationPublicToken = result.applicationPublicToken;
+    } catch (caught) {
+      // Most likely the owning portal organisation is out of assessment
+      // credits. Show the candidate why rather than an error boundary.
+      const message =
+        caught instanceof Error
+          ? caught.message
+          : "This assessment could not be started.";
+
+      redirect(
+        `/mcas/link/${params.token}?error=${encodeURIComponent(message)}`,
+      );
+    }
+
+    redirect(buildMcasCandidateApplicationUrl(applicationPublicToken));
   }
 
   if (!status.ok) {
@@ -67,6 +91,12 @@ export default async function McasReusableLinkPage({ params }: PageProps) {
             value={completedApplications.toString()}
           />
         </div>
+
+        {startError ? (
+          <p className="mt-6 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-5 py-4 text-sm leading-6 text-amber-100">
+            {startError}
+          </p>
+        ) : null}
 
         <form action={startAssessmentAction} className="mt-8">
           <button

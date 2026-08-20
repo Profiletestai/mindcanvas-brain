@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 type Props = {
   orgSlug: string;
   orgName?: string | null;
+  /** Adds the MCAS tabs. Resolved server-side in the org layout. */
+  showMcas?: boolean;
   children: React.ReactNode;
 };
 
@@ -22,8 +24,22 @@ const tabs = [
   { label: "Profile Settings", path: "profile" },
 ] as const;
 
-export default function PortalChrome({ orgSlug, orgName, children }: Props) {
+// Only rendered for orgs entitled to the People engine; the pages behind them
+// re-check membership and entitlement.
+const mcasTabs = [
+  { label: "MCAS Tests", path: "mcas/links" },
+  { label: "MCAS Candidates", path: "mcas/database" },
+] as const;
+
+export default function PortalChrome({
+  orgSlug,
+  orgName,
+  showMcas = false,
+  children,
+}: Props) {
   const pathname = usePathname();
+
+  const visibleTabs = showMcas ? [...tabs, ...mcasTabs] : [...tabs];
 
   return (
     <div className="min-h-screen">
@@ -41,7 +57,7 @@ export default function PortalChrome({ orgSlug, orgName, children }: Props) {
 
       {/* Tabs */}
       <div className="flex gap-2 px-5 pb-4 flex-wrap">
-        {tabs.map((t) => {
+        {visibleTabs.map((t) => {
           const href = `/portal/${orgSlug}/${t.path}`;
           const active = pathname?.startsWith(href);
 

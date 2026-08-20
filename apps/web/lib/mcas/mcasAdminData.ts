@@ -36,7 +36,7 @@ export type McasOrgDashboardStats = {
 
 export type McasApplicationStatus = "created" | "started" | "completed";
 
-type McasCandidateDatabaseViewRow = {
+export type McasCandidateDatabaseViewRow = {
   partner_application_id: string;
   org_id: string;
   partner_key: string;
@@ -532,7 +532,8 @@ export async function getMcasTestLinks({
   return ((data ?? []) as McasPartnerApplicationRow[]).map(normaliseTestLinkRow);
 }
 
-function normaliseCandidateDatabaseRow(
+/** Shared with lib/mcas/mcasPortalData.ts so both views map identically. */
+export function normaliseCandidateDatabaseRow(
   row: McasCandidateDatabaseViewRow,
 ): McasCandidateDatabaseRow {
   const firstName = cleanText(row.candidate_first_name);
@@ -642,7 +643,11 @@ function cleanText(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function readDistribution(value: unknown): Array<{ code: string; value: number }> {
+/**
+ * Parses a stored distribution regardless of which key the writer used.
+ * Exported for the portal candidate view, which renders the same payloads.
+ */
+export function readDistribution(value: unknown): Array<{ code: string; value: number }> {
   if (!value) return [];
 
   if (Array.isArray(value)) {
