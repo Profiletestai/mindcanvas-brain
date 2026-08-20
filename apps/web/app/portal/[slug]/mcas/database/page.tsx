@@ -13,11 +13,8 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = {
   q?: string;
-  status?: string;
   page?: string;
 };
-
-const STATUS_FILTERS = ["all", "created", "started", "completed"] as const;
 
 export default async function McasDatabasePage({
   params,
@@ -37,12 +34,10 @@ export default async function McasDatabasePage({
   const { org } = guard.access;
 
   const q = (searchParams.q ?? "").trim();
-  const status = (searchParams.status ?? "all").trim();
   const page = Math.max(Number.parseInt(searchParams.page ?? "1", 10) || 1, 1);
 
   const result = await listPortalMcasCandidates(org.id, {
     query: q || null,
-    status,
     page,
     pageSize: 25,
   });
@@ -52,7 +47,6 @@ export default async function McasDatabasePage({
   const pageHref = (target: number) => {
     const search = new URLSearchParams();
     if (q) search.set("q", q);
-    if (status && status !== "all") search.set("status", status);
     if (target > 1) search.set("page", String(target));
     const qs = search.toString();
     return qs ? `${basePath}?${qs}` : basePath;
@@ -77,21 +71,6 @@ export default async function McasDatabasePage({
             placeholder="Name, email or application ID"
             className="w-72 rounded border border-gray-300 p-2 text-sm"
           />
-        </label>
-
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium">Status</span>
-          <select
-            name="status"
-            defaultValue={status}
-            className="rounded border border-gray-300 p-2 text-sm"
-          >
-            {STATUS_FILTERS.map((value) => (
-              <option key={value} value={value}>
-                {value === "all" ? "All" : value}
-              </option>
-            ))}
-          </select>
         </label>
 
         <button
