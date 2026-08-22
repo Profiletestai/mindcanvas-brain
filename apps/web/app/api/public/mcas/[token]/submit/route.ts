@@ -3,6 +3,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import {
+  recordPortalMcasUsage,
+  resolvePortalOwner,
+} from "./_lib/portalUsage";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -28,6 +33,7 @@ type CandidatePayload = {
 type McasPartnerApplicationRow = {
   id: string;
   org_id: string;
+  portal_org_id: string | null;
   partner_key: string;
   application_id: string;
   public_token: string;
@@ -41,6 +47,7 @@ type McasPartnerApplicationRow = {
 type McasTestLinkRow = {
   id: string;
   public_token: string;
+  portal_org_id: string | null;
   link_type:
     "candidate_assessment" | "reverse_role_assessment" | "internal_validation";
   framework_slug: string;
@@ -662,6 +669,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         [
           "id",
           "org_id",
+          "portal_org_id",
           "partner_key",
           "application_id",
           "public_token",
@@ -710,6 +718,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         [
           "id",
           "public_token",
+          "portal_org_id",
           "link_type",
           "framework_slug",
           "framework_version",
@@ -756,6 +765,9 @@ export async function POST(req: Request, ctx: RouteContext) {
         { status: 400 },
       );
     }
+
+    // Portal ownership snapshot — see _lib/portalUsage.ts for the rule.
+    const portalOrgId = resolvePortalOwner(application, testLink);
 
     const { data: frameworkData, error: frameworkError } = await sb
       .from("frameworks")
@@ -842,6 +854,10 @@ export async function POST(req: Request, ctx: RouteContext) {
         consent: true,
         status: "started",
         started_at: startedAt,
+        // Backfills applications created before the portal integration, and
+        // covers the reverse-role/direct-link paths that bypass
+        // createMcasApplicationFromReusableLink.
+        portal_org_id: portalOrgId,
       })
       .eq("id", application.id);
 
@@ -978,6 +994,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           framework_version: application.framework_version,
           status: "started",
           meta: assessmentMeta,
+          portal_org_id: portalOrgId,
         })
         .eq("id", assessmentId);
 
@@ -1002,6 +1019,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             framework_version: application.framework_version,
             status: "started",
             meta: assessmentMeta,
+            portal_org_id: portalOrgId,
           })
           .select("id, report_token")
           .single();
@@ -1270,6 +1288,22 @@ export async function POST(req: Request, ctx: RouteContext) {
       );
     }
 
+    /*
+     * Portal usage. Recorded only after the result is saved and both rows are
+     * marked completed, so a failure earlier in the route never charges the org.
+     *
+     * The reference is stable across retries, which is what makes this
+     * retry-safe: fn_reserve_submission short-circuits on a reference it has
+     * already recorded (migration 20260813140000).
+     *
+     * A failure here is logged, never thrown. The assessment is scored and
+     * persisted by now; losing the candidate's result to protect a ledger row
+     * would be the wrong trade. The quota gate that can actually turn a
+     * candidate away runs earlier, at link start, in
+     * createMcasApplicationFromReusableLink.
+     */
+    const usage = await recordPortalMcasUsage(portalOrgId, assessmentId);
+
     const { resultUrl, snapshotUrl, fullReportUrl } = resultUrlsForLink(
       testLink,
       reportToken,
@@ -1338,6 +1372,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       },
       confidence,
       flags,
+      usage,
       ghlSync: {
         ok: ghlSyncResult.ok,
         skipped: Boolean(ghlSyncResult.skipped),

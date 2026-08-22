@@ -209,6 +209,8 @@ export type ReserveSubmissionResult = {
   reason?: "no_subscription" | "limit_reached";
   /** Which pot the submission was drawn from when ok. */
   source?: "engine_trial" | "subscription";
+  /** True when this reference was already charged — a retry, nothing spent. */
+  already_recorded?: boolean;
   engine_key?: string;
   allowance?: number;
   used?: number;
