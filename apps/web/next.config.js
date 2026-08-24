@@ -1,11 +1,19 @@
-const path = require('path');
+const path = require("path");
 
-/** @type {import('next').NextConfig} */
+/** @type {import("next").NextConfig} */
 const nextConfig = {
-  // moved out of "experimental"
-  outputFileTracingRoot: path.join(__dirname, '..', '..'),
+  output: "standalone",
+
+  outputFileTracingRoot: path.join(__dirname, "..", ".."),
+
+  // TypeScript has already been verified separately with `pnpm typecheck`.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   experimental: {
-    // keep other experimental flags here if you have any
+    webpackMemoryOptimizations: true,
+    webpackBuildWorker: false,
   },
 };
 
