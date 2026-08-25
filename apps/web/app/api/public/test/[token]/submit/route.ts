@@ -3455,15 +3455,18 @@ export async function POST(
     let ghlSyncResult: GhlSyncResult | null = null;
     if (isGedTest && isAllowedGedGhlOrg) {
       ghlSyncResult = await syncGedToGhl({
-        taker,
-        token,
-        testName:
-          String(test.name || meta?.assessment_name || "Growth Engine Diagnostic"),
-        orgId: String(taker.org_id),
-        reportUrl: reportUrlForEmail,
-        resultUrl: baseResultUrl,
-        qscSummary,
-        gedDiagnostics,
+       taker,
+       token,
+       testName:
+         linkAssessmentName ||
+         normalizeText(test.name) ||
+         normalizeText(meta?.assessment_name) ||
+         "Growth Engine Diagnostic",
+       orgId: String(taker.org_id),
+       reportUrl: reportUrlForEmail,
+       resultUrl: baseResultUrl,
+       qscSummary,
+       gedDiagnostics,
       });
 
       if (!ghlSyncResult.ok && !ghlSyncResult.skipped) {

@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { api, isErr } from "../_lib/api";
 import { StepCard } from "../_components/StepCard";
-import { DIAGNOSTIC_PATH, SESSION_BOOKED_PATH } from "../_lib/progress";
+import {
+  DIAGNOSTIC_PATH,
+  SESSION_BOOKED_PATH,
+} from "../_lib/progress";
 
 const SESSION_OUTCOMES = [
   "Choose your best first use case",
@@ -17,45 +20,67 @@ const SESSION_OUTCOMES = [
 
 export default function BookSessionPage() {
   const router = useRouter();
-  const [pending, setPending] = useState<"booked" | "later" | null>(null);
+
+  const [pending, setPending] = useState<
+    "booked" | "later" | null
+  >(null);
+
   const [error, setError] = useState("");
 
   async function confirmBooked() {
     if (pending) return;
+
     setPending("booked");
     setError("");
-    const res = await api.completeStep(8);
-    if (isErr(res)) {
-      setError(res.error);
+
+    const response =
+      await api.completeStep(8);
+
+    if (isErr(response)) {
+      setError(response.error);
       setPending(null);
       return;
     }
+
     router.push(SESSION_BOOKED_PATH);
   }
 
   async function doThisLater() {
     if (pending) return;
+
     setPending("later");
     setError("");
 
-    // Completing step 9 skips both the booking choice and its confirmation
-    // screen while keeping progress monotonic and resumable.
-    const res = await api.completeStep(9);
-    if (isErr(res)) {
-      setError(res.error);
+    // Completing internal step 9 skips the booking confirmation screen while
+    // keeping database progress monotonic and resumable.
+    const response =
+      await api.completeStep(9);
+
+    if (isErr(response)) {
+      setError(response.error);
       setPending(null);
       return;
     }
+
     router.push(DIAGNOSTIC_PATH);
   }
 
   return (
     <StepCard
+      width="min(1120px, 100%)"
+      minHeight="auto"
       titleNoWrap={false}
+      className="lg:px-[56px] lg:pt-[36px]"
       title={
         <>
           Book your{" "}
-          <span style={{ color: "rgb(84, 175, 224)" }}>onboarding session</span>
+          <span
+            style={{
+              color: "rgb(84, 175, 224)",
+            }}
+          >
+            onboarding session
+          </span>
         </>
       }
       subtitle="Choose a convenient time to meet with our team and plan your first steps with MindCanvas."
@@ -64,19 +89,24 @@ export default function BookSessionPage() {
         className="mt-8 rounded-[18px] border"
         style={{
           background: "#fff",
-          borderColor: "rgb(228,238,248)",
-          padding: "24px",
-          boxShadow: "0px 2px 12px 0px rgba(13,45,94,0.06)",
+          borderColor:
+            "rgb(228,238,248)",
+          padding: "clamp(20px, 3vw, 36px)",
+          boxShadow:
+            "0px 2px 12px 0px rgba(13,45,94,0.06)",
         }}
       >
         <p
           className="font-bold"
-          style={{ color: "rgb(24,44,62)", fontSize: "14px" }}
+          style={{
+            color: "rgb(24,44,62)",
+            fontSize: "15px",
+          }}
         >
           On the call, we will help you:
         </p>
 
-        <ul className="mt-4 space-y-2.5">
+        <ul className="mt-4 grid gap-x-8 gap-y-2.5 md:grid-cols-2">
           {SESSION_OUTCOMES.map((item) => (
             <li
               key={item}
@@ -90,37 +120,41 @@ export default function BookSessionPage() {
               <span
                 className="mt-[3px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
                 style={{
-                  background: "rgba(34,197,94,0.12)",
+                  background:
+                    "rgba(34,197,94,0.12)",
                   color: "rgb(22,163,74)",
                   fontSize: "10px",
                   fontWeight: 800,
                 }}
+                aria-hidden
               >
                 ✓
               </span>
+
               <span>{item}</span>
             </li>
           ))}
         </ul>
 
         <div
-          className="mt-6 overflow-hidden rounded-[12px] border"
+          className="mt-7 w-full overflow-hidden rounded-[12px] border"
           style={{
-            borderColor: "rgb(208,224,240)",
+            borderColor:
+              "rgb(208,224,240)",
             background: "#fff",
           }}
         >
           <iframe
             src="https://api.leadconnectorhq.com/widget/booking/l8LJSqYiHvaM1QxzmYNH"
             allow="payment"
-            scrolling="no"
+            scrolling="yes"
             id="c5QYwNeVaP2cbd9K5KCR_1785147207106"
             title="Book your MindCanvas onboarding session"
             style={{
+              display: "block",
               width: "100%",
-              minHeight: "720px",
+              minHeight: "920px",
               border: "none",
-              overflow: "hidden",
             }}
           />
         </div>
@@ -131,44 +165,59 @@ export default function BookSessionPage() {
         />
 
         {error && (
-          <p className="mt-4 text-sm text-rose-500" role="alert">
+          <p
+            className="mt-4 text-sm text-rose-500"
+            role="alert"
+          >
             {error}
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={confirmBooked}
-          disabled={pending !== null}
-          className={`mt-6 h-[54px] w-full rounded-[12px] font-bold text-white ${
-            pending ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-          }`}
-          style={{
-            background:
-              "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
-            fontSize: "15px",
-            boxShadow: "0px 4px 16px 0px rgba(37,99,200,0.35)",
-          }}
-        >
-          {pending === "booked" ? "Saving…" : "I’ve booked my session"}
-        </button>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={confirmBooked}
+            disabled={pending !== null}
+            className={`h-[54px] w-full rounded-[12px] font-bold text-white ${
+              pending
+                ? "cursor-not-allowed opacity-40"
+                : "cursor-pointer"
+            }`}
+            style={{
+              background:
+                "linear-gradient(180deg, rgb(6,94,144) 0%, rgb(42,137,190) 100%)",
+              fontSize: "15px",
+              boxShadow:
+                "0px 4px 16px 0px rgba(37,99,200,0.35)",
+            }}
+          >
+            {pending === "booked"
+              ? "Saving…"
+              : "I’ve booked my session"}
+          </button>
 
-        <button
-          type="button"
-          onClick={doThisLater}
-          disabled={pending !== null}
-          className={`mt-3 h-[50px] w-full rounded-[12px] border font-semibold ${
-            pending ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-          }`}
-          style={{
-            background: "#fff",
-            borderColor: "rgb(208,224,240)",
-            color: "rgb(42,137,190)",
-            fontSize: "14px",
-          }}
-        >
-          {pending === "later" ? "Saving…" : "Do this later"}
-        </button>
+          <button
+            type="button"
+            onClick={doThisLater}
+            disabled={pending !== null}
+            className={`h-[54px] w-full rounded-[12px] border font-semibold ${
+              pending
+                ? "cursor-not-allowed opacity-40"
+                : "cursor-pointer"
+            }`}
+            style={{
+              background: "#fff",
+              borderColor:
+                "rgb(208,224,240)",
+              color: "rgb(42,137,190)",
+              fontSize: "14px",
+            }}
+          >
+            {pending === "later"
+              ? "Saving…"
+              : "Do this later"}
+          </button>
+        </div>
       </div>
     </StepCard>
   );
