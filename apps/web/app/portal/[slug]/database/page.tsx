@@ -5,6 +5,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import TestTakerEmailActions from "@/components/portal/TestTakerEmailActions";
+import DatabaseFilters from "@/components/portal/DatabaseFilters";
+import PortalPageHeader from "@/components/portal/PortalPageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,7 @@ type SearchParams = {
   q?: string;
   testId?: string;
   purpose?: string;
+  status?: string;
   sort?: string;
   page?: string;
 };
@@ -27,6 +30,31 @@ type Row = {
   testStatus: "Completed" | "Incomplete";
   created: string;
 };
+
+// Format a timestamp as a relative label (e.g. "2h ago", "Yesterday").
+function relativeTime(value: string | null): string {
+  if (!value) return "—";
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return "—";
+
+  const diffMs = Date.now() - then;
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default async function DatabasePage({
   params,
@@ -53,6 +81,7 @@ export default async function DatabasePage({
     const q = (searchParams.q || "").trim();
     const selectedTestId = (searchParams.testId || "").trim();
     const selectedPurpose = (searchParams.purpose || "").trim();
+    const selectedStatus = (searchParams.status || "").trim().toLowerCase();
     const sortKey = (searchParams.sort || "created_desc") as
       | "created_desc"
       | "created_asc"
@@ -163,6 +192,13 @@ export default async function DatabasePage({
       }
     }
 
+    // Push completion status filter into DB
+    if (selectedStatus === "completed") {
+      takerQuery = takerQuery.ilike("status", "completed");
+    } else if (selectedStatus === "incomplete") {
+      takerQuery = takerQuery.or("status.is.null,status.not.ilike.completed");
+    }
+
     const { data: takers, error: tkErr, count } = await takerQuery.range(
       from,
       to,
@@ -186,15 +222,41 @@ export default async function DatabasePage({
           String(t.status || "").toLowerCase() === "completed"
             ? "Completed"
             : "Incomplete",
-        created: t.created_at
-          ? new Date(t.created_at as any).toISOString().slice(0, 10)
-          : "—",
+        created: relativeTime(t.created_at),
       };
     });
 
     const totalCount = count ?? 0;
     const hasPrev = page > 1;
     const hasNext = page * pageSize < totalCount;
+
+    // --- presentation helpers -------------------------------------------
+    const avatarPalette = [
+      "bg-sky-500/15 text-sky-300",
+      "bg-emerald-500/15 text-emerald-300",
+      "bg-amber-500/15 text-amber-300",
+      "bg-violet-500/15 text-violet-300",
+      "bg-rose-500/15 text-rose-300",
+      "bg-cyan-500/15 text-cyan-300",
+    ];
+    const initials = (name: string) =>
+      name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() ?? "")
+        .join("") || "—";
+    const avatarColor = (seed: string) => {
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+      return avatarPalette[Math.abs(h) % avatarPalette.length];
+    };
+
+    // Status → pill badge (matches design: rounded-full bordered chip).
+    const statusPillClass = (status: Row["testStatus"]) =>
+      status === "Completed"
+        ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-400"
+        : "border-amber-500/40 bg-amber-500/[0.08] text-amber-400";
 
     // SAFE helper to build URLs from filters
     const buildHref = (extra: Partial<SearchParams>) => {
@@ -203,6 +265,8 @@ export default async function DatabasePage({
         extra.testId !== undefined ? extra.testId : selectedTestId;
       const nextPurpose =
         extra.purpose !== undefined ? extra.purpose : selectedPurpose;
+      const nextStatus =
+        extra.status !== undefined ? extra.status : selectedStatus;
       const nextSort = extra.sort !== undefined ? extra.sort : sortKey;
       const nextPage = extra.page !== undefined ? extra.page : String(page);
 
@@ -211,6 +275,7 @@ export default async function DatabasePage({
       if (nextQ) usp.set("q", nextQ);
       if (nextTestId) usp.set("testId", nextTestId);
       if (nextPurpose) usp.set("purpose", nextPurpose);
+      if (nextStatus) usp.set("status", nextStatus);
       if (nextSort) usp.set("sort", nextSort);
       if (nextPage) usp.set("page", nextPage);
 
@@ -219,177 +284,233 @@ export default async function DatabasePage({
     };
 
     return (
-      <div className="space-y-5 text-slate-100">
-        {/* Header row: title + CSV */}
-        <header className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Database</h1>
-          <form action={`/api/portal/takers-export`} method="GET">
-            <input type="hidden" name="org" value={slug} />
-            <input type="hidden" name="q" value={q} />
-            <input type="hidden" name="testId" value={selectedTestId} />
-            <input type="hidden" name="purpose" value={selectedPurpose} />
-            <input type="hidden" name="sort" value={sortKey} />
-            <button
-              type="submit"
-              className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-slate-100 transition hover:bg-white/10"
+      <div className="space-y-6 text-slate-100">
+        {/* Header row: title + actions */}
+        <PortalPageHeader
+          title="Database"
+          subtitle="All profile submissions — review results, track status, and take action."
+          actions={
+            <>
+            <form action={`/api/portal/takers-export`} method="GET">
+              <input type="hidden" name="org" value={slug} />
+              <input type="hidden" name="q" value={q} />
+              <input type="hidden" name="testId" value={selectedTestId} />
+              <input type="hidden" name="purpose" value={selectedPurpose} />
+              <input type="hidden" name="status" value={selectedStatus} />
+              <input type="hidden" name="sort" value={sortKey} />
+              <button
+                type="submit"
+                style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+                className="inline-flex h-[30px] items-center justify-center rounded-md border border-[rgba(255,255,255,0.11)] bg-[rgba(255,255,255,0.04)] px-4 text-[12px] font-bold leading-none tracking-[0.1px] text-[rgba(255,255,255,0.62)] transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+              >
+                Export
+              </button>
+            </form>
+
+            <Link
+              href={`/portal/${slug}/links`}
+              style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+              className="inline-flex h-[30px] items-center gap-[7px] rounded-md bg-[linear-gradient(101.83deg,#54AFE0_0%,#54AFE0_100%)] px-4 text-[12px] font-bold leading-none tracking-[0.1px] text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90"
             >
-              Download CSV
-            </button>
-          </form>
-        </header>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New test link
+            </Link>
+            </>
+          }
+        />
 
         {/* Filters row */}
-        <form
-          className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_auto]"
-          action={`/portal/${slug}/database`}
-          method="GET"
-        >
-          <input
-            name="q"
-            defaultValue={searchParams.q || ""}
-            placeholder="Search name, email, or company…"
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-          />
+        <DatabaseFilters
+          tests={(tests ?? []).map((t: any) => ({
+            id: t.id,
+            label: t.name || t.slug || "Untitled",
+          }))}
+          purposeOptions={purposeOptions}
+          initialQ={searchParams.q || ""}
+          initialTestId={selectedTestId}
+          initialPurpose={selectedPurpose}
+          initialStatus={selectedStatus}
+          initialSort={sortKey}
+        />
 
-          <select
-            name="testId"
-            defaultValue={selectedTestId}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-          >
-            <option value="">All tests</option>
-            {(tests ?? []).map((t: any) => (
-              <option key={t.id} value={t.id}>
-                {t.name || t.slug || "Untitled"}
-              </option>
-            ))}
-          </select>
-
-          <select
-            name="purpose"
-            defaultValue={selectedPurpose}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-          >
-            <option value="">All test names / purposes</option>
-            {purposeOptions.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-
-          <select
-            name="sort"
-            defaultValue={sortKey}
-            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-          >
-            <option value="created_desc">Newest first</option>
-            <option value="created_asc">Oldest first</option>
-            <option value="company_asc">Company A → Z</option>
-            <option value="company_desc">Company Z → A</option>
-          </select>
-
-          <button
-            className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-slate-100 transition hover:bg-white/10"
-            type="submit"
-          >
-            Apply
-          </button>
-        </form>
-
-        {/* White data card */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-lg">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Name
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Email
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Company
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Test
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Test name / purpose
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Test status
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Created
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, idx) => (
-                <tr
-                  key={r.id}
-                  className={
-                    "border-t border-slate-100" +
-                    (idx % 2 === 1 ? " bg-slate-50" : "") +
-                    " hover:bg-slate-100/80"
-                  }
-                >
-                  <td className="px-4 py-2">{r.name}</td>
-                  <td className="px-4 py-2">{r.email}</td>
-                  <td className="px-4 py-2">{r.company}</td>
-                  <td className="px-4 py-2">{r.testName}</td>
-                  <td className="px-4 py-2">{r.testPurpose}</td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={
-                        r.testStatus === "Completed"
-                          ? "inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700"
-                          : "inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700"
-                      }
-                    >
-                      {r.testStatus}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2">{r.created}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex flex-col gap-1">
-                      <TestTakerEmailActions
-                        orgSlug={slug}
-                        testId={r.testId}
-                        takerId={r.id}
-                        compact
-                      />
-                      <Link
-                        className="text-[11px] text-sky-700 underline hover:text-sky-900"
-                        href={`/portal/${slug}/database/${r.id}`}
-                      >
-                        View profile
-                      </Link>
-                    </div>
-                  </td>
+        {/* Data card */}
+        <div className="overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#0e2a45] backdrop-blur-[24px]">
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.07] text-left text-[12px] font-semibold uppercase tracking-[0.08em] text-[#647789]">
+                  <th className="px-6 py-5">Name</th>
+                  <th className="px-5 py-5">Test taken</th>
+                  <th className="px-5 py-5">Date</th>
+                  <th className="px-5 py-5">Status</th>
+                  <th className="px-5 py-5">Report</th>
+                  <th className="px-5 py-5">Tags</th>
+                  <th className="px-6 py-5">Actions</th>
                 </tr>
-              ))}
-
-              {rows.length === 0 && (
-                <tr>
-                  <td
-                    className="px-4 py-6 text-center text-slate-500"
-                    colSpan={8}
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="border-b border-white/[0.05] transition hover:bg-white/[0.025]"
                   >
-                    No test takers found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    {/* Name + email + avatar */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${avatarColor(
+                            r.name,
+                          )}`}
+                        >
+                          {initials(r.name)}
+                        </span>
+                        <div className="flex min-w-0 items-baseline gap-2.5">
+                          <span className="whitespace-nowrap text-[15px] font-semibold text-white">
+                            {r.name}
+                          </span>
+                          {r.email && r.email !== "—" && (
+                            <span className="truncate text-[13px] text-slate-500">
+                              {r.email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Test taken */}
+                    <td className="px-5 py-4">
+                      <span className="inline-flex items-center whitespace-nowrap rounded-full border border-[#3d6ea8]/50 px-3.5 py-1.5 text-[13px] font-medium text-[#4a9cff]">
+                        {r.testName}
+                      </span>
+                    </td>
+
+                    {/* Date */}
+                    <td className="whitespace-nowrap px-5 py-4 text-[14px] text-slate-400">
+                      {r.created}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-5 py-4">
+                      <span
+                        className={`inline-flex items-center whitespace-nowrap rounded-full border px-3 py-1 text-[12px] font-semibold ${statusPillClass(
+                          r.testStatus,
+                        )}`}
+                      >
+                        {r.testStatus}
+                      </span>
+                    </td>
+
+                    {/* Report */}
+                    <td className="px-5 py-4">
+                      {r.testStatus === "Completed" ? (
+                        <Link
+                          href={`/portal/${slug}/database/${r.id}`}
+                          className="inline-flex items-center whitespace-nowrap rounded-full border border-white/[0.12] bg-white/[0.06] px-4 py-1.5 text-[13px] font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                        >
+                          View report
+                        </Link>
+                      ) : (
+                        <span className="whitespace-nowrap text-[13px] italic text-slate-500">
+                          In progress
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Tags */}
+                    <td className="px-5 py-4">
+                      {r.testPurpose && r.testPurpose !== "—" ? (
+                        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-white/[0.08] px-3.5 py-1.5 text-[13px] font-medium text-slate-500">
+                          {r.testPurpose}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">—</span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/portal/${slug}/database/${r.id}`}
+                          title="View profile"
+                          className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-white/[0.08] bg-white/[0.04] text-white/[0.36] transition hover:bg-white/[0.07] hover:text-white/70"
+                        >
+                          <svg
+                            width="26"
+                            height="26"
+                            viewBox="0 0 26 26"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.45714"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M8.71436 8.71429H17.2858V15.5714L14.7144 18.1429H8.71436V8.71429Z" />
+                            <path d="M10.4285 11.2857H15.5713" />
+                            <path d="M10.4285 13.8571H12.9999" />
+                          </svg>
+                        </Link>
+
+                        <TestTakerEmailActions
+                          orgSlug={slug}
+                          testId={r.testId}
+                          takerId={r.id}
+                          compact
+                        />
+
+                        <a
+                          href={`/api/portal/takers-export?org=${slug}&q=${encodeURIComponent(
+                            r.email,
+                          )}`}
+                          title="Download CSV"
+                          className="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] border border-white/[0.08] bg-white/[0.04] text-white/[0.36] transition hover:bg-white/[0.07] hover:text-white/70"
+                        >
+                          <svg
+                            width="26"
+                            height="26"
+                            viewBox="0 0 26 26"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.45714"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M8.71436 15.5714V17.2857H17.2858V15.5714M13.0001 8.71429V14.7143M15.5715 12.1429L13.0001 14.7143L10.4286 12.1429" />
+                          </svg>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {rows.length === 0 && (
+                  <tr>
+                    <td
+                      className="px-6 py-10 text-center text-slate-500"
+                      colSpan={7}
+                    >
+                      No submissions found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Pagination */}
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-300">
+          <span className="text-slate-500">
             Page {page}
             {totalCount > 0 ? ` · ${totalCount} total` : ""}
           </span>
@@ -398,12 +519,12 @@ export default async function DatabasePage({
             {hasPrev ? (
               <Link
                 href={buildHref({ page: String(page - 1) })}
-                className="rounded-xl border border-white/20 bg-white/5 px-3 py-1 transition hover:bg-white/10"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-slate-200 transition hover:bg-white/10"
               >
                 Prev
               </Link>
             ) : (
-              <span className="cursor-not-allowed rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-slate-500">
+              <span className="cursor-not-allowed rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-slate-600">
                 Prev
               </span>
             )}
@@ -411,12 +532,12 @@ export default async function DatabasePage({
             {hasNext ? (
               <Link
                 href={buildHref({ page: String(page + 1) })}
-                className="rounded-xl border border-white/20 bg-white/5 px-3 py-1 transition hover:bg-white/10"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-slate-200 transition hover:bg-white/10"
               >
                 Next
               </Link>
             ) : (
-              <span className="cursor-not-allowed rounded-xl border border-white/10 bg-white/5 px-3 py-1 text-slate-500">
+              <span className="cursor-not-allowed rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-slate-600">
                 Next
               </span>
             )}

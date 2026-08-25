@@ -2,14 +2,10 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
+import { normalizeReportVariant } from "@/lib/links/normalize";
+import { requireOrgAccess } from "@/lib/server/orgAccess";
 
 export const runtime = "nodejs";
-
-type ReportVariant = "lite" | "full";
-
-function normalizeReportVariant(v: any): ReportVariant {
-  return String(v || "").trim().toLowerCase() === "lite" ? "lite" : "full";
-}
 
 export async function GET(req: Request) {
   try {
@@ -18,6 +14,15 @@ export async function GET(req: Request) {
 
     if (!orgId) {
       return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
+    }
+
+    // Otherwise any caller could list another organisation's links by id.
+    const access = await requireOrgAccess(orgId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status },
+      );
     }
 
     const sb = createClient().schema("portal");
@@ -39,6 +44,7 @@ export async function GET(req: Request) {
           "org_id",
           "redirect_url",
           "next_steps_url",
+          "hidden_results_message",
           "use_count",
           "max_uses",
           "meta",
@@ -112,6 +118,7 @@ export async function GET(req: Request) {
 
       redirect_url: r.redirect_url || null,
       next_steps_url: r.next_steps_url || null,
+      hidden_results_message: r.hidden_results_message || null,
 
       use_count:
         typeof usesByToken[r.token] === "number"

@@ -4,10 +4,12 @@ import "server-only";
 import type { CSSProperties, ReactNode } from "react";
 
 import { getStripeMode } from "@/app/_lib/billing";
-import { getAdminClient } from "@/app/_lib/portal";
+import { getAdminClient, getServerSupabase } from "@/app/_lib/portal";
 import LegacyBillingCheckoutModal from "@/components/billing/LegacyBillingCheckoutModal";
-import PortalChrome from "@/components/portal/PortalChrome";
+import PortalHeader from "@/components/portal/PortalHeader";
+import PortalSidebar from "@/components/portal/PortalSidebar";
 import BackgroundGrid from "@/components/ui/BackgroundGrid";
+import { loadModels } from "@/lib/portal/loadModels";
 
 import PilotGracePopup from "./PilotGracePopup";
 
@@ -169,6 +171,44 @@ export default async function OrgLayout({
     ? await requiresLegacyBilling(org)
     : false;
 
+  // Logged-in user (for the welcome header) — always the current user, never the org owner
+  let firstName: string | null = null;
+  let fullName: string | null = null;
+  let isSuperadmin = false;
+  try {
+    const sb = await getServerSupabase();
+    const { data } = await sb.auth.getUser();
+    const user = data?.user ?? null;
+    const meta = (user?.user_metadata ?? {}) as Record<string, any>;
+
+    const metaFull =
+      [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim() ||
+      meta.full_name ||
+      meta.name ||
+      null;
+
+    firstName = meta.first_name || (metaFull ? metaFull.split(/\s+/)[0] : null);
+    fullName = metaFull;
+
+    // Same lookup as app/admin/layout.tsx — gates the "Back to admin" link.
+    if (user?.id) {
+      const admin = await getAdminClient();
+      const { data: adminRow } = await admin
+        .schema("portal")
+        .from("superadmin")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      isSuperadmin = Boolean(adminRow?.user_id);
+    }
+  } catch {
+    // ignore — header falls back to a generic greeting
+  }
+
+  // Model list for the header's "Create test link" wizard.
+  const models = org ? await loadModels(org.id) : [];
+
   const brandVariables = {
     "--brand-primary": org?.brand_primary ?? "#2d8fc4",
     "--brand-secondary": org?.brand_secondary ?? "#015a8b",
@@ -201,18 +241,38 @@ export default async function OrgLayout({
     >
       <BackgroundGrid />
 
+      {/* Rotated brand gradient cover (per Figma: -12.49deg, opacity .35, blur 18px) */}
       <div
-        className="relative z-10"
+        aria-hidden
+        className="pointer-events-none fixed left-1/2 top-1/2 -z-10 h-[180%] w-[180%] -translate-x-1/2 -translate-y-1/2 rotate-[-12.49deg] opacity-[0.65] [filter:blur(18px)]"
         style={{
-          fontFamily: "var(--report-font-family)",
+          background:
+            "linear-gradient(90deg, rgba(1,90,139,0) 0%, rgba(1,90,139,0.4) 25%, rgba(45,143,196,0.533) 50%, rgba(100,186,226,0.4) 75%, rgba(100,186,226,0) 100%)",
         }}
+      />
+
+      {/* Portal nav + content */}
+      <div
+        className="relative z-10 flex min-h-screen"
+        style={{ fontFamily: "var(--report-font-family)" }}
       >
-        <PortalChrome
-          orgSlug={slug}
-          orgName={org?.brand_name ?? org?.name ?? slug}
-        >
-          {children}
-        </PortalChrome>
+        {/* Left sidebar (full-height, light theme) */}
+        <div className="hidden md:block">
+          <PortalSidebar orgSlug={slug} />
+        </div>
+
+        {/* Main column: welcome header + page body */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <PortalHeader
+            orgSlug={slug}
+            orgId={org?.id ?? ""}
+            models={models}
+            firstName={firstName}
+            fullName={fullName}
+            isSuperadmin={isSuperadmin}
+          />
+          <div className="px-5 pb-10 pt-4">{children}</div>
+        </div>
       </div>
 
       <PilotGracePopup />
