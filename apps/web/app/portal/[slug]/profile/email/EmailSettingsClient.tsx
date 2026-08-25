@@ -24,11 +24,12 @@ export default function EmailSettingsClient({ slug }: { slug: string }) {
       report_from_name: org.report_from_name,
       report_from_email: org.report_from_email,
       report_footer_notes: org.report_footer_notes,
+      notification_email: org.notification_email,
     });
   }
 
   return (
-    <ProfileShell>
+    <ProfileShell title="Email & notifications" subtitle="Control how organisation emails appear and where internal alerts are delivered.">
       <ProfileCard
         title="Email settings"
         description="How your emails appear to test takers and report recipients."
@@ -58,6 +59,13 @@ export default function EmailSettingsClient({ slug }: { slug: string }) {
               onChange={(e) => update("report_from_email", e.target.value)}
             />
           </Field>
+        </div>
+
+        <div className="mt-5">
+          <Field label="Internal notification email" htmlFor="notification-email">
+            <input id="notification-email" type="email" className={inputClass} placeholder="notifications@acmeconsulting.com" value={org?.notification_email ?? ""} disabled={!org} onChange={(e) => update("notification_email", e.target.value)} />
+          </Field>
+          <p className="mt-2 text-xs text-white/45">New assessment completion alerts are delivered here.</p>
         </div>
 
         <div className="mt-5">

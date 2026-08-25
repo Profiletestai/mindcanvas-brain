@@ -145,13 +145,13 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
       match: `${base}/profile`,
       icon: ProfileIcon,
       children: [
-        { label: "Personal details", href: `${base}/profile` },
+        { label: "Overview", href: `${base}/profile/overview` },
+        { label: "My Account", href: `${base}/profile` },
         { label: "Organisation", href: `${base}/profile/organisation` },
-        { label: "Logo", href: `${base}/profile/logo` },
-        { label: "Email settings", href: `${base}/profile/email` },
-        { label: "Billing", href: `${base}/billing` },
+        { label: "Branding", href: `${base}/profile/logo` },
+        { label: "Email & Notifications", href: `${base}/profile/email` },
+        { label: "Billing & Usage", href: `${base}/billing` },
         { label: "Setup checklist", href: `${base}/profile/checklist` },
-        { label: "Add users", href: `${base}/profile/users` },
       ],
     },
     {

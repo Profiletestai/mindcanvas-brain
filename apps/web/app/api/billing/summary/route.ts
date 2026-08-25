@@ -340,6 +340,8 @@ async function loadStripeDetails({
       plan: fallbackPlan,
       payment_method: null,
       invoices: [] as SafeInvoice[],
+      cancel_at_period_end: false,
+      cancel_at: null as string | null,
     };
   }
 
@@ -439,6 +441,8 @@ async function loadStripeDetails({
             invoice.invoice_pdf ?? null,
         })
       ),
+      cancel_at_period_end: Boolean(subscription?.cancel_at_period_end),
+      cancel_at: subscription?.cancel_at ? unixTimestampToIso(subscription.cancel_at) : null,
     };
   } catch (error) {
     console.error(
@@ -450,6 +454,8 @@ async function loadStripeDetails({
       plan: fallbackPlan,
       payment_method: null,
       invoices: [] as SafeInvoice[],
+      cancel_at_period_end: false,
+      cancel_at: null as string | null,
     };
   }
 }
@@ -627,6 +633,10 @@ export async function GET(req: Request) {
             stripeDetails.payment_method,
           invoices:
             stripeDetails.invoices,
+          cancel_at_period_end:
+            stripeDetails.cancel_at_period_end,
+          cancel_at:
+            stripeDetails.cancel_at,
         }
       : null,
 

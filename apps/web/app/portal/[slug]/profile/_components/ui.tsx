@@ -17,12 +17,12 @@ export {
 export { PortalCard as ProfileCard, Field } from "@/components/portal/PortalCard";
 
 // Wraps a profile sub-page: shared "Profile" heading + section content.
-export function ProfileShell({ children }: { children: ReactNode }) {
+export function ProfileShell({ children, title = "Profile", subtitle = "Manage your account, organisation, billing, and settings." }: { children: ReactNode; title?: string; subtitle?: string }) {
   return (
     <div style={JAKARTA_STYLE} className="space-y-6 text-slate-100">
       <PortalPageHeader
-        title="Profile"
-        subtitle="Manage your account, organisation, billing, and settings."
+        title={title}
+        subtitle={subtitle}
       />
       {children}
     </div>

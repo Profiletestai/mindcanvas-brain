@@ -72,6 +72,8 @@ type Summary = {
     } | null;
 
     invoices: Invoice[];
+    cancel_at_period_end: boolean;
+    cancel_at: string | null;
   } | null;
 
   next_action:
@@ -431,21 +433,20 @@ export default function BillingClient({
         : "";
 
   return (
-    <div className="space-y-6 p-6 text-white">
-      <header className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
+    <div className="space-y-5 text-white">
+      <header>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#64bae2]">
-              MindCanvas
+              Profile
             </p>
 
             <h1 className="mt-2 text-2xl font-semibold">
-              Billing
+              Billing &amp; usage
             </h1>
 
             <p className="mt-1 text-sm text-white/60">
-              Subscription, payment and
-              invoice details for {org.name}.
+              Your plan, monthly usage, payment details and invoices for {org.name}.
             </p>
           </div>
 
@@ -461,7 +462,14 @@ export default function BillingClient({
         </div>
       </header>
 
-      {displayStatus !== "active" && (
+      {billing?.cancel_at_period_end && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+          <div><p className="font-semibold">Your subscription is scheduled to end.</p><p className="mt-1 text-amber-100/70">Access continues until {formatDate(billing.cancel_at || billing.period_end)}.</p></div>
+          <button type="button" onClick={managePaymentMethod} disabled={actionBusy} className="rounded-lg bg-[#54afe0] px-4 py-2 text-xs font-semibold text-white">Manage subscription</button>
+        </div>
+      )}
+
+      {displayStatus !== "active" && !billing?.cancel_at_period_end && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
           {displayStatus === "past_due"
             ? "Your latest payment is past due. Please update your payment method to restore normal billing."
@@ -474,7 +482,7 @@ export default function BillingClient({
       <section className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
           <h2 className="text-base font-semibold">
-            Current subscription
+            Plan
           </h2>
 
           <div className="mt-5 space-y-4">
@@ -629,10 +637,7 @@ export default function BillingClient({
           )}
 
           <p className="mt-3 text-xs leading-5 text-white/45">
-            Payment details are securely
-            managed by Stripe. Plan changes
-            and cancellation are not available
-            here.
+            Payment details, plan changes and cancellation are securely managed by Stripe.
           </p>
         </div>
       </section>
@@ -643,7 +648,7 @@ export default function BillingClient({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-semibold">
-              Invoice history
+              Invoices
             </h2>
 
             <p className="mt-1 text-sm text-white/55">

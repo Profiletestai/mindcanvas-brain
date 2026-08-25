@@ -1,52 +1,48 @@
-// apps/web/app/portal/[slug]/profile/checklist/page.tsx
-// Profile → Setup checklist (mockup: static, all items complete).
-import { ProfileShell, ProfileCard } from "../_components/ui";
-import PreviewBanner from "../_components/PreviewBanner";
+import Link from "next/link";
+import { getAdminClient, getServerSupabase } from "@/app/_lib/portal";
+import { ProfileCard, ProfileShell } from "../_components/ui";
+import { notFound } from "next/navigation";
+import { requireOrgAccess } from "@/lib/server/orgAccess";
 
 export const dynamic = "force-dynamic";
 
-const items = [
-  "Account created",
-  "Email verified",
-  "Organisation created",
-  "Logo uploaded",
-  "First diagnostic completed",
-  "Onboarding session booked",
-  "First test link created",
-  "Billing set up",
-  "Community joined",
-];
+type Item = { label: string; complete: boolean; href?: string };
 
-export default function Page() {
-  return (
-    <ProfileShell>
-      <PreviewBanner note="Checklist items are not tracked against your account yet." />
-      <ProfileCard
-        title="Setup checklist"
-        description="Your MindCanvas account is fully set up."
-      >
-        <div className="rounded-2xl border border-emerald-500/[0.22] bg-emerald-500/10 px-5 py-4">
-          <p className="text-[14px] font-bold text-emerald-400">
-            🎉 All done — {items.length} of {items.length} complete
-          </p>
-          <p className="text-[12.5px] text-white/50">
-            Your account is fully configured and live.
-          </p>
-        </div>
+export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const admin = await getAdminClient();
+  const portal = admin.schema("portal");
+  const { data: org } = await portal.from("orgs").select("id,name,website_url,industry,primary_contact_name,primary_contact_email,logo_url,brand_primary,brand_secondary").eq("slug", slug).maybeSingle();
+  const auth = await getServerSupabase();
+  const { data: authData } = await auth.auth.getUser();
+  const orgId = org?.id ?? "";
+  const accessCheck = await requireOrgAccess(orgId);
+  if (!accessCheck.ok) notFound();
 
-        <ul className="mt-5 divide-y divide-white/[0.06]">
-          {items.map((label) => (
-            <li key={label} className="flex items-center gap-3 py-3">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              </span>
-              <span className="text-[14px] text-white/80">{label}</span>
-            </li>
-          ))}
-        </ul>
-      </ProfileCard>
-    </ProfileShell>
-  );
+  const [billingResult, linksResult, submissionsResult] = orgId ? await Promise.all([
+    portal.from("billing_accounts").select("stripe_status").eq("org_id", orgId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    portal.from("test_links").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    portal.from("test_submissions").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+  ]) : [{ data: null }, { count: 0 }, { count: 0 }] as const;
+
+  const billingStatus = billingResult.data?.stripe_status?.toLowerCase() ?? "";
+  const items: Item[] = [
+    { label: "Account created", complete: Boolean(authData.user) },
+    { label: "Email verified", complete: Boolean(authData.user?.email_confirmed_at) },
+    { label: "Organisation created", complete: Boolean(org?.id), href: `/portal/${slug}/profile/organisation` },
+    { label: "Organisation details completed", complete: Boolean(org?.name && org?.website_url && org?.industry && org?.primary_contact_name && org?.primary_contact_email), href: `/portal/${slug}/profile/organisation` },
+    { label: "Branding added", complete: Boolean(org?.logo_url && org?.brand_primary && org?.brand_secondary), href: `/portal/${slug}/profile/logo` },
+    { label: "First test link created", complete: (linksResult.count ?? 0) > 0, href: `/portal/${slug}/links` },
+    { label: "First assessment completed", complete: (submissionsResult.count ?? 0) > 0, href: `/portal/${slug}/database` },
+    { label: "Billing set up", complete: ["active", "trialing", "pilot"].includes(billingStatus), href: `/portal/${slug}/billing` },
+  ];
+  const complete = items.filter((item) => item.complete).length;
+  const percent = Math.round((complete / items.length) * 100);
+
+  return <ProfileShell title="Setup checklist" subtitle="Finish the essentials to get the most from your MindCanvas account.">
+    <ProfileCard title={`${complete} of ${items.length} complete`} description={complete === items.length ? "Your account is fully configured and ready." : "Complete the remaining steps when you are ready."}>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${percent}%` }} /></div>
+      <ul className="mt-6 divide-y divide-white/[0.06]">{items.map((item) => <li key={item.label} className="flex items-center justify-between gap-4 py-4"><div className="flex items-center gap-3"><span className={item.complete ? "flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-xs text-white" : "h-5 w-5 rounded-full border border-white/25"}>{item.complete ? "✓" : ""}</span><span className={item.complete ? "text-sm text-white/65" : "text-sm font-medium text-white"}>{item.label}</span></div>{!item.complete && item.href && <Link href={item.href} className="text-xs font-semibold text-[#64bae2] hover:underline">Complete →</Link>}</li>)}</ul>
+    </ProfileCard>
+  </ProfileShell>;
 }
