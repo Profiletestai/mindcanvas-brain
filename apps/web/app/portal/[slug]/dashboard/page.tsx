@@ -126,8 +126,6 @@ export default async function DashboardPage({
     }
 
     const status = String(org.status || "").toLowerCase();
-    const needsBilling = status === "pending_activation";
-    const pastDue = status === "past_due";
 
     // --- 2) Billing / submission usage (allowance, used, remaining) ------
     let usage: SubmissionUsage | null = null;
@@ -140,6 +138,9 @@ export default async function DashboardPage({
     const allowance = usage?.allowance ?? null;
     const remaining = usage?.remaining ?? null;
     const resetDate = usage?.period_end ?? null;
+    const isInternal = usage?.exempt === true;
+    const needsBilling = !isInternal && status === "pending_activation";
+    const pastDue = !isInternal && status === "past_due";
 
     // --- Plan tier (drives Starter vs Pro analytics variant) ------------
     let tier: number | null = null;
@@ -148,7 +149,7 @@ export default async function DashboardPage({
     } catch {
       tier = null;
     }
-    const isPro = tier != null && tier >= 2;
+    const isPro = isInternal || (tier != null && tier >= 2);
     const plan = TIER_PLANS.find((p) => p.tier === tier);
 
     // --- 3) Tests (for names) -------------------------------------------
@@ -498,8 +499,18 @@ export default async function DashboardPage({
           </div>
         )}
 
+        {isInternal && (
+          <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-400/25 bg-emerald-400/[0.08] px-4 py-3">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">✓</span>
+            <div>
+              <div className="text-[13px] font-bold text-emerald-100">Internal account · Full platform access</div>
+              <div className="text-[12px] text-emerald-100/65">All analytics, insights, test engines and unlimited submissions are available.</div>
+            </div>
+          </div>
+        )}
+
         {/* Pro status banner (active Pro+ orgs) */}
-        {isPro && !needsBilling && !pastDue && (
+        {isPro && !isInternal && !needsBilling && !pastDue && (
           <ProStatusBanner
             slug={slug}
             planLabel={plan?.label ?? "Pro"}

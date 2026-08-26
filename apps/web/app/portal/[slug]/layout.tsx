@@ -174,6 +174,7 @@ export default async function OrgLayout({
   // Logged-in user (for the welcome header) — always the current user, never the org owner
   let firstName: string | null = null;
   let fullName: string | null = null;
+  let avatarUrl: string | null = null;
   let isSuperadmin = false;
   try {
     const sb = await getServerSupabase();
@@ -189,6 +190,7 @@ export default async function OrgLayout({
 
     firstName = meta.first_name || (metaFull ? metaFull.split(/\s+/)[0] : null);
     fullName = metaFull;
+    avatarUrl = typeof meta.avatar_url === "string" ? meta.avatar_url : null;
 
     // Same lookup as app/admin/layout.tsx — gates the "Back to admin" link.
     if (user?.id) {
@@ -269,6 +271,7 @@ export default async function OrgLayout({
             models={models}
             firstName={firstName}
             fullName={fullName}
+            avatarUrl={avatarUrl}
             isSuperadmin={isSuperadmin}
           />
           <div className="px-5 pb-10 pt-4">{children}</div>

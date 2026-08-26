@@ -28,6 +28,7 @@ type Invoice = {
 
 type Summary = {
   ok: true;
+  is_internal: boolean;
 
   org: {
     id: string;
@@ -398,9 +399,12 @@ export default function BillingClient({
   const { org, billing, usage } =
     summary;
 
-  const displayStatus =
-    billing?.display_status ??
-    "payment_required";
+  const isInternal = summary.is_internal;
+
+  const displayStatus = isInternal
+    ? "active"
+    : billing?.display_status ??
+      "payment_required";
 
   const statusStyle =
     STATUS_STYLE[displayStatus];
@@ -418,11 +422,13 @@ export default function BillingClient({
   const canActivate =
     displayStatus ===
       "payment_required" &&
-    billing?.billing_source === "legacy";
+    billing?.billing_source === "legacy" &&
+    !isInternal;
 
   const canManagePayment =
-    displayStatus === "active" ||
-    displayStatus === "past_due";
+    !isInternal &&
+    (displayStatus === "active" ||
+      displayStatus === "past_due");
 
   const recurringSuffix =
     billing?.plan.interval === "month"
@@ -462,14 +468,21 @@ export default function BillingClient({
         </div>
       </header>
 
-      {billing?.cancel_at_period_end && (
+      {isInternal && (
+        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+          <p className="font-semibold">Internal account · Full platform access</p>
+          <p className="mt-1 text-emerald-100/70">No subscription or payment method is required. All platform features and unlimited submissions are enabled.</p>
+        </div>
+      )}
+
+      {!isInternal && billing?.cancel_at_period_end && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
           <div><p className="font-semibold">Your subscription is scheduled to end.</p><p className="mt-1 text-amber-100/70">Access continues until {formatDate(billing.cancel_at || billing.period_end)}.</p></div>
           <button type="button" onClick={managePaymentMethod} disabled={actionBusy} className="rounded-lg bg-[#54afe0] px-4 py-2 text-xs font-semibold text-white">Manage subscription</button>
         </div>
       )}
 
-      {displayStatus !== "active" && !billing?.cancel_at_period_end && (
+      {!isInternal && displayStatus !== "active" && !billing?.cancel_at_period_end && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
           {displayStatus === "past_due"
             ? "Your latest payment is past due. Please update your payment method to restore normal billing."
@@ -489,14 +502,15 @@ export default function BillingClient({
             <DetailRow
               label="Plan"
               value={
-                billing?.plan.name ??
-                "MindCanvas subscription"
+                isInternal
+                  ? "Internal full access"
+                  : billing?.plan.name ?? "MindCanvas subscription"
               }
             />
 
             <DetailRow
               label="Billing cycle"
-              value={formatInterval(
+              value={isInternal ? "Not applicable" : formatInterval(
                 billing?.plan.interval ??
                   billing?.billing_interval ??
                   null
@@ -506,7 +520,7 @@ export default function BillingClient({
             <DetailRow
               label="Amount"
               value={
-                <>
+                isInternal ? "No charge" : <>
                   {formatMoney(
                     billing?.plan
                       .amount_cents ?? null,
@@ -526,7 +540,9 @@ export default function BillingClient({
             <DetailRow
               label="Next payment"
               value={
-                isActive
+                isInternal
+                  ? "Not applicable"
+                  : isActive
                   ? formatDate(
                       billing?.period_end ??
                         null
@@ -591,7 +607,9 @@ export default function BillingClient({
             </div>
           ) : (
             <p className="mt-5 text-sm text-white/60">
-              {canActivate
+              {isInternal
+                ? "No payment method is required for this internal account."
+                : canActivate
                 ? "Your payment method will be added securely when you activate the subscription."
                 : "No saved card details are available yet."}
             </p>
@@ -636,13 +654,15 @@ export default function BillingClient({
             </button>
           )}
 
-          <p className="mt-3 text-xs leading-5 text-white/45">
-            Payment details, plan changes and cancellation are securely managed by Stripe.
-          </p>
+          {!isInternal && (
+            <p className="mt-3 text-xs leading-5 text-white/45">
+              Payment details, plan changes and cancellation are securely managed by Stripe.
+            </p>
+          )}
         </div>
       </section>
 
-      <UsageBundlesSection orgId={org.id} usage={usage} />
+      {!isInternal && <UsageBundlesSection orgId={org.id} usage={usage} />}
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

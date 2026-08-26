@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FormStatus } from "@/components/portal/FormStatus";
 import { Field, ProfileCard, ProfileShell, ghostBtnClass, inputClass, primaryBtnClass } from "./_components/ui";
 
-type Account = { email: string; first_name: string; last_name: string; phone: string; job_title: string; timezone: string; email_verified: boolean };
+type Account = { email: string; first_name: string; last_name: string; phone: string; job_title: string; timezone: string; avatar_url: string; email_verified: boolean };
 const TIMEZONES = ["Africa/Johannesburg", "Australia/Brisbane", "Australia/Sydney", "Europe/London", "America/New_York", "America/Los_Angeles"];
 
 export default function PersonalDetailsClient() {
+  const router = useRouter();
   const [account, setAccount] = useState<Account | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -38,13 +40,48 @@ export default function PersonalDetailsClient() {
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || "Unable to save your account");
       setPassword(""); setShowPassword(false); setSaved(true);
+      router.refresh();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save your account"); }
+    finally { setBusy(false); }
+  }
+
+  async function uploadAvatar(file: File) {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/portal/account/avatar", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Unable to upload profile image");
+      setAccount((current) => current ? { ...current, avatar_url: data.avatar_url } : current);
+      setSaved(true); router.refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to upload profile image"); }
+    finally { setBusy(false); }
+  }
+
+  async function removeAvatar() {
+    setBusy(true); setError(null); setSaved(false);
+    try {
+      const response = await fetch("/api/portal/account/avatar", { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "Unable to remove profile image");
+      setAccount((current) => current ? { ...current, avatar_url: "" } : current);
+      setSaved(true); router.refresh();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to remove profile image"); }
     finally { setBusy(false); }
   }
 
   return <ProfileShell title="My account" subtitle="Your personal details. Changes affect only your own login.">
     <FormStatus error={error} saved={saved} />
     <ProfileCard title="Profile" description="How you appear to your team inside MindCanvas.">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
+        {account?.avatar_url ? <img src={account.avatar_url} alt="Your profile" className="h-20 w-20 rounded-full border border-white/15 object-cover" /> : <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[#54afe0]/30 bg-[#54afe0]/15 text-xl font-bold text-[#64bae2]">{`${account?.first_name?.[0] ?? ""}${account?.last_name?.[0] ?? ""}`.toUpperCase() || "U"}</div>}
+        <div className="flex flex-wrap gap-3">
+          <label className={`${primaryBtnClass} cursor-pointer`}><span>{busy ? "Uploading…" : account?.avatar_url ? "Replace photo" : "Upload photo"}</span><input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAvatar(file); event.currentTarget.value = ""; }} /></label>
+          {account?.avatar_url && <button type="button" className={ghostBtnClass} disabled={busy} onClick={() => void removeAvatar()}>Remove photo</button>}
+        </div>
+        <p className="w-full text-xs text-white/45">JPG, PNG or WebP. Maximum 2MB.</p>
+      </div>
       <div className="grid gap-5 md:grid-cols-2">
         <Field label="First name" htmlFor="first-name"><input id="first-name" className={inputClass} value={account?.first_name ?? ""} disabled={!account || busy} onChange={(e) => update("first_name", e.target.value)} /></Field>
         <Field label="Last name" htmlFor="last-name"><input id="last-name" className={inputClass} value={account?.last_name ?? ""} disabled={!account || busy} onChange={(e) => update("last_name", e.target.value)} /></Field>

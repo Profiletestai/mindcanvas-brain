@@ -13,7 +13,7 @@ export async function GET() {
   if (error || !data.user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
   const user = data.user;
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-  return NextResponse.json({ ok: true, account: { email: user.email ?? "", first_name: clean(meta.first_name), last_name: clean(meta.last_name), phone: clean(meta.phone), job_title: clean(meta.job_title), timezone: clean(meta.timezone) || "Africa/Johannesburg", email_verified: Boolean(user.email_confirmed_at) } });
+  return NextResponse.json({ ok: true, account: { email: user.email ?? "", first_name: clean(meta.first_name), last_name: clean(meta.last_name), phone: clean(meta.phone), job_title: clean(meta.job_title), timezone: clean(meta.timezone) || "Africa/Johannesburg", avatar_url: clean(meta.avatar_url, 2000), email_verified: Boolean(user.email_confirmed_at) } });
 }
 
 export async function PATCH(req: Request) {

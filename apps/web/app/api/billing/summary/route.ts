@@ -538,6 +538,8 @@ export async function GET(req: Request) {
   const usage =
     await getSubmissionUsage(orgId);
 
+  const isInternal = usage.exempt === true;
+
   const entitlement =
     await getActiveEntitlement(orgId);
 
@@ -561,7 +563,9 @@ export async function GET(req: Request) {
         ).toISOString()
       : null;
 
-  const displayStatus = deriveDisplayStatus(
+  const displayStatus: BillingDisplayStatus = isInternal
+    ? "active"
+    : deriveDisplayStatus(
     org.status,
     billingAccount?.stripe_status
   );
@@ -600,6 +604,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
+
+    is_internal: isInternal,
 
     org: {
       id: org.id,

@@ -14,6 +14,7 @@ type Props = {
   models: ModelOption[];
   firstName?: string | null;
   fullName?: string | null;
+  avatarUrl?: string | null;
   // "Back to admin" is only meaningful for portal.superadmin users.
   isSuperadmin?: boolean;
 };
@@ -95,9 +96,10 @@ export default function PortalHeader({
   models,
   firstName,
   fullName,
+  avatarUrl,
   isSuperadmin = false,
 }: Props) {
-  const name = (firstName ?? "").trim() || "there";
+  const name = (firstName ?? "").trim();
 
   // Mobile nav drawer — the sidebar is hidden below md, so this is the only
   // navigation on small screens.
@@ -162,7 +164,7 @@ export default function PortalHeader({
 
       <div className="min-w-0">
         <h1 className="truncate text-[20px] leading-[32px] font-extrabold tracking-[-0.4px] text-white">
-          Welcome, {name}.
+          {name ? `Welcome, ${name}.` : "Welcome back."}
         </h1>
         <p className="mt-1 text-[12.5px] font-light leading-[20px] tracking-0 text-[rgba(255,255,255,0.36)]">
           Here&apos;s what&apos;s happening with your MindCanvas account today.
@@ -205,13 +207,21 @@ export default function PortalHeader({
           {HelpIcon}
         </button>
 
-        <div
-          aria-label={fullName ?? undefined}
-          style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[rgba(74,155,255,0.3)] bg-[rgba(74,155,255,0.15)] text-[10.5px] font-bold leading-[16.8px] text-[rgba(84,175,224,1)]"
-        >
-          {initials(fullName)}
-        </div>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={fullName ? `${fullName}'s profile` : "Your profile"}
+            className="h-[30px] w-[30px] rounded-full border border-[rgba(74,155,255,0.3)] object-cover"
+          />
+        ) : (
+          <div
+            aria-label={fullName ?? undefined}
+            style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[rgba(74,155,255,0.3)] bg-[rgba(74,155,255,0.15)] text-[10.5px] font-bold leading-[16.8px] text-[rgba(84,175,224,1)]"
+          >
+            {initials(fullName)}
+          </div>
+        )}
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[5px] border-t border-[rgba(255,255,255,0.06)]" />
