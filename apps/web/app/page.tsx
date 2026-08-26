@@ -129,7 +129,7 @@ export default function Landing() {
           </a>
           <span>•</span>
           <a
-            href="https://profiletest.ai/terms--conditions"
+            href="https://profiletest.ai/terms-and-conditions"
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:text-slate-300"

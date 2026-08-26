@@ -1614,7 +1614,7 @@ export default function PublicTestClient({
                   </a>{" "}
                   and{" "}
                   <a
-                    href="/terms"
+                    href="https://profiletest.ai/terms-and-conditions"
                     target="_blank"
                     className="underline"
                     rel="noopener noreferrer"
