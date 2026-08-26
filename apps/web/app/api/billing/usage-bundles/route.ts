@@ -14,6 +14,7 @@ import {
 } from "@/app/_lib/billing";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
 import { getAuthUser } from "@/app/api/onboarding/v2/_lib/auth";
+import { requireOrgAccess } from "@/lib/server/orgAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,19 +57,27 @@ export async function GET(req: Request) {
   if (auth.error) return auth.error;
 
   const url = new URL(req.url);
-  const resolved = await resolveOwnerOrgId(
-    auth.user.id,
-    url.searchParams.get("orgId"),
-  );
+  const orgIdHint = url.searchParams.get("orgId");
+  let orgId: string;
 
-  if (!resolved.ok) {
-    return jerr(resolved.error, resolved.code, resolved.status);
+  if (orgIdHint) {
+    const access = await requireOrgAccess(orgIdHint);
+    if (!access.ok) {
+      return jerr(access.error, "org_access_denied", access.status);
+    }
+    orgId = orgIdHint;
+  } else {
+    const resolved = await resolveOwnerOrgId(auth.user.id, null);
+    if (!resolved.ok) {
+      return jerr(resolved.error, resolved.code, resolved.status);
+    }
+    orgId = resolved.orgId;
   }
 
   const [org, entitlement, billingAccount] = await Promise.all([
-    getOrgRow(resolved.orgId),
-    getActiveEntitlement(resolved.orgId),
-    getOwnerBillingAccount(resolved.orgId),
+    getOrgRow(orgId),
+    getActiveEntitlement(orgId),
+    getOwnerBillingAccount(orgId),
   ]);
 
   if (!org) return jerr("Organisation not found.", "org_not_found", 404);
