@@ -14,6 +14,7 @@ import {
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
+import { requireOrgAccess } from "@/lib/server/orgAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -472,20 +473,31 @@ export async function GET(req: Request) {
   const orgIdHint =
     url.searchParams.get("orgId");
 
-  const resolved = await resolveOwnerOrgId(
-    user.id,
-    orgIdHint
-  );
-
-  if (!resolved.ok) {
-    return jerr(
-      resolved.error,
-      resolved.code,
-      resolved.status
+  let orgId: string;
+  if (orgIdHint) {
+    const access = await requireOrgAccess(orgIdHint);
+    if (!access.ok) {
+      return jerr(
+        access.error,
+        "org_access_denied",
+        access.status
+      );
+    }
+    orgId = orgIdHint;
+  } else {
+    const resolved = await resolveOwnerOrgId(
+      user.id,
+      null
     );
+    if (!resolved.ok) {
+      return jerr(
+        resolved.error,
+        resolved.code,
+        resolved.status
+      );
+    }
+    orgId = resolved.orgId;
   }
-
-  const { orgId } = resolved;
 
   const org = await getOrgRow(orgId);
 

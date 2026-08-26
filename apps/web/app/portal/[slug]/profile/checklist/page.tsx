@@ -22,7 +22,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   const [billingResult, linksResult, submissionsResult] = orgId ? await Promise.all([
     portal.from("billing_accounts").select("stripe_status").eq("org_id", orgId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     portal.from("test_links").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    portal.from("test_submissions").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    portal.from("test_takers").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "completed"),
   ]) : [{ data: null }, { count: 0 }, { count: 0 }] as const;
 
   const billingStatus = billingResult.data?.stripe_status?.toLowerCase() ?? "";

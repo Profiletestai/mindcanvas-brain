@@ -459,7 +459,7 @@ export default async function DashboardPage({
           <div className="ml-auto flex items-center gap-3">
             <span className="text-[12px] text-white/50">Billing</span>
             <Link
-              href="/portal/billing"
+              href={`/portal/${slug}/billing`}
               className="inline-flex h-[28px] items-center rounded-md border border-white/[0.12] bg-white/[0.04] px-3 text-[12px] font-semibold text-white/70 transition-colors hover:bg-white/[0.08]"
             >
               Manage
@@ -490,7 +490,7 @@ export default async function DashboardPage({
                 : "Card details required before test links can be shared or embedded."}
             </span>
             <Link
-              href="/portal/billing"
+              href={`/portal/${slug}/billing`}
               className="ml-auto inline-flex h-[28px] items-center rounded-md border border-amber-400/40 bg-amber-400/10 px-3 text-[12px] font-semibold text-amber-100 transition-colors hover:bg-amber-400/20"
             >
               {pastDue ? "Update billing" : "Add card"}
@@ -522,7 +522,7 @@ export default async function DashboardPage({
               clients.
             </p>
             <Link
-              href="/portal/billing"
+              href={`/portal/${slug}/billing`}
               className="mt-3 inline-flex h-[32px] items-center rounded-md bg-[#54AFE0] px-4 text-[12px] font-bold text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90"
             >
               Set up billing

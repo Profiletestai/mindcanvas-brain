@@ -26,7 +26,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
     portal.from("billing_accounts").select("tier,stripe_status,billing_interval").eq("org_id", orgId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     portal.from("entitlements").select("included_trials_per_month,extra_trials_purchased,status").eq("org_id", orgId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     portal.from("test_links").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    portal.from("test_submissions").select("id", { count: "exact", head: true }).eq("org_id", orgId),
+    portal.from("test_takers").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "completed"),
     portal.from("org_test_access").select("test_id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "active"),
     user ? portal.from("user_orgs").select("role").eq("org_id", orgId).eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
   ]) : [{ data: null }, { data: null }, { count: 0 }, { count: 0 }, { count: 0 }, { data: null }] as const;
