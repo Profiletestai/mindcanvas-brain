@@ -285,7 +285,11 @@ export default function CreateTestLinkModal({
         {/* Body — scrolls when content exceeds the viewport-bounded card */}
         <div className="mt-6 min-h-[200px] flex-1 overflow-y-auto pr-1">
           {step === STEP_MODEL && (
-            <StepChooseModel control={control} models={models} />
+            <StepChooseModel
+            control={control}
+            models={models}
+            orgId={orgId}
+           />
           )}
           {step === STEP_NAME && <StepName register={register} />}
           {step === STEP_EXPERIENCE && <StepExperience control={control} />}

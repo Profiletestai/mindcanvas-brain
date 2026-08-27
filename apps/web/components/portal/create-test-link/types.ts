@@ -5,6 +5,9 @@ export type ModelOption = {
   id: string;
   name: string;
   category?: string;
+  locked?: boolean;
+  requiredTier?: 2 | 3;
+  requiredPlan?: "Pro" | "Niche";
 };
 
 export type Experience = "show" | "hide" | "host" | "review";
