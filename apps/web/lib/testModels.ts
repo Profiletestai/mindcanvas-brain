@@ -44,7 +44,7 @@ const MODEL_CATALOG: { match: RegExp; meta: ModelMeta }[] = [
     },
   },
   {
-    match: /lead\s*\/?\s*mps|\bmps\b|coaching/i,
+    match: /\blead(?:\s*\/?\s*mps|\s+system)?\b|\bmps\b|coaching/i,
     meta: {
       category: "Predictive Coaching Intelligence",
       description:
