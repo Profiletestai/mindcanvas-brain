@@ -56,7 +56,8 @@ function getStripeClient(): Stripe {
     );
   }
 
-  const expectedPrefix = stripeMode === "live" ? "sk_live_" : "sk_test_";
+  const expectedPrefix =
+    stripeMode === "live" ? "sk_live_" : "sk_test_";
 
   if (!key.startsWith(expectedPrefix)) {
     throw new Error(
@@ -82,11 +83,16 @@ function isMissingStripeResource(error: unknown): boolean {
 }
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
   return "Unable to create usage-bundle checkout.";
 }
 
-async function readRequest(req: Request): Promise<CheckoutRequest> {
+async function readRequest(
+  req: Request,
+): Promise<CheckoutRequest> {
   try {
     return (await req.json()) as CheckoutRequest;
   } catch {
@@ -95,7 +101,9 @@ async function readRequest(req: Request): Promise<CheckoutRequest> {
 }
 
 export async function POST(req: Request) {
-  if (process.env.REVENUE_USAGE_BUNDLES_ENABLED !== "true") {
+  if (
+    process.env.REVENUE_USAGE_BUNDLES_ENABLED !== "true"
+  ) {
     return jerr(
       "Usage-bundle purchases are not currently available.",
       "feature_disabled",
@@ -107,15 +115,29 @@ export async function POST(req: Request) {
   if (auth.error) return auth.error;
 
   const body = await readRequest(req);
-  const resolved = await resolveOwnerOrgId(auth.user.id, body.orgId ?? null);
+  const resolved = await resolveOwnerOrgId(
+    auth.user.id,
+    body.orgId ?? null,
+  );
 
   if (!resolved.ok) {
-    return jerr(resolved.error, resolved.code, resolved.status);
+    return jerr(
+      resolved.error,
+      resolved.code,
+      resolved.status,
+    );
   }
 
   const org = await getOrgRow(resolved.orgId);
 
-  if (!org) return jerr("Organisation not found.", "org_not_found", 404);
+  if (!org) {
+    return jerr(
+      "Organisation not found.",
+      "org_not_found",
+      404,
+    );
+  }
+
   if (org.status !== "active") {
     return jerr(
       "The organisation must be active before purchasing extra usages.",
@@ -126,7 +148,11 @@ export async function POST(req: Request) {
 
   const entitlement = await getActiveEntitlement(org.id);
 
-  if (!entitlement || entitlement.tier < 1 || entitlement.tier > 4) {
+  if (
+    !entitlement ||
+    entitlement.tier < 1 ||
+    entitlement.tier > 4
+  ) {
     return jerr(
       "An active paid subscription is required to purchase extra usages.",
       "paid_subscription_required",
@@ -137,12 +163,20 @@ export async function POST(req: Request) {
   const billingAccount = await getOwnerBillingAccount(org.id);
 
   if (!billingAccount) {
-    return jerr("Billing account not found.", "billing_account_missing", 409);
+    return jerr(
+      "Billing account not found.",
+      "billing_account_missing",
+      409,
+    );
   }
 
-  const stripeStatus = billingAccount.stripe_status?.trim().toLowerCase() ?? "";
+  const stripeStatus =
+    billingAccount.stripe_status?.trim().toLowerCase() ?? "";
 
-  if (stripeStatus !== "active" && stripeStatus !== "trialing") {
+  if (
+    stripeStatus !== "active" &&
+    stripeStatus !== "trialing"
+  ) {
     return jerr(
       "The subscription must be active before purchasing extra usages.",
       "subscription_not_active",
@@ -151,26 +185,37 @@ export async function POST(req: Request) {
   }
 
   if (!auth.user.email) {
-    return jerr("Your account has no email address.", "email_required", 400);
+    return jerr(
+      "Your account has no email address.",
+      "email_required",
+      400,
+    );
   }
 
   const stripeMode = getStripeMode();
-  const { data: catalogData, error: catalogError } = await portalAdmin()
-    .from("usage_bundle_catalog")
-    .select(
-      "id, bundle_code, display_name, tier, quantity, currency, amount_cents, stripe_mode, stripe_price_id, active, expires_after_days",
-    )
-    .eq("bundle_code", "extra_20")
-    .eq("tier", entitlement.tier)
-    .eq("stripe_mode", stripeMode)
-    .eq("active", true)
-    .maybeSingle();
+
+  const { data: catalogData, error: catalogError } =
+    await portalAdmin()
+      .from("usage_bundle_catalog")
+      .select(
+        "id, bundle_code, display_name, tier, quantity, currency, amount_cents, stripe_mode, stripe_price_id, active, expires_after_days",
+      )
+      .eq("bundle_code", "extra_20")
+      .eq("tier", entitlement.tier)
+      .eq("stripe_mode", stripeMode)
+      .eq("active", true)
+      .maybeSingle();
 
   if (catalogError) {
-    return jerr(catalogError.message, "bundle_lookup_failed", 500);
+    return jerr(
+      catalogError.message,
+      "bundle_lookup_failed",
+      500,
+    );
   }
 
-  const catalog = catalogData as UsageBundleCatalogRow | null;
+  const catalog =
+    catalogData as UsageBundleCatalogRow | null;
 
   if (!catalog?.stripe_price_id) {
     return jerr(
@@ -193,13 +238,19 @@ export async function POST(req: Request) {
   try {
     stripe = getStripeClient();
   } catch (error) {
-    return jerr(getErrorMessage(error), "stripe_configuration_error", 500);
+    return jerr(
+      getErrorMessage(error),
+      "stripe_configuration_error",
+      500,
+    );
   }
 
   let stripePrice: Stripe.Price;
 
   try {
-    stripePrice = await stripe.prices.retrieve(catalog.stripe_price_id);
+    stripePrice = await stripe.prices.retrieve(
+      catalog.stripe_price_id,
+    );
   } catch (error) {
     if (isMissingStripeResource(error)) {
       return jerr(
@@ -209,7 +260,11 @@ export async function POST(req: Request) {
       );
     }
 
-    return jerr(getErrorMessage(error), "stripe_price_lookup_failed", 502);
+    return jerr(
+      getErrorMessage(error),
+      "stripe_price_lookup_failed",
+      502,
+    );
   }
 
   if (
@@ -233,10 +288,16 @@ export async function POST(req: Request) {
         billingAccount.stripe_customer_id,
       );
 
-      if (!customer.deleted) usableCustomerId = customer.id;
+      if (!customer.deleted) {
+        usableCustomerId = customer.id;
+      }
     } catch (error) {
       if (!isMissingStripeResource(error)) {
-        return jerr(getErrorMessage(error), "customer_lookup_failed", 502);
+        return jerr(
+          getErrorMessage(error),
+          "customer_lookup_failed",
+          502,
+        );
       }
 
       // A Preview deployment can share the database with Production while
@@ -267,9 +328,13 @@ export async function POST(req: Request) {
     .select("id")
     .single();
 
-  if (purchaseInsert.error || !purchaseInsert.data?.id) {
+  if (
+    purchaseInsert.error ||
+    !purchaseInsert.data?.id
+  ) {
     return jerr(
-      purchaseInsert.error?.message || "Unable to create purchase record.",
+      purchaseInsert.error?.message ||
+        "Unable to create purchase record.",
       "purchase_create_failed",
       500,
     );
@@ -277,8 +342,14 @@ export async function POST(req: Request) {
 
   const purchaseId = String(purchaseInsert.data.id);
   const origin = new URL(req.url).origin;
-  const billingPath =
-    `/portal/billing?orgId=${encodeURIComponent(org.id)}`;
+
+  const billingPath = org.slug
+    ? `/portal/${encodeURIComponent(org.slug)}/billing`
+    : `/portal/billing?orgId=${encodeURIComponent(org.id)}`;
+
+  const billingSeparator = billingPath.includes("?")
+    ? "&"
+    : "?";
 
   let session: Stripe.Checkout.Session;
 
@@ -286,15 +357,21 @@ export async function POST(req: Request) {
     session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
-        line_items: [{ price: catalog.stripe_price_id, quantity: 1 }],
+        line_items: [
+          {
+            price: catalog.stripe_price_id,
+            quantity: 1,
+          },
+        ],
         ...(usableCustomerId
           ? { customer: usableCustomerId }
           : { customer_email: auth.user.email }),
         client_reference_id: org.id,
         success_url:
-          `${origin}${billingPath}&bundle=success` +
+          `${origin}${billingPath}${billingSeparator}bundle=success` +
           `&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}${billingPath}&bundle=cancelled`,
+        cancel_url:
+          `${origin}${billingPath}${billingSeparator}bundle=cancelled`,
         metadata: {
           purchase_id: purchaseId,
           purchase_type: "usage_bundle",
@@ -313,7 +390,10 @@ export async function POST(req: Request) {
           },
         },
       },
-      { idempotencyKey: `mc-usage-bundle-${purchaseId}` },
+      {
+        idempotencyKey:
+          `mc-usage-bundle-${purchaseId}`,
+      },
     );
   } catch (error) {
     await portalAdmin()
@@ -331,7 +411,11 @@ export async function POST(req: Request) {
       })
       .eq("id", purchaseId);
 
-    return jerr(getErrorMessage(error), "stripe_checkout_failed", 502);
+    return jerr(
+      getErrorMessage(error),
+      "stripe_checkout_failed",
+      502,
+    );
   }
 
   if (!session.url) {
@@ -344,7 +428,9 @@ export async function POST(req: Request) {
 
   const purchaseUpdate = await portalAdmin()
     .from("purchases")
-    .update({ stripe_checkout_session_id: session.id })
+    .update({
+      stripe_checkout_session_id: session.id,
+    })
     .eq("id", purchaseId);
 
   if (purchaseUpdate.error) {
