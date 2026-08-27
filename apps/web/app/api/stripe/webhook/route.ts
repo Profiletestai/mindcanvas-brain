@@ -18,6 +18,7 @@ type EventMeta = {
   customer: string | null;
   subId: string | null;
   stripeStatus: string | null;
+  stripePriceId: string | null;
   periodStart: string | null;
   periodEnd: string | null;
 };
@@ -173,6 +174,8 @@ function applySubscriptionMeta(
   meta.customer = getExpandableId(subscription.customer);
   meta.orgId = subscription.metadata?.org_id?.trim() || meta.orgId;
   meta.stripeStatus = subscription.status;
+  meta.stripePriceId =
+    subscription.items.data[0]?.price?.id ?? null;
   meta.periodStart = periodStart;
   meta.periodEnd = periodEnd;
 }
@@ -228,6 +231,7 @@ async function extractMeta(
     customer: null,
     subId: null,
     stripeStatus: null,
+    stripePriceId: null,
     periodStart: null,
     periodEnd: null,
   };
@@ -670,19 +674,20 @@ export async function POST(req: Request) {
       );
     }
 
-    const { error: rpcError } = await portalAdmin().rpc(
-      "fn_apply_billing_event",
-      {
-        p_event_id: event.id,
-        p_event_type: event.type,
-        p_org_id: meta.orgId,
-        p_stripe_customer: meta.customer,
-        p_stripe_sub_id: meta.subId,
-        p_stripe_status: meta.stripeStatus,
-        p_period_start: meta.periodStart,
-        p_period_end: meta.periodEnd,
-      } as never,
-    );
+          const { error: rpcError } = await portalAdmin().rpc(
+        "fn_apply_billing_event_v2",
+        {
+          p_event_id: event.id,
+          p_event_type: event.type,
+          p_org_id: meta.orgId,
+          p_stripe_customer: meta.customer,
+          p_stripe_sub_id: meta.subId,
+          p_stripe_status: meta.stripeStatus,
+          p_period_start: meta.periodStart,
+          p_period_end: meta.periodEnd,
+          p_stripe_price_id: meta.stripePriceId,
+        } as never,
+      );
 
     if (rpcError) {
       await finishEvent(event.id, "failed", rpcError.message);

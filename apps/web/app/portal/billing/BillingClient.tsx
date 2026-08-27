@@ -1,8 +1,10 @@
 //apps/web/app/portal/billing/BillingClient.tsx
 "use client";
 
-import Link from "next/link";
 import UsageBundlesSection from "./UsageBundlesSection";
+import UpgradePlansSection from "./UpgradePlansSection";
+import Link from "next/link";
+
 import {
   useCallback,
   useEffect,
@@ -676,7 +678,22 @@ export default function BillingClient({
         </div>
       </section>
 
-      {!isInternal && <UsageBundlesSection orgId={org.id} usage={usage} />}
+      {!isInternal &&
+        isActive &&
+        billing?.tier &&
+        billing.tier < 3 && (
+          <UpgradePlansSection
+            orgId={org.id}
+            currentTier={billing.tier}
+          />
+        )}
+
+      {!isInternal && (
+        <UsageBundlesSection
+          orgId={org.id}
+          usage={usage}
+        />
+      )}
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
