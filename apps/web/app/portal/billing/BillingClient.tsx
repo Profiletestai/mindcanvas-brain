@@ -425,6 +425,11 @@ export default function BillingClient({
     billing?.billing_source === "legacy" &&
     !isInternal;
 
+  const canChoosePlan =
+    displayStatus === "payment_required" &&
+    billing?.billing_source !== "legacy" &&
+    !isInternal;
+
   const canManagePayment =
     !isInternal &&
     (displayStatus === "active" ||
@@ -634,6 +639,15 @@ export default function BillingClient({
                 ? "Opening secure checkout…"
                 : "Activate subscription"}
             </button>
+          )}
+
+          {canChoosePlan && (
+            <Link
+              href={`/onboarding/v2/plan?orgId=${encodeURIComponent(org.id)}`}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2d8fc4] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#247baa]"
+            >
+              Choose a plan
+            </Link>
           )}
 
           {canManagePayment && (

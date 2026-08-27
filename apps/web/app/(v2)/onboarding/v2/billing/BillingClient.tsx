@@ -13,12 +13,26 @@ const POLL_ATTEMPTS = 20;
 
 type BillingInterval = "month" | "year";
 
-async function startCheckout(interval: BillingInterval): Promise<string> {
+async function startCheckout(
+  interval: BillingInterval,
+  orgId: string | null,
+  tier: number | null
+): Promise<string> {
+  const body: {
+    flow: "onboarding";
+    interval: BillingInterval;
+    orgId?: string;
+    tier?: number;
+  } = { flow: "onboarding", interval };
+
+  if (orgId) body.orgId = orgId;
+  if (tier !== null) body.tier = tier;
+
   const res = await fetch("/api/billing/checkout", {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ flow: "onboarding", interval }),
+    body: JSON.stringify(body),
     cache: "no-store",
   });
   const json = await res.json().catch(() => null);
@@ -32,6 +46,12 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
   const status = params.get("status");
   const interval: BillingInterval =
     params.get("interval") === "year" ? "year" : "month";
+  const orgId = params.get("orgId")?.trim() || null;
+  const tierValue = Number(params.get("tier"));
+  const tier =
+    Number.isInteger(tierValue) && tierValue >= 1 && tierValue <= 4
+      ? tierValue
+      : null;
 
   const [error, setError] = useState("");
   const [retrying, setRetrying] = useState(false);
@@ -40,7 +60,10 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
 
   const confirmPayment = useCallback(async () => {
     for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
-      const res = await fetch("/api/billing/summary", {
+      const summaryUrl = orgId
+        ? `/api/billing/summary?orgId=${encodeURIComponent(orgId)}`
+        : "/api/billing/summary";
+      const res = await fetch(summaryUrl, {
         credentials: "include",
         cache: "no-store",
       });
@@ -50,7 +73,11 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
         json.billing?.stripe_status === "active" &&
         json.billing?.is_pilot === false;
       if (active) {
-        router.replace(ORGANISATION_PATH);
+        if (orgId && json?.org?.slug) {
+          router.replace(`/portal/${json.org.slug}/billing`);
+        } else {
+          router.replace(ORGANISATION_PATH);
+        }
         return;
       }
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -58,7 +85,7 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
     setError(
       "Your payment went through but we are still waiting for confirmation. Refresh this page in a moment."
     );
-  }, [router]);
+  }, [router, orgId]);
 
   useEffect(() => {
     if (status === "success") {
@@ -70,15 +97,15 @@ export function BillingClient(_: { tiers: BillingTier[] }) {
     if (status === "cancelled") return;
     if (initiated.current) return;
     initiated.current = true;
-    startCheckout(interval)
+    startCheckout(interval, orgId, tier)
       .then((url) => { window.location.href = url; })
       .catch((e: Error) => setError(e.message));
-  }, [status, interval, confirmPayment]);
+  }, [status, interval, orgId, tier, confirmPayment]);
 
   const retry = () => {
     setError("");
     setRetrying(true);
-    startCheckout(interval)
+    startCheckout(interval, orgId, tier)
       .then((url) => { window.location.href = url; })
       .catch((e: Error) => { setError(e.message); setRetrying(false); });
   };
