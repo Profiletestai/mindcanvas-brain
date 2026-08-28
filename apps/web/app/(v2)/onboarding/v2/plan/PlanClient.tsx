@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, isErr } from "../_lib/api";
 import {
   BILLING_PATH,
@@ -57,6 +57,8 @@ export function PlanClient({
   cards: TierCardData[];
 }) {
   const router = useRouter();
+  const params = useSearchParams();
+  const orgId = params.get("orgId")?.trim() || null;
 
   const [choice, setChoice] =
     useState<PlanChoice>(null);
@@ -209,9 +211,16 @@ export function PlanClient({
       return;
     }
 
-    router.push(
-      `${BILLING_PATH}?interval=${interval}`
-    );
+    const billingParams = new URLSearchParams({
+      interval,
+      tier: String(activeCard.tier),
+    });
+
+    if (orgId) {
+      billingParams.set("orgId", orgId);
+    }
+
+    router.push(`${BILLING_PATH}?${billingParams.toString()}`);
   }
 
   if (loading) {

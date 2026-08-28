@@ -203,7 +203,7 @@ export default function AccountPage() {
                   <>
                     I agree to the{" "}
                     <a
-                      href="https://profiletest.ai/terms--conditions"
+                      href="https://profiletest.ai/terms-and-conditions"
                       target="_blank"
                       rel="noreferrer"
                       className="underline"

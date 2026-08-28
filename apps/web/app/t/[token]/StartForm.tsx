@@ -326,7 +326,7 @@ export default function StartForm({ token }: { token: string }) {
                     </a>{" "}
                     and{" "}
                     <a
-                      href="/terms"
+                      href="https://profiletest.ai/terms-and-conditions"
                       target="_blank"
                       rel="noreferrer"
                       className="underline underline-offset-2 text-white/80 hover:text-white"

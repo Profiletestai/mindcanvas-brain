@@ -53,7 +53,7 @@ export function OtpInput({ value, onChange, length = 6, autoFocus }: Props) {
   };
 
   return (
-    <div className="flex gap-2.5 justify-center">
+    <div className="flex justify-between gap-2 sm:gap-2.5">
       {Array.from({ length }).map((_, i) => (
         <input
           key={i}
@@ -66,11 +66,12 @@ export function OtpInput({ value, onChange, length = 6, autoFocus }: Props) {
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKey(i, e)}
           onPaste={handlePaste}
-          className={`h-[56px] w-[48px] text-center text-2xl font-bold rounded-lg outline-none transition focus:ring-2 focus:ring-white/40 bg-white/5 text-white ${
-            value[i] ? "border-white/60" : "border-white/20"
-          } border`}
+          aria-label={`Digit ${i + 1}`}
+          autoComplete={i === 0 ? "one-time-code" : "off"}
+          className="h-[52px] min-w-0 flex-1 rounded-[8px] border border-white/80 bg-white text-center text-[20px] font-extrabold text-black outline-none transition focus:border-[#4FA8D8] focus:ring-2 focus:ring-[#4FA8D8]/35 sm:h-[58px] sm:max-w-[52px]"
         />
       ))}
     </div>
   );
 }
+
