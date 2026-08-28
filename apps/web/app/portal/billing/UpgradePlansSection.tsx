@@ -37,7 +37,7 @@ const PLANS: UpgradePlan[] = [
     allowance: 50,
     engines: "Sales + Coaching + People",
     unlocks:
-      "Unlock MPS and the MindCanvas Alignment System",
+      "Unlock the MindCanvas Alignment System (MCAS)",
   },
 ];
 

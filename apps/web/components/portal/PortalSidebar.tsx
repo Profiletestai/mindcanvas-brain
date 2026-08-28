@@ -204,11 +204,11 @@ export default function PortalSidebar({
         },
       ],
     },
-    {
-      key: "resources",
-      label: "Resources",
+            {
+      key: "community",
+      label: "Community",
+      href: "https://community.profiletest.ai",
       icon: ResourcesIcon,
-      disabled: true,
     },
     {
       key: "affiliate",
