@@ -24,26 +24,20 @@ export default async function McasLinksPage({
     testSlug: MCAS_TEST_SLUG,
   });
 
-  if (!guard.ok) return <McasAccessNotice failure={guard} />;
+  if (!guard.ok) {
+    return <McasAccessNotice failure={guard} />;
+  }
 
   const { org, role } = guard.access;
 
-  // The API re-checks this; the flag only decides whether to render the form.
+  // The API performs the authoritative permission check.
+  // This only determines whether write actions are displayed.
   const canWrite = PORTAL_WRITE_ROLES.has(role);
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">
-          MCAS — {org.name ?? org.slug}
-        </h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Create MCAS assessment links, share them with candidates, and pause
-          them when a role is filled.
-        </p>
-      </div>
-
-      <McasLinksClient orgSlug={org.slug} canWrite={canWrite} />
-    </div>
+    <McasLinksClient
+      orgSlug={org.slug}
+      canWrite={canWrite}
+    />
   );
 }
