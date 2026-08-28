@@ -95,7 +95,7 @@ export default function ProfileClient({ slug }: { slug: string }) {
       )}
 
       {/* Basic info */}
-      <section className="space-y-4">
+      <section id="organisation" className="space-y-4 scroll-mt-24">
         <h2 className="text-lg font-medium">Basic Info</h2>
         <Field label="Name" value={org.name} onChange={(v) => updateField("name", v)} />
         <Field label="Slug" value={org.slug} disabled help="Used in URLs; cannot be changed." />
@@ -109,7 +109,7 @@ export default function ProfileClient({ slug }: { slug: string }) {
       </section>
 
       {/* Branding */}
-      <section className="space-y-4">
+      <section id="branding" className="space-y-4 scroll-mt-24">
         <h2 className="text-lg font-medium">Branding</h2>
         <Field label="Logo URL" value={org.logo_url ?? ""} onChange={(v) => updateField("logo_url", v)} />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -137,7 +137,7 @@ export default function ProfileClient({ slug }: { slug: string }) {
       </section>
 
       {/* Contact */}
-      <section className="space-y-4">
+      <section id="personal" className="space-y-4 scroll-mt-24">
         <h2 className="text-lg font-medium">Contact</h2>
         <Field
           label="Primary Contact Name"
@@ -170,7 +170,7 @@ export default function ProfileClient({ slug }: { slug: string }) {
       </section>
 
       {/* Report defaults */}
-      <section className="space-y-4">
+      <section id="email" className="space-y-4 scroll-mt-24">
         <h2 className="text-lg font-medium">Report Defaults</h2>
         <Field
           label="Report From Name"

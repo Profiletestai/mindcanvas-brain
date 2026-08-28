@@ -2,20 +2,40 @@ import "./globals.css";
 import "../styles/branding.css";
 import type { ReactNode } from "react";
 import Script from "next/script";
-import { Inter, Manrope } from "next/font/google";
+import {
+  DM_Sans,
+  Inter,
+  Manrope,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./pdf-print.css";
 
-/** Inter = main UI font, Manrope = optional accent via CSS variable */
+/** Inter remains the default font across the existing platform. */
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
 });
 
+/** Manrope remains available as an optional accent font. */
 const manrope = Manrope({
   subsets: ["latin"],
   variable: "--font-manrope",
+  display: "swap",
+});
+
+/** Used by the new public homepage and login experience. */
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
+});
+
+/** Used by primary buttons in the new public experience. */
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
   display: "swap",
 });
 
@@ -24,8 +44,11 @@ const googleAnalyticsId =
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${manrope.variable}`}>
-      {/* Make Inter the default font everywhere */}
+    <html
+      lang="en"
+      className={`${inter.variable} ${manrope.variable} ${plusJakarta.variable} ${dmSans.variable}`}
+    >
+      {/* Inter remains the default font everywhere else in the platform. */}
       <body className={inter.className} suppressHydrationWarning>
         {children}
 

@@ -14,6 +14,7 @@ import {
   resolveOwnerOrgId,
 } from "@/app/_lib/billing";
 import { portalAdmin } from "@/app/_lib/supabaseAdmin";
+import { requireOrgAccess } from "@/lib/server/orgAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -340,6 +341,8 @@ async function loadStripeDetails({
       plan: fallbackPlan,
       payment_method: null,
       invoices: [] as SafeInvoice[],
+      cancel_at_period_end: false,
+      cancel_at: null as string | null,
     };
   }
 
@@ -439,6 +442,8 @@ async function loadStripeDetails({
             invoice.invoice_pdf ?? null,
         })
       ),
+      cancel_at_period_end: Boolean(subscription?.cancel_at_period_end),
+      cancel_at: subscription?.cancel_at ? unixTimestampToIso(subscription.cancel_at) : null,
     };
   } catch (error) {
     console.error(
@@ -450,6 +455,8 @@ async function loadStripeDetails({
       plan: fallbackPlan,
       payment_method: null,
       invoices: [] as SafeInvoice[],
+      cancel_at_period_end: false,
+      cancel_at: null as string | null,
     };
   }
 }
@@ -466,20 +473,31 @@ export async function GET(req: Request) {
   const orgIdHint =
     url.searchParams.get("orgId");
 
-  const resolved = await resolveOwnerOrgId(
-    user.id,
-    orgIdHint
-  );
-
-  if (!resolved.ok) {
-    return jerr(
-      resolved.error,
-      resolved.code,
-      resolved.status
+  let orgId: string;
+  if (orgIdHint) {
+    const access = await requireOrgAccess(orgIdHint);
+    if (!access.ok) {
+      return jerr(
+        access.error,
+        "org_access_denied",
+        access.status
+      );
+    }
+    orgId = orgIdHint;
+  } else {
+    const resolved = await resolveOwnerOrgId(
+      user.id,
+      null
     );
+    if (!resolved.ok) {
+      return jerr(
+        resolved.error,
+        resolved.code,
+        resolved.status
+      );
+    }
+    orgId = resolved.orgId;
   }
-
-  const { orgId } = resolved;
 
   const org = await getOrgRow(orgId);
 
@@ -520,6 +538,8 @@ export async function GET(req: Request) {
   const usage =
     await getSubmissionUsage(orgId);
 
+  const isInternal = usage.exempt === true;
+
   const entitlement =
     await getActiveEntitlement(orgId);
 
@@ -543,7 +563,9 @@ export async function GET(req: Request) {
         ).toISOString()
       : null;
 
-  const displayStatus = deriveDisplayStatus(
+  const displayStatus: BillingDisplayStatus = isInternal
+    ? "active"
+    : deriveDisplayStatus(
     org.status,
     billingAccount?.stripe_status
   );
@@ -582,6 +604,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ok: true,
+
+    is_internal: isInternal,
 
     org: {
       id: org.id,
@@ -627,6 +651,10 @@ export async function GET(req: Request) {
             stripeDetails.payment_method,
           invoices:
             stripeDetails.invoices,
+          cancel_at_period_end:
+            stripeDetails.cancel_at_period_end,
+          cancel_at:
+            stripeDetails.cancel_at,
         }
       : null,
 

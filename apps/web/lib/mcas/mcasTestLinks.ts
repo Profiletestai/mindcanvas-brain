@@ -13,6 +13,11 @@ export type McasUsageLimitType = "unlimited" | "limited";
 export type McasTestLinkRow = {
   id: string;
   org_id: string;
+  /**
+   * Owning portal.orgs row, set only on links created from the portal.
+   * NULL for links created in /admin/mcas. Added by migration 20260813130000.
+   */
+  portal_org_id: string | null;
   public_token: string;
   link_type: McasTestLinkType;
   framework_slug: string;
@@ -43,6 +48,7 @@ export type McasOrganisationLite = {
 export type McasAdminTestLink = {
   id: string;
   orgId: string;
+  portalOrgId: string | null;
   publicToken: string;
   linkType: McasTestLinkType;
   frameworkSlug: string;
@@ -68,6 +74,11 @@ export type McasAdminTestLink = {
 
 export type CreateMcasReusableTestLinkInput = {
   orgId: string;
+  /**
+   * Owning portal organisation. Set by the portal APIs; /admin/mcas passes
+   * nothing and the link stays outside every portal tenant.
+   */
+  portalOrgId?: string | null;
   linkType: McasTestLinkType;
   name: string;
   contactOwnerName?: string | null;
@@ -178,6 +189,7 @@ export async function createMcasReusableTestLink(
 
   const payload = {
     org_id: input.orgId,
+    portal_org_id: input.portalOrgId ?? null,
     link_type: input.linkType,
     framework_slug: "mcas-core-alignment",
     framework_version: "v1",
@@ -213,22 +225,38 @@ export async function createMcasReusableTestLink(
   };
 }
 
+/**
+ * Lists MCAS test links, scoped either to an mcas.organisations row (admin) or
+ * to a portal.orgs row (portal). Exactly one of `orgId` / `portalOrgId` must be
+ * given — the scope is applied in the query, never in application code.
+ */
 export async function getMcasAdminTestLinks({
   orgId,
+  portalOrgId,
   limit = 100,
 }: {
-  orgId: string;
+  orgId?: string;
+  portalOrgId?: string;
   limit?: number;
 }): Promise<McasAdminTestLink[]> {
+  if (!orgId && !portalOrgId) {
+    throw new Error("getMcasAdminTestLinks requires orgId or portalOrgId");
+  }
+
   const supabase = getMcasClient();
 
-  const { data, error } = await supabase
+  let request = supabase
     .from("test_links")
     .select("*")
-    .eq("org_id", orgId)
     .neq("status", "archived")
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  request = portalOrgId
+    ? request.eq("portal_org_id", portalOrgId)
+    : request.eq("org_id", orgId as string);
+
+  const { data, error } = await request;
 
   if (error) {
     throw new Error(`Failed to load MCAS test links: ${error.message}`);
@@ -236,63 +264,78 @@ export async function getMcasAdminTestLinks({
 
   const links = (data ?? []) as McasTestLinkRow[];
 
-  return Promise.all(
-    links.map(async (link) => {
-      const [totalResult, completedResult] = await Promise.all([
-        supabase
-          .from("partner_applications")
-          .select("id", { count: "exact", head: true })
-          .eq("test_link_id", link.id),
-
-        supabase
-          .from("partner_applications")
-          .select("id", { count: "exact", head: true })
-          .eq("test_link_id", link.id)
-          .eq("status", "completed"),
-      ]);
-
-      if (totalResult.error) {
-        throw new Error(
-          `Failed to count applications for link ${link.name}: ${totalResult.error.message}`,
-        );
-      }
-
-      if (completedResult.error) {
-        throw new Error(
-          `Failed to count completed applications for link ${link.name}: ${completedResult.error.message}`,
-        );
-      }
-
-      const totalApplications = totalResult.count ?? 0;
-      const completedApplications = completedResult.count ?? 0;
-
-      return {
-        id: link.id,
-        orgId: link.org_id,
-        publicToken: link.public_token,
-        linkType: link.link_type,
-        frameworkSlug: link.framework_slug,
-        frameworkVersion: link.framework_version,
-        name: link.name,
-        contactOwnerName: link.contact_owner_name,
-        recipientEmail: link.recipient_email,
-        sendEmail: link.send_email,
-        reportVersion: link.report_version,
-        showResults: link.show_results,
-        emailReport: link.email_report,
-        nextStepsUrl: link.next_steps_url,
-        usageLimitType: link.usage_limit_type,
-        usageLimitCount: link.usage_limit_count,
-        status: link.status,
-        createdAt: link.created_at,
-        updatedAt: link.updated_at,
-        reusableUrl: buildMcasReusableTestLinkUrl(link.public_token),
-        totalApplications,
-        completedApplications,
-        openApplications: Math.max(totalApplications - completedApplications, 0),
-      };
-    }),
+  const counts = await countApplicationsByLink(
+    supabase,
+    links.map((link) => link.id),
   );
+
+  return links.map((link) => {
+    const tally = counts.get(link.id) ?? { total: 0, completed: 0 };
+
+    return {
+      id: link.id,
+      orgId: link.org_id,
+      portalOrgId: link.portal_org_id ?? null,
+      publicToken: link.public_token,
+      linkType: link.link_type,
+      frameworkSlug: link.framework_slug,
+      frameworkVersion: link.framework_version,
+      name: link.name,
+      contactOwnerName: link.contact_owner_name,
+      recipientEmail: link.recipient_email,
+      sendEmail: link.send_email,
+      reportVersion: link.report_version,
+      showResults: link.show_results,
+      emailReport: link.email_report,
+      nextStepsUrl: link.next_steps_url,
+      usageLimitType: link.usage_limit_type,
+      usageLimitCount: link.usage_limit_count,
+      status: link.status,
+      createdAt: link.created_at,
+      updatedAt: link.updated_at,
+      reusableUrl: buildMcasReusableTestLinkUrl(link.public_token),
+      totalApplications: tally.total,
+      completedApplications: tally.completed,
+      openApplications: Math.max(tally.total - tally.completed, 0),
+    };
+  });
+}
+
+/**
+ * One round trip for every link's application tally, instead of two per link.
+ */
+async function countApplicationsByLink(
+  supabase: ReturnType<typeof getMcasClient>,
+  linkIds: string[],
+): Promise<Map<string, { total: number; completed: number }>> {
+  const counts = new Map<string, { total: number; completed: number }>();
+
+  if (linkIds.length === 0) return counts;
+
+  const { data, error } = await supabase
+    .from("partner_applications")
+    .select("test_link_id, status")
+    .in("test_link_id", linkIds);
+
+  if (error) {
+    throw new Error(`Failed to count MCAS applications: ${error.message}`);
+  }
+
+  for (const row of (data ?? []) as Array<{
+    test_link_id: string | null;
+    status: string | null;
+  }>) {
+    if (!row.test_link_id) continue;
+
+    const tally = counts.get(row.test_link_id) ?? { total: 0, completed: 0 };
+
+    tally.total += 1;
+    if (row.status === "completed") tally.completed += 1;
+
+    counts.set(row.test_link_id, tally);
+  }
+
+  return counts;
 }
 
 export async function getMcasPublicTestLinkStatus(
@@ -408,6 +451,21 @@ export async function createMcasApplicationFromReusableLink(
   const link = status.link;
   const org = status.organisation;
 
+  // Quota is checked here, before the candidate answers 25 questions — not at
+  // submit time, where the only options would be to discard their answers or to
+  // exceed the plan. Mirrors the open/start gate the GED flow uses.
+  if (link.portal_org_id) {
+    const availability = await getMcasSubmissionAvailability(link.portal_org_id);
+
+    if (!availability.available) {
+      throw new Error(
+        availability.reason === "no_subscription"
+          ? "This organisation does not have an active subscription."
+          : "This organisation has no assessment credits remaining.",
+      );
+    }
+  }
+
   const applicationId = generateMcasApplicationId(org.slug, link.public_token);
 
   const { data, error } = await supabase
@@ -416,6 +474,9 @@ export async function createMcasApplicationFromReusableLink(
       partner_key: org.slug,
       application_id: applicationId,
       org_id: org.id,
+      // Ownership snapshot: taken at creation so the candidate stays attributed
+      // even if the link is later disabled or re-pointed.
+      portal_org_id: link.portal_org_id ?? null,
       test_link_id: link.id,
       framework_slug: link.framework_slug,
       framework_version: link.framework_version,
@@ -432,6 +493,39 @@ export async function createMcasApplicationFromReusableLink(
   return {
     applicationPublicToken: data.public_token as string,
   };
+}
+
+/**
+ * Read-only quota check for an MCAS link's owning portal org. Consumes nothing.
+ *
+ * Imports are deferred so that the public MCAS path — which is mostly used by
+ * links with no portal owner — does not pull the billing/Stripe module graph in
+ * on every request.
+ */
+async function getMcasSubmissionAvailability(portalOrgId: string): Promise<{
+  available: boolean;
+  reason?: string;
+}> {
+  const [{ getSubmissionAvailability }, { getMcasCatalogueTestId }] =
+    await Promise.all([
+      import("@/app/_lib/billing"),
+      import("@/lib/portal/authz"),
+    ]);
+
+  const testId = await getMcasCatalogueTestId();
+
+  if (!testId) {
+    // Migration 20260813120000 has not run here. Never block a candidate over a
+    // missing catalogue row — usage recording will log the same problem later.
+    console.warn(
+      "[MCAS] No portal.tests row for mcas-core-alignment; skipping quota check",
+    );
+    return { available: true };
+  }
+
+  const availability = await getSubmissionAvailability(portalOrgId, testId);
+
+  return { available: availability.available, reason: availability.reason };
 }
 
 function generateMcasApplicationId(orgSlug: string, linkToken: string): string {

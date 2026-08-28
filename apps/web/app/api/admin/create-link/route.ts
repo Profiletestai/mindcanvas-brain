@@ -4,39 +4,14 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { Resend } from "resend";
 import crypto from "crypto";
+import {
+  normalizeMaxUses,
+  normalizeReportVariant,
+} from "@/lib/links/normalize";
+import { createLinkSchema, formatZodError } from "@/lib/links/schema";
+import { requireOrgAccess } from "@/lib/server/orgAccess";
 
 export const runtime = "nodejs";
-
-type ReportVariant = "lite" | "full";
-
-type Body = {
-  orgId: string;
-  testId: string;
-  testDisplayName?: string | null;
-  contactOwner?: string | null;
-  showResults?: boolean;
-  emailReport?: boolean;
-  hiddenResultsMessage?: string | null;
-
-  redirectUrl?: string | null;
-  nextStepsUrl?: string | null;
-  expiresAt?: string | null;
-
-  recipientEmail?: string | null;
-  recipientName?: string | null;
-
-  reportVariant?: ReportVariant | null;
-  report_variant?: ReportVariant | null;
-
-  max_uses?: number | null;
-};
-
-function normalizeMaxUses(v: any): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = typeof v === "number" ? v : parseInt(String(v), 10);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return null;
-  return n;
-}
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const EMAIL_FROM =
@@ -54,32 +29,28 @@ function absoluteUrl(path: string) {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-function normalizeReportVariant(v: any): ReportVariant {
-  return String(v || "")
-    .trim()
-    .toLowerCase() === "lite"
-    ? "lite"
-    : "full";
-}
-
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as Body;
+    const raw = await req.json().catch(() => null);
 
-    if (!body.orgId || !body.testId) {
+    const parsed = createLinkSchema.safeParse(raw ?? {});
+
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "Missing orgId or testId" },
+        { ok: false, error: formatZodError(parsed.error) },
         { status: 400 },
       );
     }
+
+    const body = parsed.data;
 
     const {
       orgId,
       testId,
       testDisplayName,
       contactOwner,
-      showResults = true,
-      emailReport = true,
+      showResults,
+      emailReport,
       hiddenResultsMessage,
       redirectUrl,
       nextStepsUrl,
@@ -87,6 +58,16 @@ export async function POST(req: Request) {
       recipientEmail,
       recipientName,
     } = body;
+
+    // Links are created with the service-role client, so membership of the
+    // target org is checked here rather than relying on RLS.
+    const access = await requireOrgAccess(orgId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { ok: false, error: access.error },
+        { status: access.status },
+      );
+    }
 
     const reportVariant = normalizeReportVariant(
       body.report_variant ?? body.reportVariant,

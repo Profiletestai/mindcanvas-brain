@@ -12,6 +12,7 @@ export type OrgSettings = {
   logo_url?: string | null;
   brand_primary?: string | null;
   brand_secondary?: string | null;
+  brand_accent?: string | null;
   brand_background?: string | null;
   brand_text?: string | null;
 

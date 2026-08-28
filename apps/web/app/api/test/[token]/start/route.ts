@@ -93,6 +93,7 @@ export async function POST(
         expires_at,
         max_uses,
         use_count,
+        is_active,
         is_disabled
       `
       )
@@ -115,6 +116,15 @@ export async function POST(
     if (link.is_disabled === true) {
       return cors(
         NextResponse.json({ error: "This link is disabled." }, { status: 403 })
+      );
+    }
+    // Deactivated from the portal — the link must stop resolving.
+    if (link.is_active === false) {
+      return cors(
+        NextResponse.json(
+          { error: "This link is no longer active." },
+          { status: 403 }
+        )
       );
     }
     if (isExpired(link.expires_at)) {

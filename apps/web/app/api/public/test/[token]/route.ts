@@ -14,6 +14,8 @@ type LinkRow = {
   org_id: string;
   max_uses: number | null;
   use_count: number | null;
+  is_active: boolean | null;
+  expires_at: string | null;
 };
 
 type TestRow = {
@@ -129,6 +131,24 @@ function normalizeWebsiteUrl(value: unknown): {
   }
 }
 
+// A link is refused once it is deactivated from the portal or past its
+// expiry date — neither was checked on this path before.
+function isLinkClosed(link: {
+  is_active: boolean | null;
+  expires_at: string | null;
+}): boolean {
+  if (link.is_active === false) {
+    return true;
+  }
+
+  if (!link.expires_at) {
+    return false;
+  }
+
+  const expiry = Date.parse(link.expires_at);
+  return !Number.isNaN(expiry) && expiry <= Date.now();
+}
+
 function isWhatsWhatsOrganisation(org: OrgRow | null): boolean {
   if (!org) {
     return false;
@@ -162,7 +182,9 @@ export async function GET(
     // taking the test and must be used for organisation-specific behaviour.
     const { data: linkRow, error: linkErr } = (await sb
       .from("test_links")
-      .select("token, test_id, org_id, max_uses, use_count")
+      .select(
+        "token, test_id, org_id, max_uses, use_count, is_active, expires_at"
+      )
       .eq("token", token)
       .maybeSingle()) as { data: LinkRow | null; error: any };
 
@@ -170,6 +192,13 @@ export async function GET(
       return NextResponse.json(
         { ok: false, error: "invalid link" },
         { status: 404 }
+      );
+    }
+
+    if (isLinkClosed(linkRow)) {
+      return NextResponse.json(
+        { ok: false, error: "This link is no longer active." },
+        { status: 403 }
       );
     }
 
@@ -343,10 +372,18 @@ export async function POST(
     // 1) Resolve the public link.
     const { data: link, error: linkErr } = (await sb
       .from("test_links")
-      .select("test_id, token, org_id")
+      .select("test_id, token, org_id, is_active, expires_at")
       .eq("token", token)
       .maybeSingle()) as {
-      data: { test_id: string; token: string; org_id: string } | null;
+      data:
+        | {
+            test_id: string;
+            token: string;
+            org_id: string;
+            is_active: boolean | null;
+            expires_at: string | null;
+          }
+        | null;
       error: any;
     };
 
@@ -354,6 +391,13 @@ export async function POST(
       return NextResponse.json(
         { ok: false, error: "invalid link" },
         { status: 404 }
+      );
+    }
+
+    if (isLinkClosed(link)) {
+      return NextResponse.json(
+        { ok: false, error: "This link is no longer active." },
+        { status: 403 }
       );
     }
 

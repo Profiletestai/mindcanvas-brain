@@ -1,66 +1,37 @@
-// apps/web/app/portal/login/page.tsx
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
+import { PublicPageShell } from "@/components/public/ProfiletestChrome";
 import { OtpInput } from "./_components/OtpInput";
 
 function safeNextPath(input: unknown, fallback: string) {
-  const s = typeof input === "string" ? input.trim() : "";
-  if (!s.startsWith("/")) return fallback;
-  if (s.startsWith("//")) return fallback;
-  return s;
+  const value = typeof input === "string" ? input.trim() : "";
+  if (!value.startsWith("/") || value.startsWith("//")) return fallback;
+  return value;
 }
 
-type LoginResponse = {
-  ok: boolean;
-  error?: string;
-  next?: string;
-  is_superadmin?: boolean;
-  org_slug?: string | null;
-};
+type LoginResponse = { ok: boolean; error?: string; next?: string; is_superadmin?: boolean; org_slug?: string | null };
 
 function getNextFromUrl(): string | null {
   try {
-    const usp = new URLSearchParams(window.location.search || "");
-    const next = usp.get("next");
-    return next ? next : null;
+    return new URLSearchParams(window.location.search || "").get("next");
   } catch {
     return null;
   }
 }
 
 function handleLoginResponse(json: LoginResponse) {
-  const isSuper = !!json.is_superadmin;
-
+  const isSuper = Boolean(json.is_superadmin);
   const nextFromUrl = getNextFromUrl();
-  const nextFromServer = json?.next;
+  const fallback = isSuper ? "/dashboard" : json.org_slug ? `/portal/${json.org_slug}/dashboard` : "/portal";
 
-  const computedFallback = isSuper
-    ? "/dashboard"
-    : json?.org_slug
-      ? `/portal/${json.org_slug}/dashboard`
-      : "/portal";
+  try { sessionStorage.setItem("mc_just_logged_in", "1"); } catch {}
 
-  try {
-    sessionStorage.setItem("mc_just_logged_in", "1");
-  } catch {}
-
-  let target = safeNextPath(nextFromUrl || nextFromServer, computedFallback);
-
-  if (
-    !isSuper &&
-    (target === "/dashboard" || target.startsWith("/dashboard/"))
-  ) {
-    target = computedFallback;
-  }
-  if (!isSuper && (target === "/admin" || target.startsWith("/admin/"))) {
-    target = computedFallback;
-  }
-  if (isSuper && target.startsWith("/portal/") && !nextFromUrl) {
-    target = "/dashboard";
-  }
-
+  let target = safeNextPath(nextFromUrl || json.next, fallback);
+  if (!isSuper && (target === "/dashboard" || target.startsWith("/dashboard/"))) target = fallback;
+  if (!isSuper && (target === "/admin" || target.startsWith("/admin/"))) target = fallback;
+  if (isSuper && target.startsWith("/portal/") && !nextFromUrl) target = "/dashboard";
   window.location.href = target;
 }
 
@@ -79,243 +50,92 @@ export default function LoginPage() {
 
   function switchMode(next: Mode) {
     if (next === mode) return;
-    setMode(next);
-    setStep("email");
-    setError(null);
-    setInfo(null);
-    setPassword("");
-    setToken("");
+    setMode(next); setStep("email"); setError(null); setInfo(null); setPassword(""); setToken("");
   }
 
-  async function onPasswordSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
+  async function onPasswordSubmit(event: React.FormEvent) {
+    event.preventDefault(); setError(null); setLoading(true);
     try {
-      const res = await fetch("/api/portal/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        redirect: "manual",
-      });
-
-      const ct = res.headers.get("content-type") || "";
-      const json = ct.includes("application/json")
-        ? ((await res.json().catch(() => null)) as LoginResponse | null)
-        : null;
-
-      if (!res.ok || !json?.ok) {
-        setError(json?.error || `Login failed (HTTP ${res.status})`);
-        return;
-      }
-
+      const response = await fetch("/api/portal/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }), redirect: "manual" });
+      const contentType = response.headers.get("content-type") || "";
+      const json = contentType.includes("application/json") ? ((await response.json().catch(() => null)) as LoginResponse | null) : null;
+      if (!response.ok || !json?.ok) { setError(json?.error || `Login failed (HTTP ${response.status})`); return; }
       handleLoginResponse(json);
-    } catch (e: any) {
-      setError(e?.message ?? "Login failed");
-    } finally {
-      setLoading(false);
-    }
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : "Login failed");
+    } finally { setLoading(false); }
   }
 
   async function sendOtp() {
-    setError(null);
-    setInfo(null);
-    setLoading(true);
+    setError(null); setInfo(null); setLoading(true);
     try {
-      const res = await fetch("/api/portal/login/otp/request", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const json = (await res.json().catch(() => null)) as LoginResponse | null;
-      if (!res.ok || !json?.ok) {
-        setError(json?.error || `Request failed (HTTP ${res.status})`);
-        return;
-      }
-      setStep("code");
-      setToken("");
-      setInfo(`Code sent to ${email}`);
-    } catch (e: any) {
-      setError(e?.message ?? "Request failed");
-    } finally {
-      setLoading(false);
-    }
+      const response = await fetch("/api/portal/login/otp/request", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
+      const json = (await response.json().catch(() => null)) as LoginResponse | null;
+      if (!response.ok || !json?.ok) { setError(json?.error || `Request failed (HTTP ${response.status})`); return; }
+      setStep("code"); setToken(""); setInfo(`Code sent to ${email}`);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : "Request failed");
+    } finally { setLoading(false); }
   }
 
-  async function onOtpEmailSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    await sendOtp();
-  }
-
-  async function onOtpVerifySubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  async function onOtpVerifySubmit(event: React.FormEvent) {
+    event.preventDefault(); setError(null); setLoading(true);
     try {
-      const res = await fetch("/api/portal/login/otp/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, token }),
-      });
-      const json = (await res.json().catch(() => null)) as LoginResponse | null;
-      if (!res.ok || !json?.ok) {
-        setError(json?.error || `Verification failed (HTTP ${res.status})`);
-        return;
-      }
+      const response = await fetch("/api/portal/login/otp/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, token }) });
+      const json = (await response.json().catch(() => null)) as LoginResponse | null;
+      if (!response.ok || !json?.ok) { setError(json?.error || `Verification failed (HTTP ${response.status})`); return; }
       handleLoginResponse(json);
-    } catch (e: any) {
-      setError(e?.message ?? "Verification failed");
-    } finally {
-      setLoading(false);
-    }
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : "Verification failed");
+    } finally { setLoading(false); }
   }
 
-  const tabBtn = (active: boolean) =>
-    `flex-1 py-2 text-sm rounded-md transition ${
-      active
-        ? "bg-white/10 text-white border border-white/25"
-        : "text-white/60 hover:text-white border border-transparent"
-    }`;
+  const inputClass = "mt-2 h-[46px] w-full rounded-[8px] border border-[#2a3544] bg-[#101925] px-4 text-[14.5px] text-[#F2F5F8] outline-none transition placeholder:text-[#6B7686] focus:border-[#4FA8D8] focus:ring-2 focus:ring-[#4FA8D8]/15";
+  const buttonClass = "h-[50px] w-full rounded-[8px] bg-gradient-to-r from-[#2877ad] to-[#3a9bd0] text-[15px] font-bold text-white shadow-[0_8px_22px_rgba(42,139,193,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55 [font-family:var(--font-dm-sans)]";
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-[#0b0f16] text-white">
-      <div className="w-full max-w-sm space-y-4 border border-white/15 rounded-xl p-6">
-        <h1 className="text-xl font-semibold">Client Portal Login</h1>
+    <PublicPageShell compactHeader>
+      <section className="relative flex flex-1 items-center bg-[radial-gradient(circle_at_50%_20%,rgba(20,58,83,0.2),transparent_44%),linear-gradient(135deg,#040b13,#06101b_55%,#030810)] px-5 py-14 sm:px-8 sm:py-20">
+        <div className="mx-auto w-full max-w-[420px]">
+          <Link href="/" className="inline-flex items-center gap-2 text-[13.5px] text-[#6B7686] transition hover:text-[#9AA7BA]"><span aria-hidden>←</span> Back to Profiletest.ai</Link>
+          <h1 className="mt-8 text-[30px] font-extrabold text-[#F2F5F8]">Welcome back</h1>
+          <p className="mt-2 text-[14.5px] leading-[22.5px] text-[#9AA7BA]">Log in to access your dashboard, test links, reports<br className="hidden sm:block" /> and Insider Insights.</p>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className={tabBtn(mode === "password")}
-            onClick={() => switchMode("password")}
-          >
-            Password
-          </button>
-          <button
-            type="button"
-            className={tabBtn(mode === "otp")}
-            onClick={() => switchMode("otp")}
-          >
-            OTP
-          </button>
+          <div className="mt-7 grid grid-cols-2 rounded-[9px] border border-[#263242] bg-[#101824] p-1">
+            <button type="button" onClick={() => switchMode("password")} className={`h-10 rounded-[7px] text-[13.5px] font-semibold transition ${mode === "password" ? "border border-[#326d91] bg-[#19344a] text-[#F2F5F8]" : "text-[#9AA7BA] hover:text-white"}`}>Password</button>
+            <button type="button" onClick={() => switchMode("otp")} className={`h-10 rounded-[7px] text-[13.5px] font-semibold transition ${mode === "otp" ? "border border-[#326d91] bg-[#19344a] text-[#F2F5F8]" : "text-[#9AA7BA] hover:text-white"}`}>Email code</button>
+          </div>
+
+          {error ? <div role="alert" className="mt-4 rounded-[8px] border border-red-400/35 bg-red-400/10 px-3 py-2.5 text-[13px] text-red-300">{error}</div> : null}
+          {info && !error ? <div className="mt-4 rounded-[8px] border border-[#5FE3B3]/30 bg-[#5FE3B3]/10 px-3 py-2.5 text-[13px] text-[#5FE3B3]">✓&nbsp; {info}</div> : null}
+
+          {mode === "password" ? (
+            <form onSubmit={onPasswordSubmit} className="mt-7 space-y-5">
+              <label className="block text-[12.5px] font-semibold tracking-[0.01em] text-[#9AA7BA]">Email address<input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} placeholder="you@company.com" autoComplete="email" required /></label>
+              <label className="block text-[12.5px] font-semibold tracking-[0.01em] text-[#9AA7BA]"><span className="flex items-center justify-between"><span>Password</span><Link href="/portal/forgot-password" className="text-[#4FA8D8] transition hover:text-[#73bce3]">Forgot password?</Link></span><input className={inputClass} type="password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} placeholder="••••••••" autoComplete="current-password" required /></label>
+              <button className={buttonClass} type="submit" disabled={loading}>{loading ? "Logging in…" : "Log in"}</button>
+            </form>
+          ) : null}
+
+          {mode === "otp" && step === "email" ? (
+            <form onSubmit={(event) => { event.preventDefault(); void sendOtp(); }} className="mt-7 space-y-5">
+              <label className="block text-[12.5px] font-semibold tracking-[0.01em] text-[#9AA7BA]">Email address<input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} placeholder="you@company.com" autoComplete="email" required /></label>
+              <button className={buttonClass} type="submit" disabled={loading || !email}>{loading ? "Sending…" : "Send email code"}</button>
+            </form>
+          ) : null}
+
+          {mode === "otp" && step === "code" ? (
+            <form onSubmit={onOtpVerifySubmit} className="mt-5 space-y-5">
+              <div><p className="mb-3 text-[12.5px] font-semibold text-[#9AA7BA]">Enter the code we sent to your email.</p><OtpInput value={token} onChange={setToken} autoFocus /></div>
+              <div className="text-right"><button type="button" onClick={() => void sendOtp()} disabled={loading} className="text-[12.5px] font-semibold text-[#4FA8D8] transition hover:text-[#73bce3] disabled:opacity-50">Resend code</button></div>
+              <button className={buttonClass} type="submit" disabled={loading || token.length !== 6}>{loading ? "Verifying…" : "Continue"}</button>
+              <button type="button" onClick={() => { setStep("email"); setToken(""); setError(null); setInfo(null); }} className="w-full text-center text-[12.5px] text-[#6B7686] transition hover:text-white">Use a different email</button>
+            </form>
+          ) : null}
+
+          <p className="mt-6 text-center text-[13.5px] text-[#6B7686]">New to Profiletest.ai? <Link href="/onboarding/v2" className="font-semibold text-[#4FA8D8] underline underline-offset-2">Start with 3 free tests.</Link></p>
         </div>
-
-        {error && <div className="text-red-400 text-sm">{error}</div>}
-        {info && !error && <div className="text-green-400 text-sm">{info}</div>}
-
-        {mode === "password" && (
-          <form onSubmit={onPasswordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm mb-1">Email</label>
-              <input
-                className="w-full rounded-md border border-white/20 bg-transparent p-2"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                placeholder="you@company.com"
-                autoComplete="email"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm mb-1">Password</label>
-              <input
-                className="w-full rounded-md border border-white/20 bg-transparent p-2"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.currentTarget.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-              />
-              <div className="mt-1 text-right">
-                <Link
-                  href="/portal/forgot-password"
-                  className="text-xs text-white/60 hover:text-white"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-            </div>
-
-            <button
-              className="w-full rounded-md border border-white/25 py-2 hover:bg-white/5 disabled:opacity-50"
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
-        )}
-
-        {mode === "otp" && step === "email" && (
-          <form onSubmit={onOtpEmailSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm mb-1">Email</label>
-              <input
-                className="w-full rounded-md border border-white/20 bg-transparent p-2"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                placeholder="you@company.com"
-                autoComplete="email"
-                required
-              />
-            </div>
-
-            <button
-              className="w-full rounded-md border border-white/25 py-2 hover:bg-white/5 disabled:opacity-50"
-              type="submit"
-              disabled={loading || !email}
-            >
-              {loading ? "Sending…" : "Send code"}
-            </button>
-          </form>
-        )}
-
-        {mode === "otp" && step === "code" && (
-          <form onSubmit={onOtpVerifySubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm mb-2 text-center">
-                Enter the 6-digit code
-              </label>
-              <OtpInput value={token} onChange={setToken} autoFocus />
-            </div>
-
-            <button
-              className="w-full rounded-md border border-white/25 py-2 hover:bg-white/5 disabled:opacity-50"
-              type="submit"
-              disabled={loading || token.length !== 6}
-            >
-              {loading ? "Verifying…" : "Verify"}
-            </button>
-
-            <div className="flex justify-between text-xs text-white/60">
-              <button
-                type="button"
-                className="hover:text-white disabled:opacity-50"
-                onClick={sendOtp}
-                disabled={loading}
-              >
-                Resend code
-              </button>
-              <button
-                type="button"
-                className="hover:text-white"
-                onClick={() => {
-                  setStep("email");
-                  setToken("");
-                  setError(null);
-                  setInfo(null);
-                }}
-              >
-                Use a different email
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+      </section>
+    </PublicPageShell>
   );
 }
