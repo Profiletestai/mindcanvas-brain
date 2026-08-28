@@ -1,14 +1,24 @@
 // apps/web/app/portal/[slug]/tests/page.tsx
 // Server component — Tests hub for /portal/[slug]/tests
 
-import { createClient } from "@/lib/server/supabaseAdmin";
-import { getActiveEntitlement } from "@/app/_lib/billing";
-import PortalPageHeader from "@/components/portal/PortalPageHeader";
+import Link from "next/link";
+
+import {
+  getActiveEntitlement,
+} from "@/app/_lib/billing";
 import CreateTestLinkButton from "@/components/portal/CreateTestLinkButton";
-import UpgradeEngineButton from "@/components/portal/UpgradeEngineButton";
 import type { ModelOption } from "@/components/portal/CreateTestLinkModal";
-import { cardClass } from "@/components/portal/ui";
-import { loadModels } from "@/lib/portal/loadModels";
+import PortalPageHeader from "@/components/portal/PortalPageHeader";
+import UpgradeEngineButton from "@/components/portal/UpgradeEngineButton";
+import {
+  cardClass,
+} from "@/components/portal/ui";
+import {
+  loadModels,
+} from "@/lib/portal/loadModels";
+import {
+  createClient,
+} from "@/lib/server/supabaseAdmin";
 import { metaFor } from "@/lib/testModels";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +43,8 @@ const LOCKED_CATALOG: LockedModel[] = [
   },
   {
     id: "locked-people-engine",
-    name: "MindCanvas Alignment System",
+    name:
+      "MindCanvas Alignment System",
     category:
       "Predictive Team Design Intelligence",
     locked: true,
@@ -43,27 +54,46 @@ const LOCKED_CATALOG: LockedModel[] = [
   },
 ];
 
+function isMcasModel(
+  model: Pick<
+    ModelOption,
+    "name"
+  >,
+): boolean {
+  return (
+    /\bmcas\b|mindcanvas alignment|core alignment/i.test(
+      model.name,
+    )
+  );
+}
+
 export default async function TestsPage({
   params,
 }: {
-  params: { slug: string };
+  params: {
+    slug: string;
+  };
 }) {
   const { slug } = params;
 
   try {
     const sb =
-      createClient().schema("portal");
+      createClient().schema(
+        "portal",
+      );
 
-    const { data: org, error: orgErr } =
-      await sb
-        .from("orgs")
-        .select("id, slug, name")
-        .eq("slug", slug)
-        .maybeSingle();
+    const {
+      data: org,
+      error: orgError,
+    } = await sb
+      .from("orgs")
+      .select("id, slug, name")
+      .eq("slug", slug)
+      .maybeSingle();
 
-    if (orgErr || !org) {
+    if (orgError || !org) {
       throw new Error(
-        orgErr?.message ||
+        orgError?.message ||
           "Organisation not found",
       );
     }
@@ -71,11 +101,14 @@ export default async function TestsPage({
     const [models, entitlement] =
       await Promise.all([
         loadModels(org.id),
-        getActiveEntitlement(org.id),
+        getActiveEntitlement(
+          org.id,
+        ),
       ]);
 
     const currentTier =
-      entitlement?.status === "active"
+      entitlement?.status ===
+      "active"
         ? entitlement.tier
         : null;
 
@@ -90,10 +123,15 @@ export default async function TestsPage({
           )
         : [];
 
-    const modalModels: ModelOption[] = [
-      ...models,
-      ...lockedModels,
-    ];
+    // MCAS is catalogue-only and uses its dedicated portal link builder.
+    const modalModels: ModelOption[] =
+      [
+        ...models.filter(
+          (model) =>
+            !isMcasModel(model),
+        ),
+        ...lockedModels,
+      ];
 
     return (
       <div className="space-y-6 text-slate-100">
@@ -116,70 +154,99 @@ export default async function TestsPage({
           </div>
 
           <div className="grid gap-x-2 gap-y-3.5 lg:grid-cols-2">
-            {models.map((model) => {
-              const meta = metaFor(
-                model.name,
-              );
+            {models.map(
+              (model) => {
+                const meta =
+                  metaFor(
+                    model.name,
+                  );
 
-              return (
-                <div
-                  key={model.id}
-                  className={`flex min-h-[254px] flex-col p-5 ${cardClass}`}
-                >
-                  <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#54AFE0]">
-                    {meta.category}
-                  </div>
-
-                  <h2 className="mt-2 text-[15px] font-extrabold leading-[20px] tracking-[-0.2px] text-white">
-                    {model.name}
-                  </h2>
-
-                  <p className="mt-2.5 text-[12px] font-light leading-[18px] text-white/[0.62]">
-                    {meta.description}
-                  </p>
-
-                  <div className="mt-3 space-y-2 border-t border-white/[0.05] pt-3.5">
-                    <div className="flex text-[11px]">
-                      <span className="w-[73px] shrink-0 font-semibold text-white/[0.36]">
-                        Best for
-                      </span>
-
-                      <span className="font-light text-white/[0.62]">
-                        {meta.bestFor}
-                      </span>
-                    </div>
-
-                    <div className="flex text-[11px]">
-                      <span className="w-[73px] shrink-0 font-semibold text-white/[0.36]">
-                        Output
-                      </span>
-
-                      <span className="font-light text-white/[0.62]">
-                        {meta.output}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-auto flex justify-end pt-6">
-                    <CreateTestLinkButton
-                      orgId={org.id}
-                      orgSlug={slug}
-                      models={modalModels}
-                      initialModelId={
-                        model.id
+                return (
+                  <div
+                    key={model.id}
+                    className={`flex min-h-[254px] flex-col p-5 ${cardClass}`}
+                  >
+                    <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#54AFE0]">
+                      {
+                        meta.category
                       }
-                      variant="card"
-                    />
+                    </div>
+
+                    <h2 className="mt-2 text-[15px] font-extrabold leading-[20px] tracking-[-0.2px] text-white">
+                      {model.name}
+                    </h2>
+
+                    <p className="mt-2.5 text-[12px] font-light leading-[18px] text-white/[0.62]">
+                      {
+                        meta.description
+                      }
+                    </p>
+
+                    <div className="mt-3 space-y-2 border-t border-white/[0.05] pt-3.5">
+                      <div className="flex text-[11px]">
+                        <span className="w-[73px] shrink-0 font-semibold text-white/[0.36]">
+                          Best for
+                        </span>
+
+                        <span className="font-light text-white/[0.62]">
+                          {
+                            meta.bestFor
+                          }
+                        </span>
+                      </div>
+
+                      <div className="flex text-[11px]">
+                        <span className="w-[73px] shrink-0 font-semibold text-white/[0.36]">
+                          Output
+                        </span>
+
+                        <span className="font-light text-white/[0.62]">
+                          {
+                            meta.output
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-auto flex justify-end pt-6">
+                      {isMcasModel(
+                        model,
+                      ) ? (
+                        <Link
+                          href={`/portal/${slug}/mcas/links`}
+                          className="inline-flex h-[24px] items-center rounded-md bg-[#54AFE0] px-[11px] text-[11px] font-semibold leading-none tracking-[0.1px] text-white shadow-[0_6px_20px_0_rgba(26,106,232,0.38)] transition-opacity hover:opacity-90"
+                        >
+                          Manage MCAS
+                        </Link>
+                      ) : (
+                        <CreateTestLinkButton
+                          orgId={
+                            org.id
+                          }
+                          orgSlug={
+                            slug
+                          }
+                          models={
+                            modalModels
+                          }
+                          initialModelId={
+                            model.id
+                          }
+                          variant="card"
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              },
+            )}
 
             {lockedModels.map(
               (model) => {
-                const meta = metaFor(
-                  model.descriptionName,
-                );
+                const meta =
+                  metaFor(
+                    model.descriptionName,
+                  );
 
                 return (
                   <div
@@ -191,24 +258,33 @@ export default async function TestsPage({
                     <div className="relative flex h-full flex-1 flex-col">
                       <div className="flex items-start justify-between gap-3">
                         <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-[#54AFE0]/65">
-                          {meta.category}
+                          {
+                            meta.category
+                          }
                         </div>
 
                         <div className="inline-flex items-center gap-1.5 rounded-full border border-[#54AFE0]/25 bg-[#54AFE0]/10 px-2.5 py-1 text-[10px] font-bold text-[#8ed3f4]">
                           <span aria-hidden>
                             🔒
                           </span>
-                          {model.requiredPlan}
+
+                          {
+                            model.requiredPlan
+                          }
                         </div>
                       </div>
 
                       <div className="opacity-55">
                         <h2 className="mt-2 text-[15px] font-extrabold leading-[20px] tracking-[-0.2px] text-white">
-                          {model.name}
+                          {
+                            model.name
+                          }
                         </h2>
 
                         <p className="mt-2.5 text-[12px] font-light leading-[18px] text-white/[0.62]">
-                          {meta.description}
+                          {
+                            meta.description
+                          }
                         </p>
 
                         <div className="mt-3 space-y-2 border-t border-white/[0.05] pt-3.5">
@@ -218,7 +294,9 @@ export default async function TestsPage({
                             </span>
 
                             <span className="font-light text-white/[0.62]">
-                              {meta.bestFor}
+                              {
+                                meta.bestFor
+                              }
                             </span>
                           </div>
 
@@ -228,7 +306,9 @@ export default async function TestsPage({
                             </span>
 
                             <span className="font-light text-white/[0.62]">
-                              {meta.output}
+                              {
+                                meta.output
+                              }
                             </span>
                           </div>
                         </div>
@@ -237,12 +317,17 @@ export default async function TestsPage({
                       <div className="mt-auto flex items-end justify-between gap-4 pt-5">
                         <p className="max-w-[210px] text-[11px] leading-4 text-white/50">
                           Upgrade to{" "}
-                          {model.requiredPlan} to
-                          unlock this engine.
+                          {
+                            model.requiredPlan
+                          }{" "}
+                          to unlock this
+                          engine.
                         </p>
 
                         <UpgradeEngineButton
-                          orgId={org.id}
+                          orgId={
+                            org.id
+                          }
                           targetTier={
                             model.requiredTier
                           }
@@ -258,17 +343,19 @@ export default async function TestsPage({
               },
             )}
 
-            {lockedModels.length === 0 && (
+            {lockedModels.length ===
+              0 && (
               <div
                 className={`flex min-h-[254px] flex-col items-center justify-center p-5 text-center ${cardClass}`}
               >
                 <p className="text-[11px] font-light leading-[16px] text-white/[0.36]">
-                  More models coming soon.
+                  More models coming
+                  soon.
                 </p>
 
                 <p className="text-[11px] font-light leading-[16px] text-white/[0.36]">
-                  Speak to us about custom
-                  systems.
+                  Speak to us about
+                  custom systems.
                 </p>
               </div>
             )}

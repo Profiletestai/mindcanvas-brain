@@ -4,10 +4,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 type Props = {
   orgSlug: string;
+  showMcas?: boolean;
   // Called after any nav link is followed — lets the mobile drawer close.
   onNavigate?: () => void;
 };
@@ -44,7 +49,7 @@ const DashboardIcon = (
     <path d="M5.075 1.3125H2.3625C1.7826 1.3125 1.3125 1.7826 1.3125 2.3625V5.075C1.3125 5.6549 1.7826 6.125 2.3625 6.125H5.075C5.6549 6.125 6.125 5.6549 6.125 5.075V2.3625C6.125 1.7826 5.6549 1.3125 5.075 1.3125Z" />
     <path d="M11.6375 1.3125H8.925C8.3451 1.3125 7.875 1.7826 7.875 2.3625V5.075C7.875 5.6549 8.3451 6.125 8.925 6.125H11.6375C12.2174 6.125 12.6875 5.6549 12.6875 5.075V2.3625C12.6875 1.7826 12.2174 1.3125 11.6375 1.3125Z" />
     <path d="M5.075 7.875H2.3625C1.7826 7.875 1.3125 8.3451 1.3125 8.925V11.6375C1.3125 12.2174 1.7826 12.6875 2.3625 12.6875H5.075C5.6549 12.6875 6.125 12.2174 6.125 11.6375V8.925C6.125 8.3451 5.6549 7.875 5.075 7.875Z" />
-    <path d="M11.6375 7.875H8.925C8.3451 7.875 7.875 8.3451 7.875 8.925V11.6375C7.875 12.2174 8.3451 12.6875 8.925 12.6875H11.6375C12.2174 12.6875 12.6875 12.2174 12.6875 11.6375V8.925C12.6875 8.3451 12.2174 7.875 11.6375 7.875Z" />
+    <path d="M11.6375 7.875H8.925C8.3451 7.875 7.875 8.3451 7.875 8.925V11.6375C7.875 12.2174 8.3451 12.6875 8.925 12.6875H11.6375C12.2174 12.6875 12.6875 12.2174 12.6875 11.6375V8.925C12.6875 8.3451 11.904 7.875 10.9375 7.875Z" />
   </svg>
 );
 
@@ -104,12 +109,21 @@ const RevenueIcon = (
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <line x1="12" y1="2" x2="12" y2="22" />
+    <line
+      x1="12"
+      y1="2"
+      x2="12"
+      y2="22"
+    />
     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
   </svg>
 );
 
-export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
+export default function PortalSidebar({
+  orgSlug,
+  showMcas = false,
+  onNavigate,
+}: Props) {
   const pathname = usePathname() ?? "";
   const base = `/portal/${orgSlug}`;
 
@@ -135,7 +149,22 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
       match: `${base}/tests`,
       icon: TestsIcon,
       children: [
-        { label: "Created test links", href: `${base}/links` },
+        {
+          label: "Created test links",
+          href: `${base}/links`,
+        },
+        ...(showMcas
+          ? [
+              {
+                label: "MCAS test links",
+                href: `${base}/mcas/links`,
+              },
+              {
+                label: "MCAS candidates",
+                href: `${base}/mcas/database`,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -145,13 +174,34 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
       match: `${base}/profile`,
       icon: ProfileIcon,
       children: [
-        { label: "Overview", href: `${base}/profile/overview` },
-        { label: "My Account", href: `${base}/profile` },
-        { label: "Organisation", href: `${base}/profile/organisation` },
-        { label: "Branding", href: `${base}/profile/logo` },
-        { label: "Email & Notifications", href: `${base}/profile/email` },
-        { label: "Billing & Usage", href: `${base}/billing` },
-        { label: "Setup checklist", href: `${base}/profile/checklist` },
+        {
+          label: "Overview",
+          href: `${base}/profile/overview`,
+        },
+        {
+          label: "My Account",
+          href: `${base}/profile`,
+        },
+        {
+          label: "Organisation",
+          href: `${base}/profile/organisation`,
+        },
+        {
+          label: "Branding",
+          href: `${base}/profile/logo`,
+        },
+        {
+          label: "Email & Notifications",
+          href: `${base}/profile/email`,
+        },
+        {
+          label: "Billing & Usage",
+          href: `${base}/billing`,
+        },
+        {
+          label: "Setup checklist",
+          href: `${base}/profile/checklist`,
+        },
       ],
     },
     {
@@ -160,7 +210,6 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
       icon: ResourcesIcon,
       disabled: true,
     },
-    // No pages behind these yet — rendered through the disabled branch.
     {
       key: "affiliate",
       label: "Affiliate",
@@ -175,32 +224,77 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
     },
   ];
 
-  const isActive = (item: NavItem) => {
-    if (item.match && pathname.startsWith(item.match)) return true;
-    if (item.key === "tests" && pathname.startsWith(`${base}/links`)) return true;
-    // Billing lives at the org root, not under /profile, but reads as a
-    // Profile child in the nav.
-    if (item.key === "profile" && pathname.startsWith(`${base}/billing`))
+  const isActive = (
+    item: NavItem,
+  ) => {
+    if (
+      item.match &&
+      pathname.startsWith(item.match)
+    ) {
       return true;
+    }
+
+    if (
+      item.key === "tests" &&
+      pathname.startsWith(`${base}/links`)
+    ) {
+      return true;
+    }
+
+    if (
+      item.key === "tests" &&
+      pathname.startsWith(
+        `${base}/mcas/`,
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      item.key === "profile" &&
+      pathname.startsWith(
+        `${base}/billing`,
+      )
+    ) {
+      return true;
+    }
+
     return false;
   };
 
-  const childActive = (c: Child) =>
-    !!c.href && pathname === c.href.split("#")[0] && c.href.startsWith(base);
+  const childActive = (child: Child) =>
+    Boolean(
+      child.href &&
+        pathname ===
+          child.href.split("#")[0] &&
+        child.href.startsWith(base),
+    );
 
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<
+    string | null
+  >(null);
+
   useEffect(() => {
-    const active = items.find((i) => i.children && isActive(i));
-    if (active) setOpen(active.key);
-  }, [pathname]);
+    const active = items.find(
+      (item) =>
+        item.children &&
+        isActive(item),
+    );
+
+    if (active) {
+      setOpen(active.key);
+    }
+  }, [pathname, showMcas]);
 
   return (
     <aside
-      style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}
+      style={{
+        fontFamily:
+          '"Plus Jakarta Sans", sans-serif',
+      }}
       className="flex h-full min-h-screen w-56 shrink-0 flex-col border-r border-neutral-200 bg-white text-[#9CA3AF]"
     >
-      {/* Logo */}
-      <div className="flex items-center gap-2 pb-5 pt-6 pl-[15px] pr-5">
+      <div className="flex items-center gap-2 pb-5 pl-[15px] pr-5 pt-6">
         <Image
           src="/images/profile-test-ai-logo.png"
           alt="profiletest.ai"
@@ -213,9 +307,16 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
 
       <nav className="flex flex-1 flex-col gap-2 overflow-y-auto pb-6">
         {items.map((item) => {
-          const active = isActive(item);
-          const hasChildren = !!item.children?.length;
-          const expanded = open === item.key;
+          const active =
+            isActive(item);
+
+          const hasChildren =
+            Boolean(
+              item.children?.length,
+            );
+
+          const expanded =
+            open === item.key;
 
           const rowClass = [
             "group relative flex h-[30px] items-center gap-[18px] border-l-[3px] px-3 text-[12.5px] font-medium leading-none",
@@ -228,23 +329,40 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
 
           const inner = (
             <>
-              <span className="shrink-0">{item.icon}</span>
-              <span className="flex-1">{item.label}</span>
+              <span className="shrink-0">
+                {item.icon}
+              </span>
+
+              <span className="flex-1">
+                {item.label}
+              </span>
             </>
           );
 
           return (
             <div key={item.key}>
               {item.disabled ? (
-                <div className={rowClass} aria-disabled title="Coming soon">
+                <div
+                  className={rowClass}
+                  aria-disabled
+                  title="Coming soon"
+                >
                   {inner}
                 </div>
               ) : (
                 <Link
-                  href={item.href ?? "#"}
+                  href={
+                    item.href ?? "#"
+                  }
                   className={rowClass}
                   onClick={() => {
-                    setOpen(hasChildren && !expanded ? item.key : null);
+                    setOpen(
+                      hasChildren &&
+                        !expanded
+                        ? item.key
+                        : null,
+                    );
+
                     onNavigate?.();
                   }}
                 >
@@ -252,39 +370,71 @@ export default function PortalSidebar({ orgSlug, onNavigate }: Props) {
                 </Link>
               )}
 
-              {hasChildren && expanded && (
-                <div className="mb-1 ml-[2.4rem] mt-0.5 flex flex-col">
-                  {item.children!.map((c) => {
-                    const cActive = childActive(c);
-                    const cClass = [
-                      "py-1.5 pl-4 pr-3 text-[12.5px] font-medium leading-none",
-                      c.disabled
-                        ? "cursor-not-allowed text-neutral-300"
-                        : cActive
-                          ? "text-[rgba(84,175,224,1)]"
-                          : "text-[#9CA3AF]",
-                    ].join(" ");
+              {hasChildren &&
+                expanded && (
+                  <div className="mb-1 ml-[2.4rem] mt-0.5 flex flex-col">
+                    {item.children!.map(
+                      (child) => {
+                        const activeChild =
+                          childActive(
+                            child,
+                          );
 
-                    if (c.disabled || !c.href) {
-                      return (
-                        <span key={c.label} className={cClass} title="Coming soon">
-                          {c.label}
-                        </span>
-                      );
-                    }
-                    return (
-                      <Link
-                        key={c.label}
-                        href={c.href}
-                        className={cClass}
-                        onClick={() => onNavigate?.()}
-                      >
-                        {c.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
+                        const childClass =
+                          [
+                            "py-1.5 pl-4 pr-3 text-[12.5px] font-medium leading-none",
+                            child.disabled
+                              ? "cursor-not-allowed text-neutral-300"
+                              : activeChild
+                                ? "text-[rgba(84,175,224,1)]"
+                                : "text-[#9CA3AF]",
+                          ].join(" ");
+
+                        if (
+                          child.disabled ||
+                          !child.href
+                        ) {
+                          return (
+                            <span
+                              key={
+                                child.label
+                              }
+                              className={
+                                childClass
+                              }
+                              title="Coming soon"
+                            >
+                              {
+                                child.label
+                              }
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <Link
+                            key={
+                              child.label
+                            }
+                            href={
+                              child.href
+                            }
+                            className={
+                              childClass
+                            }
+                            onClick={() =>
+                              onNavigate?.()
+                            }
+                          >
+                            {
+                              child.label
+                            }
+                          </Link>
+                        );
+                      },
+                    )}
+                  </div>
+                )}
             </div>
           );
         })}
