@@ -181,6 +181,15 @@ const PRIORITY_ORDER_NOTE =
 
 const FIX_ORDER_LABELS = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
 
+const METHOD_LAYER_LABEL: Record<PillarKey, "Identity" | "Structure" | "Execution"> = {
+  identity: "Identity",
+  positioning: "Structure",
+  offer: "Structure",
+  revenue_model: "Structure",
+  sales: "Execution",
+  decision: "Execution",
+};
+
 const BANDS: Array<{ min: number; label: string }> = [
   { min: 0, label: "Chance-Based" },
   { min: 40, label: "Inconsistent" },
@@ -546,6 +555,25 @@ export default function InevitableStandardReportClient({
       : pillarsByPct.map((pillar) => pillar.key)
   ).slice(0, 3);
 
+  // When the primary constraint sits outside the top 3 priorities (it is in a
+  // later Method layer), explain the gap. Position is derived from the array.
+  const primaryFixPosition =
+    primaryKey && rankedFixOrder.length > 0
+      ? rankedFixOrder.indexOf(primaryKey)
+      : -1;
+  const layersBeforePrimary =
+    primaryKey && METHOD_LAYER_LABEL[primaryKey] === "Execution"
+      ? "Identity and Structure"
+      : primaryKey && METHOD_LAYER_LABEL[primaryKey] === "Structure"
+        ? "Identity"
+        : "";
+  const showConstraintSequenceNote =
+    primaryFixPosition >= 3 && !!layersBeforePrimary;
+  const primaryPositionLabel =
+    primaryFixPosition >= 0
+      ? FIX_ORDER_LABELS[primaryFixPosition] || `${primaryFixPosition + 1}`
+      : "";
+
   const dominant = approaches.dominant || null;
   const dominantLabel = dominant
     ? approaches.labels?.[dominant] ||
@@ -867,6 +895,16 @@ export default function InevitableStandardReportClient({
             </li>
           ))}
         </ol>
+        {showConstraintSequenceNote ? (
+          <p className="mt-5 border-l-2 border-[#d8d2c6] pl-5 text-[13px] leading-6 text-[#4b5563]">
+            <strong className="font-semibold text-[#1e2a38]">
+              {pillarLabel(primaryKey)}
+            </strong>{" "}
+            is your Primary Constraint, but per the Method, work in{" "}
+            {layersBeforePrimary} comes first — that is why it appears as your{" "}
+            {primaryPositionLabel} priority here rather than your first.
+          </p>
+        ) : null}
         <p className="mt-5 text-[13px] leading-6 text-[#918a7d]">{PRIORITY_ORDER_NOTE}</p>
 
         <div className="mt-12 border-t border-[#e7e3db] pt-10">
