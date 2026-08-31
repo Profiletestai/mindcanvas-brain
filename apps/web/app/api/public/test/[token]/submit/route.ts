@@ -5,6 +5,10 @@ import { calculateQscScores } from "@/lib/qsc-scoring";
 import { sendTemplatedEmail } from "@/lib/server/emailTemplates";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { reserveSubmission } from "@/app/_lib/billing";
+import {
+  mapInevitableStandardSubmission,
+  type InevitableStandardSubmittedAnswer,
+} from "@/lib/inevitable-standard/mapSubmission";
 
 type AB = "A" | "B" | "C" | "D";
 type AnswerCode = "A" | "B" | "C" | "D" | "E";
@@ -2816,6 +2820,18 @@ export async function POST(
       testNameLower.includes("growth engine diagnostic") ||
       testNameLower.startsWith("ged");
 
+    const inevitableEngineKey = String(meta?.engine_key || "")
+      .toLowerCase()
+      .trim();
+
+    const isInevitableStandardTest =
+      meta?.is_inevitable_standard === true ||
+      inevitableEngineKey === "inevitable_standard" ||
+      inevitableEngineKey === "inevitable-standard" ||
+      slugLower === "inevitable-standard" ||
+      slugLower.startsWith("inevitable-standard-") ||
+      testNameLower.includes("inevitable standard");
+
     const qscAudience: "entrepreneur" | "leader" = isQscEntrepreneur
       ? "entrepreneur"
       : "leader";
@@ -2837,6 +2853,87 @@ export async function POST(
     const byId: Record<string, PortalQuestionRow> = {};
     for (const q of questions || []) {
       byId[q.id] = q;
+    }
+
+    let inevitableStandardScore: ReturnType<
+      typeof mapInevitableStandardSubmission
+    >["score"] | null = null;
+
+    if (isInevitableStandardTest) {
+      const storedQuestions = (questions || []).map(
+        (question: PortalQuestionRow) => {
+          const rawIndex = question.idx;
+
+          const numericIndex =
+            typeof rawIndex === "number"
+              ? rawIndex
+              : typeof rawIndex === "string" && rawIndex.trim()
+                ? Number(rawIndex)
+                : null;
+
+          return {
+            id: question.id,
+            idx:
+              typeof numericIndex === "number" &&
+              Number.isInteger(numericIndex)
+                ? numericIndex
+                : null,
+          };
+        }
+      );
+
+      const normalizedAnswers: InevitableStandardSubmittedAnswer[] = [];
+
+      for (const row of answers) {
+        const questionId =
+          row?.question_id || row?.qid || row?.id;
+
+        if (!questionId) continue;
+
+        normalizedAnswers.push({
+          question_id: String(questionId),
+          choice_index: toZeroBasedSelected(row),
+          text:
+            typeof row?.text === "string"
+              ? row.text
+              : null,
+        });
+      }
+
+      const mapped = mapInevitableStandardSubmission({
+        questions: storedQuestions,
+        answers: normalizedAnswers,
+        currency:
+          normalizeText(
+            meta?.default_currency ||
+              meta?.currency ||
+              meta?.commercial_context?.currency
+          ) || null,
+      });
+
+      if (mapped.issues.length > 0) {
+        console.warn(
+          "[submit] Inevitable Standard validation failed",
+          {
+            taker_id: taker.id,
+            test_id: taker.test_id,
+            effective_test_id: effectiveTestId,
+            issues: mapped.issues,
+          }
+        );
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "The Inevitable Standard submission is incomplete or invalid.",
+            issues: mapped.issues,
+          },
+          { status: 400 }
+        );
+      }
+
+      inevitableStandardScore = mapped.score;
     }
 
     const gedDiagnostics = extractGedDiagnostics(questions || [], answers);
@@ -3002,10 +3099,26 @@ export async function POST(
         D: freqTotals.D,
       },
       profiles: profileTotals,
+      inevitable_standard: inevitableStandardScore,
       meta: {
         wrapper_test_id: taker.test_id,
         effective_test_id: effectiveTestId,
         is_ged: isGedTest,
+        is_inevitable_standard: isInevitableStandardTest,
+        inevitable_standard: inevitableStandardScore
+          ? {
+              model_version:
+                inevitableStandardScore.model_version,
+              scoring_version:
+                inevitableStandardScore.scoring_version,
+              constraint_version:
+                inevitableStandardScore.constraint_version,
+              scoring_complete:
+                inevitableStandardScore.scoring_complete,
+              qa_flags:
+                inevitableStandardScore.qa_flags,
+            }
+          : null,
         ged: hasGedDiagnostics(gedDiagnostics) ? gedDiagnostics : null,
         rhythm: rhythmScore
           ? {
