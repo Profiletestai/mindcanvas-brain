@@ -277,10 +277,12 @@ export async function GET(
   let orgSlug: string | null = null;
   let orgName: string | null = null;
   let testName: string | null = null;
+  let testSlug: string | null = null;
+  let testMeta: any = null;
 
   const testRes = await sb
     .from("tests")
-    .select("id, name, org_id")
+    .select("id, name, slug, org_id, meta")
     .eq("id", testId)
     .maybeSingle();
 
@@ -288,6 +290,8 @@ export async function GET(
     console.warn("[test result] error loading test metadata", testRes.error);
   } else if (testRes.data) {
     testName = (testRes.data as any).name ?? null;
+    testSlug = (testRes.data as any).slug ?? null;
+    testMeta = (testRes.data as any).meta ?? null;
 
     const orgId = (testRes.data as any).org_id as string | null | undefined;
     if (orgId) {
@@ -357,6 +361,52 @@ export async function GET(
       text: a?.text ?? null,
     }))
     .filter((x) => x.question_id);
+
+  const engineKey = String(testMeta?.engine_key || "").toLowerCase().trim();
+  const normalizedSlug = String(testSlug || "").toLowerCase().trim();
+  const normalizedName = String(testName || "").toLowerCase().trim();
+  const isInevitableStandard =
+    testMeta?.is_inevitable_standard === true ||
+    engineKey === "inevitable_standard" ||
+    engineKey === "inevitable-standard" ||
+    normalizedSlug === "inevitable-standard" ||
+    normalizedSlug.startsWith("inevitable-standard-") ||
+    normalizedName.includes("inevitable standard");
+
+  if (isInevitableStandard) {
+    const inevitableStandard =
+      rawTotals && typeof rawTotals === "object"
+        ? rawTotals.inevitable_standard
+        : null;
+
+    if (!inevitableStandard || typeof inevitableStandard !== "object") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "The Inevitable Standard score is not available for this test taker.",
+        },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        org_slug: orgSlug,
+        org_name: orgName,
+        test_name: testName,
+        assessment_type: "inevitable_standard",
+        link: linkMeta,
+        taker: {
+          id: tid,
+          first_name: takerFirst,
+          last_name: takerLast,
+        },
+        inevitable_standard: inevitableStandard,
+        version: "inevitable-standard-v1",
+      },
+    });
+  }
 
   let frequencyTotals = normalizeFreqTotals(rawTotals);
   let profileTotals = normalizeProfileTotals(rawTotals);
