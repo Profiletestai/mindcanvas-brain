@@ -43,12 +43,6 @@ export const IDENTITY_DECISION_OVERRIDE_MAX_PCT = 40;
 export const IDENTITY_DECISION_OVERRIDE_PROXIMITY_PCT = 10;
 
 /**
- * A pillar below this percentage counts as a "clear third issue" worth adding
- * to the priority fix order beyond the primary and secondary constraints.
- */
-export const PRIORITY_FIX_THIRD_ISSUE_MAX_PCT = 60;
-
-/**
  * Minimum gap between the primary and secondary constraint percentages for the
  * primary to count as "clearly separated" when grading confidence.
  */
@@ -370,23 +364,12 @@ export function deriveInevitableStandardConstraints(
     };
   }
 
-  // 4) Priority fix order: primary + secondary (+ a clear third), sequenced by
-  //    Method layer (Identity -> Structure -> Execution), then by severity.
-  const thirdCandidate = rankedPillars.find(
-    (pillar) =>
-      pillar !== primaryConstraint && pillar !== secondaryConstraint,
-  );
-  const includeThird =
-    thirdCandidate !== undefined &&
-    pillarPercentage(score, thirdCandidate) < PRIORITY_FIX_THIRD_ISSUE_MAX_PCT;
-
-  const priorityFixOrder = [
-    ...new Set(
-      includeThird && thirdCandidate
-        ? [primaryConstraint, secondaryConstraint, thirdCandidate]
-        : [primaryConstraint, secondaryConstraint],
-    ),
-  ].sort(
+  // 4) Priority fix order: the FULL 6-pillar ranking, sequenced strictly by
+  //    Method layer (Identity -> Structure -> Execution) regardless of which
+  //    pillar is numerically lowest, then by severity (lowest % first) within
+  //    each layer. Reports slice this single list: the Diagnostic Snapshot
+  //    shows the top 3, the Full Diagnostic shows all 6 (spec section 3).
+  const priorityFixOrder = [...INEVITABLE_STANDARD_PILLARS].sort(
     (a, b) =>
       methodLayerIndex(a) - methodLayerIndex(b) ||
       pillarPercentage(score, a) - pillarPercentage(score, b) ||

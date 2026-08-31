@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getBaseUrl } from "@/lib/server-url";
+
+/* -------------------------------------------------------------------------- */
+/* Types                                                                       */
+/* -------------------------------------------------------------------------- */
 
 type PillarKey =
   | "identity"
@@ -54,6 +58,18 @@ type RevenueInStructure = {
   disclaimer?: string | null;
 };
 
+type ApproachData = {
+  counts?: Partial<Record<ApproachCode, number>>;
+  percentages?: Partial<Record<ApproachCode, number>>;
+  labels?: Partial<Record<ApproachCode, string>>;
+  dominant?: ApproachCode | null;
+  secondary?: ApproachCode | "BALANCED" | null;
+  map?: {
+    x_people_trust_minus_evidence_proof?: number | null;
+    y_future_possibility_minus_timing_certainty?: number | null;
+  } | null;
+};
+
 type InevitableStandardScore = {
   scoring_complete?: boolean;
   overall?: {
@@ -64,64 +80,69 @@ type InevitableStandardScore = {
     label?: string;
   };
   pillars?: Partial<Record<PillarKey, PillarResult>>;
-  approaches?: {
-    counts?: Partial<Record<ApproachCode, number>>;
-    percentages?: Partial<Record<ApproachCode, number>>;
-    labels?: Partial<Record<ApproachCode, string>>;
-    dominant?: ApproachCode | null;
-    secondary?: ApproachCode | "BALANCED" | null;
-  };
-  context_answers?: Record<string, string | null>;
-  commercial_context?: Record<string, string | null>;
+  approaches?: ApproachData;
   constraints?: ConstraintResult | null;
   revenue_in_structure?: RevenueInStructure | null;
 };
 
 type ResultPayload = {
   test_name?: string | null;
+  org_name?: string | null;
   taker?: {
     first_name?: string | null;
     last_name?: string | null;
+    // Not currently returned by result/route.ts — the cover renders it only
+    // when present, so surfacing `company` there later needs no change here.
+    company?: string | null;
   };
+  business_name?: string | null;
   inevitable_standard?: InevitableStandardScore | null;
 };
 
-const PILLARS: Array<{
-  key: PillarKey;
-  label: string;
-  description: string;
-}> = [
+/* -------------------------------------------------------------------------- */
+/* Constants                                                                   */
+/* -------------------------------------------------------------------------- */
+
+const PILLARS: Array<{ key: PillarKey; label: string; descriptor: string }> = [
   {
     key: "identity",
     label: "Identity",
-    description: "Authority, commercial confidence and willingness to lead.",
+    descriptor: "Authority, commercial confidence and willingness to lead.",
   },
   {
     key: "positioning",
     label: "Positioning",
-    description: "How clearly the market understands and chooses you.",
+    descriptor: "How clearly the market understands and chooses you.",
   },
   {
     key: "offer",
     label: "Offer",
-    description: "The clarity, boundaries and repeatability of what you sell.",
+    descriptor: "The clarity, boundaries and repeatability of what you sell.",
   },
   {
     key: "sales",
     label: "Sales",
-    description: "Discovery, conversion and the quality of the buying path.",
+    descriptor: "Discovery, conversion and the quality of the buying path.",
   },
   {
     key: "revenue_model",
     label: "Revenue Model",
-    description: "Margin, retention, owner reward and transferability.",
+    descriptor: "Margin, retention, owner reward and transferability.",
   },
   {
     key: "decision",
     label: "Decision",
-    description: "Commercial focus, follow-through and decision discipline.",
+    descriptor: "Commercial focus, follow-through and decision discipline.",
   },
 ];
+
+const PILLAR_BY_KEY: Record<string, { label: string; descriptor: string }> =
+  Object.fromEntries(
+    PILLARS.map((pillar) => [
+      pillar.key,
+      { label: pillar.label, descriptor: pillar.descriptor },
+    ]),
+  );
 
 const APPROACHES: Array<{ code: ApproachCode; label: string }> = [
   { code: "A", label: "Future-Led" },
@@ -130,91 +151,86 @@ const APPROACHES: Array<{ code: ApproachCode; label: string }> = [
   { code: "D", label: "Evidence-Led" },
 ];
 
-const CONTEXT_LABELS: Record<string, string> = {
-  predictable_revenue: "More predictable revenue and better-fit demand.",
-  greater_profit_owner_reward:
-    "More of the revenue becoming profit and meaningful owner reward.",
-  reduced_founder_dependency:
-    "The business performing and growing without needing me in the middle of it.",
-  personal_wealth_choice_freedom:
-    "More personal wealth, choice and freedom outside the business.",
-  scale_without_weakening:
-    "Growing into a bigger opportunity without weakening quality or stability.",
-  marketing_visibility_leads: "Marketing, visibility, content or lead generation.",
-  positioning_pricing_offer: "Positioning, pricing, the offer or what the business sells.",
-  sales_conversion_follow_up: "Sales conversations, conversion, offers or follow-up.",
-  team_systems_delivery: "Team, systems, delivery or making the business run better.",
-  profitability_recurring_revenue_retention:
-    "Profitability, recurring revenue, retention or what the business keeps.",
-  strategy_priorities_direction: "Strategy, priorities, direction or focus.",
-  demand_not_predictable: "Demand is not yet predictable enough.",
-  revenue_not_profit_or_owner_value:
-    "Revenue is being created, but not enough becomes profit or owner value.",
-  founder_dependency: "Too much of what makes the business work still depends on the founder.",
-  too_many_open_priorities: "Too many priorities or important decisions remain open.",
-  market_clarity_or_choice: "The market does not understand or choose the business quickly enough.",
-};
-
-const COMMERCIAL_CONTEXT_LABELS: Record<string, Record<string, string>> = {
-  revenue_band: {
-    under_100k: "Under 100k",
-    "100k_250k": "100k–250k",
-    "250k_500k": "250k–500k",
-    "500k_1m": "500k–1m",
-    "1m_2m": "1m–2m",
-    "2m_5m": "2m–5m",
-    "5m_10m": "5m–10m",
-    "10m_plus": "10m+",
-  },
-  monthly_opportunity_band: {
-    "0_2": "0–2 opportunities",
-    "3_5": "3–5 opportunities",
-    "6_10": "6–10 opportunities",
-    "11_20": "11–20 opportunities",
-    "21_50": "21–50 opportunities",
-    "51_plus": "51+ opportunities",
-  },
-  initial_customer_value_band: {
-    under_1k: "Under 1k",
-    "1k_5k": "1k–5k",
-    "5k_15k": "5k–15k",
-    "15k_50k": "15k–50k",
-    "50k_100k": "50k–100k",
-    "100k_plus": "100k+",
-  },
-};
-
-const PILLAR_INSIGHTS: Record<PillarKey, string> = {
-  identity:
-    "This reflects how consistently the business is willing to claim value, hold its position and lead the commercial moment.",
-  positioning:
-    "This reflects how clearly the right people can recognise the problem, outcome and distinct position of the business.",
-  offer:
-    "This reflects whether the offer has clear boundaries, repeatable logic and a path for customers to progress.",
-  sales:
-    "This reflects how reliably conversations move from understanding the need to a clear, appropriate decision.",
-  revenue_model:
-    "This reflects how deliberately the business protects margin, creates repeat value and rewards ownership.",
-  decision:
-    "This reflects how consistently the business chooses priorities, protects momentum and follows through when conditions change.",
-};
-
 const PILLAR_CONSTRAINT_COPY: Record<PillarKey, string> = {
   identity:
-    "When Identity is the constraint, the business is not consistently claiming its value or holding its position, so strong work elsewhere gets discounted before it can compound.",
+    "The business is not consistently claiming its value or holding its position, so strong work elsewhere gets discounted before it can compound.",
   positioning:
-    "When Positioning is the constraint, the right buyers cannot quickly recognise the problem, outcome and distinct choice on offer, so demand stays harder to create than it should be.",
+    "The right buyers cannot quickly recognise the problem, outcome and distinct choice on offer, so demand stays harder to create than it should be.",
   offer:
-    "When Offer is the constraint, what is being sold lacks clear boundaries or a repeatable path, so each sale is negotiated from scratch and value leaks.",
+    "What is being sold lacks clear boundaries or a repeatable path, so each sale is negotiated from scratch and value leaks.",
   sales:
-    "When Sales is the constraint, conversations do not reliably move from understanding the need to a clear decision, so good opportunities stall rather than resolve.",
+    "Conversations do not reliably move from understanding the need to a clear decision, so good opportunities stall rather than resolve.",
   revenue_model:
-    "When Revenue Model is the constraint, the business is not deliberately protecting margin, building repeat value or rewarding ownership, so revenue grows without enough of it being kept.",
+    "The business is not deliberately protecting margin, building repeat value or rewarding ownership, so revenue grows without enough of it being kept.",
   decision:
-    "When Decision is the constraint, priorities and follow-through shift too easily, so momentum is lost and important calls stay open longer than they should.",
+    "Priorities and follow-through shift too easily, so momentum is lost and important calls stay open longer than they should.",
 };
 
+const APPROACH_LENS_COPY: Record<ApproachCode, string> = {
+  A: "A Future-Led approach leans toward possibility, direction and the larger outcome. This may shape how the result above shows up — momentum can run ahead of the structure that would make it repeatable.",
+  B: "A Connection-Led approach leans toward people, relevance and the quality of the relationship. This may shape how the result shows up — trust builds well, while the point where a clear decision is asked for can be left softer than it needs to be.",
+  C: "A Timing-Led approach leans toward sequence, readiness and what needs to happen first. This may shape how the result shows up — quality is protected, while decisions can stay open longer than the commercial situation needs.",
+  D: "An Evidence-Led approach leans toward proof, clarity and a sound basis for action. This may shape how the result shows up — judgement is sound, while the search for certainty can slow a decision that is already clear enough.",
+};
+
+const OPENING_COPY =
+  "Your Inevitable Standard Readiness shows how deliberately your business is currently built to move revenue through to profit, personal wealth and greater freedom. It is calculated across six areas of the business and is designed to show where the foundations are already working and where greater structure could have the biggest impact.";
+
+const PRIORITY_ORDER_NOTE =
+  "The order is not a ranking of importance. It is the sequence in which work compounds fastest for this result.";
+
 const FIX_ORDER_LABELS = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
+
+const BANDS: Array<{ min: number; label: string }> = [
+  { min: 0, label: "Chance-Based" },
+  { min: 40, label: "Inconsistent" },
+  { min: 60, label: "Partly Structured" },
+  { min: 80, label: "Deliberate & Repeatable" },
+];
+
+/* Green / Amber / Red — muted and editorial, never traffic-light. Green means
+ * "leverage this strength", not "ignore this". */
+type Gar = "green" | "amber" | "red";
+
+const GAR: Record<
+  Gar,
+  { letter: string; name: string; tone: string; bar: string; chipBg: string; chipText: string }
+> = {
+  green: {
+    letter: "G",
+    name: "Green",
+    tone: "Leverage this strength",
+    bar: "#5b8a72",
+    chipBg: "#eef2ef",
+    chipText: "#3f5e50",
+  },
+  amber: {
+    letter: "A",
+    name: "Amber",
+    tone: "Strengthen and stabilise",
+    bar: "#b58a45",
+    chipBg: "#f5f0e6",
+    chipText: "#7a5a28",
+  },
+  red: {
+    letter: "R",
+    name: "Red",
+    tone: "Priority — investigate and rebuild",
+    bar: "#a6564e",
+    chipBg: "#f2eae8",
+    chipText: "#7c3f39",
+  },
+};
+
+function garForRisk(risk: string | undefined): Gar {
+  if (risk === "low_risk") return "green";
+  if (risk === "medium_risk") return "amber";
+  return "red";
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helpers                                                                     */
+/* -------------------------------------------------------------------------- */
 
 function numberOr(value: unknown, fallback = 0): number {
   const parsed = Number(value);
@@ -225,12 +241,24 @@ function clampPercentage(value: unknown): number {
   return Math.max(0, Math.min(100, numberOr(value)));
 }
 
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 function humanise(value: unknown): string {
   const text = String(value ?? "").trim();
   if (!text) return "";
   return text
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function pillarLabel(key?: string | null): string {
+  return PILLAR_BY_KEY[String(key ?? "")]?.label || humanise(key);
+}
+
+function pillarDescriptor(key?: string | null): string {
+  return PILLAR_BY_KEY[String(key ?? "")]?.descriptor || "";
 }
 
 function formatWhole(value: unknown): string {
@@ -251,88 +279,141 @@ function formatCurrencyAmount(
   return code ? `${code} ${amount}` : amount;
 }
 
-function formatApproxCount(value: unknown): string {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return "";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(
-    parsed,
+function bandLabelFor(percentage: number): string {
+  let label = BANDS[0].label;
+  for (const band of BANDS) if (percentage >= band.min) label = band.label;
+  return label;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Small presentational pieces                                                 */
+/* -------------------------------------------------------------------------- */
+
+function Eyebrow({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#2a6b76]">
+      {children}
+    </p>
   );
 }
 
-function contextValue(value: string | null | undefined): string {
-  if (!value) return "";
-  return CONTEXT_LABELS[value] || humanise(value);
-}
-
-function commercialContextValue(key: string, value: string | null | undefined): string {
-  if (!value) return "";
-  return COMMERCIAL_CONTEXT_LABELS[key]?.[value] || humanise(value);
-}
-
-function overallCopy(level: string | undefined): string {
-  switch (level) {
-    case "deliberate_and_repeatable":
-      return "The business is operating from a strong base of deliberate, repeatable commercial choices. The next opportunity is to strengthen leverage without losing what already works.";
-    case "partly_structured":
-      return "There are meaningful structures and strengths in place, but some important commercial outcomes still depend on consistency, capacity or the founder personally.";
-    case "inconsistent":
-      return "The business has evidence of capability, but commercial outcomes are not yet being produced consistently enough to feel dependable.";
-    default:
-      return "Commercial progress is currently relying too heavily on individual moments, personal effort or circumstances lining up. The first priority is to create a more deliberate base.";
-  }
-}
-
-function approachCopy(code: ApproachCode | null): string {
-  switch (code) {
-    case "A":
-      return "You are most naturally Future-Led: you notice possibility, direction and the larger outcome the business could create. That can generate ambition and movement; it is strongest when paired with clear commercial commitments and review points.";
-    case "B":
-      return "You are most naturally Connection-Led: you pay close attention to people, relevance and the quality of the relationship. That can create trust and strong customer understanding; it is strongest when the business also makes the next decision explicit.";
-    case "C":
-      return "You are most naturally Timing-Led: you notice sequence, readiness and what needs to happen before the next step. That can protect quality and reduce unnecessary disruption; it is strongest when timing does not become a reason to leave decisions open.";
-    case "D":
-      return "You are most naturally Evidence-Led: you look for proof, clarity and a sound basis for action. That can protect quality and commercial judgement; it is strongest when the search for certainty still leaves room for timely decisions.";
-    default:
-      return "Your approach mix is still being established. The most useful question is which pattern appears most often when a commercial decision is uncertain or important.";
-  }
-}
-
-function riskClasses(risk: string | undefined): { badge: string; bar: string } {
-  if (risk === "low_risk") {
-    return { badge: "bg-emerald-50 text-emerald-700", bar: "bg-emerald-500" };
-  }
-  if (risk === "medium_risk") {
-    return { badge: "bg-amber-50 text-amber-700", bar: "bg-amber-500" };
-  }
-  return { badge: "bg-rose-50 text-rose-700", bar: "bg-rose-500" };
-}
-
-function ScoreBar({ percentage, colour = "bg-[#2c8fbf]" }: { percentage: number; colour?: string }) {
+function SectionTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+    <h2 className="mt-3 font-serif text-[26px] leading-snug text-[#1e2a38] sm:text-[30px]">
+      {children}
+    </h2>
+  );
+}
+
+function Section({
+  eyebrow,
+  title,
+  intro,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  intro?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-[#e7e3db] print:break-before-page">
+      <div className="mx-auto max-w-3xl px-6 py-14 sm:px-10 sm:py-16">
+        <Eyebrow>{eyebrow}</Eyebrow>
+        <SectionTitle>{title}</SectionTitle>
+        {intro ? (
+          <p className="mt-4 text-[15px] leading-7 text-[#4b5563]">{intro}</p>
+        ) : null}
+        <div className="mt-8">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function BandMeter({ percentage }: { percentage: number }) {
+  return (
+    <div className="mt-8">
+      <div className="relative h-2 w-full rounded-full bg-[#ece7dd]">
+        {[40, 60, 80].map((mark) => (
+          <span
+            key={mark}
+            className="absolute top-0 h-2 w-px bg-[#d6cfc0]"
+            style={{ left: `${mark}%` }}
+          />
+        ))}
+        <span
+          className="absolute -top-1 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-white bg-[#2a6b76] shadow-sm"
+          style={{ left: `${clampPercentage(percentage)}%` }}
+        />
+      </div>
+      <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.12em] text-[#9a9384]">
+        {BANDS.map((band) => (
+          <span key={band.label}>{band.label}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PillarBar({ percentage, colour }: { percentage: number; colour: string }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#ece7dd]">
       <div
-        className={`h-full rounded-full transition-all ${colour}`}
-        style={{ width: `${clampPercentage(percentage)}%` }}
+        className="h-full rounded-full"
+        style={{ width: `${clampPercentage(percentage)}%`, backgroundColor: colour }}
       />
     </div>
   );
 }
 
-function SectionHeading({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
+/**
+ * Restrained decision-approach map. One marker on a two-axis plot — no fill,
+ * no icons, no colour beyond a single accent dot. Vertical: Future ↔ Timing.
+ * Horizontal: Evidence ↔ Connection.
+ */
+function ApproachCompass({ x, y }: { x: number; y: number }) {
+  const size = 260;
+  const height = 230;
+  const cx = size / 2;
+  const cy = height / 2;
+  const reach = 54;
+  const clamp = (value: number) => Math.max(-1, Math.min(1, value / 50));
+  const px = cx + clamp(x) * reach;
+  const py = cy - clamp(y) * reach;
+  const line = "#cfc9bd";
+  const label = "#6b7280";
+
   return (
-    <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        {eyebrow ? (
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#2c8fbf]">
-            {eyebrow}
-          </p>
-        ) : null}
-        <h2 className="text-2xl font-semibold tracking-tight text-[#12223a]">{title}</h2>
-      </div>
-      {children}
-    </div>
+    <svg
+      viewBox={`0 0 ${size} ${height}`}
+      className="mx-auto h-[230px] w-full max-w-[280px]"
+      role="img"
+      aria-label="Commercial decision approach map"
+    >
+      <rect x={cx - 70} y={cy - 70} width={140} height={140} fill="none" stroke={line} />
+      <line x1={cx} y1={cy - 70} x2={cx} y2={cy + 70} stroke={line} />
+      <line x1={cx - 70} y1={cy} x2={cx + 70} y2={cy} stroke={line} />
+      <text x={cx} y={cy - 84} textAnchor="middle" fontSize="10" letterSpacing="1.5" fill={label}>
+        FUTURE
+      </text>
+      <text x={cx} y={cy + 96} textAnchor="middle" fontSize="10" letterSpacing="1.5" fill={label}>
+        TIMING
+      </text>
+      <text x={cx - 78} y={cy + 3} textAnchor="end" fontSize="10" letterSpacing="1" fill={label}>
+        EVIDENCE
+      </text>
+      <text x={cx + 78} y={cy + 3} textAnchor="start" fontSize="10" letterSpacing="1" fill={label}>
+        CONNECTION
+      </text>
+      <circle cx={px} cy={py} r="9" fill="none" stroke="#2a6b76" strokeWidth="1" opacity="0.3" />
+      <circle cx={px} cy={py} r="4.5" fill="#2a6b76" />
+    </svg>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Component                                                                   */
+/* -------------------------------------------------------------------------- */
 
 export default function InevitableStandardReportClient({
   token,
@@ -363,13 +444,17 @@ export default function InevitableStandardReportClient({
 
         const nextPayload = (json?.data || null) as ResultPayload | null;
         if (!nextPayload?.inevitable_standard) {
-          throw new Error("The Inevitable Standard result is not available for this test taker.");
+          throw new Error(
+            "The Inevitable Standard result is not available for this test taker.",
+          );
         }
 
         if (!cancelled) setPayload(nextPayload);
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "Unable to load report.");
+          setError(
+            loadError instanceof Error ? loadError.message : "Unable to load report.",
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -388,23 +473,12 @@ export default function InevitableStandardReportClient({
   }, [tid, token]);
 
   const score = payload?.inevitable_standard;
-  const overall = score?.overall;
-  const approaches = score?.approaches;
-  const dominant = approaches?.dominant || null;
-
-  const lowestPillar = useMemo(() => {
-    if (!score?.pillars) return null;
-    return PILLARS.map((pillar) => ({
-      ...pillar,
-      percentage: clampPercentage(score.pillars?.[pillar.key]?.percentage),
-    })).sort((a, b) => a.percentage - b.percentage)[0] || null;
-  }, [score]);
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f5f7fb] px-4 py-12 text-[#12223a]">
-        <div className="mx-auto max-w-5xl rounded-3xl bg-white p-8 shadow-sm">
-          <p className="text-sm text-slate-500">Preparing your personalised report…</p>
+      <main className="min-h-screen bg-[#faf8f4] px-6 py-16 text-[#1e2a38]">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm text-[#8b8f98]">Preparing your Diagnostic Snapshot…</p>
         </div>
       </main>
     );
@@ -412,13 +486,11 @@ export default function InevitableStandardReportClient({
 
   if (error || !score) {
     return (
-      <main className="min-h-screen bg-[#f5f7fb] px-4 py-12 text-[#12223a]">
-        <div className="mx-auto max-w-3xl rounded-3xl bg-white p-8 shadow-sm">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#2c8fbf]">
-            The Inevitable Standard™
-          </p>
-          <h1 className="text-2xl font-semibold">Report not available</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
+      <main className="min-h-screen bg-[#faf8f4] px-6 py-16 text-[#1e2a38]">
+        <div className="mx-auto max-w-2xl">
+          <Eyebrow>The Inevitable Standard Diagnostic™</Eyebrow>
+          <h1 className="mt-3 font-serif text-3xl">Report not available</h1>
+          <p className="mt-3 text-sm leading-6 text-[#4b5563]">
             {error || "The completed assessment result could not be found."}
           </p>
         </div>
@@ -426,401 +498,398 @@ export default function InevitableStandardReportClient({
     );
   }
 
-  const firstName = payload?.taker?.first_name?.trim() || "there";
-  const overallPercentage = clampPercentage(overall?.percentage);
-  const dominantLabel = dominant
-    ? approaches?.labels?.[dominant] || APPROACHES.find((item) => item.code === dominant)?.label
-    : null;
-  const context = score.context_answers || {};
-  const commercial = score.commercial_context || {};
-  const secondary = approaches?.secondary;
-
+  const overall = score.overall || {};
+  const approaches = score.approaches || {};
   const constraints = score.constraints ?? null;
   const revenueInStructure = score.revenue_in_structure ?? null;
 
-  const pillarLabelFor = (key?: string | null): string =>
-    PILLARS.find((item) => item.key === key)?.label || humanise(key);
-  const pillarPctFor = (key?: string | null): number =>
-    key ? clampPercentage(score.pillars?.[key as PillarKey]?.percentage) : 0;
+  const overallPercentage = round1(clampPercentage(overall.percentage));
+  const bandDescriptor = overall.label || bandLabelFor(overallPercentage);
 
-  const primaryConstraintKey =
-    (constraints?.primary_constraint as PillarKey | undefined) || null;
-  const secondaryConstraintKey =
+  const clientName =
+    [payload?.taker?.first_name, payload?.taker?.last_name]
+      .map((part) => (part || "").trim())
+      .filter(Boolean)
+      .join(" ") || "—";
+  const businessName =
+    (payload?.taker?.company || payload?.business_name || "").trim() || null;
+  const assessmentDate = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+  const orgName = (payload?.org_name || "").trim();
+
+  const pillarView = PILLARS.map((pillar) => {
+    const result = score.pillars?.[pillar.key] || {};
+    return {
+      ...pillar,
+      percentage: round1(clampPercentage(result.percentage)),
+      gar: garForRisk(result.risk),
+    };
+  });
+
+  const pillarsByPct = [...pillarView].sort((a, b) => a.percentage - b.percentage);
+  const lowestPillar = pillarsByPct[0] || null;
+
+  const primaryKey = (constraints?.primary_constraint as PillarKey | undefined) || null;
+  const secondaryKey =
     (constraints?.secondary_constraint as PillarKey | undefined) || null;
   const falseConstraint = constraints?.false_constraint ?? null;
-  const priorityFixOrder = Array.isArray(constraints?.priority_fix_order)
-    ? constraints.priority_fix_order.filter(Boolean)
+
+  const rankedFixOrder = Array.isArray(constraints?.priority_fix_order)
+    ? (constraints!.priority_fix_order!.filter(Boolean) as string[])
     : [];
-  const rreTranslation = revenueInStructure?.translation ?? null;
-  const headlinePillarLabel = primaryConstraintKey
-    ? pillarLabelFor(primaryConstraintKey)
-    : lowestPillar?.label || null;
+  const firstThree = (
+    rankedFixOrder.length > 0
+      ? rankedFixOrder
+      : pillarsByPct.map((pillar) => pillar.key)
+  ).slice(0, 3);
 
-  const contextCards = [
-    { label: "The constraint you named", value: context["13"] },
-    { label: "What you want next", value: contextValue(context["26"]) },
-    { label: "Where your attention has gone", value: contextValue(context["27"]) },
-    { label: "How the business feels today", value: contextValue(context["28"]) },
-    { label: "The decision still waiting", value: context["29"] },
-  ].filter((item) => item.value);
+  const dominant = approaches.dominant || null;
+  const dominantLabel = dominant
+    ? approaches.labels?.[dominant] ||
+      APPROACHES.find((item) => item.code === dominant)?.label ||
+      dominant
+    : null;
+  const dominantPct = dominant
+    ? round1(clampPercentage(approaches.percentages?.[dominant]))
+    : 0;
 
-  const commercialCards = [
-    { label: "Revenue over the last 12 months", value: commercialContextValue("revenue_band", commercial.revenue_band) },
-    { label: "Meaningful monthly opportunities", value: commercialContextValue("monthly_opportunity_band", commercial.monthly_opportunity_band) },
-    { label: "Typical first customer value", value: commercialContextValue("initial_customer_value_band", commercial.initial_customer_value_band) },
-  ].filter((item) => item.value);
+  const approachPercent = (code: ApproachCode) =>
+    round1(clampPercentage(approaches.percentages?.[code]));
+  const compassX =
+    numberOr(
+      approaches.map?.x_people_trust_minus_evidence_proof,
+      approachPercent("B") - approachPercent("D"),
+    ) || 0;
+  const compassY =
+    numberOr(
+      approaches.map?.y_future_possibility_minus_timing_certainty,
+      approachPercent("A") - approachPercent("C"),
+    ) || 0;
+
+  const rreShowRange =
+    !!revenueInStructure && !revenueInStructure.needs_revenue_confirmation;
+  const rreShowConfirm =
+    !!revenueInStructure && !!revenueInStructure.needs_revenue_confirmation;
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] text-[#12223a] print:bg-white">
-      <header className="bg-[#10283f] text-white print:bg-[#10283f]">
-        <div className="mx-auto max-w-6xl px-5 py-5 sm:px-8">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#8dd5f3]">
-                Profiletest.ai
-              </p>
-              <p className="mt-1 text-sm text-white/70">The Inevitable Standard™</p>
+    <main className="min-h-screen bg-[#faf8f4] text-[#1e2a38] print:bg-white">
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="fixed right-4 top-4 z-10 rounded-full border border-[#d9d3c6] bg-white/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4b5563] shadow-sm backdrop-blur transition hover:bg-white print:hidden"
+      >
+        Print / Save PDF
+      </button>
+
+      {/* 1 — Cover */}
+      <section className="flex min-h-[88vh] flex-col justify-between px-6 py-16 sm:px-12 print:min-h-0 print:break-after-page">
+        <Eyebrow>The Inevitable Standard Diagnostic™</Eyebrow>
+
+        <div className="mx-auto w-full max-w-3xl">
+          <h1 className="font-serif text-[40px] leading-[1.1] text-[#1e2a38] sm:text-[64px]">
+            Map Your Revenue-To-Freedom Pathway
+          </h1>
+          <p className="mt-5 font-serif text-xl text-[#6b7280] sm:text-2xl">
+            Your Diagnostic Snapshot
+          </p>
+
+          <div className="mt-10 h-px w-16 bg-[#c9c2b4]" />
+
+          <dl className="mt-8 space-y-2 text-[15px]">
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-[#9a9384]">Prepared for</dt>
+              <dd className="font-medium text-[#1e2a38]">{clientName}</dd>
             </div>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10 print:hidden"
-            >
-              Print / save PDF
-            </button>
-          </div>
+            {businessName ? (
+              <div className="flex gap-3">
+                <dt className="w-32 shrink-0 text-[#9a9384]">Business</dt>
+                <dd className="text-[#4b5563]">{businessName}</dd>
+              </div>
+            ) : null}
+            <div className="flex gap-3">
+              <dt className="w-32 shrink-0 text-[#9a9384]">Assessment date</dt>
+              <dd className="text-[#4b5563]">{assessmentDate}</dd>
+            </div>
+          </dl>
         </div>
-      </header>
 
-      <section className="bg-[#10283f] pb-14 text-white">
-        <div className="mx-auto grid max-w-6xl gap-10 px-5 pt-8 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-          <div>
-            <p className="text-sm font-medium text-[#8dd5f3]">Your commercial readiness report</p>
-            <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-              {firstName}, this is how the business is currently making growth possible.
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/75">
-              This report shows how deliberately the business is currently creating, converting and keeping commercial value—and where the next increase in consistency is most likely to come from.
-            </p>
-          </div>
+        <p className="mx-auto w-full max-w-3xl text-[12px] leading-5 text-[#9a9384]">
+          Created from The Inevitable Standard Method™ by Genene Wilson, The Wealth
+          Architect.
+        </p>
+      </section>
 
-          <div className="rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8dd5f3]">Result at a glance</p>
-            <div className="mt-4 flex items-end gap-3">
-              <span className="text-6xl font-semibold tracking-tight">{overallPercentage}%</span>
-              <span className="pb-2 text-sm text-white/70">commercial readiness</span>
-            </div>
-            <p className="mt-3 text-xl font-medium">{overall?.label || "Commercial readiness"}</p>
-            <p className="mt-3 text-sm leading-6 text-white/70">{overallCopy(overall?.level)}</p>
+      {/* 2 — Opening result area */}
+      <section className="border-t border-[#e7e3db] bg-white print:break-before-page">
+        <div className="mx-auto max-w-3xl px-6 py-16 sm:px-10 sm:py-20">
+          <Eyebrow>Your Inevitable Standard Readiness</Eyebrow>
+          <div className="mt-6 flex items-end gap-4">
+            <span className="font-serif text-[72px] leading-none text-[#1e2a38] sm:text-[96px]">
+              {overallPercentage}%
+            </span>
+            <span className="pb-3 font-serif text-2xl text-[#6b7280]">{bandDescriptor}</span>
           </div>
+          <BandMeter percentage={overallPercentage} />
+          <p className="mt-8 max-w-2xl text-[15px] leading-7 text-[#4b5563]">{OPENING_COPY}</p>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl space-y-12 px-5 py-10 sm:px-8 sm:py-14">
-        <section className="rounded-3xl border border-[#d7e6ef] bg-white p-7 shadow-sm">
-          <SectionHeading
-            eyebrow="Headline diagnosis"
-            title={`${firstName}, your commercial readiness is ${overallPercentage}%`}
-          />
-          {primaryConstraintKey ? (
-            <p className="text-[15px] leading-7 text-slate-600">
-              That places the business in the{" "}
-              <strong className="text-[#12223a]">
-                &ldquo;{overall?.label || "current"}&rdquo;
-              </strong>{" "}
-              band. The single biggest thing holding this back is{" "}
-              <strong className="text-[#12223a]">{headlinePillarLabel}</strong> at{" "}
-              {pillarPctFor(primaryConstraintKey)}%. Strengthening this is where the
-              next gain in consistency comes from.
-            </p>
-          ) : (
-            <p className="text-[15px] leading-7 text-slate-600">
-              That places the business in the{" "}
-              <strong className="text-[#12223a]">
-                &ldquo;{overall?.label || "current"}&rdquo;
-              </strong>{" "}
-              band. Its weakest area is{" "}
-              <strong className="text-[#12223a]">
-                {lowestPillar?.label || "not yet available"}
-              </strong>{" "}
-              at {lowestPillar?.percentage ?? 0}% &mdash; the part of the commercial
-              system where a more deliberate pattern would most improve repeatability.
-            </p>
-          )}
-        </section>
+      {/* 3 — Six-pillar display */}
+      <Section
+        eyebrow="The Six Pillars"
+        title="Where the business is built — and where it is exposed"
+      >
+        <div className="border-t border-[#e7e3db]">
+          {pillarView.map((pillar) => {
+            const gar = GAR[pillar.gar];
+            return (
+              <div
+                key={pillar.key}
+                className="grid grid-cols-1 gap-3 border-b border-[#e7e3db] py-5 sm:grid-cols-[190px_1fr_auto] sm:items-center sm:gap-6"
+              >
+                <div>
+                  <p className="text-[15px] font-medium text-[#1e2a38]">{pillar.label}</p>
+                  <p className="mt-0.5 text-[12px] leading-5 text-[#918a7d]">
+                    {pillar.descriptor}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <PillarBar percentage={pillar.percentage} colour={gar.bar} />
+                  <span className="w-11 shrink-0 text-right text-[15px] font-semibold tabular-nums text-[#1e2a38]">
+                    {pillar.percentage}%
+                  </span>
+                </div>
+                <span
+                  className="justify-self-start rounded-sm px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] sm:justify-self-end"
+                  style={{ backgroundColor: gar.chipBg, color: gar.chipText }}
+                >
+                  {gar.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-6 text-[12px] leading-6 text-[#918a7d]">
+          <strong className="font-semibold text-[#4b5563]">Green</strong> — a strength to
+          leverage.&nbsp;&nbsp;
+          <strong className="font-semibold text-[#4b5563]">Amber</strong> — working, needs
+          strengthening and stabilising.&nbsp;&nbsp;
+          <strong className="font-semibold text-[#4b5563]">Red</strong> — a priority for
+          investigation and rebuild.
+        </p>
+      </Section>
 
-        <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <div className="rounded-3xl bg-white p-7 shadow-sm">
-            <SectionHeading eyebrow="Your operating pattern" title={dominantLabel || "Your commercial approach"}>
-              {dominant ? (
-                <span className="rounded-full bg-[#e6f5fb] px-3 py-1 text-xs font-semibold text-[#167ca9]">{dominant}</span>
-              ) : null}
-            </SectionHeading>
-            <p className="text-[15px] leading-7 text-slate-600">{approachCopy(dominant)}</p>
-            {secondary && secondary !== "BALANCED" ? (
-              <p className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                Your secondary pattern is <strong className="text-[#12223a]">{approaches?.labels?.[secondary] || secondary}</strong>. This is the pattern most likely to influence how you balance your natural instinct with the demands of the situation.
+      {/* 4 — Key diagnosis */}
+      <Section
+        eyebrow="Key Diagnosis"
+        title="What is most likely shaping the result"
+      >
+        {primaryKey ? (
+          <div className="space-y-10">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2a6b76]">
+                Primary constraint
               </p>
+              <p className="mt-1 font-serif text-xl text-[#1e2a38]">
+                {pillarLabel(primaryKey)}
+              </p>
+              <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
+                The area most likely to be limiting progress right now.{" "}
+                {PILLAR_CONSTRAINT_COPY[primaryKey as PillarKey] || ""}
+              </p>
+
+              {rreShowRange ? (
+                <div className="mt-5 border-l-2 border-[#d8d2c6] pl-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#918a7d]">
+                    Revenue in your structure
+                  </p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-[#1e2a38]">
+                    {formatCurrencyAmount(
+                      revenueInStructure?.currency,
+                      revenueInStructure?.range_low,
+                    )}{" "}
+                    <span className="font-normal text-[#9a9384]">–</span>{" "}
+                    {formatCurrencyAmount(
+                      revenueInStructure?.currency,
+                      revenueInStructure?.range_high,
+                    )}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-6 text-[#4b5563]">
+                    Commercial value that may be easier to convert, retain or release as{" "}
+                    {pillarLabel(revenueInStructure?.primary_constraint_pillar)} becomes more
+                    deliberate.
+                  </p>
+                  {revenueInStructure?.disclaimer ? (
+                    <p className="mt-2 text-[11px] leading-5 text-[#9a9384]">
+                      {revenueInStructure.disclaimer}
+                    </p>
+                  ) : null}
+                </div>
+              ) : rreShowConfirm ? (
+                <div className="mt-5 border-l-2 border-[#d8d2c6] pl-5 text-[13px] leading-6 text-[#4b5563]">
+                  A revenue-in-structure range needs a specific annual figure at this scale.
+                  Your advisor can add it.
+                </div>
+              ) : null}
+            </div>
+
+            {secondaryKey ? (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#2a6b76]">
+                  Secondary constraint
+                </p>
+                <p className="mt-1 font-serif text-xl text-[#1e2a38]">
+                  {pillarLabel(secondaryKey)}
+                </p>
+                <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
+                  The area most likely to reinforce or recreate the primary constraint.
+                </p>
+              </div>
+            ) : null}
+
+            {falseConstraint ? (
+              <div className="rounded-sm border border-[#e2d9c3] bg-[#faf6ec] p-6">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8a6d33]">
+                  What may not be the real problem
+                </p>
+                <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
+                  The result points less to{" "}
+                  <strong className="font-semibold text-[#1e2a38]">
+                    {pillarLabel(falseConstraint.stated_pillar)}
+                  </strong>{" "}
+                  and more to{" "}
+                  <strong className="font-semibold text-[#1e2a38]">
+                    {pillarLabel(falseConstraint.evidence_pillar)}
+                  </strong>
+                  .
+                </p>
+                {falseConstraint.explanation ? (
+                  <p className="mt-3 text-[14px] leading-7 text-[#4b5563]">
+                    {falseConstraint.explanation}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
+        ) : (
+          <p className="text-[15px] leading-7 text-[#4b5563]">
+            Primary area to strengthen:{" "}
+            <strong className="font-semibold text-[#1e2a38]">
+              {lowestPillar?.label || "not yet available"}
+            </strong>{" "}
+            ({lowestPillar?.percentage ?? 0}%) — the pillar where a more deliberate pattern
+            would most improve repeatability.
+          </p>
+        )}
+      </Section>
 
-          <div className="rounded-3xl bg-white p-7 shadow-sm">
-            <SectionHeading eyebrow="Approach mix" title="How decisions tend to be made" />
-            <div className="space-y-5">
-              {APPROACHES.map((approach) => {
-                const percentage = clampPercentage(approaches?.percentages?.[approach.code]);
-                const isDominant = approach.code === dominant;
-                return (
-                  <div key={approach.code}>
-                    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-                      <span className={isDominant ? "font-semibold text-[#12223a]" : "text-slate-600"}>
-                        {approach.label}
-                      </span>
-                      <span className="font-semibold text-[#12223a]">{percentage}%</span>
-                    </div>
-                    <ScoreBar percentage={percentage} colour={isDominant ? "bg-[#2c8fbf]" : "bg-slate-300"} />
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-6 text-xs leading-5 text-slate-500">
-              This is an approach pattern, not a ranking of better or worse ways to lead. Its value is in showing which instinct may need balancing in the next commercial decision.
-            </p>
-          </div>
-        </section>
+      {/* 5 — Commercial decision approach */}
+      <Section
+        eyebrow="Commercial Decision Approach"
+        title="How You Naturally Make Commercial Decisions"
+      >
+        <p className="text-[15px] leading-7 text-[#4b5563]">
+          Your leading approach is{" "}
+          <strong className="font-semibold text-[#1e2a38]">
+            {dominantLabel || "still forming"}
+          </strong>
+          {dominant ? ` (${dominantPct}%)` : ""}.{" "}
+          {dominant ? APPROACH_LENS_COPY[dominant] : APPROACH_LENS_COPY.A}
+        </p>
 
-        <section>
-          <SectionHeading eyebrow="Six-pillar readiness" title="Where commercial strength is currently concentrated">
-            <span className="text-xs text-slate-500">Each pillar is scored out of 12</span>
-          </SectionHeading>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {PILLARS.map((pillar) => {
-              const result = score.pillars?.[pillar.key] || {};
-              const percentage = clampPercentage(result.percentage);
-              const styles = riskClasses(result.risk);
+        <div className="mt-8 grid gap-10 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="space-y-4">
+            {APPROACHES.map((approach) => {
+              const pct = approachPercent(approach.code);
+              const isDominant = approach.code === dominant;
               return (
-                <article key={pillar.key} className="rounded-3xl bg-white p-6 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-[#12223a]">{pillar.label}</h3>
-                      <p className="mt-2 text-sm leading-5 text-slate-500">{pillar.description}</p>
-                    </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${styles.badge}`}>
-                      {result.risk_label || humanise(result.risk) || "Readiness"}
+                <div key={approach.code}>
+                  <div className="mb-1.5 flex items-center justify-between text-[13px]">
+                    <span
+                      className={
+                        isDominant
+                          ? "font-semibold text-[#1e2a38]"
+                          : "text-[#4b5563]"
+                      }
+                    >
+                      {approach.label}
                     </span>
+                    <span className="font-semibold tabular-nums text-[#1e2a38]">{pct}%</span>
                   </div>
-                  <div className="mt-6 flex items-baseline justify-between">
-                    <span className="text-3xl font-semibold text-[#12223a]">{percentage}%</span>
-                    <span className="text-xs text-slate-400">{numberOr(result.raw)}/12</span>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#ece7dd]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: isDominant ? "#2a6b76" : "#c4bdae",
+                      }}
+                    />
                   </div>
-                  <div className="mt-3">
-                    <ScoreBar percentage={percentage} colour={styles.bar} />
-                  </div>
-                  <p className="mt-4 text-sm leading-6 text-slate-600">{PILLAR_INSIGHTS[pillar.key]}</p>
-                </article>
+                </div>
               );
             })}
           </div>
-        </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl bg-white p-7 shadow-sm">
-            <SectionHeading
-              eyebrow={primaryConstraintKey ? "Primary constraint" : "What your result suggests"}
-              title={
-                primaryConstraintKey
-                  ? "The one thing to strengthen first"
-                  : "The next increase in consistency"
-              }
-            />
-            {primaryConstraintKey ? (
-              <>
-                <p className="text-[15px] leading-7 text-slate-600">
-                  Your primary constraint is{" "}
-                  <strong className="text-[#12223a]">{pillarLabelFor(primaryConstraintKey)}</strong>{" "}
-                  at {pillarPctFor(primaryConstraintKey)}%.{" "}
-                  {PILLAR_CONSTRAINT_COPY[primaryConstraintKey as PillarKey] ||
-                    PILLAR_INSIGHTS[primaryConstraintKey as PillarKey] ||
-                    ""}
-                </p>
-                {secondaryConstraintKey ? (
-                  <p className="mt-4 text-[15px] leading-7 text-slate-600">
-                    The reinforcing issue holding it in place is{" "}
-                    <strong className="text-[#12223a]">{pillarLabelFor(secondaryConstraintKey)}</strong>{" "}
-                    at {pillarPctFor(secondaryConstraintKey)}%. The two tend to keep each
-                    other in position, so the primary constraint is where the work starts.
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="text-[15px] leading-7 text-slate-600">
-                The lowest current pillar is <strong className="text-[#12223a]">{lowestPillar?.label || "not yet available"}</strong> at {lowestPillar?.percentage ?? 0}%. That does not mean the business is weak in this area. It identifies the part of the commercial system where strengthening the underlying pattern may create the clearest improvement in repeatability.
-              </p>
-            )}
-            <div className="mt-6 rounded-2xl border-l-4 border-[#2c8fbf] bg-[#f2f9fc] p-5">
-              <p className="text-sm font-semibold text-[#12223a]">A useful question to carry forward</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                What would need to become deliberate, visible and repeatable in {(headlinePillarLabel || "this area").toLowerCase()} for the business to rely less on personal effort or favourable circumstances?
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-3xl bg-[#eaf5fa] p-7">
-            <SectionHeading eyebrow="A note on the model" title="Read the result as a pattern" />
-            <p className="text-[15px] leading-7 text-slate-600">
-              The Inevitable Standard looks at six connected parts of commercial readiness. The score is not a prediction and it is not a judgement of the founder. It is a structured snapshot of the decisions and habits most likely to shape how revenue becomes repeatable value.
-            </p>
-            <p className="mt-4 text-[15px] leading-7 text-slate-600">
-              The most useful result is the one that gives you a clearer next decision—not the one that simply gives you a higher number.
+          <div className="sm:w-[280px]">
+            <ApproachCompass x={compassX} y={compassY} />
+            <p className="mt-2 text-center text-[11px] leading-5 text-[#918a7d]">
+              Vertical: Future ↔ Timing. Horizontal: Evidence ↔ Connection.
             </p>
           </div>
-        </section>
+        </div>
 
-        {falseConstraint ? (
-          <section className="rounded-3xl border-l-4 border-amber-400 bg-amber-50 p-7">
-            <SectionHeading
-              eyebrow="False constraint"
-              title="What feels like the problem vs. what the evidence shows"
-            />
-            <p className="text-[15px] leading-7 text-slate-700">
-              You may see the issue as{" "}
-              <strong className="text-[#12223a]">{pillarLabelFor(falseConstraint.stated_pillar)}</strong>, but the
-              pattern in your answers points to{" "}
-              <strong className="text-[#12223a]">{pillarLabelFor(falseConstraint.evidence_pillar)}</strong>.
-            </p>
-            {falseConstraint.explanation ? (
-              <p className="mt-4 text-[15px] leading-7 text-slate-600">
-                {falseConstraint.explanation}
-              </p>
-            ) : null}
-          </section>
-        ) : null}
+        <p className="mt-8 text-[12px] leading-6 text-[#918a7d]">
+          This is a lens within the diagnostic, not a personality type. Your approach may
+          influence how the result shows up — it does not determine it.
+        </p>
+      </Section>
 
-        {priorityFixOrder.length > 0 ? (
-          <section className="rounded-3xl bg-white p-7 shadow-sm">
-            <SectionHeading
-              eyebrow="Priority fix order"
-              title="Work these in sequence, not all at once"
-            />
-            <ol className="space-y-4">
-              {priorityFixOrder.map((key, index) => (
-                <li key={`${key}-${index}`} className="flex gap-4">
-                  <span className="shrink-0 rounded-full bg-[#e6f5fb] px-2.5 py-1 text-xs font-semibold text-[#167ca9]">
-                    {FIX_ORDER_LABELS[index] || `${index + 1}`}
-                  </span>
-                  <div>
-                    <p className="text-[15px] font-semibold text-[#12223a]">{pillarLabelFor(key)}</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      {PILLAR_INSIGHTS[key as PillarKey] ||
-                        PILLARS.find((item) => item.key === key)?.description ||
-                        ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-5 text-xs leading-5 text-slate-500">
-              Each step needs to hold before the next will stick. Working the list in this
-              order keeps the change manageable and makes it clear what is actually moving
-              the result.
-            </p>
-          </section>
-        ) : null}
-
-        {revenueInStructure ? (
-          <section className="rounded-3xl bg-white p-7 shadow-sm">
-            <SectionHeading
-              eyebrow="Revenue in your structure"
-              title="The commercial value sitting in the current setup"
-            />
-            {revenueInStructure.needs_revenue_confirmation ? (
-              <p className="text-[15px] leading-7 text-slate-600">
-                Your revenue is in the highest band, so this estimate needs a specific
-                annual figure to be meaningful. Share an approximate number with your
-                advisor and the range can be modelled properly.
-              </p>
-            ) : (
-              <>
-                <p className="text-3xl font-semibold tracking-tight text-[#12223a]">
-                  {formatCurrencyAmount(revenueInStructure.currency, revenueInStructure.range_low)}{" "}
-                  <span className="text-slate-400">to</span>{" "}
-                  {formatCurrencyAmount(revenueInStructure.currency, revenueInStructure.range_high)}
+      {/* 6 — Finish */}
+      <Section eyebrow="Where to Begin" title="Your First Three Priorities">
+        <ol className="border-t border-[#e7e3db]">
+          {firstThree.map((key, index) => (
+            <li
+              key={`${key}-${index}`}
+              className="flex gap-5 border-b border-[#e7e3db] py-5"
+            >
+              <span className="w-8 shrink-0 font-serif text-[22px] tabular-nums text-[#b8b0a0]">
+                {FIX_ORDER_LABELS[index] || `${index + 1}`}
+              </span>
+              <div>
+                <p className="text-[15px] font-medium text-[#1e2a38]">{pillarLabel(key)}</p>
+                <p className="mt-0.5 text-[13px] leading-6 text-[#4b5563]">
+                  {pillarDescriptor(key)}
                 </p>
-                <p className="mt-4 text-[15px] leading-7 text-slate-600">
-                  This is commercial value that may be easier to convert, retain or release
-                  once{" "}
-                  <strong className="text-[#12223a]">
-                    {pillarLabelFor(revenueInStructure.primary_constraint_pillar)}
-                  </strong>{" "}
-                  becomes more deliberate and repeatable. It is a modelled range, not a
-                  measured figure.
-                </p>
-                {rreTranslation &&
-                (rreTranslation.customer_values_low != null ||
-                  rreTranslation.customer_values_high != null) ? (
-                  <p className="mt-3 text-sm leading-6 text-slate-500">
-                    That is roughly {formatApproxCount(rreTranslation.customer_values_low)} to{" "}
-                    {formatApproxCount(rreTranslation.customer_values_high)} typical customer
-                    values, based on the deal size you gave.
-                  </p>
-                ) : null}
-                {revenueInStructure.disclaimer ? (
-                  <p className="mt-5 text-xs leading-5 text-slate-400">
-                    {revenueInStructure.disclaimer}
-                  </p>
-                ) : null}
-              </>
-            )}
-          </section>
-        ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-5 text-[13px] leading-6 text-[#918a7d]">{PRIORITY_ORDER_NOTE}</p>
 
-        {contextCards.length > 0 ? (
-          <section>
-            <SectionHeading eyebrow="Your business context" title="The situation behind the score" />
-            <div className="grid gap-4 md:grid-cols-2">
-              {contextCards.map((card) => (
-                <div key={card.label} className="rounded-3xl border border-slate-200 bg-white p-6">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
-                  <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-[#12223a]">{card.value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {commercialCards.length > 0 ? (
-          <section>
-            <SectionHeading eyebrow="Commercial context" title="The scale surrounding the result">
-              {commercial.currency ? <span className="text-xs font-semibold text-slate-500">Currency: {commercial.currency}</span> : null}
-            </SectionHeading>
-            <div className="grid gap-4 md:grid-cols-3">
-              {commercialCards.map((card) => (
-                <div key={card.label} className="rounded-3xl bg-white p-6 shadow-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
-                  <p className="mt-3 text-xl font-semibold text-[#12223a]">{card.value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-3xl bg-[#10283f] p-8 text-white sm:p-10">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8dd5f3]">Your next step</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Turn the clearest signal into one deliberate move.</h2>
-          <p className="mt-4 max-w-3xl text-[15px] leading-7 text-white/75">
-            Start with{" "}
-            {primaryConstraintKey
-              ? `your primary constraint (${pillarLabelFor(primaryConstraintKey)})`
-              : "the lowest-readiness pillar"}{" "}
-            and the decision you identified as still waiting. The aim is not to improve everything at once. It is to create one visible change that makes the business more repeatable and gives you better evidence for what to strengthen next.
+        <div className="mt-12 border-t border-[#e7e3db] pt-10">
+          <button
+            type="button"
+            aria-disabled="true"
+            onClick={(event) => event.preventDefault()}
+            className="cursor-default rounded-sm bg-[#1e2a38] px-6 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white/95"
+          >
+            Explore Your Full Revenue-To-Freedom Pathway
+          </button>
+          <p className="mt-3 text-[12px] text-[#918a7d]">
+            Your Full Diagnostic Report is being prepared.
           </p>
-          <p className="mt-6 text-sm font-medium text-[#8dd5f3]">{dominantLabel ? `${dominantLabel} is your natural starting instinct.` : "Your result is your starting point."}</p>
-        </section>
+        </div>
+      </Section>
 
-        <footer className="border-t border-slate-200 pt-6 text-center text-xs leading-5 text-slate-400">
-          The Inevitable Standard™ · Powered by Profiletest.ai · This report is a structured diagnostic snapshot, not financial advice.
-        </footer>
-      </div>
+      <footer className="border-t border-[#e7e3db]">
+        <div className="mx-auto max-w-3xl px-6 py-8 text-[11px] leading-6 text-[#9a9384] sm:px-10">
+          The Inevitable Standard™{orgName ? ` · ${orgName}` : ""} · This snapshot is
+          general business information, not financial, tax, legal or accounting advice.
+        </div>
+      </footer>
     </main>
   );
 }
