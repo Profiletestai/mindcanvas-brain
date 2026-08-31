@@ -312,10 +312,11 @@ export async function GET(
 
   let takerFirst: string | null = null;
   let takerLast: string | null = null;
+  let takerCompany: string | null = null;
 
   const takerRes = await sb
     .from("test_takers")
-    .select("first_name, last_name")
+    .select("first_name, last_name, company")
     .eq("id", tid)
     .maybeSingle();
 
@@ -324,6 +325,7 @@ export async function GET(
   } else if (takerRes.data) {
     takerFirst = (takerRes.data as any).first_name ?? null;
     takerLast = (takerRes.data as any).last_name ?? null;
+    takerCompany = (takerRes.data as any).company ?? null;
   }
 
   let rawTotals: any = null;
@@ -337,13 +339,15 @@ export async function GET(
 
   const r2 = await sb
     .from("test_submissions")
-    .select("totals, raw_answers, answers_json")
+    .select("totals, raw_answers, answers_json, created_at")
     .eq("taker_id", tid)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   rawTotals = r1.data?.totals ?? r2.data?.totals ?? null;
+  const submissionCompletedAt: string | null =
+    (r2.data as any)?.created_at ?? null;
 
   const ra = Array.isArray(r2.data?.raw_answers)
     ? r2.data?.raw_answers
@@ -417,7 +421,9 @@ export async function GET(
           id: tid,
           first_name: takerFirst,
           last_name: takerLast,
+          company: takerCompany,
         },
+        completed_at: submissionCompletedAt,
         inevitable_standard: {
           ...inevitableStandardRecord,
           constraints,

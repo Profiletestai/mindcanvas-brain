@@ -88,11 +88,10 @@ type InevitableStandardScore = {
 type ResultPayload = {
   test_name?: string | null;
   org_name?: string | null;
+  completed_at?: string | null;
   taker?: {
     first_name?: string | null;
     last_name?: string | null;
-    // Not currently returned by result/route.ts — the cover renders it only
-    // when present, so surfacing `company` there later needs no change here.
     company?: string | null;
   };
   business_name?: string | null;
@@ -522,11 +521,14 @@ export default function InevitableStandardReportClient({
       .join(" ") || "—";
   const businessName =
     (payload?.taker?.company || payload?.business_name || "").trim() || null;
+  const completedAt = payload?.completed_at ? new Date(payload.completed_at) : null;
   const assessmentDate = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date());
+  }).format(
+    completedAt && !Number.isNaN(completedAt.getTime()) ? completedAt : new Date(),
+  );
   const orgName = (payload?.org_name || "").trim();
 
   const pillarView = PILLARS.map((pillar) => {
