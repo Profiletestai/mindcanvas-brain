@@ -9,6 +9,8 @@ import {
   mapInevitableStandardSubmission,
   type InevitableStandardSubmittedAnswer,
 } from "@/lib/inevitable-standard/mapSubmission";
+import { deriveInevitableStandardConstraints } from "@/lib/inevitable-standard/constraintEngine";
+import { calculateInevitableStandardRevenueInStructure } from "@/lib/inevitable-standard/revenueInStructure";
 
 type AB = "A" | "B" | "C" | "D";
 type AnswerCode = "A" | "B" | "C" | "D" | "E";
@@ -2858,6 +2860,12 @@ export async function POST(
     let inevitableStandardScore: ReturnType<
       typeof mapInevitableStandardSubmission
     >["score"] | null = null;
+    let inevitableStandardConstraints: ReturnType<
+      typeof deriveInevitableStandardConstraints
+    > | null = null;
+    let inevitableStandardRevenue: ReturnType<
+      typeof calculateInevitableStandardRevenueInStructure
+    > | null = null;
 
     if (isInevitableStandardTest) {
       const storedQuestions = (questions || []).map(
@@ -2934,6 +2942,51 @@ export async function POST(
       }
 
       inevitableStandardScore = mapped.score;
+
+      // Constraint Engine + Revenue-in-Structure. These are pure, synchronous
+      // functions with no IO, so on a valid score they will not throw. If they
+      // ever do, degrade gracefully: the readiness score is still valid and
+      // useful on its own, so store it without the constraint/RRE layer rather
+      // than discarding a completed submission.
+      try {
+        const constraints = deriveInevitableStandardConstraints({
+          // The engine reads the founder's Q13/Q29 free text from
+          // score.context_answers, which mapSubmission has already populated.
+          score: mapped.score,
+        });
+
+        const primaryPillarPercentage = Number(
+          mapped.score.pillars?.[constraints.primary_constraint]?.percentage,
+        );
+
+        const revenueInStructure =
+          calculateInevitableStandardRevenueInStructure({
+            primary_constraint: constraints.primary_constraint,
+            confidence: constraints.confidence,
+            primary_constraint_pillar_percentage: Number.isFinite(
+              primaryPillarPercentage,
+            )
+              ? primaryPillarPercentage
+              : 0,
+            commercial_context: mapped.commercial_context,
+          });
+
+        inevitableStandardConstraints = constraints;
+        inevitableStandardRevenue = revenueInStructure;
+      } catch (constraintError) {
+        console.warn(
+          "[submit] Inevitable Standard constraint/RRE derivation failed; storing score only",
+          {
+            taker_id: taker.id,
+            test_id: taker.test_id,
+            effective_test_id: effectiveTestId,
+            error:
+              constraintError instanceof Error
+                ? constraintError.message
+                : String(constraintError),
+          },
+        );
+      }
     }
 
     const gedDiagnostics = extractGedDiagnostics(questions || [], answers);
@@ -3091,6 +3144,17 @@ export async function POST(
           : topFrequencyCode)
       : null;
 
+    // The constraint and revenue-in-structure results are stored as sibling
+    // keys on the score object, matching how totals.inevitable_standard is
+    // already a single flat result object.
+    const inevitableStandardTotals = inevitableStandardScore
+      ? {
+          ...inevitableStandardScore,
+          constraints: inevitableStandardConstraints,
+          revenue_in_structure: inevitableStandardRevenue,
+        }
+      : null;
+
     const totals = {
       frequencies: {
         A: freqTotals.A,
@@ -3099,7 +3163,7 @@ export async function POST(
         D: freqTotals.D,
       },
       profiles: profileTotals,
-      inevitable_standard: inevitableStandardScore,
+      inevitable_standard: inevitableStandardTotals,
       meta: {
         wrapper_test_id: taker.test_id,
         effective_test_id: effectiveTestId,
@@ -3117,6 +3181,9 @@ export async function POST(
                 inevitableStandardScore.scoring_complete,
               qa_flags:
                 inevitableStandardScore.qa_flags,
+              constraints_derived: inevitableStandardConstraints !== null,
+              revenue_in_structure_derived:
+                inevitableStandardRevenue !== null,
             }
           : null,
         ged: hasGedDiagnostics(gedDiagnostics) ? gedDiagnostics : null,

@@ -389,6 +389,22 @@ export async function GET(
       );
     }
 
+    // Constraint Engine and Revenue-in-Structure results are stored as sibling
+    // keys on the score object. Submissions completed before these shipped will
+    // not have them - degrade gracefully and surface null rather than 409, so
+    // existing report links keep working.
+    const inevitableStandardRecord = inevitableStandard as Record<string, unknown>;
+    const constraints =
+      inevitableStandardRecord.constraints &&
+      typeof inevitableStandardRecord.constraints === "object"
+        ? inevitableStandardRecord.constraints
+        : null;
+    const revenueInStructure =
+      inevitableStandardRecord.revenue_in_structure &&
+      typeof inevitableStandardRecord.revenue_in_structure === "object"
+        ? inevitableStandardRecord.revenue_in_structure
+        : null;
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -402,7 +418,11 @@ export async function GET(
           first_name: takerFirst,
           last_name: takerLast,
         },
-        inevitable_standard: inevitableStandard,
+        inevitable_standard: {
+          ...inevitableStandardRecord,
+          constraints,
+          revenue_in_structure: revenueInStructure,
+        },
         version: "inevitable-standard-v1",
       },
     });

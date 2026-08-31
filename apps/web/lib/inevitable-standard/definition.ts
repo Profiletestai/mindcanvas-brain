@@ -3,7 +3,7 @@ export const INEVITABLE_STANDARD_MODEL_VERSION =
 export const INEVITABLE_STANDARD_SCORING_VERSION =
   "inevitable_standard_scoring_v1" as const;
 export const INEVITABLE_STANDARD_CONSTRAINT_VERSION =
-  "inevitable_standard_constraints_v1_draft" as const;
+  "inevitable_standard_constraints_v1" as const;
 
 export const INEVITABLE_STANDARD_PILLARS = [
   "identity",
