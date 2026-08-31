@@ -21,6 +21,39 @@ type PillarResult = {
   risk_label?: string;
 };
 
+type ConstraintConfidence = "High" | "Medium" | "Directional";
+
+type FalseConstraint = {
+  stated_pillar?: string | null;
+  evidence_pillar?: string | null;
+  mismatch?: boolean | null;
+  explanation?: string | null;
+};
+
+type ConstraintResult = {
+  primary_constraint?: PillarKey | string | null;
+  secondary_constraint?: PillarKey | string | null;
+  false_constraint?: FalseConstraint | null;
+  priority_fix_order?: Array<PillarKey | string> | null;
+  confidence?: ConstraintConfidence | null;
+  identity_decision_override?: boolean | null;
+};
+
+type RevenueInStructure = {
+  primary_constraint_pillar?: PillarKey | string | null;
+  point_estimate?: number | null;
+  range_low?: number | null;
+  range_high?: number | null;
+  currency?: string | null;
+  needs_revenue_confirmation?: boolean | null;
+  translation?: {
+    customer_values_low?: number | null;
+    customer_values_high?: number | null;
+  } | null;
+  confidence_label?: ConstraintConfidence | null;
+  disclaimer?: string | null;
+};
+
 type InevitableStandardScore = {
   scoring_complete?: boolean;
   overall?: {
@@ -40,6 +73,8 @@ type InevitableStandardScore = {
   };
   context_answers?: Record<string, string | null>;
   commercial_context?: Record<string, string | null>;
+  constraints?: ConstraintResult | null;
+  revenue_in_structure?: RevenueInStructure | null;
 };
 
 type ResultPayload = {
@@ -164,6 +199,23 @@ const PILLAR_INSIGHTS: Record<PillarKey, string> = {
     "This reflects how consistently the business chooses priorities, protects momentum and follows through when conditions change.",
 };
 
+const PILLAR_CONSTRAINT_COPY: Record<PillarKey, string> = {
+  identity:
+    "When Identity is the constraint, the business is not consistently claiming its value or holding its position, so strong work elsewhere gets discounted before it can compound.",
+  positioning:
+    "When Positioning is the constraint, the right buyers cannot quickly recognise the problem, outcome and distinct choice on offer, so demand stays harder to create than it should be.",
+  offer:
+    "When Offer is the constraint, what is being sold lacks clear boundaries or a repeatable path, so each sale is negotiated from scratch and value leaks.",
+  sales:
+    "When Sales is the constraint, conversations do not reliably move from understanding the need to a clear decision, so good opportunities stall rather than resolve.",
+  revenue_model:
+    "When Revenue Model is the constraint, the business is not deliberately protecting margin, building repeat value or rewarding ownership, so revenue grows without enough of it being kept.",
+  decision:
+    "When Decision is the constraint, priorities and follow-through shift too easily, so momentum is lost and important calls stay open longer than they should.",
+};
+
+const FIX_ORDER_LABELS = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
+
 function numberOr(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -179,6 +231,32 @@ function humanise(value: unknown): string {
   return text
     .replace(/_/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatWhole(value: unknown): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "";
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
+    Math.round(parsed),
+  );
+}
+
+function formatCurrencyAmount(
+  currency: string | null | undefined,
+  value: unknown,
+): string {
+  const amount = formatWhole(value);
+  if (!amount) return "";
+  const code = (currency || "").trim();
+  return code ? `${code} ${amount}` : amount;
+}
+
+function formatApproxCount(value: unknown): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "";
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(
+    parsed,
+  );
 }
 
 function contextValue(value: string | null | undefined): string {
@@ -357,6 +435,27 @@ export default function InevitableStandardReportClient({
   const commercial = score.commercial_context || {};
   const secondary = approaches?.secondary;
 
+  const constraints = score.constraints ?? null;
+  const revenueInStructure = score.revenue_in_structure ?? null;
+
+  const pillarLabelFor = (key?: string | null): string =>
+    PILLARS.find((item) => item.key === key)?.label || humanise(key);
+  const pillarPctFor = (key?: string | null): number =>
+    key ? clampPercentage(score.pillars?.[key as PillarKey]?.percentage) : 0;
+
+  const primaryConstraintKey =
+    (constraints?.primary_constraint as PillarKey | undefined) || null;
+  const secondaryConstraintKey =
+    (constraints?.secondary_constraint as PillarKey | undefined) || null;
+  const falseConstraint = constraints?.false_constraint ?? null;
+  const priorityFixOrder = Array.isArray(constraints?.priority_fix_order)
+    ? constraints.priority_fix_order.filter(Boolean)
+    : [];
+  const rreTranslation = revenueInStructure?.translation ?? null;
+  const headlinePillarLabel = primaryConstraintKey
+    ? pillarLabelFor(primaryConstraintKey)
+    : lowestPillar?.label || null;
+
   const contextCards = [
     { label: "The constraint you named", value: context["13"] },
     { label: "What you want next", value: contextValue(context["26"]) },
@@ -418,6 +517,38 @@ export default function InevitableStandardReportClient({
       </section>
 
       <div className="mx-auto max-w-6xl space-y-12 px-5 py-10 sm:px-8 sm:py-14">
+        <section className="rounded-3xl border border-[#d7e6ef] bg-white p-7 shadow-sm">
+          <SectionHeading
+            eyebrow="Headline diagnosis"
+            title={`${firstName}, your commercial readiness is ${overallPercentage}%`}
+          />
+          {primaryConstraintKey ? (
+            <p className="text-[15px] leading-7 text-slate-600">
+              That places the business in the{" "}
+              <strong className="text-[#12223a]">
+                &ldquo;{overall?.label || "current"}&rdquo;
+              </strong>{" "}
+              band. The single biggest thing holding this back is{" "}
+              <strong className="text-[#12223a]">{headlinePillarLabel}</strong> at{" "}
+              {pillarPctFor(primaryConstraintKey)}%. Strengthening this is where the
+              next gain in consistency comes from.
+            </p>
+          ) : (
+            <p className="text-[15px] leading-7 text-slate-600">
+              That places the business in the{" "}
+              <strong className="text-[#12223a]">
+                &ldquo;{overall?.label || "current"}&rdquo;
+              </strong>{" "}
+              band. Its weakest area is{" "}
+              <strong className="text-[#12223a]">
+                {lowestPillar?.label || "not yet available"}
+              </strong>{" "}
+              at {lowestPillar?.percentage ?? 0}% &mdash; the part of the commercial
+              system where a more deliberate pattern would most improve repeatability.
+            </p>
+          )}
+        </section>
+
         <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
           <div className="rounded-3xl bg-white p-7 shadow-sm">
             <SectionHeading eyebrow="Your operating pattern" title={dominantLabel || "Your commercial approach"}>
@@ -494,14 +625,42 @@ export default function InevitableStandardReportClient({
 
         <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl bg-white p-7 shadow-sm">
-            <SectionHeading eyebrow="What your result suggests" title="The next increase in consistency" />
-            <p className="text-[15px] leading-7 text-slate-600">
-              The lowest current pillar is <strong className="text-[#12223a]">{lowestPillar?.label || "not yet available"}</strong> at {lowestPillar?.percentage ?? 0}%. That does not mean the business is weak in this area. It identifies the part of the commercial system where strengthening the underlying pattern may create the clearest improvement in repeatability.
-            </p>
+            <SectionHeading
+              eyebrow={primaryConstraintKey ? "Primary constraint" : "What your result suggests"}
+              title={
+                primaryConstraintKey
+                  ? "The one thing to strengthen first"
+                  : "The next increase in consistency"
+              }
+            />
+            {primaryConstraintKey ? (
+              <>
+                <p className="text-[15px] leading-7 text-slate-600">
+                  Your primary constraint is{" "}
+                  <strong className="text-[#12223a]">{pillarLabelFor(primaryConstraintKey)}</strong>{" "}
+                  at {pillarPctFor(primaryConstraintKey)}%.{" "}
+                  {PILLAR_CONSTRAINT_COPY[primaryConstraintKey as PillarKey] ||
+                    PILLAR_INSIGHTS[primaryConstraintKey as PillarKey] ||
+                    ""}
+                </p>
+                {secondaryConstraintKey ? (
+                  <p className="mt-4 text-[15px] leading-7 text-slate-600">
+                    The reinforcing issue holding it in place is{" "}
+                    <strong className="text-[#12223a]">{pillarLabelFor(secondaryConstraintKey)}</strong>{" "}
+                    at {pillarPctFor(secondaryConstraintKey)}%. The two tend to keep each
+                    other in position, so the primary constraint is where the work starts.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-[15px] leading-7 text-slate-600">
+                The lowest current pillar is <strong className="text-[#12223a]">{lowestPillar?.label || "not yet available"}</strong> at {lowestPillar?.percentage ?? 0}%. That does not mean the business is weak in this area. It identifies the part of the commercial system where strengthening the underlying pattern may create the clearest improvement in repeatability.
+              </p>
+            )}
             <div className="mt-6 rounded-2xl border-l-4 border-[#2c8fbf] bg-[#f2f9fc] p-5">
               <p className="text-sm font-semibold text-[#12223a]">A useful question to carry forward</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                What would need to become deliberate, visible and repeatable in {lowestPillar?.label?.toLowerCase() || "this area"} for the business to rely less on personal effort or favourable circumstances?
+                What would need to become deliberate, visible and repeatable in {(headlinePillarLabel || "this area").toLowerCase()} for the business to rely less on personal effort or favourable circumstances?
               </p>
             </div>
           </div>
@@ -516,6 +675,104 @@ export default function InevitableStandardReportClient({
             </p>
           </div>
         </section>
+
+        {falseConstraint ? (
+          <section className="rounded-3xl border-l-4 border-amber-400 bg-amber-50 p-7">
+            <SectionHeading
+              eyebrow="False constraint"
+              title="What feels like the problem vs. what the evidence shows"
+            />
+            <p className="text-[15px] leading-7 text-slate-700">
+              You may see the issue as{" "}
+              <strong className="text-[#12223a]">{pillarLabelFor(falseConstraint.stated_pillar)}</strong>, but the
+              pattern in your answers points to{" "}
+              <strong className="text-[#12223a]">{pillarLabelFor(falseConstraint.evidence_pillar)}</strong>.
+            </p>
+            {falseConstraint.explanation ? (
+              <p className="mt-4 text-[15px] leading-7 text-slate-600">
+                {falseConstraint.explanation}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
+        {priorityFixOrder.length > 0 ? (
+          <section className="rounded-3xl bg-white p-7 shadow-sm">
+            <SectionHeading
+              eyebrow="Priority fix order"
+              title="Work these in sequence, not all at once"
+            />
+            <ol className="space-y-4">
+              {priorityFixOrder.map((key, index) => (
+                <li key={`${key}-${index}`} className="flex gap-4">
+                  <span className="shrink-0 rounded-full bg-[#e6f5fb] px-2.5 py-1 text-xs font-semibold text-[#167ca9]">
+                    {FIX_ORDER_LABELS[index] || `${index + 1}`}
+                  </span>
+                  <div>
+                    <p className="text-[15px] font-semibold text-[#12223a]">{pillarLabelFor(key)}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      {PILLAR_INSIGHTS[key as PillarKey] ||
+                        PILLARS.find((item) => item.key === key)?.description ||
+                        ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-5 text-xs leading-5 text-slate-500">
+              Each step needs to hold before the next will stick. Working the list in this
+              order keeps the change manageable and makes it clear what is actually moving
+              the result.
+            </p>
+          </section>
+        ) : null}
+
+        {revenueInStructure ? (
+          <section className="rounded-3xl bg-white p-7 shadow-sm">
+            <SectionHeading
+              eyebrow="Revenue in your structure"
+              title="The commercial value sitting in the current setup"
+            />
+            {revenueInStructure.needs_revenue_confirmation ? (
+              <p className="text-[15px] leading-7 text-slate-600">
+                Your revenue is in the highest band, so this estimate needs a specific
+                annual figure to be meaningful. Share an approximate number with your
+                advisor and the range can be modelled properly.
+              </p>
+            ) : (
+              <>
+                <p className="text-3xl font-semibold tracking-tight text-[#12223a]">
+                  {formatCurrencyAmount(revenueInStructure.currency, revenueInStructure.range_low)}{" "}
+                  <span className="text-slate-400">to</span>{" "}
+                  {formatCurrencyAmount(revenueInStructure.currency, revenueInStructure.range_high)}
+                </p>
+                <p className="mt-4 text-[15px] leading-7 text-slate-600">
+                  This is commercial value that may be easier to convert, retain or release
+                  once{" "}
+                  <strong className="text-[#12223a]">
+                    {pillarLabelFor(revenueInStructure.primary_constraint_pillar)}
+                  </strong>{" "}
+                  becomes more deliberate and repeatable. It is a modelled range, not a
+                  measured figure.
+                </p>
+                {rreTranslation &&
+                (rreTranslation.customer_values_low != null ||
+                  rreTranslation.customer_values_high != null) ? (
+                  <p className="mt-3 text-sm leading-6 text-slate-500">
+                    That is roughly {formatApproxCount(rreTranslation.customer_values_low)} to{" "}
+                    {formatApproxCount(rreTranslation.customer_values_high)} typical customer
+                    values, based on the deal size you gave.
+                  </p>
+                ) : null}
+                {revenueInStructure.disclaimer ? (
+                  <p className="mt-5 text-xs leading-5 text-slate-400">
+                    {revenueInStructure.disclaimer}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </section>
+        ) : null}
 
         {contextCards.length > 0 ? (
           <section>
@@ -551,7 +808,11 @@ export default function InevitableStandardReportClient({
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8dd5f3]">Your next step</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight">Turn the clearest signal into one deliberate move.</h2>
           <p className="mt-4 max-w-3xl text-[15px] leading-7 text-white/75">
-            Start with the lowest-readiness pillar and the decision you identified as still waiting. The aim is not to improve everything at once. It is to create one visible change that makes the business more repeatable and gives you better evidence for what to strengthen next.
+            Start with{" "}
+            {primaryConstraintKey
+              ? `your primary constraint (${pillarLabelFor(primaryConstraintKey)})`
+              : "the lowest-readiness pillar"}{" "}
+            and the decision you identified as still waiting. The aim is not to improve everything at once. It is to create one visible change that makes the business more repeatable and gives you better evidence for what to strengthen next.
           </p>
           <p className="mt-6 text-sm font-medium text-[#8dd5f3]">{dominantLabel ? `${dominantLabel} is your natural starting instinct.` : "Your result is your starting point."}</p>
         </section>
