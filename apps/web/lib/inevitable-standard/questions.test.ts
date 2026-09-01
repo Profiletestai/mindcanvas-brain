@@ -7,6 +7,7 @@ import {
   toInevitableStandardDatabaseQuestions,
   validateInevitableStandardQuestionBank,
 } from "./questions";
+import { mapInevitableStandardSubmission } from "./mapSubmission";
 
 describe("The Inevitable Standard approved question bank", () => {
   it("passes all structural integrity checks", () => {
@@ -76,5 +77,32 @@ describe("The Inevitable Standard approved question bank", () => {
       commercial_context_key: "revenue_band",
       question_bank_version: "inevitable_standard_questions_v0_4",
     });
+  });
+
+  it("seeds a test that a public submission can score with zero issues", () => {
+    // Mirrors what /api/admin/inevitable-standard/seed writes to
+    // portal.test_questions and what /submit then reads back.
+    const rows = toInevitableStandardDatabaseQuestions();
+
+    const storedQuestions = rows.map((row) => ({
+      id: `seeded_${row.idx}`,
+      idx: row.idx,
+    }));
+
+    const answers = rows.map((row) =>
+      row.type === "text"
+        ? { question_id: `seeded_${row.idx}`, text: "placeholder answer" }
+        : { question_id: `seeded_${row.idx}`, choice_index: 0 },
+    );
+
+    const mapped = mapInevitableStandardSubmission({
+      questions: storedQuestions,
+      answers,
+      currency: "AUD",
+    });
+
+    expect(mapped.issues).toEqual([]);
+    expect(mapped.score.scoring_complete).toBe(true);
+    expect(mapped.score.answered_scored_questions).toBe(24);
   });
 });
