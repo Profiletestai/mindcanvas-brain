@@ -1,307 +1,48 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { Newsreader } from "next/font/google";
+import { useEffect, useState, type ReactNode } from "react";
 import { getBaseUrl } from "@/lib/server-url";
-import { getInevitableStandardPillarBandContent } from "@/lib/inevitable-standard/content/reportCopy";
-
-/* -------------------------------------------------------------------------- */
-/* Display type — Newsreader for headings, the readiness figure and pillar     */
-/* names. Body copy stays on the platform sans (Inter). Self-hosted by         */
-/* next/font, so no external request and no change to any other surface.       */
-/* -------------------------------------------------------------------------- */
-
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  display: "swap",
-  variable: "--font-newsreader",
-});
-
-const serif: CSSProperties = {
-  fontFamily:
-    "var(--font-newsreader), ui-serif, Georgia, 'Times New Roman', serif",
-};
-
-/* -------------------------------------------------------------------------- */
-/* Design tokens (spec §5 — Reporting Suite design brief)                      */
-/* -------------------------------------------------------------------------- */
-
-const NAVY_DEEP = "#14263d";
-const NAVY = "#1f2c46";
-const NAVY_GRADIENT = `linear-gradient(158deg, ${NAVY_DEEP} 0%, ${NAVY} 100%)`;
-const GOLD = "#b89a5e"; // arcs, rules, dots, borders
-const GOLD_TEXT = "#8a6a3c"; // small-caps labels on the ivory ground
-const IVORY = "#faf8f4"; // page ground
-const IVORY_PANEL = "#f5efe3"; // sidebar / inset panels
-const IVORY_BORDER = "#e7ddc8";
-const INK = "#1e2a38";
-const HAIRLINE = "#e7e3db";
-
-/* -------------------------------------------------------------------------- */
-/* Types                                                                       */
-/* -------------------------------------------------------------------------- */
-
-type PillarKey =
-  | "identity"
-  | "positioning"
-  | "offer"
-  | "sales"
-  | "revenue_model"
-  | "decision";
-
-type ApproachCode = "A" | "B" | "C" | "D";
-
-type PillarResult = {
-  raw?: number;
-  max?: number;
-  percentage?: number;
-  risk?: "high_risk" | "medium_risk" | "low_risk";
-  risk_label?: string;
-};
-
-type ConstraintConfidence = "High" | "Medium" | "Directional";
-
-type FalseConstraint = {
-  stated_pillar?: string | null;
-  evidence_pillar?: string | null;
-  mismatch?: boolean | null;
-  explanation?: string | null;
-};
-
-type ConstraintResult = {
-  primary_constraint?: PillarKey | string | null;
-  secondary_constraint?: PillarKey | string | null;
-  false_constraint?: FalseConstraint | null;
-  priority_fix_order?: Array<PillarKey | string> | null;
-  confidence?: ConstraintConfidence | null;
-  identity_decision_override?: boolean | null;
-};
-
-type RevenueInStructure = {
-  primary_constraint_pillar?: PillarKey | string | null;
-  point_estimate?: number | null;
-  range_low?: number | null;
-  range_high?: number | null;
-  currency?: string | null;
-  needs_revenue_confirmation?: boolean | null;
-  translation?: {
-    customer_values_low?: number | null;
-    customer_values_high?: number | null;
-  } | null;
-  confidence_label?: ConstraintConfidence | null;
-  disclaimer?: string | null;
-};
-
-type ApproachData = {
-  counts?: Partial<Record<ApproachCode, number>>;
-  percentages?: Partial<Record<ApproachCode, number>>;
-  labels?: Partial<Record<ApproachCode, string>>;
-  dominant?: ApproachCode | null;
-  secondary?: ApproachCode | "BALANCED" | null;
-  map?: {
-    x_people_trust_minus_evidence_proof?: number | null;
-    y_future_possibility_minus_timing_certainty?: number | null;
-  } | null;
-};
-
-type InevitableStandardScore = {
-  scoring_complete?: boolean;
-  overall?: {
-    raw?: number;
-    max?: number;
-    percentage?: number;
-    level?: string;
-    label?: string;
-  };
-  pillars?: Partial<Record<PillarKey, PillarResult>>;
-  approaches?: ApproachData;
-  constraints?: ConstraintResult | null;
-  revenue_in_structure?: RevenueInStructure | null;
-};
-
-type ResultPayload = {
-  test_name?: string | null;
-  org_name?: string | null;
-  completed_at?: string | null;
-  taker?: {
-    first_name?: string | null;
-    last_name?: string | null;
-    company?: string | null;
-  };
-  business_name?: string | null;
-  inevitable_standard?: InevitableStandardScore | null;
-};
-
-/* -------------------------------------------------------------------------- */
-/* Constants                                                                   */
-/* -------------------------------------------------------------------------- */
-
-const PILLARS: Array<{ key: PillarKey; label: string; descriptor: string }> = [
-  {
-    key: "identity",
-    label: "Identity",
-    descriptor: "Authority, commercial confidence and willingness to lead.",
-  },
-  {
-    key: "positioning",
-    label: "Positioning",
-    descriptor: "How clearly the market understands and chooses you.",
-  },
-  {
-    key: "offer",
-    label: "Offer",
-    descriptor: "The clarity, boundaries and repeatability of what you sell.",
-  },
-  {
-    key: "sales",
-    label: "Sales",
-    descriptor: "Discovery, conversion and the quality of the buying path.",
-  },
-  {
-    key: "revenue_model",
-    label: "Revenue Model",
-    descriptor: "Margin, retention, owner reward and transferability.",
-  },
-  {
-    key: "decision",
-    label: "Decision",
-    descriptor: "Commercial focus, follow-through and decision discipline.",
-  },
-];
-
-const PILLAR_BY_KEY: Record<string, { label: string; descriptor: string }> =
-  Object.fromEntries(
-    PILLARS.map((pillar) => [
-      pillar.key,
-      { label: pillar.label, descriptor: pillar.descriptor },
-    ]),
-  );
-
-const APPROACHES: Array<{ code: ApproachCode; label: string }> = [
-  { code: "A", label: "Future-Led" },
-  { code: "B", label: "Connection-Led" },
-  { code: "C", label: "Timing-Led" },
-  { code: "D", label: "Evidence-Led" },
-];
-
-/**
- * Fallback constraint sentences. Used when the content layer has no entry for the
- * primary-constraint pillar at its band — see primaryConstraintSentence().
- */
-const PILLAR_CONSTRAINT_COPY: Record<PillarKey, string> = {
-  identity:
-    "The business is not consistently claiming its value or holding its position, so strong work elsewhere gets discounted before it can compound.",
-  positioning:
-    "The right buyers cannot quickly recognise the problem, outcome and distinct choice on offer, so demand stays harder to create than it should be.",
-  offer:
-    "What is being sold lacks clear boundaries or a repeatable path, so each sale is negotiated from scratch and value leaks.",
-  sales:
-    "Conversations do not reliably move from understanding the need to a clear decision, so good opportunities stall rather than resolve.",
-  revenue_model:
-    "The business is not deliberately protecting margin, building repeat value or rewarding ownership, so revenue grows without enough of it being kept.",
-  decision:
-    "Priorities and follow-through shift too easily, so momentum is lost and important calls stay open longer than they should.",
-};
-
-const APPROACH_LENS_COPY: Record<ApproachCode, string> = {
-  A: "A Future-Led approach leans toward possibility, direction and the larger outcome. This may shape how the result above shows up — momentum can run ahead of the structure that would make it repeatable.",
-  B: "A Connection-Led approach leans toward people, relevance and the quality of the relationship. This may shape how the result shows up — trust builds well, while the point where a clear decision is asked for can be left softer than it needs to be.",
-  C: "A Timing-Led approach leans toward sequence, readiness and what needs to happen first. This may shape how the result shows up — quality is protected, while decisions can stay open longer than the commercial situation needs.",
-  D: "An Evidence-Led approach leans toward proof, clarity and a sound basis for action. This may shape how the result shows up — judgement is sound, while the search for certainty can slow a decision that is already clear enough.",
-};
-
-const OPENING_COPY =
-  "Your Inevitable Standard Readiness shows how deliberately your business is currently built to move revenue through to profit, personal wealth and greater freedom. It is calculated across six areas of the business and is designed to show where the foundations are already working and where greater structure could have the biggest impact.";
-
-const PRIORITY_ORDER_NOTE =
-  "The order is not a ranking of importance. It is the sequence in which work compounds fastest for this result.";
-
-const FIX_ORDER_LABELS = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
-
-const METHOD_LAYER_LABEL: Record<PillarKey, "Identity" | "Structure" | "Execution"> = {
-  identity: "Identity",
-  positioning: "Structure",
-  offer: "Structure",
-  revenue_model: "Structure",
-  sales: "Execution",
-  decision: "Execution",
-};
-
-const BANDS: Array<{ min: number; label: string }> = [
-  { min: 0, label: "Chance-Based" },
-  { min: 40, label: "Inconsistent" },
-  { min: 60, label: "Partly Structured" },
-  { min: 80, label: "Deliberate & Repeatable" },
-];
-
-/** Short band language, reused from spec §2. */
-const BAND_MEANING: Record<string, string> = {
-  "Chance-Based":
-    "Right now the result is carried mostly by effort, instinct and hope rather than by structure.",
-  Inconsistent:
-    "Some parts of the business are working, but value, time and money are still leaking in places.",
-  "Partly Structured":
-    "There is a working base to build on. It needs tightening before it is ready to scale.",
-  "Deliberate & Repeatable":
-    "The business is built clearly enough to support predictable results.",
-};
-
-/* Green / Amber / Red — muted and editorial, never traffic-light. Green means
- * "leverage this strength", not "ignore this". */
-type Gar = "green" | "amber" | "red";
-
-const GAR: Record<
-  Gar,
-  { letter: string; name: string; tone: string; bar: string; chipBg: string; chipText: string }
-> = {
-  green: {
-    letter: "G",
-    name: "Green",
-    tone: "Leverage this strength",
-    bar: "#5b8a72",
-    chipBg: "#eef2ef",
-    chipText: "#3f5e50",
-  },
-  amber: {
-    letter: "A",
-    name: "Amber",
-    tone: "Strengthen and stabilise",
-    bar: "#b58a45",
-    chipBg: "#f5f0e6",
-    chipText: "#7a5a28",
-  },
-  red: {
-    letter: "R",
-    name: "Red",
-    tone: "Priority — investigate and rebuild",
-    bar: "#a6564e",
-    chipBg: "#f2eae8",
-    chipText: "#7c3f39",
-  },
-};
-
-function garForRisk(risk: string | undefined): Gar {
-  if (risk === "low_risk") return "green";
-  if (risk === "medium_risk") return "amber";
-  return "red";
-}
-
-/**
- * The primary-constraint sentence shown in Key Diagnosis. Prefers sourced copy
- * from the content layer, matched to the pillar's band; falls back to the in-file
- * PILLAR_CONSTRAINT_COPY string when the content layer has no entry for that
- * pillar/band (Red for any pillar, Green for most).
- */
-function primaryConstraintSentence(pillar: PillarKey, band: Gar): string {
-  const bandContent = getInevitableStandardPillarBandContent(pillar, band);
-  return (
-    bandContent.what_this_means?.text ||
-    bandContent.where_leaking?.text ||
-    PILLAR_CONSTRAINT_COPY[pillar] ||
-    ""
-  );
-}
+import {
+  APPROACH_LENS_COPY,
+  APPROACHES,
+  ApproachCompass,
+  BandMeter,
+  BAND_MEANING,
+  Eyebrow,
+  FIX_ORDER_LABELS,
+  GarLegend,
+  GOLD,
+  GOLD_TEXT,
+  HAIRLINE,
+  INK,
+  IVORY,
+  IVORY_BORDER,
+  IVORY_PANEL,
+  METHOD_LAYER_LABEL,
+  NAVY_DEEP,
+  NAVY_GRADIENT,
+  OPENING_COPY,
+  PILLAR_CONSTRAINT_COPY,
+  PillarSummaryList,
+  PRIORITY_ORDER_NOTE,
+  ReadinessDonut,
+  RevenueInStructurePanel,
+  bandLabelFor,
+  buildPillarView,
+  clampPercentage,
+  formatAssessmentDate,
+  newsreader,
+  numberOr,
+  pillarDescriptor,
+  pillarLabel,
+  primaryConstraintSentence,
+  round1,
+  serif,
+  type ApproachCode,
+  type Gar,
+  type PillarKey,
+  type ResultPayload,
+} from "./inevitableStandardShared";
 
 /* Report Index — drives the persistent sidebar nav and the print-only index. */
 const SECTIONS: Array<{ id: string; label: string }> = [
@@ -313,82 +54,8 @@ const SECTIONS: Array<{ id: string; label: string }> = [
 ];
 
 /* -------------------------------------------------------------------------- */
-/* Helpers                                                                     */
+/* Report-1 presentational pieces                                              */
 /* -------------------------------------------------------------------------- */
-
-function numberOr(value: unknown, fallback = 0): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function clampPercentage(value: unknown): number {
-  return Math.max(0, Math.min(100, numberOr(value)));
-}
-
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
-}
-
-function humanise(value: unknown): string {
-  const text = String(value ?? "").trim();
-  if (!text) return "";
-  return text
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function pillarLabel(key?: string | null): string {
-  return PILLAR_BY_KEY[String(key ?? "")]?.label || humanise(key);
-}
-
-function pillarDescriptor(key?: string | null): string {
-  return PILLAR_BY_KEY[String(key ?? "")]?.descriptor || "";
-}
-
-function formatWhole(value: unknown): string {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return "";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
-    Math.round(parsed),
-  );
-}
-
-function formatCurrencyAmount(
-  currency: string | null | undefined,
-  value: unknown,
-): string {
-  const amount = formatWhole(value);
-  if (!amount) return "";
-  const code = (currency || "").trim();
-  return code ? `${code} ${amount}` : amount;
-}
-
-function bandLabelFor(percentage: number): string {
-  let label = BANDS[0].label;
-  for (const band of BANDS) if (percentage >= band.min) label = band.label;
-  return label;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Small presentational pieces                                                 */
-/* -------------------------------------------------------------------------- */
-
-function Eyebrow({
-  children,
-  tone = "gold",
-}: {
-  children: ReactNode;
-  tone?: "gold" | "light";
-}) {
-  return (
-    <p
-      className="text-[11px] font-semibold uppercase tracking-[0.24em]"
-      style={{ color: tone === "light" ? "rgba(255,255,255,0.62)" : GOLD_TEXT }}
-    >
-      {children}
-    </p>
-  );
-}
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return (
@@ -432,167 +99,6 @@ function Section({
   );
 }
 
-/**
- * Circular readiness gauge. A single value (overall readiness %), shown as a
- * gold arc on a faint track, with the figure and band word in the centre.
- */
-function ReadinessDonut({
-  percentage,
-  band,
-}: {
-  percentage: number;
-  band: string;
-}) {
-  const size = 232;
-  const stroke = 16;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const pct = clampPercentage(percentage);
-  const filled = (pct / 100) * circumference;
-  const center = size / 2;
-
-  return (
-    <svg
-      viewBox={`0 0 ${size} ${size}`}
-      className="h-[200px] w-[200px] sm:h-[232px] sm:w-[232px]"
-      role="img"
-      aria-label={`Inevitable Standard Readiness ${round1(pct)} percent, ${band}`}
-    >
-      <circle
-        cx={center}
-        cy={center}
-        r={radius}
-        fill="none"
-        stroke="rgba(255,255,255,0.14)"
-        strokeWidth={stroke}
-      />
-      <circle
-        cx={center}
-        cy={center}
-        r={radius}
-        fill="none"
-        stroke={GOLD}
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={`${filled} ${circumference - filled}`}
-        transform={`rotate(-90 ${center} ${center})`}
-      />
-      <text
-        x={center}
-        y={center - 4}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        style={serif}
-        fontSize="46"
-        fill="#ffffff"
-      >
-        {round1(pct)}%
-      </text>
-      <text
-        x={center}
-        y={center + 28}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize="11"
-        letterSpacing="2"
-        fill="rgba(255,255,255,0.65)"
-      >
-        {band.toUpperCase()}
-      </text>
-    </svg>
-  );
-}
-
-function BandMeter({ percentage }: { percentage: number }) {
-  return (
-    <div className="mt-2">
-      <div
-        className="relative h-2 w-full rounded-full"
-        style={{ backgroundColor: "#ece7dd" }}
-      >
-        {[40, 60, 80].map((mark) => (
-          <span
-            key={mark}
-            className="absolute top-0 h-2 w-px"
-            style={{ left: `${mark}%`, backgroundColor: "#d6cfc0" }}
-          />
-        ))}
-        <span
-          className="absolute -top-1 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-white shadow-sm"
-          style={{
-            left: `${clampPercentage(percentage)}%`,
-            backgroundColor: NAVY,
-          }}
-        />
-      </div>
-      <div className="mt-2 flex justify-between text-[10px] uppercase tracking-[0.12em] text-[#9a9384]">
-        {BANDS.map((band) => (
-          <span key={band.label}>{band.label}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PillarBar({ percentage, colour }: { percentage: number; colour: string }) {
-  return (
-    <div
-      className="h-1.5 w-full overflow-hidden rounded-full"
-      style={{ backgroundColor: "#ece7dd" }}
-    >
-      <div
-        className="h-full rounded-full"
-        style={{ width: `${clampPercentage(percentage)}%`, backgroundColor: colour }}
-      />
-    </div>
-  );
-}
-
-/**
- * Restrained decision-approach map. One marker on a two-axis plot — no fill,
- * no icons, one gold accent dot. Vertical: Future ↔ Timing.
- * Horizontal: Evidence ↔ Connection.
- */
-function ApproachCompass({ x, y }: { x: number; y: number }) {
-  const size = 260;
-  const height = 230;
-  const cx = size / 2;
-  const cy = height / 2;
-  const reach = 54;
-  const clamp = (value: number) => Math.max(-1, Math.min(1, value / 50));
-  const px = cx + clamp(x) * reach;
-  const py = cy - clamp(y) * reach;
-  const line = "#cfc9bd";
-  const label = "#6b7280";
-
-  return (
-    <svg
-      viewBox={`0 0 ${size} ${height}`}
-      className="mx-auto h-[230px] w-full max-w-[280px]"
-      role="img"
-      aria-label="Commercial decision approach map"
-    >
-      <rect x={cx - 70} y={cy - 70} width={140} height={140} fill="none" stroke={line} />
-      <line x1={cx} y1={cy - 70} x2={cx} y2={cy + 70} stroke={line} />
-      <line x1={cx - 70} y1={cy} x2={cx + 70} y2={cy} stroke={line} />
-      <text x={cx} y={cy - 84} textAnchor="middle" fontSize="10" letterSpacing="1.5" fill={label}>
-        FUTURE
-      </text>
-      <text x={cx} y={cy + 96} textAnchor="middle" fontSize="10" letterSpacing="1.5" fill={label}>
-        TIMING
-      </text>
-      <text x={cx - 78} y={cy + 3} textAnchor="end" fontSize="10" letterSpacing="1" fill={label}>
-        EVIDENCE
-      </text>
-      <text x={cx + 78} y={cy + 3} textAnchor="start" fontSize="10" letterSpacing="1" fill={label}>
-        CONNECTION
-      </text>
-      <circle cx={px} cy={py} r="9" fill="none" stroke={GOLD} strokeWidth="1" opacity="0.4" />
-      <circle cx={px} cy={py} r="4.5" fill={GOLD} />
-    </svg>
-  );
-}
-
 function SidebarIndex({
   activeSection,
   readiness,
@@ -615,10 +121,7 @@ function SidebarIndex({
           Report Index
         </p>
 
-        <div
-          className="mt-4 border-t pt-4"
-          style={{ borderColor: IVORY_BORDER }}
-        >
+        <div className="mt-4 border-t pt-4" style={{ borderColor: IVORY_BORDER }}>
           <p className="text-[11px] uppercase tracking-[0.16em] text-[#9a9384]">
             Readiness
           </p>
@@ -800,25 +303,10 @@ export default function InevitableStandardReportClient({
       .join(" ") || "—";
   const businessName =
     (payload?.taker?.company || payload?.business_name || "").trim() || null;
-  const completedAt = payload?.completed_at ? new Date(payload.completed_at) : null;
-  const assessmentDate = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(
-    completedAt && !Number.isNaN(completedAt.getTime()) ? completedAt : new Date(),
-  );
+  const assessmentDate = formatAssessmentDate(payload?.completed_at);
   const orgName = (payload?.org_name || "").trim();
 
-  const pillarView = PILLARS.map((pillar) => {
-    const result = score.pillars?.[pillar.key] || {};
-    return {
-      ...pillar,
-      percentage: round1(clampPercentage(result.percentage)),
-      gar: garForRisk(result.risk),
-    };
-  });
-
+  const pillarView = buildPillarView(score);
   const pillarsByPct = [...pillarView].sort((a, b) => a.percentage - b.percentage);
   const lowestPillar = pillarsByPct[0] || null;
 
@@ -881,11 +369,6 @@ export default function InevitableStandardReportClient({
       approachPercent("A") - approachPercent("C"),
     ) || 0;
 
-  const rreShowRange =
-    !!revenueInStructure && !revenueInStructure.needs_revenue_confirmation;
-  const rreShowConfirm =
-    !!revenueInStructure && !!revenueInStructure.needs_revenue_confirmation;
-
   return (
     <main
       className={`${newsreader.variable} min-h-screen`}
@@ -919,17 +402,11 @@ export default function InevitableStandardReportClient({
               >
                 Map Your Revenue-To-Freedom Pathway
               </h1>
-              <p
-                className="mt-4 text-xl text-white/70 sm:text-2xl"
-                style={serif}
-              >
+              <p className="mt-4 text-xl text-white/70 sm:text-2xl" style={serif}>
                 Your Diagnostic Snapshot
               </p>
 
-              <div
-                className="mt-8 h-px w-16"
-                style={{ backgroundColor: GOLD }}
-              />
+              <div className="mt-8 h-px w-16" style={{ backgroundColor: GOLD }} />
 
               <dl className="mt-8 space-y-2 text-[14px]">
                 <div className="flex gap-3">
@@ -950,10 +427,7 @@ export default function InevitableStandardReportClient({
             </div>
 
             <div className="flex flex-col items-center gap-3 justify-self-center lg:justify-self-end">
-              <ReadinessDonut
-                percentage={overallPercentage}
-                band={bandDescriptor}
-              />
+              <ReadinessDonut percentage={overallPercentage} band={bandDescriptor} />
               <p className="max-w-[220px] text-center text-[11px] uppercase tracking-[0.16em] text-white/45">
                 Inevitable Standard Readiness
               </p>
@@ -1016,53 +490,8 @@ export default function InevitableStandardReportClient({
             eyebrow="The Six Pillars"
             title="Where the business is built — and where it is exposed"
           >
-            <div className="border-t" style={{ borderColor: HAIRLINE }}>
-              {pillarView.map((pillar) => {
-                const gar = GAR[pillar.gar];
-                return (
-                  <div
-                    key={pillar.key}
-                    className="grid grid-cols-1 gap-3 border-b py-5 sm:grid-cols-[190px_1fr_auto] sm:items-center sm:gap-6"
-                    style={{ borderColor: HAIRLINE }}
-                  >
-                    <div>
-                      <p
-                        className="text-[15px] font-medium"
-                        style={{ ...serif, color: INK }}
-                      >
-                        {pillar.label}
-                      </p>
-                      <p className="mt-0.5 text-[12px] leading-5 text-[#918a7d]">
-                        {pillar.descriptor}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <PillarBar percentage={pillar.percentage} colour={gar.bar} />
-                      <span
-                        className="w-11 shrink-0 text-right text-[15px] font-semibold tabular-nums"
-                        style={{ color: INK }}
-                      >
-                        {pillar.percentage}%
-                      </span>
-                    </div>
-                    <span
-                      className="justify-self-start rounded-sm px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] sm:justify-self-end"
-                      style={{ backgroundColor: gar.chipBg, color: gar.chipText }}
-                    >
-                      {gar.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-6 text-[12px] leading-6 text-[#918a7d]">
-              <strong className="font-semibold text-[#4b5563]">Green</strong> — a strength to
-              leverage.&nbsp;&nbsp;
-              <strong className="font-semibold text-[#4b5563]">Amber</strong> — working, needs
-              strengthening and stabilising.&nbsp;&nbsp;
-              <strong className="font-semibold text-[#4b5563]">Red</strong> — a priority for
-              investigation and rebuild.
-            </p>
+            <PillarSummaryList pillars={pillarView} />
+            <GarLegend />
           </Section>
 
           {/* 3 — Key diagnosis */}
@@ -1080,10 +509,7 @@ export default function InevitableStandardReportClient({
                   >
                     Primary constraint
                   </p>
-                  <p
-                    className="mt-1 text-xl"
-                    style={{ ...serif, color: INK }}
-                  >
+                  <p className="mt-1 text-xl" style={{ ...serif, color: INK }}>
                     {pillarLabel(primaryKey)}
                   </p>
                   <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
@@ -1093,46 +519,12 @@ export default function InevitableStandardReportClient({
                       : PILLAR_CONSTRAINT_COPY[primaryKey as PillarKey] || ""}
                   </p>
 
-                  {rreShowRange ? (
-                    <div
-                      className="mt-5 border-l-2 pl-5"
-                      style={{ borderColor: GOLD }}
-                    >
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#918a7d]">
-                        Revenue in your structure
-                      </p>
-                      <p
-                        className="mt-1 text-lg font-semibold tabular-nums"
-                        style={{ color: INK }}
-                      >
-                        {formatCurrencyAmount(
-                          revenueInStructure?.currency,
-                          revenueInStructure?.range_low,
-                        )}{" "}
-                        <span className="font-normal text-[#9a9384]">–</span>{" "}
-                        {formatCurrencyAmount(
-                          revenueInStructure?.currency,
-                          revenueInStructure?.range_high,
-                        )}
-                      </p>
-                      <p className="mt-1 text-[13px] leading-6 text-[#4b5563]">
-                        Commercial value that may be easier to convert, retain or release as{" "}
-                        {pillarLabel(revenueInStructure?.primary_constraint_pillar)} becomes more
-                        deliberate.
-                      </p>
-                      {revenueInStructure?.disclaimer ? (
-                        <p className="mt-2 text-[11px] leading-5 text-[#9a9384]">
-                          {revenueInStructure.disclaimer}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : rreShowConfirm ? (
-                    <div
-                      className="mt-5 border-l-2 pl-5 text-[13px] leading-6 text-[#4b5563]"
-                      style={{ borderColor: GOLD }}
-                    >
-                      A revenue-in-structure range needs a specific annual figure at this scale.
-                      Your advisor can add it.
+                  {revenueInStructure ? (
+                    <div className="mt-5">
+                      <RevenueInStructurePanel
+                        rre={revenueInStructure}
+                        variant="compact"
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -1145,10 +537,7 @@ export default function InevitableStandardReportClient({
                     >
                       Secondary constraint
                     </p>
-                    <p
-                      className="mt-1 text-xl"
-                      style={{ ...serif, color: INK }}
-                    >
+                    <p className="mt-1 text-xl" style={{ ...serif, color: INK }}>
                       {pillarLabel(secondaryKey)}
                     </p>
                     <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
@@ -1315,20 +704,19 @@ export default function InevitableStandardReportClient({
             <p className="mt-5 text-[13px] leading-6 text-[#918a7d]">{PRIORITY_ORDER_NOTE}</p>
 
             <div
-              className="mt-12 border-t pt-10"
+              className="mt-12 border-t pt-10 print:hidden"
               style={{ borderColor: HAIRLINE }}
             >
-              <button
-                type="button"
-                aria-disabled="true"
-                onClick={(event) => event.preventDefault()}
-                className="cursor-default rounded-sm px-6 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white/95"
+              <a
+                href={`/t/${encodeURIComponent(token)}/full-report?tid=${encodeURIComponent(tid)}`}
+                className="inline-block rounded-sm px-6 py-3 text-[13px] font-semibold uppercase tracking-[0.12em] text-white/95 transition hover:brightness-110"
                 style={{ backgroundColor: NAVY_DEEP }}
               >
                 Explore Your Full Revenue-To-Freedom Pathway
-              </button>
+              </a>
               <p className="mt-3 text-[12px] text-[#918a7d]">
-                Your Full Diagnostic Report is being prepared.
+                Your Full Diagnostic Report opens the six pillars, the Revenue-To-Freedom
+                model and a 30/60/90-day focus in depth.
               </p>
             </div>
           </Section>
