@@ -1,0 +1,31 @@
+Build the Insider Insights content layer, extracting real content from the four master source reports now in docs/insider-insights-source/. Read docs/insider-insights-architecture-spec.md first - it's the rulebook (evidence hierarchy, content ID scheme, selection/suppression rules, ethical boundaries). Read that in full before touching the source reports.
+
+IMPORTANT RECONCILIATION: the architecture spec's scoring section explains that these source documents describe an older 30-question/5-per-pillar model. Our actual built engine (scoreInevitableStandard.ts, constraintEngine.ts) uses the newer, signed-off 29-question/4-per-pillar model and is authoritative for all scoring. Ignore any specific scoring arithmetic in the source documents - only extract the qualitative content (pillar-state language, trust builders, objection interpretations, etc.), which maps cleanly onto our existing pillar/approach/constraint structure regardless of the old scoring numbers.
+
+TASK: read all four master reports (report-A-future-led-source.txt, report-B-connection-led-source.txt, report-C-timing-led-source.txt, report-D-evidence-led-source.txt) in docs/insider-insights-source/, plus build-delivery-guide-source.txt for additional context beyond what's already summarized in the architecture spec. These are large (~2,700+ lines each) - read them properly, don't skim.
+
+Extract and structure the following into a new content module, e.g. apps/web/lib/inevitable-standard/content/insiderInsightsContent.ts (or a JSON data file if that fits the codebase's existing content-storage pattern better - check how reportCopy.ts is structured and follow the same convention):
+
+1. Per report (A/B/C/D), the core approach profile content: How They Think, How They Decide, How They Buy, Price and Value, Trust Builders, Trust Reducers, Communication Style, Coaching Style - as written in the actual source documents, not paraphrased or improved.
+
+2. The 72 pillar-state blocks (6 pillars x 3 states x 4 approaches) - extract the actual text for each. Use the Content ID scheme from the architecture spec (II-{REPORT}-PILLAR-{PILLAR}-{STATE}) as the key structure.
+
+3. The Primary Constraint blocks (24: 6 pillars x 4 approaches) and the directional Primary+Secondary pair blocks (120: 30 pairs x 4 approaches) - extract what exists in the source documents. If the full 120 aren't explicitly written out in the masters (the architecture spec suggests some may be), extract what's actually there and flag clearly what's missing rather than inventing the gaps.
+
+4. False Constraint content - the four core framework-supported false constraints (already implemented in constraintEngine.ts) plus whatever approach-specific extensions exist in the source documents. Per the architecture spec, these approach-specific extensions should be extracted and stored but NOT wired into the formal False Constraint engine as active outputs yet - keep them as a separate, clearly-labeled "informal hypotheses" content family.
+
+5. Risk signals per approach - extract the actual flags/codes/interpretations from the source documents.
+
+6. Buying signals, resistance signals, objections and their interpretations, per approach.
+
+7. The PROSPER-based Predictive Conversation Strategy content, and pre-call preparation questions, per approach - if the source documents contain this written out per-approach (they should, given the architecture spec's section list), extract it directly rather than reconstructing it.
+
+8. Post-sale coaching priorities, accountability/progress signals, and adviser green/red flags - extract as written.
+
+For each major content family, follow the Content ID scheme from the architecture spec exactly, so this content can be selected programmatically later (this stage is content extraction only - do not build the report UI or wire this into any route yet, that's a later stage).
+
+Where the source documents' structure or section numbering differs between reports A/B/C/D (the architecture spec notes this happens), normalize to the canonical rendering order and Content ID scheme from the spec, not the individual document's own numbering.
+
+This is a large extraction task. Take your time, be thorough, and flag anything that doesn't fit cleanly - especially: content families that exist for some approaches but not others, any place the source documents contradict the architecture spec's rules, and any content that touches the ethical boundaries section (financial capacity inference, guaranteed outcomes) that needs special handling.
+
+Run typecheck when done. Don't attempt a full test suite pass yet if the shape of this content module is still evolving - focus on getting the extraction complete and accurate first. Show me a structured summary of what you extracted (content family by content family, with counts - e.g. "72/72 pillar-state blocks extracted" or "58/120 directional pairs found, 62 missing - listed below") before committing anything.
