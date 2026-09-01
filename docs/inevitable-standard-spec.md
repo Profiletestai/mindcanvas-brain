@@ -52,7 +52,9 @@ Based on: pattern consistency across related questions, contradiction detection,
 | Structure | Positioning, Offer, Revenue Model |
 | Execution | Sales, Decision |
 
-Priority Fix Order is sequenced strictly by layer — Identity, then Structure, then Execution — regardless of which pillar is numerically lowest. A pillar in an earlier layer can appear before the primary constraint in the sequence if the primary constraint sits in a later layer (e.g. primary = Sales, secondary = Identity → fix order is [Identity, Sales]).
+Priority Fix Order is a **full ranking of all 6 pillars**, sequenced strictly by Method layer — Identity, then Structure, then Execution — regardless of which pillar is numerically lowest. Within a layer, order by severity (lowest % first). The order is explicitly *not* a ranking of importance — it's the sequence in which work compounds fastest, per the approved report copy ("The order is not a ranking of importance. It is the sequence in which work compounds fastest for this result.").
+
+**Single source of truth, sliced per report:** the engine (`constraintEngine.ts`) always returns the full 6-pillar ranking. Individual reports decide how much to show — the Diagnostic Snapshot shows only the top 3 ("Your First Three Priorities"), the Full Diagnostic shows all 6, numbered 01–06. Do not build two separate ranking outputs — slicing in the UI guarantees both reports can never silently disagree.
 
 ### False Constraint — v1 keyword rules
 
@@ -129,9 +131,74 @@ Currency currently defaults to a flat `"USD"` constant. The product intent (per 
 
 ## 5. Report architecture
 
-- **Lite Report**: Headline Diagnosis, Readiness %, Six Pillar Snapshot, Primary Constraint, False Constraint, Style Snapshot, Priority Fix Order, configurable CTA. Does NOT reveal full source code or complete method.
-- **Full Diagnostic**: adds Executive Summary, detailed pillar breakdowns, Secondary Constraint, selected 4×6 source code cells (not all 24), Revenue Chain Impact, Commercial Risk Factors, Reassessment Guidance.
-- **Internal Extended Source Code**: private, advisor-only. Profile Summary, How They Think/Decide, Constraint Pattern, How to Communicate, What Builds Trust, What Blocks the Sale, Best Offer Fit, Pre-call Questions, Micro Scripts, Green/Red Flags.
+**[Updated 31 Aug 2026 — reconciled against the Design Brief for The Inevitable Standard™ Reporting Suite. This supersedes all earlier "Lite/Full/Internal" naming — follow this exactly.]**
+
+**Design system principles (apply across all four surfaces):**
+- Editorial, intelligent, premium. High-end strategic advisory report, not colorful quiz/assessment software. Generous white space, strong hierarchy.
+- No excessive icons, illustrations, rounded "quiz cards", cartoon graphics or decorative gradients on content. Charts/visual devices only when they aid understanding. The **navy cover/hero gradient** (`#14263d → #1f2c46`) is the one deliberate exception — it is the brand's signature surface, not decoration, and only appears as the hero band and the CTA/accent blocks.
+- Green/Amber/Red must be muted and sophisticated, not traffic-light neon.
+- **Content rule:** Green ≠ "ignore this" — it means *leverage this strength*. Amber = strengthen and stabilise. Red = priority investigation and rebuild. Apply this to all risk-band copy.
+- **Content rule:** never say a founder behaves a certain way *because* they are Connection-Led/Future-Led/etc. Always frame as "your approach *may influence* how this result shows up." The Commercial Decision Approach is a lens within the diagnostic, not a personality label — never let it recolor the whole report.
+- Same typography, spacing, colour language, pillar labels, G/A/R treatment, approach visual language, and Revenue→Freedom model must appear consistently across all four surfaces — they should feel like one product, distinguished by purpose, not four different products.
+
+### Report 1 — Diagnostic Snapshot (client-facing, fast/visual, ~5–8 pages)
+Answers in seconds: Where am I now? What's strong? Where's the risk? What's most likely holding me back? How do I naturally make decisions? What should I focus on first?
+
+**Layout:** navy gradient **hero** (cover + result in one band) across the top, then a **two-column body** — a persistent ivory **Report Index** sidebar (sticky, scroll-spy, numbered section links + the readiness figure) on the left, the report on the right. On print the sidebar is replaced by a compact inline Report Index and the body collapses to one column.
+
+- Hero (navy gradient `#14263d → #1f2c46`, white text): "The Inevitable Standard Diagnostic™" eyebrow, "Map Your Revenue-To-Freedom Pathway", "Your Diagnostic Snapshot", client name, business name, assessment date. **Circular readiness gauge** (gold arc donut) with the Readiness % and band word in the centre. Optional footer elsewhere: "Created from The Inevitable Standard Method™ by Genene Wilson, The Wealth Architect."
+- Readiness Overview section: short explanatory copy, the four-band meter with a marker at the score, and one band-meaning sentence (reuse spec §2 band language).
+- Six-pillar display: all 6, each with score %, G/A/R indicator, very short descriptor. Six clean **bars**, not a radar or a donut (radar/radial makes precise comparison harder). The circular gauge is reserved for the single overall readiness value only.
+- Key diagnosis: Primary Constraint (named + "the area most likely to be limiting progress right now"), Secondary Constraint (named + "the area most likely to reinforce or recreate the primary constraint"), "What May Not Be The Real Problem" (client-friendly label for False Constraint — only render if non-null). Revenue-in-Structure range sits under the Primary Constraint on a gold rule.
+- Commercial Decision Approach: heading "How You Naturally Make Commercial Decisions", primary approach + %, all 4 as a percentage mix, compass-style map (North=Future-Led, South=Timing-Led, Left=Evidence-Led, Right=Connection-Led), one gold accent dot. Must not look like a personality badge — frame as commercial decision intelligence.
+- Finish: "Your First Three Priorities" (top 3 slice of the full 6-pillar Priority Fix Order), then CTA: "Explore Your Full Revenue-To-Freedom Pathway" (navy block).
+
+#### Design tokens (Report 1, and the shared basis for Reports 2–4)
+
+| Token | Value | Use |
+|---|---|---|
+| Navy deep / navy | `#14263d` / `#1f2c46` | hero gradient (`158deg`), CTA block, sidebar active item, band-meter marker |
+| Gold | `#b89a5e` | readiness arc, section/rule accents, dominant approach bar, compass dot, priority numerals |
+| Gold text | `#8a6a3c` | small-caps eyebrows / labels on the ivory ground (readable contrast) |
+| Ivory ground | `#faf8f4` | page background |
+| Ivory panel / border | `#f5efe3` / `#e7ddc8` | sidebar, inset panels |
+| Ink | `#1e2a38` | body + headings ink |
+| Hairline | `#e7e3db` | section dividers, list rules |
+| G / A / R bars | `#5b8a72` / `#b58a45` / `#a6564e` | muted, never traffic-light; chips use low-chroma tints of each |
+| Display type | **Newsreader** (serif, `next/font`, self-hosted) | h1, section titles, readiness figure, pillar names, priority numerals |
+| Body type | Inter (platform default) | all body copy |
+
+**Status: built.** The rebuild to this layout/token set is live in `InevitableStandardReportClient.tsx` (data, scoring and copy layers unchanged from Stage 4 — this was a presentational rebuild only). Newsreader is loaded via `next/font` scoped to that one component, so no other surface is affected.
+
+### Report 2 — Full Diagnostic Report (client-facing, explanatory, "beautifully designed strategy report or short book")
+- Cover: "The Inevitable Standard Diagnostic™ — Your Revenue-To-Freedom Pathway — Prepared for [CLIENT NAME]", then "Genene Wilson, The Wealth Architect".
+- Opening (results-first, not buried after 10 pages of theory): Readiness %, six-pillar summary, Primary Constraint, Secondary Constraint, Commercial Decision Approach, full Priority Fix Order (all 6, numbered 01–06).
+- Core framework spread: Revenue → Profit → Personal Wealth → Freedom (major visual), then Identity → Structure → Execution (second visual model).
+- Pillar chapters — all 6, each with a consistent template: score + G/A/R status, then What This Result Means / What Appears to Be Working / Where Value May Currently Be Leaking / How This Affects Your Revenue-To-Freedom Pathway / What to Focus On Now / What to Watch / What Progress Should Look Like. Layout must accommodate G/A/R content changing dynamically without breaking.
+- Personal context: Q13/Q29 (and contextual MCQs) surfaced selectively as "What You Told Us" → "What Your Diagnostic Adds" (dynamic interpretation). Don't overuse — only where a quote genuinely improves interpretation.
+- Commercial Decision Approach chapter: primary approach, secondary influence, percentage mix, connected to pillar evidence — same "may influence" framing rule as Report 1.
+- Closing: 30/60/90-day focus as a strong visual pathway, then reconnect to Revenue → Profit → Personal Wealth → Freedom. Final message: the purpose is not to improve six scores, it's to build a business that works more deliberately for the founder.
+
+### Report 3 — Insider Insights (advisor/seller-facing only, NOT shown to test-taker)
+"Predictive Selling & Coaching Playbook." Related visual family to the client reports but more analytical/operational — more navy/slate, less ivory/gold.
+
+- Cover: "The Inevitable Standard™ Insider Insights — Predictive Selling & Coaching Playbook — Prepared for [CLIENT NAME] — INTERNAL USE ONLY".
+- Page 1 (Insider Snapshot): client, primary/secondary Commercial Decision Approach, overall readiness, primary/secondary constraint, strongest pillar, possible false constraint, priority fix order, six pillar scores.
+- Page 2 (Predictive Signals at a Glance): How They Think, How They Decide, How They Buy, What Builds Trust, What Reduces Trust, Best Communication Style, Likely Objection, What May Really Be Underneath It, Buying Signals, Resistance Signals, What To Challenge, What Not To Assume, Coaching Style. Close with a visually strong box: "THE ONE THING THIS CONVERSATION NEEDS TO ACHIEVE."
+- Diagnostic Interpretation: Q13/Q29 verbatim ("Founder's Own Words"), then pillar G/A/R readout, then scannable tags: HYPOTHESIS TO VALIDATE, LISTEN FOR, DO NOT ASSUME, COACHING SIGNAL, BUYING SIGNAL, RISK SIGNAL, GREEN LEVERAGE.
+
+**Requires real authored content for all 24 Style × Pillar combinations** (per Framework §6.1 format) — this is a writing workstream, not something to auto-generate from scoring data. See §6 item 5.
+
+### Product 4 — Group Diagnostic Dashboard (advisor/cohort-owner facing, NOT a report — a dashboard attached to a specific assessment link)
+- Heading: "The Inevitable Standard™ Group Diagnostic Dashboard" + [Link/Cohort/Organisation name]. Subtext: "A consolidated view of the commercial strengths, constraints and decision patterns across this group."
+- Top summary: Total Assessments Completed, Average Readiness, Most Common Primary Constraint, Most Common Secondary Constraint, Strongest Group Pillar, Highest-Risk Group Pillar.
+- Six-pillar group view: average % **and** %Green/%Amber/%Red per pillar — distribution matters more than the average (a polarised group can hide behind a mid-range mean).
+- Constraint intelligence: Primary Constraint Distribution (% per pillar across the cohort), Most Common Constraint Combinations (e.g. "Sales + Decision"), a generated "where intervention should begin" recommendation.
+- Commercial Decision Approach distribution: aggregate 4-way mix; approach↔pillar-state correlation as a secondary drill-down, not on the main view.
+- Individual results table: Name, Date, Readiness %, Primary Approach, Primary/Secondary Constraint, all 6 pillar scores — every row clickable through to that person's reports. Filterable by G/A/R, Primary Constraint, Approach, completion date, pillar, readiness range.
+- Data-first, clean, practical — less editorial than the reports, but same design system.
+
+**Still new scope, needs its own logic spec before building** (distribution bucketing, constraint-combination clustering, intervention-recommendation generation) — sequence after Reports 1–3 are complete. See §6 item 7.
 
 ## 6. Known open items (not blockers, but tracked)
 
@@ -139,6 +206,9 @@ Currency currently defaults to a flat `"USD"` constant. The product intent (per 
 2. Question wording assumes founder is personally in the sales conversation (Q9, Q15, Q21, Q24) — noted limitation above ~5m revenue, to revisit for licensed/institutional version.
 3. RRE opportunity factors and severity curve are judgement-based starting assumptions — need calibration against real client outcomes before being described as validated.
 4. **`link.show_results` gating is not respected.** The platform's existing "hold results back for the debrief call" setting lives in `ReportGateClient`, but `InevitableStandardReportClient` is reached directly from `report/page.tsx` and bypasses it. Every Inevitable Standard completion currently shows the full report regardless of link configuration. Deferred to Stage 5 — must be resolved before any real seller relies on this setting.
+5. **Insider Insights 24-cell source code content does not exist yet.** This is a writing/authoring task (Genene's voice, per Framework §6.1 format), not something Claude Code should invent. Sequence this as a parallel workstream, not a blocker to building the report UI — build against placeholder/sample content first if needed, swap in real content once authored.
+6. **Group Diagnostic Dashboard is new scope beyond the original Framework doc** (which placed group/institutional dashboards at Phase 4). Group-level aggregation logic (distribution buckets, constraint-combination clustering, intervention recommendations) needs its own spec before building — the Design Brief describes the UI/content but not the underlying computation. Sequence after Reports 1–3 are complete.
+7. **Stage 4's report component needs rework, not polish, to match Report 1 (Diagnostic Snapshot) per the Design Brief.** No cover page, no dashboard-style opening, no compass-style approach map, no defined page structure exists in the current build.
 
 ## 7. Question bank
 
