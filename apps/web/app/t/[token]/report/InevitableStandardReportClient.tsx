@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getBaseUrl } from "@/lib/server-url";
+import { getInevitableStandardPillarBandContent } from "@/lib/inevitable-standard/content/reportCopy";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
@@ -150,6 +151,10 @@ const APPROACHES: Array<{ code: ApproachCode; label: string }> = [
   { code: "D", label: "Evidence-Led" },
 ];
 
+/**
+ * Fallback constraint sentences. Used when the content layer has no entry for the
+ * primary-constraint pillar at its band — see primaryConstraintSentence().
+ */
 const PILLAR_CONSTRAINT_COPY: Record<PillarKey, string> = {
   identity:
     "The business is not consistently claiming its value or holding its position, so strong work elsewhere gets discounted before it can compound.",
@@ -234,6 +239,22 @@ function garForRisk(risk: string | undefined): Gar {
   if (risk === "low_risk") return "green";
   if (risk === "medium_risk") return "amber";
   return "red";
+}
+
+/**
+ * The primary-constraint sentence shown in Key Diagnosis. Prefers sourced copy
+ * from the content layer, matched to the pillar's band; falls back to the in-file
+ * PILLAR_CONSTRAINT_COPY string when the content layer has no entry for that
+ * pillar/band (Red for any pillar, Green for most).
+ */
+function primaryConstraintSentence(pillar: PillarKey, band: Gar): string {
+  const bandContent = getInevitableStandardPillarBandContent(pillar, band);
+  return (
+    bandContent.what_this_means?.text ||
+    bandContent.where_leaking?.text ||
+    PILLAR_CONSTRAINT_COPY[pillar] ||
+    ""
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -544,6 +565,9 @@ export default function InevitableStandardReportClient({
   const lowestPillar = pillarsByPct[0] || null;
 
   const primaryKey = (constraints?.primary_constraint as PillarKey | undefined) || null;
+  const primaryBand: Gar | null = primaryKey
+    ? pillarView.find((pillar) => pillar.key === primaryKey)?.gar ?? null
+    : null;
   const secondaryKey =
     (constraints?.secondary_constraint as PillarKey | undefined) || null;
   const falseConstraint = constraints?.false_constraint ?? null;
@@ -728,7 +752,9 @@ export default function InevitableStandardReportClient({
               </p>
               <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
                 The area most likely to be limiting progress right now.{" "}
-                {PILLAR_CONSTRAINT_COPY[primaryKey as PillarKey] || ""}
+                {primaryBand
+                  ? primaryConstraintSentence(primaryKey as PillarKey, primaryBand)
+                  : PILLAR_CONSTRAINT_COPY[primaryKey as PillarKey] || ""}
               </p>
 
               {rreShowRange ? (
