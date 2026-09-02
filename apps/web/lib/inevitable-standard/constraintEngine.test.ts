@@ -68,7 +68,7 @@ describe("The Inevitable Standard constraint model", () => {
 
   it("maps pillars to the correct Method layers", () => {
     expect(methodLayerFor("identity")).toBe("identity");
-    expect(methodLayerFor("positioning")).toBe("structure");
+    expect(methodLayerFor("positioning")).toBe("identity");
     expect(methodLayerFor("offer")).toBe("structure");
     expect(methodLayerFor("revenue_model")).toBe("structure");
     expect(methodLayerFor("sales")).toBe("execution");
@@ -101,15 +101,14 @@ describe("deriveInevitableStandardConstraints", () => {
       mismatch: true,
     });
     expect(result.false_constraint_rule_id).toBe("lead_volume");
-    // Full 6-pillar ranking: Identity, then Structure by severity, then Execution
-    // by severity. offer 66.7 < revenue_model 75 < positioning 83.3; sales 16.7 < decision 66.7.
+    // Primary first, Secondary second, then remaining pillars by severity.
     expect(result.priority_fix_order).toEqual([
-      "identity",
+      "sales",
       "offer",
+      "decision",
+      "identity",
       "revenue_model",
       "positioning",
-      "sales",
-      "decision",
     ]);
     expect(result.confidence).toBe("High");
   });
@@ -139,13 +138,13 @@ describe("deriveInevitableStandardConstraints", () => {
       explanation: expect.stringContaining("Identity"),
     });
     expect(result.false_constraint_rule_id).toBe("price_too_high");
-    // Structure: offer 75 and revenue_model 75 tie -> canonical order; positioning 83.3 last.
+    // The override makes Identity Primary; Sales is the reinforcing Secondary.
     expect(result.priority_fix_order).toEqual([
       "identity",
+      "sales",
       "offer",
       "revenue_model",
       "positioning",
-      "sales",
       "decision",
     ]);
     // Override is an inherent judgement call - confidence never reaches High.
@@ -214,14 +213,14 @@ describe("deriveInevitableStandardConstraints", () => {
     expect(result.primary_constraint).toBe("decision");
     expect(result.false_constraint).toBeNull();
     expect(result.false_constraint_rule_id).toBeNull();
-    // offer 66.7 < positioning 75 = revenue_model 75; decision 25 < sales 66.7.
+    // Decision is Primary; Offer is Secondary; the rest follow by severity.
     expect(result.priority_fix_order).toEqual([
-      "identity",
+      "decision",
       "offer",
+      "sales",
+      "identity",
       "positioning",
       "revenue_model",
-      "decision",
-      "sales",
     ]);
     expect(result.confidence).toBe("Medium");
   });
@@ -240,20 +239,20 @@ describe("deriveInevitableStandardConstraints", () => {
 
     expect(result.primary_constraint).toBe("identity");
     expect(result.secondary_constraint).toBe("positioning");
-    // All equal -> Method layer order, then canonical pillar order within a layer.
+    // All equal -> Primary and Secondary first, then canonical order for the tie.
     expect(result.priority_fix_order).toEqual([
       "identity",
       "positioning",
       "offer",
-      "revenue_model",
       "sales",
+      "revenue_model",
       "decision",
     ]);
     expect(result.confidence).toBe("Directional");
     expect(result.false_constraint).toBeNull();
   });
 
-  it("always returns the full 6-pillar ranking, layer-sequenced then severity-sorted", () => {
+  it("always returns the full 6-pillar diagnosis-led ranking", () => {
     const score = scoreWithPillarRaws({
       identity: 7, // 58.3
       positioning: 8, // 66.7
@@ -269,15 +268,14 @@ describe("deriveInevitableStandardConstraints", () => {
     expect([...result.priority_fix_order].sort()).toEqual(
       [...INEVITABLE_STANDARD_PILLARS].sort(),
     );
-    // Identity (layer 0). Structure by severity: offer 50, positioning 66.7,
-    // revenue_model 66.7 (canonical tiebreak). Execution by severity: decision 25, sales 58.3.
+    // Decision Primary, Offer Secondary, then remaining pillars by severity.
     expect(result.priority_fix_order).toEqual([
-      "identity",
+      "decision",
       "offer",
+      "identity",
+      "sales",
       "positioning",
       "revenue_model",
-      "decision",
-      "sales",
     ]);
   });
 
@@ -298,7 +296,7 @@ describe("deriveInevitableStandardConstraints", () => {
     expect(result.false_constraint).toBeNull();
   });
 
-  it("sequences the priority fix order Identity -> Structure -> Execution regardless of which pillar is primary", () => {
+  it("starts the priority fix order with Primary then Secondary regardless of Method layer", () => {
     const score = scoreWithPillarRaws(
       {
         identity: 4, // 33.3% - secondary, Identity layer
@@ -315,20 +313,20 @@ describe("deriveInevitableStandardConstraints", () => {
 
     expect(result.primary_constraint).toBe("sales");
     expect(result.secondary_constraint).toBe("identity");
-    // Identity leads the full ranking even though Sales is the primary constraint;
-    // Structure pillars all tie at 83.3 -> canonical order.
+    // Sales is the intervention point; Identity is the reinforcing Secondary.
+    // The remaining tied pillars use canonical order.
     expect(result.priority_fix_order).toEqual([
+      "sales",
       "identity",
       "positioning",
       "offer",
       "revenue_model",
-      "sales",
       "decision",
     ]);
     expect(result.priority_fix_order.slice(0, 3)).toEqual([
+      "sales",
       "identity",
       "positioning",
-      "offer",
     ]);
     expect(result.false_constraint?.stated_pillar).toBe("revenue_model");
     expect(result.false_constraint?.evidence_pillar).toBe("sales");

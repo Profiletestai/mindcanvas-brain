@@ -42,7 +42,7 @@ Based on: pattern consistency across related questions, contradiction detection,
 - **Primary Constraint**: highest-leverage issue now. Usually lowest pillar, but Identity/Decision can override — a low Identity score can suppress the value of an otherwise-strong pillar.
 - **Secondary Constraint**: reinforcing issue that keeps Primary in place.
 - **False Constraint**: what the founder believes is the problem (from Q13/Q29 free text) vs. what the evidence shows. This is the core "recognition moment" of the product — do not skip it.
-- **Priority Fix Order**: sequence (1st, 2nd, 3rd) — never try to fix everything at once. Identity must hold before Structure; Structure must hold before Execution.
+- **Priority Fix Order**: diagnosis-led intervention sequence — Primary Constraint first, Secondary Constraint second, then the remaining pillars by current severity. Never try to fix everything at once. Identity → Structure → Execution remains the Method dependency architecture, but it does not override the diagnosed intervention point.
 
 ### Method layer grouping (used to sequence Priority Fix Order)
 
@@ -52,9 +52,9 @@ Based on: pattern consistency across related questions, contradiction detection,
 | Structure | Positioning, Offer, Revenue Model |
 | Execution | Sales, Decision |
 
-Priority Fix Order is a **full ranking of all 6 pillars**, sequenced strictly by Method layer — Identity, then Structure, then Execution — regardless of which pillar is numerically lowest. Within a layer, order by severity (lowest % first). The order is explicitly *not* a ranking of importance — it's the sequence in which work compounds fastest, per the approved report copy ("The order is not a ranking of importance. It is the sequence in which work compounds fastest for this result.").
+Priority Fix Order is a **full ranking of all 6 pillars**, led by the diagnosis: Primary Constraint first, Secondary Constraint second, then the remaining four pillars by severity (lowest % first; canonical pillar order breaks ties). Identity → Structure → Execution remains the dependency model used to explain what supports a change and why a constraint may be recreated; it must not push the Primary Constraint later in the intervention sequence. The order is explicitly *not* a ranking of abstract importance — it is the sequence in which work should be addressed for this result.
 
-**Single source of truth, sliced per report:** the engine (`constraintEngine.ts`) always returns the full 6-pillar ranking. Individual reports decide how much to show — the Diagnostic Snapshot shows only the top 3 ("Your First Three Priorities"), the Full Diagnostic shows all 6, numbered 01–06. Do not build two separate ranking outputs — slicing in the UI guarantees both reports can never silently disagree.
+**Shared diagnosis, report-specific action treatment:** the engine (`constraintEngine.ts`) always returns the full 6-pillar diagnosis-led ranking and the Full Diagnostic shows all 6, numbered 01–06. The Diagnostic Snapshot's "Your First Three Priorities" is an action-focused surface: it must begin with the Primary Constraint and may select the next two immediate actions from the current severity pattern so the short report remains practical. Both surfaces must agree on Primary and Secondary Constraint even when the Snapshot action cards are not a literal slice of the six-pillar list.
 
 ### False Constraint — v1 keyword rules
 

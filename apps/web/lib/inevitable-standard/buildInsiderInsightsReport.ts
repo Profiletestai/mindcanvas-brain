@@ -1,46 +1,38 @@
 // apps/web/lib/inevitable-standard/buildInsiderInsightsReport.ts
 //
-// Pure selection + assembly for the Insider Insights report — the private,
-// adviser-facing companion to the Inevitable Standard client reports.
+// Pure selection + assembly for the approved five-section Insider Insights
+// report. The Figma information architecture stays compact; the intelligence
+// inside it follows the master-report evidence hierarchy:
 //
-// Input: the `inevitable_standard` object stored on portal.test_results.totals
-// (score result + `constraints` sibling, including `context_answers`). Output:
-// the renderer-ready report. No IO — importable from server components and unit
-// tests alike.
+//   pillar evidence -> Constraint Engine -> approach hypothesis -> secondary
+//   influence -> live-conversation validation.
 //
-// STRUCTURE — this matches the approved Figma design, not the master Build &
-// Delivery Guide's much larger 30+-section scope. The report is a compact
-// five-section document, roughly the length of Report 1 (Diagnostic Snapshot):
-//
-//   1. Insider Snapshot        — score/constraint data, minimal new content
-//   2. Predictive Signals      — the 13-field table for the founder's PRIMARY
-//                                Commercial Decision Approach only
-//   3. Founder's Own Words     — Q13/Q29 verbatim, annotated for this founder's
-//                                actual primary constraint and evidence
-//   4. Suggested Sequence      — a 4-step talk-track for the dominant approach
-//   5. The Objective           — one sentence: what this conversation must achieve
-//
-// The full extracted content layer (all 24 primary-constraint cells, all four
-// approach profiles, the seven-stage PROSPER sequences, pre-call questions,
-// post-sale coaching, …) stays in insiderInsights.data.json as the data source.
-// This builder selects and compresses the slice that renders for one founder.
+// The approach shapes interpretation. It never creates a risk signal or
+// overrides stronger diagnostic evidence.
 
 import {
   garFromRisk,
   getInsiderInsightsForApproach,
   INSIDER_INSIGHTS_SOURCE_VERSION,
   pillarIdFromKey,
+  selectAccountability,
   selectAvoidedQuestion,
+  selectChallengeSequenceForPillar,
   selectCoreProfile,
+  selectDirectionalPair,
+  selectNextStepPositioning,
   selectObjection,
   selectPillarState,
+  selectPostSaleCoachingForPillar,
   selectPrimaryConstraint,
   selectQuestionsByPrimary,
+  selectSecondaryInfluence,
   selectStrongestPillar,
   type InsiderApproachCode,
   type InsiderApproachName,
   type InsiderGar,
   type InsiderPillarKey,
+  type InsiderPillarState,
   type InsiderRiskSignal,
 } from "./content/insiderInsights";
 
@@ -66,8 +58,6 @@ const PILLAR_LABEL: Record<InsiderPillarKey, string> = {
   decision: "Decision",
 };
 
-// Mirrors PILLARS in app/t/[token]/report/inevitableStandardShared.tsx. Duplicated
-// here so the builder stays free of the client-only shared module (next/font).
 const PILLAR_DESCRIPTOR: Record<InsiderPillarKey, string> = {
   identity: "Authority, commercial confidence and willingness to lead.",
   positioning: "How clearly the market understands and chooses you.",
@@ -105,15 +95,13 @@ const GAR_LABEL: Record<InsiderGar, string> = {
   RED: "Red",
 };
 
-/** false_constraint_rule_id (constraintEngine) -> founder-facing label. */
 const FALSE_CONSTRAINT_LABEL: Record<string, string> = {
-  lead_volume: "“We need more leads / more visibility”",
+  lead_volume: "“Not enough leads”",
   price_too_high: "“The price is too high”",
   new_offer_needed: "“We need a new or bigger offer”",
   needs_systems: "“We need better systems first”",
 };
 
-/** false_constraint_rule_id -> insiderInsights core false-constraint key. */
 const FALSE_CONSTRAINT_KEY: Record<
   string,
   "MORE_LEADS" | "PRICE_TOO_HIGH" | "NEW_OFFER" | "BETTER_SYSTEMS"
@@ -122,6 +110,19 @@ const FALSE_CONSTRAINT_KEY: Record<
   price_too_high: "PRICE_TOO_HIGH",
   new_offer_needed: "NEW_OFFER",
   needs_systems: "BETTER_SYSTEMS",
+};
+
+/**
+ * Figma shows a four-card evidence strip beneath Q13. These pairs represent
+ * the most useful evidence to place beside each supported perceived problem.
+ * Primary and Secondary are appended after these, so the cards always include
+ * the live diagnosis rather than becoming a generic template.
+ */
+const FALSE_CONSTRAINT_EVIDENCE: Record<string, InsiderPillarKey[]> = {
+  lead_volume: ["positioning", "offer"],
+  price_too_high: ["offer", "identity"],
+  new_offer_needed: ["offer", "positioning"],
+  needs_systems: ["revenue_model", "sales"],
 };
 
 /* -------------------------------------------------------------------------- */
@@ -148,6 +149,7 @@ export type InsiderTagKind =
 export type InsiderTag = { kind: InsiderTagKind; text: string };
 
 export type InsiderFounderWord = {
+  questionNumber: 13 | 29;
   prompt: string;
   quote: string;
   pillar: {
@@ -156,6 +158,7 @@ export type InsiderFounderWord = {
     garLabel: string;
     percentage: number;
   } | null;
+  evidencePillars: InsiderPillarSnapshot[];
   tags: InsiderTag[];
   riskSignal: { label: string; text: string; adviserResponse: string | null } | null;
 };
@@ -197,7 +200,9 @@ export type InsiderInsightsReport = {
   };
   predictiveSignals: InsiderSignalRow[];
   foundersWords: InsiderFounderWord[];
+  sequenceIntro: string | null;
   suggestedSequence: InsiderSequenceStep[];
+  sequenceCaution: string | null;
   objective: string | null;
   qaFlags: string[];
 };
@@ -232,14 +237,12 @@ function cleanText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** First paragraph only — the compression used for the 13-field table. */
 function firstParagraph(value: unknown): string {
   const text = cleanText(value);
   if (!text) return "";
   return (text.split(/\n{2,}/)[0] ?? "").trim();
 }
 
-/** First sentence only — the compression used for the talk-track instructions. */
 function firstSentence(value: unknown): string {
   const para = firstParagraph(value);
   if (!para) return "";
@@ -247,20 +250,53 @@ function firstSentence(value: unknown): string {
   return (match ? match[0] : para).trim();
 }
 
-/** Real answer, not filler. Mirrors fullDiagnosticTemplates.isMeaningfulFreeText. */
+/** Keep the Figma glance table concise without changing the evidence source. */
+function compact(value: unknown, max = 360): string {
+  const para = firstParagraph(value).replace(/\s+/g, " ").trim();
+  if (!para || para.length <= max) return para;
+  const candidate = para.slice(0, max + 1);
+  const lastSentence = Math.max(
+    candidate.lastIndexOf(". "),
+    candidate.lastIndexOf("? "),
+    candidate.lastIndexOf("! "),
+  );
+  if (lastSentence >= Math.floor(max * 0.55)) {
+    return candidate.slice(0, lastSentence + 1).trim();
+  }
+  const lastSpace = candidate.lastIndexOf(" ");
+  return `${candidate.slice(0, Math.max(lastSpace, max - 20)).trim()}…`;
+}
+
+function joinCompact(primary: unknown, nuance: unknown): string {
+  const a = compact(primary, 270);
+  const b = firstSentence(nuance);
+  if (!a) return compact(b);
+  if (!b || a.includes(b)) return a;
+  return compact(`${a} ${b}`, 380);
+}
+
 const QUOTE_STOPLIST = new Set([
-  "test", "testing", "tests", "na", "n/a", "none", "nothing", "asdf", "xxx",
-  "todo", "tbd",
+  "test",
+  "testing",
+  "tests",
+  "na",
+  "n/a",
+  "none",
+  "nothing",
+  "asdf",
+  "xxx",
+  "todo",
+  "tbd",
 ]);
+
 function isMeaningfulFreeText(value: unknown): boolean {
   const text = cleanText(value);
   if (text.length < 5) return false;
   if (QUOTE_STOPLIST.has(text.toLowerCase())) return false;
-  if (!/[a-z]{3,}/i.test(text)) return false;
-  return true;
+  return /[a-z]{3,}/i.test(text);
 }
 
-/** Token-overlap pick of the risk signal most relevant to this founder. */
+/** Token-overlap pick. A risk signal must still match the founder's answer. */
 function pickRiskSignal(
   signals: InsiderRiskSignal[],
   context: string,
@@ -272,10 +308,57 @@ function pickRiskSignal(
     const tokens = `${signal.label ?? ""} ${signal.text ?? ""}`
       .toLowerCase()
       .match(/[a-z]{4,}/g) ?? [];
-    const score = tokens.filter((t) => ctxTokens.has(t)).length;
+    const score = tokens.filter((token) => ctxTokens.has(token)).length;
     if (!best || score > best.score) best = { signal, score };
   }
   return best && best.score >= 3 ? best.signal : null;
+}
+
+function toRiskSignalCard(
+  signal: InsiderRiskSignal | null,
+): InsiderFounderWord["riskSignal"] {
+  if (!signal) return null;
+  const text = cleanText(signal.text);
+  if (!text) return null;
+  return {
+    label: cleanText(signal.label) || "Risk signal",
+    text,
+    adviserResponse: cleanText(signal.adviserResponse) || null,
+  };
+}
+
+function evidenceStripKeys({
+  ruleId,
+  primary,
+  secondary,
+  pillars,
+}: {
+  ruleId: string | null;
+  primary: InsiderPillarKey | null;
+  secondary: InsiderPillarKey | null;
+  pillars: InsiderPillarSnapshot[];
+}): InsiderPillarKey[] {
+  const keys: InsiderPillarKey[] = [];
+  const add = (key: InsiderPillarKey | null | undefined) => {
+    if (key && !keys.includes(key)) keys.push(key);
+  };
+
+  for (const key of ruleId ? FALSE_CONSTRAINT_EVIDENCE[ruleId] ?? [] : []) add(key);
+  add(primary);
+  add(secondary);
+
+  // If fewer than four are diagnostic-specific, fill with the next pillars in
+  // the diagnosis-led severity pattern. This keeps the Figma strip useful.
+  for (const pillar of [...pillars].sort(
+    (a, b) =>
+      a.percentage - b.percentage ||
+      PILLAR_KEYS.indexOf(a.key) - PILLAR_KEYS.indexOf(b.key),
+  )) {
+    add(pillar.key);
+    if (keys.length >= 4) break;
+  }
+
+  return keys.slice(0, 4);
 }
 
 export type BuildInsiderInsightsInput = {
@@ -299,14 +382,15 @@ export function buildInsiderInsightsReport(
   const overall = asRecord(score.overall);
   const pillarsRaw = asRecord(score.pillars);
   const contextAnswers = asRecord(score.context_answers);
-
   const qaFlags: string[] = [];
 
   /* --- approach ----------------------------------------------------------- */
+
   const percentages = asRecord(approaches.percentages);
   let approachCode: InsiderApproachCode | null = isApproachCode(approaches.dominant)
     ? approaches.dominant
     : null;
+
   if (!approachCode) {
     let best: { code: InsiderApproachCode; pct: number } | null = null;
     for (const code of ["A", "B", "C", "D"] as InsiderApproachCode[]) {
@@ -316,6 +400,7 @@ export function buildInsiderInsightsReport(
     approachCode = best?.code ?? null;
     if (approachCode) qaFlags.push("approaches.dominant missing — inferred from percentages");
   }
+
   if (!approachCode) return null;
 
   const approachData = getInsiderInsightsForApproach(approachCode);
@@ -327,8 +412,12 @@ export function buildInsiderInsightsReport(
   else if (isApproachCode(approaches.secondary)) {
     secondaryInfluence = APPROACH_NAME_BY_CODE[approaches.secondary];
   }
+  const secondaryProfile = secondaryInfluence
+    ? selectSecondaryInfluence(approachCode, secondaryInfluence)
+    : null;
 
-  /* --- pillars ---------------------------------------------------------------- */
+  /* --- pillar evidence ---------------------------------------------------- */
+
   const pillars: InsiderPillarSnapshot[] = PILLAR_KEYS.map((key) => {
     const result = asRecord(pillarsRaw[key]);
     const gar = garFromRisk(result.risk as string | undefined);
@@ -341,39 +430,51 @@ export function buildInsiderInsightsReport(
       garLabel: GAR_LABEL[gar],
     };
   });
-  const pillarByKey = new Map(pillars.map((p) => [p.key, p]));
+  const pillarByKey = new Map(pillars.map((pillar) => [pillar.key, pillar]));
 
-  /* --- constraints --------------------------------------------------------- */
+  /* --- constraint diagnosis --------------------------------------------- */
+
   const primaryKey: InsiderPillarKey | null = isPillarKey(constraints.primary_constraint)
     ? constraints.primary_constraint
     : null;
   const secondaryKey: InsiderPillarKey | null = isPillarKey(constraints.secondary_constraint)
     ? constraints.secondary_constraint
     : null;
+
   if (!primaryKey) {
-    qaFlags.push("constraints.primary_constraint missing — objection, talk-track and objective fall back to approach-only content");
+    qaFlags.push(
+      "constraints.primary_constraint missing — objection, sequence and objective fall back to approach content",
+    );
   }
+
   const primaryPillar = primaryKey ? pillarByKey.get(primaryKey) ?? null : null;
+  const secondaryPillar = secondaryKey ? pillarByKey.get(secondaryKey) ?? null : null;
   const decisionPillar = pillarByKey.get("decision") ?? null;
+
+  const strongest =
+    [...pillars].sort(
+      (a, b) =>
+        b.percentage - a.percentage ||
+        PILLAR_KEYS.indexOf(a.key) - PILLAR_KEYS.indexOf(b.key),
+    )[0] ?? null;
+
+  // Never trust the legacy stored Priority Fix Order. Older assessments may
+  // still contain the pre-alignment Method-layer sort.
+  const priorityKeys: InsiderPillarKey[] = [];
+  if (primaryKey) priorityKeys.push(primaryKey);
+  if (secondaryKey && secondaryKey !== primaryKey) priorityKeys.push(secondaryKey);
+  for (const pillar of [...pillars].sort(
+    (a, b) =>
+      a.percentage - b.percentage ||
+      PILLAR_KEYS.indexOf(a.key) - PILLAR_KEYS.indexOf(b.key),
+  )) {
+    if (!priorityKeys.includes(pillar.key)) priorityKeys.push(pillar.key);
+  }
 
   const falseConstraintRuleId =
     typeof constraints.false_constraint_rule_id === "string"
       ? constraints.false_constraint_rule_id
       : null;
-
-  const strongest = [...pillars].sort((a, b) => b.percentage - a.percentage)[0] ?? null;
-
-  const storedOrder = Array.isArray(constraints.priority_fix_order)
-    ? (constraints.priority_fix_order as unknown[]).filter(isPillarKey)
-    : [];
-  const priorityKeys: InsiderPillarKey[] = [...storedOrder];
-  for (const p of [...pillars].sort((a, b) => a.percentage - b.percentage)) {
-    if (!priorityKeys.includes(p.key)) priorityKeys.push(p.key);
-  }
-
-  /* ====================================================================== */
-  /* 1. INSIDER SNAPSHOT                                                     */
-  /* ====================================================================== */
 
   let falseConstraint: { label: string; note: string } | null = null;
   if (falseConstraintRuleId && FALSE_CONSTRAINT_LABEL[falseConstraintRuleId]) {
@@ -382,7 +483,10 @@ export function buildInsiderInsightsReport(
     const fcExplanation = cleanText(asRecord(constraints.false_constraint).explanation);
     falseConstraint = {
       label: FALSE_CONSTRAINT_LABEL[falseConstraintRuleId],
-      note: cleanText(fcBlock?.diagnosticDirection) || fcExplanation || firstParagraph(fcBlock?.text),
+      note:
+        cleanText(fcBlock?.diagnosticDirection) ||
+        fcExplanation ||
+        firstParagraph(fcBlock?.text),
     };
   }
 
@@ -408,98 +512,171 @@ export function buildInsiderInsightsReport(
       percentage: clampPct(percentages[code]),
     })),
     primaryConstraint: primaryPillar,
-    secondaryConstraint: secondaryKey ? pillarByKey.get(secondaryKey) ?? null : null,
+    secondaryConstraint: secondaryPillar,
     strongestPillar: strongest,
     falseConstraint,
     priorityOrder: priorityKeys.map((key) => ({ key, label: PILLAR_LABEL[key] })),
     pillars,
   };
 
+  /* --- selected evidence blocks ----------------------------------------- */
+
+  const pc = primaryKey ? selectPrimaryConstraint(approachCode, primaryKey) : null;
+  const primaryState: InsiderPillarState | null =
+    primaryKey && primaryPillar
+      ? selectPillarState(approachCode, primaryKey, primaryPillar.gar)
+      : null;
+  const decisionState: InsiderPillarState | null = decisionPillar
+    ? selectPillarState(approachCode, "decision", decisionPillar.gar)
+    : null;
+  const strongestBlurb =
+    strongest ? selectStrongestPillar(approachCode, strongest.key) : null;
+  const directionalPair =
+    primaryKey && secondaryKey
+      ? selectDirectionalPair(approachCode, primaryKey, secondaryKey)
+      : null;
+  const objection = primaryKey ? selectObjection(approachCode, primaryKey) : null;
+  const accountability =
+    primaryKey && primaryPillar
+      ? selectAccountability(approachCode, primaryKey, primaryPillar.gar)
+      : null;
+  const challengeDetail = primaryKey
+    ? selectChallengeSequenceForPillar(approachCode, primaryKey)
+    : null;
+  const postSaleDetail = primaryKey
+    ? selectPostSaleCoachingForPillar(approachCode, primaryKey)
+    : null;
+
   /* ====================================================================== */
-  /* 2. PREDICTIVE SIGNALS AT A GLANCE — 13 rows, primary approach only      */
+  /* 2. PREDICTIVE SIGNALS — evidence can override generic approach copy     */
   /* ====================================================================== */
 
-  const objection = primaryKey ? selectObjection(approachCode, primaryKey) : null;
   const predictiveSignals: InsiderSignalRow[] = [];
   const pushSignal = (label: string, value: string) => {
     const text = value.trim();
     if (text) predictiveSignals.push({ label, text });
     else qaFlags.push(`predictive signal "${label}" has no source content — row omitted`);
   };
-  pushSignal("How they think", firstParagraph(core?.howTheyThink));
-  pushSignal("How they decide", firstParagraph(core?.howTheyDecide));
-  pushSignal("How they buy", firstParagraph(core?.howTheyBuy));
-  pushSignal("What builds trust", firstParagraph(core?.trustBuilders));
-  pushSignal("What reduces trust", firstParagraph(core?.trustReducers));
-  pushSignal("Best communication style", firstParagraph(core?.communicationStyle));
+
+  // Actual state evidence is first. Approach baseline is only the fallback.
+  pushSignal(
+    "How they think",
+    compact(primaryState?.howThisAffectsThinking) || compact(core?.howTheyThink),
+  );
+  pushSignal(
+    "How they decide",
+    compact(decisionState?.howThisAffectsDeciding) ||
+      compact(primaryState?.howThisAffectsDeciding) ||
+      compact(core?.howTheyDecide),
+  );
+  pushSignal(
+    "How they buy",
+    compact(primaryState?.howThisAffectsBuying) || compact(core?.howTheyBuy),
+  );
+
+  // Trust remains primarily approach-led, because this is communication
+  // guidance rather than a diagnostic claim.
+  pushSignal("What builds trust", compact(core?.trustBuilders));
+  pushSignal("What reduces trust", compact(core?.trustReducers));
+
+  pushSignal(
+    "Best communication style",
+    compact(primaryState?.howToCommunicate) || compact(core?.communicationStyle),
+  );
+
   if (primaryKey) {
-    pushSignal("Likely objection", cleanText(objection?.possibleLanguage));
-    pushSignal("What may really be underneath it", cleanText(objection?.whatMaySitUnderneath));
+    pushSignal(
+      "Likely objection",
+      compact(objection?.possibleLanguage) ||
+        compact(pc?.likelyBuyingObjectionTheme),
+    );
+    pushSignal(
+      "What may really be underneath it",
+      compact(pc?.whatIsReallyHappening) ||
+        compact(directionalPair?.text) ||
+        compact(objection?.whatMaySitUnderneath),
+    );
   } else {
-    qaFlags.push("no primary constraint — 'Likely objection' / 'What may sit underneath' rows omitted");
+    qaFlags.push(
+      "no primary constraint — Likely Objection / What May Really Be Underneath rows omitted",
+    );
   }
-  pushSignal("Buying signals", firstParagraph(approachData.buyingResistance?.buying));
-  pushSignal("Resistance signals", firstParagraph(approachData.buyingResistance?.resistance));
-  pushSignal("What to challenge", firstParagraph(core?.challengeGuidance));
-  pushSignal("What not to assume", firstParagraph(core?.whatNotToAssumeGeneral));
-  pushSignal("Coaching style", firstParagraph(core?.coachingStyle));
+
+  // Buying/resistance are explicitly behavioural signals: hypotheses to
+  // observe, not findings created by the approach.
+  pushSignal("Buying signals", compact(approachData.buyingResistance?.buying));
+  pushSignal("Resistance signals", compact(approachData.buyingResistance?.resistance));
+
+  pushSignal(
+    "What to challenge",
+    compact(primaryState?.whatToChallenge) ||
+      compact(challengeDetail) ||
+      compact(core?.challengeGuidance),
+  );
+  pushSignal(
+    "What not to assume",
+    compact(primaryState?.whatNotToAssume) || compact(core?.whatNotToAssumeGeneral),
+  );
+  pushSignal(
+    "Coaching style",
+    joinCompact(
+      primaryState?.coachingImplication ||
+        postSaleDetail ||
+        accountability ||
+        core?.coachingStyle,
+      secondaryProfile?.coachingImplication,
+    ),
+  );
 
   /* ====================================================================== */
-  /* 3. FOUNDER'S OWN WORDS — Q13 / Q29 verbatim, annotated                  */
+  /* 3. FOUNDER'S OWN WORDS                                                  */
   /* ====================================================================== */
-
-  const pc = primaryKey ? selectPrimaryConstraint(approachCode, primaryKey) : null;
-  const primaryState =
-    primaryKey && primaryPillar
-      ? selectPillarState(approachCode, primaryKey, primaryPillar.gar)
-      : null;
-  const decisionState = decisionPillar
-    ? selectPillarState(approachCode, "decision", decisionPillar.gar)
-    : null;
-  const strongestBlurb = strongest ? selectStrongestPillar(approachCode, strongest.key) : null;
-  const greenLeverageTag: InsiderTag | null =
-    strongest && strongest.gar !== "RED" && strongestBlurb
-      ? { kind: "GREEN LEVERAGE", text: firstSentence(strongestBlurb) }
-      : null;
-  const hypothesisTag: InsiderTag | null = pc?.whatIsReallyHappening
-    ? { kind: "HYPOTHESIS TO VALIDATE", text: cleanText(pc.whatIsReallyHappening) }
-    : cleanText(asRecord(constraints.false_constraint).explanation)
-      ? {
-          kind: "HYPOTHESIS TO VALIDATE",
-          text: cleanText(asRecord(constraints.false_constraint).explanation),
-        }
-      : null;
 
   const q13present = isMeaningfulFreeText(contextAnswers[13]);
   const q29present = isMeaningfulFreeText(contextAnswers[29]);
-  const usedRiskLabels = new Set<string>();
-
-  const pillarTags = (state: typeof primaryState): InsiderTag[] => {
-    const out: InsiderTag[] = [];
-    if (state?.whatToListenFor)
-      out.push({ kind: "LISTEN FOR", text: firstParagraph(state.whatToListenFor) });
-    if (state?.whatNotToAssume)
-      out.push({ kind: "DO NOT ASSUME", text: firstSentence(state.whatNotToAssume) });
-    return out;
-  };
-
-  const riskFor = (context: string): InsiderFounderWord["riskSignal"] => {
-    const signals = (approachData.riskSignals ?? []).filter(
-      (s) => !usedRiskLabels.has(cleanText(s.label)),
-    );
-    const card = toRiskSignalCard(pickRiskSignal(signals, context));
-    if (card) usedRiskLabels.add(card.label);
-    return card;
-  };
-
   const foundersWords: InsiderFounderWord[] = [];
+
+  const q13EvidenceKeys = evidenceStripKeys({
+    ruleId: falseConstraintRuleId,
+    primary: primaryKey,
+    secondary: secondaryKey,
+    pillars,
+  });
 
   if (q13present) {
     const tags: InsiderTag[] = [];
-    if (hypothesisTag) tags.push(hypothesisTag);
-    tags.push(...pillarTags(primaryState));
-    if (!q29present && greenLeverageTag) tags.push(greenLeverageTag);
+
+    const hypothesis =
+      cleanText(pc?.whatIsReallyHappening) ||
+      cleanText(asRecord(constraints.false_constraint).explanation) ||
+      cleanText(directionalPair?.text);
+    if (hypothesis) {
+      tags.push({ kind: "HYPOTHESIS TO VALIDATE", text: compact(hypothesis, 440) });
+    }
+
+    if (primaryState?.whatToListenFor) {
+      tags.push({
+        kind: "LISTEN FOR",
+        text: compact(primaryState.whatToListenFor, 440),
+      });
+    }
+
+    if (primaryState?.whatNotToAssume) {
+      tags.push({
+        kind: "DO NOT ASSUME",
+        text: compact(primaryState.whatNotToAssume, 440),
+      });
+    }
+
+    if (strongest && strongest.gar === "GREEN" && strongestBlurb) {
+      tags.push({
+        kind: "GREEN LEVERAGE",
+        text: compact(strongestBlurb, 440),
+      });
+    }
+
     foundersWords.push({
+      questionNumber: 13,
       prompt: "The biggest thing holding the business back",
       quote: cleanText(contextAnswers[13]),
       pillar: primaryPillar
@@ -510,23 +687,33 @@ export function buildInsiderInsightsReport(
             percentage: primaryPillar.percentage,
           }
         : null,
+      evidencePillars: q13EvidenceKeys
+        .map((key) => pillarByKey.get(key))
+        .filter((pillar): pillar is InsiderPillarSnapshot => Boolean(pillar)),
       tags,
-      riskSignal: riskFor(
-        [
-          cleanText(contextAnswers[13]),
-          primaryKey ? PILLAR_LABEL[primaryKey] : "",
-          cleanText(pc?.approachMechanism),
-        ].join(" "),
-      ),
+      // The approved Figma uses Q13 for diagnosis/hypothesis and Q29 for the
+      // answer-level risk card. Do not invent an extra risk callout here.
+      riskSignal: null,
     });
   }
 
   if (q29present) {
-    const tags: InsiderTag[] = [];
-    if (!q13present && hypothesisTag) tags.push(hypothesisTag);
-    tags.push(...pillarTags(decisionState));
-    if (greenLeverageTag) tags.push(greenLeverageTag);
+    const riskContext = cleanText(contextAnswers[29]);
+    const riskSignal =
+      riskContext.split(/\s+/).filter(Boolean).length >= 4
+        ? toRiskSignalCard(
+            pickRiskSignal(approachData.riskSignals ?? [], riskContext),
+          )
+        : null;
+
+    if (!riskSignal && riskContext.split(/\s+/).filter(Boolean).length < 4) {
+      qaFlags.push(
+        "Q29 answer is too brief for an answer-level risk signal — risk card suppressed",
+      );
+    }
+
     foundersWords.push({
+      questionNumber: 29,
       prompt: "A decision you know you need to make but have not made",
       quote: cleanText(contextAnswers[29]),
       pillar: decisionPillar
@@ -537,10 +724,9 @@ export function buildInsiderInsightsReport(
             percentage: decisionPillar.percentage,
           }
         : null,
-      tags,
-      riskSignal: riskFor(
-        [cleanText(contextAnswers[29]), "decision certainty analysis", cleanText(pc?.approachMechanism)].join(" "),
-      ),
+      evidencePillars: [],
+      tags: [],
+      riskSignal,
     });
   }
 
@@ -549,7 +735,7 @@ export function buildInsiderInsightsReport(
   }
 
   /* ====================================================================== */
-  /* 4. SUGGESTED SEQUENCE — 4 steps, compressed from PROSPER + primary cell */
+  /* 4. SUGGESTED SEQUENCE — Figma structure, evidence-led content          */
   /* ====================================================================== */
 
   const prosper = approachData.prosper;
@@ -557,44 +743,81 @@ export function buildInsiderInsightsReport(
     ? selectQuestionsByPrimary(approachCode, primaryKey) ?? []
     : [];
   const avoided = primaryKey ? selectAvoidedQuestion(approachCode, primaryKey) : null;
-  const example = (i: number): string | null => cleanText(byPrimaryQuestions[i]) || null;
+  const nextStep = primaryKey
+    ? selectNextStepPositioning(approachCode, primaryKey)
+    : null;
+
+  const example = (index: number): string | null =>
+    cleanText(byPrimaryQuestions[index]) || null;
+
+  const sequenceIntro = primaryKey
+    ? [
+        strongest
+          ? `Lead with ${strongest.label} as evidence of what already works, then use ${PILLAR_LABEL[primaryKey]} as the contrast.`
+          : `Lead with the evidence before introducing ${PILLAR_LABEL[primaryKey]}.`,
+        firstSentence(secondaryProfile?.coachingImplication),
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : firstSentence(prosper?.PERMISSION) || null;
 
   const suggestedSequence: InsiderSequenceStep[] = [
     {
       step: 1,
-      title: "Set the diagnostic frame",
-      instruction: firstSentence(prosper?.PERMISSION),
-      example: null,
+      title: "Open on the strength, not the constraint",
+      instruction:
+        compact(strongestBlurb) ||
+        (strongest
+          ? `${strongest.label} at ${strongest.percentage}% is the strongest evidence in the result. Use it to establish that the conversation is about protecting what works, not cataloguing deficits.`
+          : firstSentence(prosper?.PERMISSION)),
+      example: strongest
+        ? `What do you recognise in ${strongest.label} as something the business already does well?`
+        : null,
     },
     {
       step: 2,
-      title: primaryKey
-        ? `Reframe toward ${PILLAR_LABEL[primaryKey]}`
-        : "Reframe toward the constraint",
-      instruction: firstSentence(prosper?.REFRAME),
+      title: "Let them describe the pattern in their own words",
+      instruction:
+        compact(prosper?.OWNERSHIP) ||
+        compact(primaryState?.whatToListenFor) ||
+        compact(prosper?.PERMISSION),
       example: example(0),
     },
     {
       step: 3,
-      title: "Surface it in their own evidence",
-      instruction: firstSentence(prosper?.POWER_QUESTIONS),
+      title: "Introduce the contrast, not the diagnosis",
+      instruction:
+        compact(directionalPair?.text) ||
+        compact(falseConstraint?.note) ||
+        compact(pc?.whatIsReallyHappening) ||
+        compact(prosper?.REFRAME),
       example: example(1) ?? (cleanText(avoided) || null),
     },
     {
       step: 4,
-      title: "Move to one recommendation and one decision",
-      instruction: [firstSentence(prosper?.RESULT), firstSentence(pc?.coachingPriority)]
-        .filter(Boolean)
-        .join(" "),
+      title: "Get one commitment, not a plan",
+      instruction:
+        compact(nextStep) ||
+        compact(pc?.coachingPriority) ||
+        compact(prosper?.RESULT),
       example: example(2),
     },
-  ].map((s) => ({ ...s, instruction: s.instruction.trim() }));
+  ];
 
-  const emptySteps = suggestedSequence.filter((s) => !s.instruction).map((s) => s.step);
-  if (emptySteps.length) qaFlags.push(`suggested sequence step(s) ${emptySteps.join(", ")} have no PROSPER source`);
+  const emptySteps = suggestedSequence
+    .filter((step) => !step.instruction)
+    .map((step) => step.step);
+  if (emptySteps.length) {
+    qaFlags.push(`suggested sequence step(s) ${emptySteps.join(", ")} have no selected source content`);
+  }
+
+  const sequenceCaution =
+    compact(primaryState?.whatNotToAssume) ||
+    compact(core?.whatNotToAssumeGeneral) ||
+    null;
 
   /* ====================================================================== */
-  /* 5. THE OBJECTIVE — one sentence                                         */
+  /* 5. THE OBJECTIVE                                                        */
   /* ====================================================================== */
 
   let objective: string | null = null;
@@ -603,14 +826,12 @@ export function buildInsiderInsightsReport(
   } else if (pc?.coachingPriority) {
     objective = firstSentence(pc.coachingPriority);
   } else if (primaryKey) {
-    objective = `Get this ${APPROACH_LABEL[approachCode]} founder to one diagnosed problem — ${PILLAR_LABEL[primaryKey]} — one recommendation, and one clean decision.`;
-    qaFlags.push("objective composed from a template — no primary-constraint conversation objective available");
+    objective = `Get this ${APPROACH_LABEL[approachCode]} founder to name the ${PILLAR_LABEL[primaryKey]} constraint in their own words and leave with one specific next decision.`;
+    qaFlags.push("objective composed from fallback template — primary-constraint objective missing");
   } else {
-    objective = `Get this ${APPROACH_LABEL[approachCode]} founder to one diagnosed problem, one recommendation, and one clean decision.`;
-    qaFlags.push("objective composed from a template — no primary constraint");
+    objective = `Get this ${APPROACH_LABEL[approachCode]} founder to one diagnosed problem, one recommendation and one clean decision.`;
+    qaFlags.push("objective composed from fallback template — no primary constraint");
   }
-
-  /* ---------------------------------------------------------------------- */
 
   return {
     meta: {
@@ -620,12 +841,18 @@ export function buildInsiderInsightsReport(
       secondaryInfluenceLabel: secondaryInfluence
         ? APPROACH_NAME_LABEL[secondaryInfluence]
         : null,
-      primaryConstraint: primaryKey ? { key: primaryKey, label: PILLAR_LABEL[primaryKey] } : null,
+      primaryConstraint: primaryKey
+        ? { key: primaryKey, label: PILLAR_LABEL[primaryKey] }
+        : null,
       secondaryConstraint: secondaryKey
         ? { key: secondaryKey, label: PILLAR_LABEL[secondaryKey] }
         : null,
       strongestPillar: strongest
-        ? { key: strongest.key, label: strongest.label, percentage: strongest.percentage }
+        ? {
+            key: strongest.key,
+            label: strongest.label,
+            percentage: strongest.percentage,
+          }
         : null,
       sourceVersion: INSIDER_INSIGHTS_SOURCE_VERSION,
       generatedAt: input.completedAt ?? null,
@@ -640,22 +867,11 @@ export function buildInsiderInsightsReport(
     snapshot,
     predictiveSignals,
     foundersWords,
+    sequenceIntro,
     suggestedSequence,
+    sequenceCaution,
     objective,
     qaFlags,
-  };
-}
-
-function toRiskSignalCard(
-  signal: InsiderRiskSignal | null,
-): InsiderFounderWord["riskSignal"] {
-  if (!signal) return null;
-  const text = cleanText(signal.text);
-  if (!text) return null;
-  return {
-    label: cleanText(signal.label) || "Risk signal",
-    text,
-    adviserResponse: cleanText(signal.adviserResponse) || null,
   };
 }
 

@@ -1,171 +1,307 @@
 "use client";
 
-/* -------------------------------------------------------------------------- */
-/* Insider Insights — the private, adviser-facing companion to the Inevitable  */
-/* Standard client reports. Five compact sections, same visual system as       */
-/* Reports 1 and 2 (navy hero, ivory two-column body, Report Index sidebar).   */
-/* Rendered from a report assembled server-side by buildInsiderInsightsReport. */
-/* -------------------------------------------------------------------------- */
-
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type {
   InsiderFounderWord,
   InsiderInsightsReport,
+  InsiderPillarSnapshot,
   InsiderSequenceStep,
 } from "@/lib/inevitable-standard/buildInsiderInsightsReport";
 import {
-  Eyebrow,
-  GAR,
   GOLD,
-  GOLD_TEXT,
   HAIRLINE,
   INK,
-  IVORY,
-  IVORY_BORDER,
-  IVORY_PANEL,
   NAVY_DEEP,
-  NAVY_GRADIENT,
-  PillarSummaryList,
   ReadinessDonut,
   newsreader,
   round1,
   serif,
-  type Gar,
 } from "@/app/t/[token]/report/inevitableStandardShared";
 import PrintButton from "@/app/t/[token]/report/PrintButton";
 
-const GAR_KEY = { GREEN: "green", AMBER: "amber", RED: "red" } as const;
+const FIGMA = {
+  page: "#041731",
+  navy: "#14263d",
+  navy2: "#1f2c46",
+  panel: "#edeff2",
+  ivory: "#f8f6f1",
+  gold: "#b89a5e",
+  goldLight: "#c9b98f",
+  body: "#66727d",
+  hairline: "#d6dae0",
+  border: "#ddd4bd",
+  green: "#4c7a5b",
+  amber: "#bd8b3d",
+  red: "#a8503f",
+};
+
+const GAR_TONE = {
+  GREEN: { colour: FIGMA.green, bg: "#e2ebe0", risk: "LOW RISK" },
+  AMBER: { colour: FIGMA.amber, bg: "#f1e5cc", risk: "MEDIUM RISK" },
+  RED: { colour: FIGMA.red, bg: "#f1ddd6", risk: "HIGH RISK" },
+} as const;
+
+const PILLAR_ICON: Record<InsiderPillarSnapshot["key"], string> = {
+  identity: "/inevitable-standard/snapshot/identitiy.png",
+  positioning: "/inevitable-standard/snapshot/positioning.png",
+  offer: "/inevitable-standard/snapshot/offer.png",
+  sales: "/inevitable-standard/snapshot/sales.png",
+  revenue_model: "/inevitable-standard/snapshot/revenue-model.png",
+  decision: "/inevitable-standard/snapshot/decision.png",
+};
+
+const SIGNAL_ICON: Record<string, string> = {
+  "How they think": "/inevitable-standard/insider-insights/Brain.png",
+  "How they decide": "/inevitable-standard/insider-insights/Stopwatch.png",
+  "How they buy": "/inevitable-standard/insider-insights/Buy.png",
+  "What builds trust": "/inevitable-standard/insider-insights/Guarantee.png",
+  "What reduces trust": "/inevitable-standard/insider-insights/Cancel.png",
+  "Best communication style": "/inevitable-standard/insider-insights/Solve.png",
+  "Likely objection": "/inevitable-standard/insider-insights/Error.png",
+  "What may really be underneath it": "/inevitable-standard/insider-insights/Search.png",
+  "Buying signals": "/inevitable-standard/insider-insights/Flag.png",
+  "Resistance signals": "/inevitable-standard/insider-insights/Refresh.png",
+  "What to challenge": "/inevitable-standard/insider-insights/Challange.png",
+  "What not to assume": "/inevitable-standard/insider-insights/Eye.png",
+  "Coaching style": "/inevitable-standard/insider-insights/Clipboard%20List.png",
+};
 
 const INDEX_ITEMS = [
-  { id: "snapshot", label: "Insider Snapshot" },
-  { id: "predictive-signals", label: "Predictive Signals at a Glance" },
-  { id: "founders-words", label: "The Founder's Own Words" },
-  { id: "suggested-sequence", label: "Suggested Sequence" },
+  { id: "snapshot", label: "Insider snapshot" },
+  { id: "predictive-signals", label: "Predictive signals at a glance" },
+  { id: "founders-words", label: "Founder's own words" },
+  { id: "suggested-sequence", label: "Suggested sequence" },
   { id: "objective", label: "The Objective" },
 ] as const;
 
-/* -------------------------------------------------------------------------- */
+const TAG_LABEL_TONE: Record<
+  InsiderFounderWord["tags"][number]["kind"],
+  string
+> = {
+  "HYPOTHESIS TO VALIDATE": "#b3893f",
+  "LISTEN FOR": "#b3893f",
+  "DO NOT ASSUME": "#a8503f",
+  "GREEN LEVERAGE": "#4c7a5b",
+};
 
-function SectionHeading({ index, title }: { index: number; title: string }) {
+function SectionShell({
+  id,
+  eyebrow,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex items-baseline gap-3">
-      <span
-        className="text-[12px] font-semibold tabular-nums"
-        style={{ color: GOLD_TEXT }}
+    <section
+      id={id}
+      className="scroll-mt-6 rounded-[20px] p-[27px] print:p-4"
+      style={{ backgroundColor: FIGMA.navy }}
+    >
+      <p
+        className="text-[14px] font-semibold uppercase tracking-[0.18em] sm:text-[16px]"
+        style={{ color: FIGMA.gold }}
       >
-        {String(index).padStart(2, "0")}
-      </span>
-      <h2 className="text-[22px] leading-snug" style={{ ...serif, color: INK }}>
-        {title}
-      </h2>
-    </div>
+        {eyebrow}
+      </p>
+      <div
+        className="mt-[26px] rounded-[20px] p-6 sm:p-10 print:mt-4 print:p-6"
+        style={{ backgroundColor: FIGMA.panel }}
+      >
+        {children}
+      </div>
+    </section>
   );
 }
 
-function GarChip({ gar, label }: { gar: Gar; label: string }) {
-  const tone = GAR[gar];
+function RiskChip({ pillar }: { pillar: InsiderPillarSnapshot }) {
+  const tone = GAR_TONE[pillar.gar];
   return (
     <span
-      className="rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
-      style={{ backgroundColor: tone.chipBg, color: tone.chipText }}
+      className="inline-flex rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em]"
+      style={{ backgroundColor: tone.bg, color: tone.colour }}
     >
-      {label}
+      {round1(pillar.percentage)}% · {tone.risk}
     </span>
   );
 }
 
-function SnapshotFact({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string | null;
-}) {
+function HeroPillars({ pillars }: { pillars: InsiderPillarSnapshot[] }) {
   return (
-    <div>
-      <dt className="text-[11px] uppercase tracking-[0.14em] text-[#8a8477]">
-        {label}
-      </dt>
-      <dd className="mt-0.5 text-[15px]" style={{ color: INK }}>
-        {value}
-      </dd>
-      {hint ? (
-        <dd className="mt-0.5 text-[12px] leading-5 text-[#8a8477]">{hint}</dd>
-      ) : null}
+    <div className="rounded-[10px] border border-white/15 bg-white/[0.05] px-7 py-5">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.16em] text-[#a9a08a]">
+        The six pillars
+      </p>
+      <div className="space-y-[13px]">
+        {pillars.map((pillar) => {
+          const tone = GAR_TONE[pillar.gar];
+          return (
+            <div
+              key={pillar.key}
+              className="grid grid-cols-[105px_1fr_34px] items-center gap-3"
+            >
+              <div className="flex items-center gap-2">
+                <img
+                  src={PILLAR_ICON[pillar.key]}
+                  alt=""
+                  className="h-6 w-6 object-contain"
+                />
+                <span className="text-[11px] text-[#cfc9b8]">
+                  {pillar.key === "revenue_model" ? "Rev. Model" : pillar.label}
+                </span>
+              </div>
+              <div className="h-[6px] overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${pillar.percentage}%`,
+                    backgroundColor: tone.colour,
+                  }}
+                />
+              </div>
+              <span className="text-right text-[11px] font-bold text-[#f0ece0]">
+                {round1(pillar.percentage)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-/* --- Section 3 card ------------------------------------------------------- */
+function PillarStrip({ pillars }: { pillars: InsiderPillarSnapshot[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 print:grid-cols-6">
+      {pillars.map((pillar) => {
+        const tone = GAR_TONE[pillar.gar];
+        return (
+          <div
+            key={pillar.key}
+            className="rounded-[6px] border-t-2 px-3 pb-2 pt-3"
+            style={{
+              borderColor: tone.colour,
+              backgroundColor: `${tone.colour}24`,
+            }}
+          >
+            <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-[#14263d]">
+              {pillar.label}
+            </p>
+            <p className="mt-1 text-[21px]" style={{ ...serif, color: FIGMA.navy }}>
+              {round1(pillar.percentage)}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-const TAG_TONE: Record<InsiderFounderWord["tags"][number]["kind"], { bg: string; text: string }> = {
-  "HYPOTHESIS TO VALIDATE": { bg: "#eef1f6", text: "#3c4a63" },
-  "LISTEN FOR": { bg: "#f5f0e6", text: "#7a5a28" },
-  "DO NOT ASSUME": { bg: "#f2eae8", text: "#7c3f39" },
-  "GREEN LEVERAGE": { bg: "#eef2ef", text: "#3f5e50" },
-};
-
-function FounderWordCard({ item }: { item: InsiderFounderWord }) {
+function QuickReferenceRow({
+  label,
+  children,
+  last = false,
+}: {
+  label: string;
+  children: ReactNode;
+  last?: boolean;
+}) {
   return (
     <div
-      className="rounded-2xl border p-6"
-      style={{ backgroundColor: "#fff", borderColor: IVORY_BORDER }}
+      className="grid gap-2 py-3.5 sm:grid-cols-[220px_1fr] sm:items-center"
+      style={{
+        borderBottom: last ? undefined : `1px dashed ${FIGMA.border}`,
+      }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] uppercase tracking-[0.14em] text-[#918a7d]">
-          {item.prompt}
+      <dt className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#736c5c]">
+        {label}
+      </dt>
+      <dd className="text-[14px] leading-6 text-[#26241d]">{children}</dd>
+    </div>
+  );
+}
+
+function EvidenceStrip({ pillars }: { pillars: InsiderPillarSnapshot[] }) {
+  if (pillars.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4">
+      {pillars.map((pillar) => {
+        const tone = GAR_TONE[pillar.gar];
+        return (
+          <div
+            key={pillar.key}
+            className="rounded-[10px] border-t-2 bg-white px-4 py-4"
+            style={{ borderColor: tone.colour }}
+          >
+            <p className="text-[8px] uppercase tracking-[0.1em] text-[#66727d]">
+              {pillar.label}
+            </p>
+            <p className="mt-2 text-[16px]" style={{ ...serif, color: FIGMA.navy }}>
+              {pillar.garLabel} {round1(pillar.percentage)}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FounderWord({ item }: { item: InsiderFounderWord }) {
+  return (
+    <div className="space-y-[18px]">
+      <div className="rounded-[15px] p-7" style={{ backgroundColor: FIGMA.ivory }}>
+        <p
+          className="text-[9px] font-bold uppercase tracking-[0.16em]"
+          style={{ color: FIGMA.gold }}
+        >
+          Founder&apos;s own words · Question {item.questionNumber}
         </p>
-        {item.pillar ? (
-          <span className="flex items-center gap-2 text-[12px] text-[#6b7280]">
-            {item.pillar.label} · {round1(item.pillar.percentage)}%
-            <GarChip gar={GAR_KEY[item.pillar.gar]} label={item.pillar.garLabel} />
-          </span>
-        ) : null}
+        <blockquote
+          className="mt-3 text-[20px] leading-8 sm:text-[21px]"
+          style={{ ...serif, color: FIGMA.navy }}
+        >
+          “{item.quote}”
+        </blockquote>
       </div>
 
-      <p className="mt-3 text-[19px] leading-8" style={{ ...serif, color: "#3f4652" }}>
-        &ldquo;{item.quote}&rdquo;
-      </p>
+      <EvidenceStrip pillars={item.evidencePillars} />
 
       {item.tags.length > 0 ? (
-        <div className="mt-5 space-y-3 border-t pt-4" style={{ borderColor: HAIRLINE }}>
-          {item.tags.map((tag) => {
-            const tone = TAG_TONE[tag.kind];
-            return (
-              <div key={tag.kind} className="flex flex-col gap-1.5 sm:flex-row sm:gap-3">
-                <span
-                  className="h-fit shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] sm:w-[168px]"
-                  style={{ backgroundColor: tone.bg, color: tone.text }}
+        <div
+          className="rounded-[6px] border bg-white px-7 py-6"
+          style={{ borderColor: FIGMA.border }}
+        >
+          <div className="space-y-5">
+            {item.tags.map((tag) => (
+              <div key={tag.kind}>
+                <p
+                  className="text-[10px] font-bold uppercase tracking-[0.08em]"
+                  style={{ color: TAG_LABEL_TONE[tag.kind] }}
                 >
                   {tag.kind}
-                </span>
-                <span className="text-[14px] leading-6 text-[#3a4250]">{tag.text}</span>
+                </p>
+                <p className="mt-2 text-[14px] leading-6 text-[#66727d]">
+                  {tag.text}
+                </p>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       ) : null}
 
       {item.riskSignal ? (
-        <div
-          className="mt-4 rounded-xl border-l-2 p-4"
-          style={{ backgroundColor: "#f2eae8", borderColor: "#a6564e" }}
-        >
-          <p
-            className="text-[10px] font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "#7c3f39" }}
-          >
-            Risk signal · {item.riskSignal.label}
-          </p>
-          <p className="mt-1 text-[14px] leading-6" style={{ color: INK }}>
+        <div className="rounded-[15px] p-7" style={{ backgroundColor: FIGMA.ivory }}>
+          <span className="inline-block bg-[#8a4a3d] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white">
+            Risk signal
+          </span>
+          <p className="mt-3 text-[13px] leading-6 text-[#66727d]">
             {item.riskSignal.text}
           </p>
           {item.riskSignal.adviserResponse ? (
-            <p className="mt-2 text-[13px] leading-6 text-[#7c3f39]">
+            <p className="mt-3 text-[12px] leading-5 text-[#8a4a3d]">
               Adviser response: {item.riskSignal.adviserResponse}
             </p>
           ) : null}
@@ -175,38 +311,37 @@ function FounderWordCard({ item }: { item: InsiderFounderWord }) {
   );
 }
 
-/* --- Section 4 step ----------------------------------------------------- */
-
 function SequenceStep({ step }: { step: InsiderSequenceStep }) {
   return (
-    <div className="flex gap-4 break-inside-avoid">
+    <div
+      className="grid grid-cols-[48px_1fr] gap-5 border-b py-5 last:border-b-0"
+      style={{ borderColor: FIGMA.hairline }}
+    >
       <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-        style={{ backgroundColor: NAVY_DEEP }}
+        className="text-[30px] leading-none"
+        style={{ ...serif, color: FIGMA.gold }}
       >
-        {step.step}
+        {String(step.step).padStart(2, "0")}
       </span>
-      <div className="min-w-0 pb-2">
-        <p className="text-[15px] font-semibold" style={{ color: INK }}>
+      <div>
+        <h3 className="text-[17px] capitalize" style={{ ...serif, color: FIGMA.navy }}>
           {step.title}
+        </h3>
+        <p className="mt-2 text-[12px] leading-5 text-[#14263d]">
+          {step.instruction}
         </p>
-        {step.instruction ? (
-          <p className="mt-1 text-[14px] leading-6 text-[#3a4250]">{step.instruction}</p>
-        ) : null}
         {step.example ? (
           <p
-            className="mt-2 border-l-2 pl-3 text-[14px] leading-6 text-[#5b6472]"
-            style={{ ...serif, borderColor: GOLD }}
+            className="mt-3 text-[14px] italic leading-6 text-[#1e3550]"
+            style={serif}
           >
-            &ldquo;{step.example}&rdquo;
+            “{step.example}”
           </p>
         ) : null}
       </div>
     </div>
   );
 }
-
-/* -------------------------------------------------------------------------- */
 
 export default function InsiderInsightsReportClient({
   report,
@@ -231,20 +366,23 @@ export default function InsiderInsightsReportClient({
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    const els = indexItems
+    const elements = indexItems
       .map((item) => document.getElementById(item.id))
-      .filter((el): el is HTMLElement => Boolean(el));
-    if (els.length === 0) return;
+      .filter((element): element is HTMLElement => Boolean(element));
+
+    if (elements.length === 0) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
-          .filter((e) => e.isIntersecting)
+          .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
         if (visible[0]) setActiveSection(visible[0].target.id);
       },
       { rootMargin: "-15% 0px -65% 0px", threshold: [0, 0.25, 0.6, 1] },
     );
-    els.forEach((el) => observer.observe(el));
+
+    elements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, [indexItems]);
 
@@ -254,278 +392,390 @@ export default function InsiderInsightsReportClient({
         month: "long",
         day: "numeric",
       })
-    : null;
+    : "—";
 
   const secondaryText = snapshot.secondaryApproach
     ? snapshot.secondaryApproach.percentage != null
-      ? `${snapshot.secondaryApproach.label} (${round1(snapshot.secondaryApproach.percentage)}%)`
+      ? `${snapshot.secondaryApproach.label} — ${round1(snapshot.secondaryApproach.percentage)}%`
       : snapshot.secondaryApproach.label
     : "—";
 
   return (
     <main
       className={`${newsreader.variable} min-h-screen`}
-      style={{ backgroundColor: IVORY, color: INK }}
+      style={{ backgroundColor: FIGMA.page, color: INK }}
     >
-      {/* Hero */}
-      <header className="px-5 pt-10 pb-8 text-white sm:px-8" style={{ background: NAVY_GRADIENT }}>
-        <div className="mx-auto flex max-w-6xl flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href={backHref}
-              className="rounded-md border border-white/25 px-3 py-2 text-sm text-white/80 hover:bg-white/10 print:hidden"
-            >
-              &larr; Back to profile
-            </Link>
-            <PrintButton className="rounded-md bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/20 print:hidden">
-              Print / Save PDF
-            </PrintButton>
-          </div>
+      {/* Keep platform/help overlays out of generated PDFs. */}
+      <style>{`
+        @media print {
+          @page { margin: 0; }
+          html, body { background: #041731 !important; }
+          body .fixed,
+          body [style*="position: fixed"],
+          body [style*="position:fixed"],
+          body [aria-label*="chat" i],
+          body .intercom-lightweight-app,
+          body .crisp-client {
+            display: none !important;
+          }
+        }
+      `}</style>
 
-          <div>
-            <Eyebrow tone="light">{meta.test.name} · Insider Insights</Eyebrow>
-            <h1 className="mt-2 text-3xl leading-tight sm:text-4xl" style={serif}>
-              {meta.taker.fullName}
-            </h1>
-            <p className="mt-1 text-sm text-white/60">
-              {[meta.taker.company, meta.org.name, completedLabel].filter(Boolean).join(" · ")}
-            </p>
-          </div>
+      {/* Approved Figma top bar */}
+      <header
+        className="border-b border-white/10 px-5 py-4 text-white print:hidden"
+        style={{ backgroundColor: FIGMA.navy }}
+      >
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-4">
+          <Link href={backHref} className="mr-auto flex min-w-[330px] items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+              <img
+                src="/images/profile-test-ai-logo.png"
+                alt="profiletest.ai"
+                className="max-h-8 max-w-8 object-contain brightness-0 invert"
+              />
+            </div>
+            <div>
+              <p className="text-[18px] font-semibold uppercase tracking-[0.14em] sm:text-[24px]">
+                Insider Insights
+              </p>
+              <p
+                className="mt-1 text-[9px] font-semibold uppercase tracking-[0.24em]"
+                style={{ color: FIGMA.goldLight }}
+              >
+                The Inevitable Standard Method™ · Powered By profiletest-ai
+              </p>
+            </div>
+          </Link>
 
-          <p
-            className="max-w-2xl rounded-lg border-l-2 border-[#b89a5e] bg-white/5 px-4 py-3 text-[13px] leading-6 text-white/80"
-          >
-            <strong className="text-white">Adviser-only.</strong> Prepared for the coach or
-            consultant leading a commercial conversation with this founder. It is never
-            shared with the test taker.
-          </p>
+          <PrintButton className="rounded-lg bg-[#b89a5e] px-5 py-2 text-[12px] font-semibold text-white">
+            Download PDF
+          </PrintButton>
+
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div className="rounded-[18px] border border-white/30 px-4 py-2">
+              <span className="block text-white/40">Prepared for</span>
+              <strong className="mt-1 block text-[12px] text-white">Coaches</strong>
+            </div>
+            <div className="rounded-[18px] border border-white/30 px-4 py-2">
+              <span className="block text-white/40">Date</span>
+              <strong className="mt-1 block text-[12px] text-white">{completedLabel}</strong>
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[230px_minmax(0,1fr)]">
-          {/* Index */}
-          <aside className="hidden lg:block print:hidden">
-            <div
-              className="sticky top-8 rounded-2xl border p-5"
-              style={{ backgroundColor: IVORY_PANEL, borderColor: IVORY_BORDER }}
+      {/* Approved Figma hero */}
+      <section className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-[60px] text-white sm:px-10">
+        <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_676px] print:grid-cols-[minmax(0,1fr)_520px] print:gap-5">
+          <div>
+            <p className="text-[12px] uppercase tracking-[0.18em]" style={{ color: FIGMA.gold }}>
+              The Inevitable Standard Method™
+            </p>
+            <h1 className="mt-6 text-[52px] leading-[0.98] sm:text-[68px] xl:text-[80px]" style={serif}>
+              Insider Insights
+            </h1>
+            <p
+              className="mt-5 text-[24px] italic sm:text-[30px]"
+              style={{ ...serif, color: FIGMA.goldLight }}
             >
-              <p
-                className="text-[10px] font-semibold uppercase tracking-[0.24em]"
-                style={{ color: GOLD_TEXT }}
-              >
-                Report Index
-              </p>
-              <div className="mt-4 border-t pt-4" style={{ borderColor: IVORY_BORDER }}>
-                <p className="text-[11px] uppercase tracking-[0.16em] text-[#9a9384]">
-                  Readiness
-                </p>
-                <p className="mt-1 text-[26px] leading-none" style={{ ...serif, color: INK }}>
-                  {round1(snapshot.readinessPercentage)}%
-                </p>
-                {snapshot.readinessLabel ? (
-                  <p className="mt-1 text-[12px] text-[#6b7280]">{snapshot.readinessLabel}</p>
-                ) : null}
-              </div>
-              <nav className="mt-4 space-y-1">
-                {indexItems.map((item, i) => {
-                  const active = item.id === activeSection;
-                  return (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      aria-current={active ? "true" : undefined}
-                      className="flex gap-2.5 rounded-lg px-2.5 py-2 text-[12.5px] leading-5 transition"
-                      style={active ? { backgroundColor: NAVY_DEEP, color: "#fff" } : { color: "#5b6472" }}
-                    >
-                      <span className="tabular-nums" style={{ color: active ? GOLD : "#a99a78" }}>
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <span>{item.label}</span>
-                    </a>
-                  );
-                })}
-              </nav>
+              Predictive Selling &amp; Coaching Playbook
+            </p>
+            <div className="mt-8 border-t border-[#b89a5e]/45 pt-3 text-[11px] uppercase tracking-[0.2em]">
+              Prepared for {meta.taker.fullName}
             </div>
-          </aside>
+            <p className="mt-5 max-w-[660px] text-[11px] leading-[18px] text-[#8e9aaa]">
+              This document is prepared for the adviser, coach or consultant conducting
+              the commercial conversation. It is not supplied to the test taker. It
+              contains interpretation and hypotheses, not conclusions.
+            </p>
+          </div>
 
-          {/* Body */}
-          <div className="space-y-14">
-            {/* 1 — SNAPSHOT */}
-            <section id="snapshot" className="scroll-mt-8">
-              <SectionHeading index={1} title="Insider Snapshot" />
-              <div
-                className="mt-4 rounded-2xl border p-6 sm:p-8"
-                style={{ backgroundColor: "#fff", borderColor: IVORY_BORDER }}
-              >
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                  <ReadinessDonut
-                    percentage={snapshot.readinessPercentage}
-                    band={snapshot.readinessLabel ?? ""}
-                    onLight
-                  />
-                  <dl className="grid flex-1 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                    <SnapshotFact
-                      label="Primary approach"
-                      value={`${snapshot.primaryApproach.label} (${round1(snapshot.primaryApproach.percentage)}%)`}
-                    />
-                    <SnapshotFact label="Secondary influence" value={secondaryText} />
-                    <SnapshotFact
-                      label="Primary constraint"
-                      value={
-                        snapshot.primaryConstraint
-                          ? `${snapshot.primaryConstraint.label} · ${round1(snapshot.primaryConstraint.percentage)}%`
-                          : "—"
-                      }
-                    />
-                    <SnapshotFact
-                      label="Secondary constraint"
-                      value={
-                        snapshot.secondaryConstraint
-                          ? `${snapshot.secondaryConstraint.label} · ${round1(snapshot.secondaryConstraint.percentage)}%`
-                          : "—"
-                      }
-                    />
-                    <SnapshotFact
-                      label="Strongest pillar"
-                      value={
-                        snapshot.strongestPillar
-                          ? `${snapshot.strongestPillar.label} · ${round1(snapshot.strongestPillar.percentage)}%`
-                          : "—"
-                      }
-                    />
-                    <SnapshotFact
-                      label="Possible false constraint"
-                      value={snapshot.falseConstraint?.label ?? "None flagged"}
-                      hint={snapshot.falseConstraint?.note ?? null}
-                    />
-                  </dl>
-                </div>
-
-                {snapshot.priorityOrder.length > 0 ? (
-                  <p className="mt-6 border-t pt-4 text-[13px] leading-6 text-[#6b7280]" style={{ borderColor: HAIRLINE }}>
-                    <span className="font-semibold uppercase tracking-[0.16em]" style={{ color: GOLD_TEXT }}>
-                      Priority fix order:{" "}
-                    </span>
-                    {snapshot.priorityOrder.map((p) => p.label).join(" → ")}
-                  </p>
-                ) : null}
-
-                <div className="mt-6 border-t pt-5" style={{ borderColor: HAIRLINE }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: GOLD_TEXT }}>
-                    Six pillars
-                  </p>
-                  <div className="mt-1">
-                    <PillarSummaryList
-                      pillars={snapshot.pillars.map((p) => ({
-                        key: p.key,
-                        label: p.label,
-                        descriptor: p.descriptor,
-                        percentage: p.percentage,
-                        gar: GAR_KEY[p.gar] as Gar,
-                      }))}
-                    />
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* 2 — PREDICTIVE SIGNALS */}
-            {report.predictiveSignals.length > 0 ? (
-              <section id="predictive-signals" className="scroll-mt-8">
-                <SectionHeading index={2} title="Predictive Signals at a Glance" />
-                <p className="mt-2 text-[13px] text-[#8a8477]">
-                  For a {meta.approachLabel} founder. Each row is the lead of the fuller
-                  guidance in the coaching library.
+          <div>
+            <div className="grid gap-6 sm:grid-cols-[263px_1fr] print:grid-cols-[190px_1fr] print:gap-4">
+              <div className="flex flex-col items-center rounded-[10px] border border-white/15 bg-white/[0.05] px-5 py-4">
+                <p className="text-center text-[10px] uppercase tracking-[0.14em] text-[#a9a08a]">
+                  Inevitable Standard Readiness
                 </p>
-                <dl
-                  className="mt-4 divide-y divide-[#e7e3db] rounded-2xl border"
-                  style={{ backgroundColor: "#fff", borderColor: IVORY_BORDER }}
-                >
-                  {report.predictiveSignals.map((row) => (
+                <ReadinessDonut
+                  percentage={snapshot.readinessPercentage}
+                  band={snapshot.readinessLabel ?? ""}
+                />
+                <p className="text-center text-[13px] text-[#e8e2d0]">
+                  {snapshot.readinessLabel || "Current result"}{" "}
+                  <span className="text-[#cfc9b8]">· Current standard</span>
+                </p>
+              </div>
+              <HeroPillars pillars={snapshot.pillars} />
+            </div>
+            <div className="mt-8 flex justify-end">
+              <span className="bg-[#a85b55] px-7 py-5 text-[11px] uppercase tracking-[0.22em] text-white">
+                Internal use only
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto grid max-w-[1275px] gap-[46px] px-5 py-14 lg:grid-cols-[303px_minmax(0,963px)]">
+        {/* Approved Figma sidebar */}
+        <aside className="print:hidden">
+          <div
+            className="sticky top-5 rounded-[20px] border border-white/10 p-[18px]"
+            style={{ backgroundColor: FIGMA.ivory }}
+          >
+            <p className="mb-4 text-[11px] uppercase tracking-[0.24em] text-[#33445a]">
+              Report Index
+            </p>
+            <nav className="space-y-2">
+              {indexItems.map((item, index) => {
+                const active = item.id === activeSection;
+                return (
+                  <a
+                    key={item.id}
+                    href={`#${item.id}`}
+                    aria-current={active ? "true" : undefined}
+                    className="block rounded-[15px] border px-4 py-3 text-[12px] leading-5 transition"
+                    style={
+                      active
+                        ? {
+                            backgroundColor: "#33445a",
+                            borderColor: "#33445a",
+                            color: "#fff",
+                          }
+                        : { borderColor: "#33445a", color: "#33445a" }
+                    }
+                  >
+                    {index + 1}. {item.label}
+                  </a>
+                );
+              })}
+            </nav>
+            <PrintButton className="mt-3 w-full rounded-[10px] bg-[#33445a] px-4 py-3 text-[12px] font-semibold text-white">
+              Download PDF
+            </PrintButton>
+            <a
+              href="#suggested-sequence"
+              className="mt-2 block w-full rounded-[10px] bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-4 py-3 text-center text-[12px] font-semibold text-white"
+            >
+              Next step
+            </a>
+          </div>
+        </aside>
+
+        <div className="space-y-10">
+          {/* 1. Quick reference */}
+          <SectionShell id="snapshot" eyebrow="Quick Reference">
+            <h2 className="text-[29px]" style={{ ...serif, color: FIGMA.navy }}>
+              Insider snapshot
+            </h2>
+
+            <dl
+              className="mt-7 rounded-[10px] border bg-white px-7 py-6"
+              style={{ borderColor: FIGMA.border }}
+            >
+              <QuickReferenceRow label="Client">
+                <strong className="text-[#182238]">{meta.taker.fullName}</strong>
+                <span className="block">
+                  {[meta.taker.company, completedLabel && `Completed ${completedLabel}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Primary Decision Approach">
+                {snapshot.primaryApproach.label} — {round1(snapshot.primaryApproach.percentage)}%
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Secondary Influence">
+                {secondaryText}
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Overall Readiness">
+                {round1(snapshot.readinessPercentage)}% — {snapshot.readinessLabel || "—"}
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Primary Constraint">
+                {snapshot.primaryConstraint ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    {snapshot.primaryConstraint.label}
+                    <RiskChip pillar={snapshot.primaryConstraint} />
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Secondary Constraint">
+                {snapshot.secondaryConstraint ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    {snapshot.secondaryConstraint.label}
+                    <RiskChip pillar={snapshot.secondaryConstraint} />
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Strongest Pillar">
+                {snapshot.strongestPillar ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    {snapshot.strongestPillar.label}
+                    <RiskChip pillar={snapshot.strongestPillar} />
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Possible False Constraint">
+                {snapshot.falseConstraint?.label || "None flagged"}
+              </QuickReferenceRow>
+
+              <QuickReferenceRow label="Priority Fix Order" last>
+                {snapshot.priorityOrder.map((item) => item.label).join(" → ")}
+              </QuickReferenceRow>
+            </dl>
+
+            <div className="mt-7">
+              <PillarStrip pillars={snapshot.pillars} />
+            </div>
+          </SectionShell>
+
+          {/* 2. Predictive signals */}
+          {report.predictiveSignals.length > 0 ? (
+            <SectionShell id="predictive-signals" eyebrow="Before the Conversation">
+              <h2 className="text-[29px]" style={{ ...serif, color: FIGMA.navy }}>
+                Predictive signals at a glance
+              </h2>
+              <div className="mt-6 grid bg-white md:grid-cols-2 print:grid-cols-2">
+                {report.predictiveSignals.map((row, index) => {
+                  const last = index === report.predictiveSignals.length - 1;
+                  return (
                     <div
                       key={row.label}
-                      className="grid grid-cols-1 gap-1 px-5 py-4 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-6"
+                      className={`border-b px-5 py-4 ${last ? "md:col-span-2 print:col-span-2" : ""}`}
+                      style={{ borderColor: FIGMA.hairline }}
                     >
-                      <dt
-                        className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[#6b7280]"
-                      >
-                        {row.label}
-                      </dt>
-                      <dd className="text-[14px] leading-6 text-[#3a4250]">{row.text}</dd>
+                      <div className="flex items-center gap-3">
+                        {SIGNAL_ICON[row.label] ? (
+                          <img
+                            src={SIGNAL_ICON[row.label]}
+                            alt=""
+                            className="h-[22px] w-[22px] object-contain"
+                          />
+                        ) : null}
+                        <p
+                          className="text-[9px] font-semibold uppercase tracking-[0.14em]"
+                          style={{ color: FIGMA.gold }}
+                        >
+                          {row.label}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-[12px] leading-[18px] text-[#14263d]">
+                        {row.text}
+                      </p>
                     </div>
-                  ))}
-                </dl>
-              </section>
-            ) : null}
+                  );
+                })}
+              </div>
+            </SectionShell>
+          ) : null}
 
-            {/* 3 — FOUNDER'S OWN WORDS */}
-            {report.foundersWords.length > 0 ? (
-              <section id="founders-words" className="scroll-mt-8">
-                <SectionHeading index={3} title="The Founder's Own Words" />
-                <p className="mt-2 text-[13px] text-[#8a8477]">
-                  What they wrote, read against their actual pillar evidence and primary
-                  constraint. Tags are hypotheses to test in the room, not conclusions.
-                </p>
-                <div className="mt-4 space-y-5">
-                  {report.foundersWords.map((item) => (
-                    <FounderWordCard key={item.prompt} item={item} />
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {/* 4 — SUGGESTED SEQUENCE */}
-            <section id="suggested-sequence" className="scroll-mt-8">
-              <SectionHeading index={4} title="Suggested Sequence" />
-              <p className="mt-2 text-[13px] text-[#8a8477]">
-                A four-step talk-track for a {meta.approachLabel} founder
-                {meta.primaryConstraint ? ` with a ${meta.primaryConstraint.label} constraint` : ""}.
-              </p>
-              <div
-                className="mt-4 space-y-5 rounded-2xl border p-6 sm:p-8"
-                style={{ backgroundColor: "#fff", borderColor: IVORY_BORDER }}
-              >
-                {report.suggestedSequence.map((step) => (
-                  <SequenceStep key={step.step} step={step} />
+          {/* 3. Founder's own words */}
+          {report.foundersWords.length > 0 ? (
+            <SectionShell id="founders-words" eyebrow="Diagnostic Interpretation">
+              <h2 className="text-[29px]" style={{ ...serif, color: FIGMA.navy }}>
+                Founder&apos;s own words
+              </h2>
+              <div className="mt-6 space-y-8">
+                {report.foundersWords.map((item) => (
+                  <FounderWord key={item.questionNumber} item={item} />
                 ))}
               </div>
-            </section>
+            </SectionShell>
+          ) : null}
 
-            {/* 5 — THE OBJECTIVE */}
-            {report.objective ? (
-              <section id="objective" className="scroll-mt-8">
-                <SectionHeading index={5} title="The Objective" />
-                <div
-                  className="mt-4 rounded-2xl border-l-4 p-6 sm:p-8"
-                  style={{ backgroundColor: IVORY_PANEL, borderColor: GOLD }}
-                >
-                  <p className="text-[19px] leading-8" style={{ ...serif, color: INK }}>
-                    {report.objective}
-                  </p>
-                </div>
-              </section>
+          {/* 4. Suggested sequence */}
+          <SectionShell id="suggested-sequence" eyebrow="In the Conversation">
+            <h2 className="text-[29px]" style={{ ...serif, color: FIGMA.navy }}>
+              Suggested sequence
+            </h2>
+            {report.sequenceIntro ? (
+              <p className="mt-3 text-[14px] leading-6 text-[#66727d]">
+                {report.sequenceIntro}
+              </p>
             ) : null}
 
-            <footer
-              className="border-t pt-6 text-[12px] text-[#9a9384] print:hidden"
-              style={{ borderColor: HAIRLINE }}
+            <div className="mt-5 border-t" style={{ borderColor: FIGMA.hairline }}>
+              {report.suggestedSequence.map((step) => (
+                <SequenceStep key={step.step} step={step} />
+              ))}
+            </div>
+
+            {report.sequenceCaution ? (
+              <div className="mt-6 rounded-[10px] border-l-2 bg-white px-6 py-5" style={{ borderColor: FIGMA.red }}>
+                <span className="inline-block bg-[#a85b55] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-white">
+                  Do not assume
+                </span>
+                <p className="mt-3 text-[12px] leading-5 text-[#14263d]">
+                  {report.sequenceCaution}
+                </p>
+              </div>
+            ) : null}
+          </SectionShell>
+
+          {/* 5. Objective */}
+          {report.objective ? (
+            <section
+              id="objective"
+              className="scroll-mt-6 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl print:py-8"
             >
-              <p>Content source: {meta.sourceVersion}.</p>
-              {report.qaFlags.length > 0 ? (
-                <details className="mt-2">
-                  <summary className="cursor-pointer">
-                    Diagnostic notes ({report.qaFlags.length}) — not shown to the founder
-                  </summary>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {report.qaFlags.map((flag, i) => (
-                      <li key={i}>{flag}</li>
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
-            </footer>
-          </div>
+              <p
+                className="text-[15px] font-medium uppercase tracking-[0.18em]"
+                style={{ color: FIGMA.gold }}
+              >
+                The Objective
+              </p>
+              <h2 className="mt-5 text-[27px]" style={serif}>
+                What this conversation needs to achieve
+              </h2>
+              <p className="mt-3 text-[11px] text-[#8e9aaa]">
+                Everything else in this playbook is optional. If the conversation
+                achieves only one thing, it should be this.
+              </p>
+              <div
+                className="mx-auto mt-8 max-w-[715px] rounded-[15px] border-2 px-8 py-9"
+                style={{ borderColor: FIGMA.gold }}
+              >
+                <p
+                  className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                  style={{ color: FIGMA.gold }}
+                >
+                  The one thing this conversation needs to achieve
+                </p>
+                <p className="mt-4 text-[23px] leading-8 sm:text-[25px]" style={serif}>
+                  {report.objective}
+                </p>
+              </div>
+            </section>
+          ) : null}
+
+          <footer className="pb-4 text-[11px] text-[#8e9aaa] print:hidden">
+            Content source: {meta.sourceVersion}.
+            {report.qaFlags.length > 0 ? (
+              <details className="mt-2">
+                <summary className="cursor-pointer">
+                  Diagnostic notes ({report.qaFlags.length})
+                </summary>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {report.qaFlags.map((flag, index) => (
+                    <li key={index}>{flag}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </footer>
         </div>
       </div>
     </main>

@@ -55,6 +55,9 @@
   iframe[src*="chat-widget"],
   #chat-widget,
   #chat-widget-container,
+  chat-widget,
+  [id*="chat-widget"],
+  [class*="chat-widget"],
   [id*="lc_text_widget"],
   [class*="lc_text_widget"] {
     display: none !important;

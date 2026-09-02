@@ -235,27 +235,42 @@ export const METHOD_LAYERS: Array<{
 }> = [
   {
     layer: "Identity",
-    blurb: "What the business believes it is allowed to charge and lead on.",
-    pillars: ["identity"],
+    blurb:
+      "Who this business is for, what it is worth, and whether the owner can hold the commercial weight of it. When this layer is unclear, everything downstream is negotiated rather than decided.",
+    pillars: ["identity", "positioning"],
   },
   {
     layer: "Structure",
-    blurb: "How the offer, position and revenue model are built to hold.",
-    pillars: ["positioning", "offer", "revenue_model"],
+    blurb:
+      "How value is packaged and how money is designed to behave once it arrives. This is the layer that determines whether revenue becomes profit.",
+    pillars: ["offer", "revenue_model"],
   },
   {
     layer: "Execution",
-    blurb: "Whether the selling and the daily decisions actually happen.",
+    blurb:
+      "What actually happens in the room and how commercial choices get made. This is the layer most people try to fix first, and the layer that depends most on the other two.",
     pillars: ["sales", "decision"],
   },
 ];
 
 /** Revenue → Profit → Personal Wealth → Freedom chain (spec §5). */
 export const REVENUE_CHAIN: Array<{ label: string; blurb: string }> = [
-  { label: "Revenue", blurb: "What the business brings in." },
-  { label: "Profit", blurb: "What it keeps after it has been fed." },
-  { label: "Personal Wealth", blurb: "What that profit builds for the owner." },
-  { label: "Freedom", blurb: "The choice and time that wealth is meant to buy." },
+  {
+    label: "Revenue",
+    blurb: "Money arriving in the business. The most visible measure, and the least complete.",
+  },
+  {
+    label: "Profit",
+    blurb: "What the structure of the business allows you to keep once delivery is paid for.",
+  },
+  {
+    label: "Personal Wealth",
+    blurb: "Whether retained profit creates value that exists beyond the business itself.",
+  },
+  {
+    label: "Freedom",
+    blurb: "Whether the business is building greater choice for the person who owns it.",
+  },
 ];
 
 export const FIX_ORDER_LABELS = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
@@ -265,7 +280,7 @@ export const METHOD_LAYER_LABEL: Record<
   "Identity" | "Structure" | "Execution"
 > = {
   identity: "Identity",
-  positioning: "Structure",
+  positioning: "Identity",
   offer: "Structure",
   revenue_model: "Structure",
   sales: "Execution",
@@ -765,24 +780,45 @@ export function buildPillarView(score: InevitableStandardScore): PillarView[] {
 }
 
 /**
- * Full 6-pillar priority order. Uses the stored constraint engine order when
- * present; otherwise falls back to ascending pillar percentage (lowest first),
- * matching how Report 1 degrades.
+ * Full 6-pillar diagnosis-led priority order.
+ *
+ * Older completed assessments may carry a stored priority_fix_order generated
+ * by the earlier Method-layer sorter. Do not trust that stale order at render
+ * time. Rebuild the sequence from the stored Primary/Secondary diagnosis and
+ * current pillar percentages so existing reports are corrected immediately.
+ *
+ * Order:
+ *   1. Primary Constraint
+ *   2. Secondary Constraint
+ *   3-6. Remaining pillars by severity, canonical order as tie-break
+ *
+ * Identity -> Structure -> Execution remains the dependency architecture used
+ * to explain what helps a change hold; it does not override where the diagnosis
+ * says to begin.
  */
 export function resolvePriorityOrder(
   constraints: ConstraintResult | null,
   pillarView: PillarView[],
 ): PillarKey[] {
-  const stored = Array.isArray(constraints?.priority_fix_order)
-    ? (constraints!.priority_fix_order!.filter(Boolean) as string[])
-    : [];
+  const isPillarKey = (value: unknown): value is PillarKey =>
+    typeof value === "string" &&
+    PILLARS.some((pillar) => pillar.key === value);
 
-  const ordered = stored.filter((key): key is PillarKey =>
-    PILLARS.some((pillar) => pillar.key === key),
+  const ordered: PillarKey[] = [];
+  const primary = constraints?.primary_constraint;
+  const secondary = constraints?.secondary_constraint;
+
+  if (isPillarKey(primary)) ordered.push(primary);
+  if (isPillarKey(secondary) && secondary !== primary) ordered.push(secondary);
+
+  const severitySorted = [...pillarView].sort(
+    (a, b) =>
+      a.percentage - b.percentage ||
+      PILLARS.findIndex((pillar) => pillar.key === a.key) -
+        PILLARS.findIndex((pillar) => pillar.key === b.key),
   );
 
-  // Ensure all six appear even if stored data is a short pre-change list.
-  for (const pillar of [...pillarView].sort((a, b) => a.percentage - b.percentage)) {
+  for (const pillar of severitySorted) {
     if (!ordered.includes(pillar.key)) ordered.push(pillar.key);
   }
 
