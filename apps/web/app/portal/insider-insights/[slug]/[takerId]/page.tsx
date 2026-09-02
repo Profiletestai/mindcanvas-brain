@@ -75,7 +75,7 @@ export default async function InsiderInsightsPage({
 
   const { data: taker } = await sb
     .from("test_takers")
-    .select("id, org_id, test_id, first_name, last_name, email, company")
+    .select("id, org_id, test_id, link_id, link_token, first_name, last_name, email, company")
     .eq("id", takerId)
     .maybeSingle();
 
@@ -122,6 +122,25 @@ export default async function InsiderInsightsPage({
   const score = inevitableStandardScore(totals, test);
   if (!score) return notFound();
 
+  let nextStepsHref: string | null = null;
+  if (taker.link_id || taker.link_token) {
+    let linkQuery = sb
+      .from("test_links")
+      .select("next_steps_url, redirect_url");
+
+    linkQuery = taker.link_id
+      ? linkQuery.eq("id", taker.link_id)
+      : linkQuery.eq("token", taker.link_token);
+
+    const { data: originatingLink } = await linkQuery.maybeSingle();
+    nextStepsHref =
+      (
+        originatingLink?.next_steps_url ||
+        originatingLink?.redirect_url ||
+        ""
+      ).trim() || null;
+  }
+
   const fullName = [taker.first_name, taker.last_name]
     .filter(Boolean)
     .join(" ")
@@ -143,6 +162,7 @@ export default async function InsiderInsightsPage({
       backHref={`/portal/${encodeURIComponent(slug)}/database/${encodeURIComponent(
         taker.id,
       )}`}
+      nextStepsHref={nextStepsHref}
     />
   );
 }
