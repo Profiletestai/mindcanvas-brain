@@ -67,8 +67,8 @@ export const INEVITABLE_STANDARD_METHOD_LAYERS: readonly {
   layer: InevitableStandardMethodLayer;
   pillars: readonly InevitableStandardPillar[];
 }[] = [
-  { layer: "identity", pillars: ["identity"] },
-  { layer: "structure", pillars: ["positioning", "offer", "revenue_model"] },
+  { layer: "identity", pillars: ["identity", "positioning"] },
+  { layer: "structure", pillars: ["offer", "revenue_model"] },
   { layer: "execution", pillars: ["sales", "decision"] },
 ];
 

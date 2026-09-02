@@ -235,27 +235,42 @@ export const METHOD_LAYERS: Array<{
 }> = [
   {
     layer: "Identity",
-    blurb: "What the business believes it is allowed to charge and lead on.",
-    pillars: ["identity"],
+    blurb:
+      "Who this business is for, what it is worth, and whether the owner can hold the commercial weight of it. When this layer is unclear, everything downstream is negotiated rather than decided.",
+    pillars: ["identity", "positioning"],
   },
   {
     layer: "Structure",
-    blurb: "How the offer, position and revenue model are built to hold.",
-    pillars: ["positioning", "offer", "revenue_model"],
+    blurb:
+      "How value is packaged and how money is designed to behave once it arrives. This is the layer that determines whether revenue becomes profit.",
+    pillars: ["offer", "revenue_model"],
   },
   {
     layer: "Execution",
-    blurb: "Whether the selling and the daily decisions actually happen.",
+    blurb:
+      "What actually happens in the room and how commercial choices get made. This is the layer most people try to fix first, and the layer that depends most on the other two.",
     pillars: ["sales", "decision"],
   },
 ];
 
 /** Revenue → Profit → Personal Wealth → Freedom chain (spec §5). */
 export const REVENUE_CHAIN: Array<{ label: string; blurb: string }> = [
-  { label: "Revenue", blurb: "What the business brings in." },
-  { label: "Profit", blurb: "What it keeps after it has been fed." },
-  { label: "Personal Wealth", blurb: "What that profit builds for the owner." },
-  { label: "Freedom", blurb: "The choice and time that wealth is meant to buy." },
+  {
+    label: "Revenue",
+    blurb: "Money arriving in the business. The most visible measure, and the least complete.",
+  },
+  {
+    label: "Profit",
+    blurb: "What the structure of the business allows you to keep once delivery is paid for.",
+  },
+  {
+    label: "Personal Wealth",
+    blurb: "Whether retained profit creates value that exists beyond the business itself.",
+  },
+  {
+    label: "Freedom",
+    blurb: "Whether the business is building greater choice for the person who owns it.",
+  },
 ];
 
 export const FIX_ORDER_LABELS = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
@@ -265,7 +280,7 @@ export const METHOD_LAYER_LABEL: Record<
   "Identity" | "Structure" | "Execution"
 > = {
   identity: "Identity",
-  positioning: "Structure",
+  positioning: "Identity",
   offer: "Structure",
   revenue_model: "Structure",
   sales: "Execution",

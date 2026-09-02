@@ -68,7 +68,7 @@ describe("The Inevitable Standard constraint model", () => {
 
   it("maps pillars to the correct Method layers", () => {
     expect(methodLayerFor("identity")).toBe("identity");
-    expect(methodLayerFor("positioning")).toBe("structure");
+    expect(methodLayerFor("positioning")).toBe("identity");
     expect(methodLayerFor("offer")).toBe("structure");
     expect(methodLayerFor("revenue_model")).toBe("structure");
     expect(methodLayerFor("sales")).toBe("execution");

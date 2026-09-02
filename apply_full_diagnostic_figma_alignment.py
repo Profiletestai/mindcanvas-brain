@@ -1,67 +1,231 @@
-"use client";
+#!/usr/bin/env python3
+"""
+Apply the approved Figma structure and styling to The Inevitable Standard
+Full Diagnostic Report, while preserving the diagnosis-led logic from Phase 1.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { getBaseUrl } from "@/lib/server-url";
-import {
-  getInevitableStandardPillarBandContent,
-  type InevitableStandardContentSection,
-} from "@/lib/inevitable-standard/content/reportCopy";
-import {
-  buildDiagnosticAdds,
-  buildNinetyDayPlan,
-  type NinetyDayPhase,
-} from "@/lib/inevitable-standard/fullDiagnosticTemplates";
-import {
-  APPROACH_LENS_COPY,
-  APPROACHES,
-  ApproachCompass,
-  BandMeter,
-  BAND_MEANING,
-  Eyebrow,
-  FIX_ORDER_LABELS,
-  GarLegend,
-  GAR,
-  GOLD,
-  GOLD_TEXT,
-  HAIRLINE,
-  INK,
-  IVORY,
-  IVORY_BORDER,
-  IVORY_PANEL,
-  METHOD_LAYER_LABEL,
-  METHOD_LAYERS,
-  NAVY,
-  NAVY_DEEP,
-  NAVY_GRADIENT,
-  PILLAR_CONSTRAINT_COPY,
-  PillarSummaryList,
-  PRIORITY_ORDER_NOTE,
-  ReadinessDonut,
-  REVENUE_CHAIN,
-  bandLabelFor,
-  buildPillarView,
-  clampPercentage,
-  formatAssessmentDate,
-  newsreader,
-  numberOr,
-  pillarDescriptor,
-  pillarLabel,
-  primaryConstraintSentence,
-  resolvePriorityOrder,
-  round1,
-  serif,
-  type ApproachCode,
-  type Gar,
-  type PillarKey,
-  type PillarView,
-  type ResultPayload,
-} from "../report/inevitableStandardShared";
+Run from the mindcanvas-brain repository root:
+    python3 apply_full_diagnostic_figma_alignment.py
 
-/* -------------------------------------------------------------------------- */
-/* Pillar chapter template (spec §5 — Report 2)                                */
-/* -------------------------------------------------------------------------- */
+This script does NOT commit, push, merge, or deploy anything.
+"""
 
-const CHAPTER_SECTIONS: Array<{
+from pathlib import Path
+import subprocess
+import sys
+
+ROOT = Path.cwd()
+FILES = {
+    "engine": ROOT / "apps/web/lib/inevitable-standard/constraintEngine.ts",
+    "tests": ROOT / "apps/web/lib/inevitable-standard/constraintEngine.test.ts",
+    "shared": ROOT / "apps/web/app/t/[token]/report/inevitableStandardShared.tsx",
+    "full": ROOT / "apps/web/app/t/[token]/full-report/InevitableStandardFullDiagnosticClient.tsx",
+}
+
+
+def branch_name():
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:
+        return ""
+
+
+def replace_once(text, old, new, label):
+    count = text.count(old)
+    if count != 1:
+        raise RuntimeError(
+            f"{label}: expected exactly one source match, found {count}. No files were written."
+        )
+    return text.replace(old, new, 1)
+
+
+def replace_between(text, start, end, replacement, label):
+    start_i = text.find(start)
+    if start_i < 0:
+        raise RuntimeError(f"{label}: start marker not found. No files were written.")
+    end_i = text.find(end, start_i + len(start))
+    if end_i < 0:
+        raise RuntimeError(f"{label}: end marker not found. No files were written.")
+    return text[:start_i] + replacement + text[end_i:]
+
+
+missing = [str(p) for p in FILES.values() if not p.exists()]
+if missing:
+    print("Missing expected files:")
+    for p in missing:
+        print("  -", p)
+    print("Run this script from the mindcanvas-brain repository root.")
+    sys.exit(1)
+
+branch = branch_name()
+if branch and branch not in {"feature/inevitable-standard", "fix/inevitable-report-alignment"}:
+    print(f"Current branch is {branch!r}.")
+    print("Switch to feature/inevitable-standard (or a fix branch from it) before applying.")
+    sys.exit(1)
+
+pending = {}
+
+# ---------------------------------------------------------------------------
+# 1. Correct the Method-layer grouping to the approved Full Diagnostic:
+#    Identity = Identity + Positioning
+#    Structure = Offer + Revenue Model
+#    Execution = Sales + Decision
+# ---------------------------------------------------------------------------
+engine = FILES["engine"].read_text(encoding="utf-8")
+engine = replace_once(
+    engine,
+    """export const INEVITABLE_STANDARD_METHOD_LAYERS: readonly {
+  layer: InevitableStandardMethodLayer;
+  pillars: readonly InevitableStandardPillar[];
+}[] = [
+  { layer: "identity", pillars: ["identity"] },
+  { layer: "structure", pillars: ["positioning", "offer", "revenue_model"] },
+  { layer: "execution", pillars: ["sales", "decision"] },
+];""",
+    """export const INEVITABLE_STANDARD_METHOD_LAYERS: readonly {
+  layer: InevitableStandardMethodLayer;
+  pillars: readonly InevitableStandardPillar[];
+}[] = [
+  { layer: "identity", pillars: ["identity", "positioning"] },
+  { layer: "structure", pillars: ["offer", "revenue_model"] },
+  { layer: "execution", pillars: ["sales", "decision"] },
+];""",
+    "constraint engine Method layers",
+)
+pending[FILES["engine"]] = engine
+
+tests = FILES["tests"].read_text(encoding="utf-8")
+tests = replace_once(
+    tests,
+    '    expect(methodLayerFor("positioning")).toBe("structure");',
+    '    expect(methodLayerFor("positioning")).toBe("identity");',
+    "Method-layer regression test",
+)
+pending[FILES["tests"]] = tests
+
+shared = FILES["shared"].read_text(encoding="utf-8")
+shared = replace_once(
+    shared,
+    """export const METHOD_LAYERS: Array<{
+  layer: "Identity" | "Structure" | "Execution";
+  blurb: string;
+  pillars: PillarKey[];
+}> = [
+  {
+    layer: "Identity",
+    blurb: "What the business believes it is allowed to charge and lead on.",
+    pillars: ["identity"],
+  },
+  {
+    layer: "Structure",
+    blurb: "How the offer, position and revenue model are built to hold.",
+    pillars: ["positioning", "offer", "revenue_model"],
+  },
+  {
+    layer: "Execution",
+    blurb: "Whether the selling and the daily decisions actually happen.",
+    pillars: ["sales", "decision"],
+  },
+];""",
+    """export const METHOD_LAYERS: Array<{
+  layer: "Identity" | "Structure" | "Execution";
+  blurb: string;
+  pillars: PillarKey[];
+}> = [
+  {
+    layer: "Identity",
+    blurb:
+      "Who this business is for, what it is worth, and whether the owner can hold the commercial weight of it. When this layer is unclear, everything downstream is negotiated rather than decided.",
+    pillars: ["identity", "positioning"],
+  },
+  {
+    layer: "Structure",
+    blurb:
+      "How value is packaged and how money is designed to behave once it arrives. This is the layer that determines whether revenue becomes profit.",
+    pillars: ["offer", "revenue_model"],
+  },
+  {
+    layer: "Execution",
+    blurb:
+      "What actually happens in the room and how commercial choices get made. This is the layer most people try to fix first, and the layer that depends most on the other two.",
+    pillars: ["sales", "decision"],
+  },
+];""",
+    "shared Method layers",
+)
+shared = replace_once(
+    shared,
+    """export const REVENUE_CHAIN: Array<{ label: string; blurb: string }> = [
+  { label: "Revenue", blurb: "What the business brings in." },
+  { label: "Profit", blurb: "What it keeps after it has been fed." },
+  { label: "Personal Wealth", blurb: "What that profit builds for the owner." },
+  { label: "Freedom", blurb: "The choice and time that wealth is meant to buy." },
+];""",
+    """export const REVENUE_CHAIN: Array<{ label: string; blurb: string }> = [
+  {
+    label: "Revenue",
+    blurb: "Money arriving in the business. The most visible measure, and the least complete.",
+  },
+  {
+    label: "Profit",
+    blurb: "What the structure of the business allows you to keep once delivery is paid for.",
+  },
+  {
+    label: "Personal Wealth",
+    blurb: "Whether retained profit creates value that exists beyond the business itself.",
+  },
+  {
+    label: "Freedom",
+    blurb: "Whether the business is building greater choice for the person who owns it.",
+  },
+];""",
+    "Revenue-to-Freedom copy",
+)
+shared = replace_once(
+    shared,
+    """export const METHOD_LAYER_LABEL: Record<
+  PillarKey,
+  "Identity" | "Structure" | "Execution"
+> = {
+  identity: "Identity",
+  positioning: "Structure",
+  offer: "Structure",
+  revenue_model: "Structure",
+  sales: "Execution",
+  decision: "Execution",
+};""",
+    """export const METHOD_LAYER_LABEL: Record<
+  PillarKey,
+  "Identity" | "Structure" | "Execution"
+> = {
+  identity: "Identity",
+  positioning: "Identity",
+  offer: "Structure",
+  revenue_model: "Structure",
+  sales: "Execution",
+  decision: "Execution",
+};""",
+    "shared Method-layer labels",
+)
+pending[FILES["shared"]] = shared
+
+# ---------------------------------------------------------------------------
+# 2. Full Diagnostic visual / information architecture alignment
+# ---------------------------------------------------------------------------
+full = FILES["full"].read_text(encoding="utf-8")
+
+# Remove the Figma-nonexistent Revenue-in-Structure panel from this report.
+full = full.replace("  RevenueInStructurePanel,\n", "", 1)
+full = full.replace("    const revenueInStructure = score.revenue_in_structure ?? null;\n", "", 1)
+full = full.replace("      revenueInStructure,\n", "", 1)
+full = full.replace("    revenueInStructure,\n", "", 1)
+
+# Add approved report assets and exact pillar questions.
+anchor = """const CHAPTER_SECTIONS: Array<{
   key: InevitableStandardContentSection;
   heading: string;
 }> = [
@@ -72,7 +236,8 @@ const CHAPTER_SECTIONS: Array<{
   { key: "focus_now", heading: "What to Focus On Now" },
   { key: "what_to_watch", heading: "What to Watch" },
   { key: "progress_looks_like", heading: "What Progress Should Look Like" },
-];
+];"""
+assets = anchor + """
 
 const PILLAR_ICON: Record<PillarKey, string> = {
   identity: "/inevitable-standard/snapshot/identitiy.png",
@@ -123,23 +288,39 @@ const HOW_TO_READ = [
   ["IV", "How You Make Commercial Decisions", "Your approach, and how it shows up in the results"],
   ["V", "Your Next Ninety Days", "30, 60 and 90-day focus"],
 ] as const;
+"""
+full = replace_once(full, anchor, assets, "Full Diagnostic asset constants")
 
-
-function chapterFallbackSentence(pillar: PillarView): string {
-  if (pillar.gar === "green") {
-    return `${pillar.label} is a relative strength in this result. ${pillar.descriptor} The work here is to hold it as a standard rather than to rebuild it.`;
-  }
+# Figma navy section shell + ivory inner panel.
+old_chapter = """function Chapter({
+  id,
+  eyebrow,
+  title,
+  children,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+}) {
   return (
-    primaryConstraintSentence(pillar.key, pillar.gar) ||
-    PILLAR_CONSTRAINT_COPY[pillar.key]
+    <section
+      id={id}
+      className="scroll-mt-8 border-t py-12 first:border-t-0 first:pt-0 sm:py-16 print:break-before-page"
+      style={{ borderColor: HAIRLINE }}
+    >
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2
+        className="mt-3 text-[26px] leading-snug sm:text-[32px]"
+        style={{ ...serif, color: INK }}
+      >
+        {title}
+      </h2>
+      <div className="mt-8">{children}</div>
+    </section>
   );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Small presentational pieces                                                 */
-/* -------------------------------------------------------------------------- */
-
-function Chapter({
+}"""
+new_chapter = """function Chapter({
   id,
   eyebrow,
   title,
@@ -174,21 +355,35 @@ function Chapter({
       </div>
     </section>
   );
-}
+}"""
+full = replace_once(full, old_chapter, new_chapter, "Figma Chapter shell")
 
-function GarChip({ gar }: { gar: Gar }) {
-  const g = GAR[gar];
+# Constraint cards.
+old_constraint = """function ConstraintBlock({
+  label,
+  pillarName,
+  body,
+}: {
+  label: string;
+  pillarName: string;
+  body: string;
+}) {
   return (
-    <span
-      className="rounded-sm px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
-      style={{ backgroundColor: g.chipBg, color: g.chipText }}
-    >
-      {g.name} — {g.tone}
-    </span>
+    <div>
+      <p
+        className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: GOLD_TEXT }}
+      >
+        {label}
+      </p>
+      <p className="mt-1 text-xl" style={{ ...serif, color: INK }}>
+        {pillarName}
+      </p>
+      <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">{body}</p>
+    </div>
   );
-}
-
-function ConstraintBlock({
+}"""
+new_constraint = """function ConstraintBlock({
   label,
   pillarName,
   body,
@@ -216,9 +411,13 @@ function ConstraintBlock({
       <p className="mt-4 text-[14px] leading-6 text-[#66727d]">{body}</p>
     </div>
   );
-}
+}"""
+full = replace_once(full, old_constraint, new_constraint, "Figma constraint cards")
 
-/** Revenue → Profit → Personal Wealth → Freedom — the primary framework visual. */
+# Revenue pathway cards.
+start = "/** Revenue → Profit → Personal Wealth → Freedom — the primary framework visual. */\nfunction RevenueChainDiagram() {"
+end = "\n\n/** Identity → Structure → Execution — the second framework visual, live scores. */"
+new_revenue = """/** Revenue → Profit → Personal Wealth → Freedom — the primary framework visual. */
 function RevenueChainDiagram() {
   return (
     <div className="grid gap-[18px] md:grid-cols-4">
@@ -238,9 +437,13 @@ function RevenueChainDiagram() {
       ))}
     </div>
   );
-}
+}"""
+full = replace_between(full, start, end, new_revenue, "Revenue pathway visual")
 
-/** Identity → Structure → Execution — the second framework visual, live scores. */
+# Method layer cards + dynamic in-result paragraph.
+start = "/** Identity → Structure → Execution — the second framework visual, live scores. */\nfunction MethodLayersDiagram"
+end = "\n\nfunction PhaseBlock"
+new_layers = """/** Identity → Structure → Execution — the second framework visual, live scores. */
 function MethodLayersDiagram({
   pillarView,
   primaryKey,
@@ -300,9 +503,13 @@ function MethodLayersDiagram({
       </p>
     </div>
   );
-}
+}"""
+full = replace_between(full, start, end, new_layers, "Method layer visual")
 
-function PhaseBlock({ phase }: { phase: NinetyDayPhase }) {
+# 30/60/90 cards.
+start = "function PhaseBlock({ phase }: { phase: NinetyDayPhase }) {"
+end = "\n\nfunction SidebarIndex"
+new_phase = """function PhaseBlock({ phase }: { phase: NinetyDayPhase }) {
   const windowLabel =
     phase.window === "Days 1–30"
       ? "30 Days"
@@ -326,9 +533,13 @@ function PhaseBlock({ phase }: { phase: NinetyDayPhase }) {
       </div>
     </div>
   );
-}
+}"""
+full = replace_between(full, start, end, new_phase, "Figma 30/60/90 cards")
 
-function SidebarIndex({
+# Figma report-index card.
+start = "function SidebarIndex({"
+end = "\n\n/* -------------------------------------------------------------------------- */\n/* Component"
+new_sidebar = """function SidebarIndex({
   sections,
   activeSection,
   readiness: _readiness,
@@ -402,194 +613,21 @@ function HeroPillarSummary({ pillars }: { pillars: PillarView[] }) {
       </div>
     </div>
   );
-}
+}"""
+full = replace_between(full, start, end, new_sidebar, "Figma sidebar and hero summary")
 
-/* -------------------------------------------------------------------------- */
-/* Component                                                                   */
-/* -------------------------------------------------------------------------- */
+# Initial active section.
+full = replace_once(
+    full,
+    '  const [activeSection, setActiveSection] = useState<string>("summary");',
+    '  const [activeSection, setActiveSection] = useState<string>("how-to-read");',
+    "initial report section",
+)
 
-export default function InevitableStandardFullDiagnosticClient({
-  token,
-  tid,
-}: {
-  token: string;
-  tid: string;
-}) {
-  const [payload, setPayload] = useState<ResultPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<string>("how-to-read");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const base = await getBaseUrl();
-        const response = await fetch(
-          `${base}/api/public/test/${encodeURIComponent(token)}/result?tid=${encodeURIComponent(tid)}`,
-          { cache: "no-store" },
-        );
-        const json = await response.json().catch(() => null);
-
-        if (!response.ok || json?.ok === false) {
-          throw new Error(json?.error || `Unable to load report (${response.status})`);
-        }
-
-        const nextPayload = (json?.data || null) as ResultPayload | null;
-        if (!nextPayload?.inevitable_standard) {
-          throw new Error(
-            "The Inevitable Standard result is not available for this test taker.",
-          );
-        }
-
-        if (!cancelled) setPayload(nextPayload);
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(
-            loadError instanceof Error ? loadError.message : "Unable to load report.",
-          );
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    if (tid) load();
-    else {
-      setError("This report link is missing the required test-taker id.");
-      setLoading(false);
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [tid, token]);
-
-  const score = payload?.inevitable_standard ?? null;
-
-  const view = useMemo(() => {
-    if (!score) return null;
-
-    const overall = score.overall || {};
-    const approaches = score.approaches || {};
-    const constraints = score.constraints ?? null;
-    const contextAnswers = score.context_answers ?? null;
-
-    const overallPercentage = round1(clampPercentage(overall.percentage));
-    const bandDescriptor = overall.label || bandLabelFor(overallPercentage);
-    const bandMeaning =
-      BAND_MEANING[bandLabelFor(overallPercentage)] ||
-      BAND_MEANING[bandDescriptor] ||
-      "";
-
-    const pillarView = buildPillarView(score);
-    const pillarByKey = new Map(pillarView.map((pillar) => [pillar.key, pillar]));
-    const pillarsByPct = [...pillarView].sort((a, b) => a.percentage - b.percentage);
-    const lowestPillar = pillarsByPct[0] || null;
-
-    const primaryKey =
-      (constraints?.primary_constraint as PillarKey | undefined) || null;
-    const secondaryKey =
-      (constraints?.secondary_constraint as PillarKey | undefined) || null;
-    const falseConstraint = constraints?.false_constraint ?? null;
-
-    const priorityOrder = resolvePriorityOrder(constraints, pillarView);
-
-
-    const dominant = approaches.dominant || null;
-    const dominantLabel = dominant
-      ? approaches.labels?.[dominant] ||
-        APPROACHES.find((item) => item.code === dominant)?.label ||
-        dominant
-      : null;
-    const dominantPct = dominant
-      ? round1(clampPercentage(approaches.percentages?.[dominant]))
-      : 0;
-    const secondaryApproach = approaches.secondary ?? null;
-    const secondaryApproachLabel =
-      secondaryApproach && secondaryApproach !== "BALANCED"
-        ? APPROACHES.find((item) => item.code === secondaryApproach)?.label ||
-          secondaryApproach
-        : secondaryApproach === "BALANCED"
-          ? "a balanced mix of the other three"
-          : null;
-
-    const approachPercent = (code: ApproachCode) =>
-      round1(clampPercentage(approaches.percentages?.[code]));
-    const compassX =
-      numberOr(
-        approaches.map?.x_people_trust_minus_evidence_proof,
-        approachPercent("B") - approachPercent("D"),
-      ) || 0;
-    const compassY =
-      numberOr(
-        approaches.map?.y_future_possibility_minus_timing_certainty,
-        approachPercent("A") - approachPercent("C"),
-      ) || 0;
-
-    const plan = buildNinetyDayPlan({
-      priorityOrder: constraints ? priorityOrder : [],
-      primaryConstraint: primaryKey,
-      secondaryConstraint: secondaryKey,
-      pillarPercentages: Object.fromEntries(
-        pillarView.map((pillar) => [pillar.key, pillar.percentage]),
-      ) as Partial<Record<PillarKey, number>>,
-    });
-
-    const diagnosticAdds = buildDiagnosticAdds({
-      q13: contextAnswers?.[13] ?? null,
-      q29: contextAnswers?.[29] ?? null,
-      primaryLabel: primaryKey ? pillarLabel(primaryKey) : null,
-      secondaryLabel: secondaryKey ? pillarLabel(secondaryKey) : null,
-      falseConstraint: falseConstraint
-        ? {
-            stated_label: pillarLabel(falseConstraint.stated_pillar),
-            evidence_label: pillarLabel(falseConstraint.evidence_pillar),
-            mismatch: falseConstraint.mismatch,
-            explanation: falseConstraint.explanation,
-          }
-        : null,
-    });
-
-    const clientName =
-      [payload?.taker?.first_name, payload?.taker?.last_name]
-        .map((part) => (part || "").trim())
-        .filter(Boolean)
-        .join(" ") || "—";
-    const businessName =
-      (payload?.taker?.company || payload?.business_name || "").trim() || null;
-    const assessmentDate = formatAssessmentDate(payload?.completed_at);
-    const orgName = (payload?.org_name || "").trim();
-
-    return {
-      overallPercentage,
-      bandDescriptor,
-      bandMeaning,
-      pillarView,
-      pillarByKey,
-      lowestPillar,
-      primaryKey,
-      secondaryKey,
-      falseConstraint,
-      priorityOrder,
-      dominant,
-      dominantLabel,
-      dominantPct,
-      secondaryApproachLabel,
-      approachPercent,
-      compassX,
-      compassY,
-      plan,
-      diagnosticAdds,
-      clientName,
-      businessName,
-      assessmentDate,
-      orgName,
-    };
-  }, [score, payload]);
-
-  const sections = useMemo(() => {
+# Sidebar / page section order, including all six pillar chapters.
+start = "  const sections = useMemo(() => {"
+end = "\n\n  useEffect(() => {\n    if (!view || typeof IntersectionObserver"
+new_sections = """  const sections = useMemo(() => {
     if (!view) return [];
     const list: Array<{ id: string; label: string }> = [
       { id: "how-to-read", label: "How to read this report" },
@@ -606,92 +644,23 @@ export default function InevitableStandardFullDiagnosticClient({
     list.push({ id: "plan", label: "Your next ninety days" });
     list.push({ id: "closing", label: "In closing" });
     return list;
-  }, [view]);
+  }, [view]);"""
+full = replace_between(full, start, end, new_sections, "Full Diagnostic section order")
 
-  useEffect(() => {
-    if (!view || typeof IntersectionObserver === "undefined") return;
+# Page background.
+full = full.replace('style={{ backgroundColor: IVORY, color: INK }}', 'style={{ backgroundColor: "#041731", color: INK }}')
 
-    const elements = sections
-      .map((section) => document.getElementById(section.id))
-      .filter((element): element is HTMLElement => Boolean(element));
-    if (elements.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible[0]) setActiveSection(visible[0].target.id);
-      },
-      { rootMargin: "-15% 0px -65% 0px", threshold: [0, 0.2, 0.5, 1] },
-    );
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
-  }, [view, sections]);
-
-  if (loading) {
-    return (
-      <main
-        className={`${newsreader.variable} min-h-screen px-6 py-16`}
-        style={{ backgroundColor: "#041731", color: INK }}
+# Replace floating print button with the approved top report bar.
+old_button = """      <button
+        type="button"
+        onClick={() => window.print()}
+        className="fixed right-4 top-4 z-20 rounded-full border bg-white/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4b5563] shadow-sm backdrop-blur transition hover:bg-white print:hidden"
+        style={{ borderColor: IVORY_BORDER }}
       >
-        <div className="mx-auto max-w-3xl">
-          <p className="text-sm text-[#8b8f98]">Preparing your Full Diagnostic Report…</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (error || !score || !view) {
-    return (
-      <main
-        className={`${newsreader.variable} min-h-screen px-6 py-16`}
-        style={{ backgroundColor: "#041731", color: INK }}
-      >
-        <div className="mx-auto max-w-2xl">
-          <Eyebrow>The Inevitable Standard Diagnostic™</Eyebrow>
-          <h1 className="mt-3 text-3xl" style={serif}>
-            Report not available
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-[#4b5563]">
-            {error || "The completed assessment result could not be found."}
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  const {
-    overallPercentage,
-    bandDescriptor,
-    bandMeaning,
-    pillarView,
-    lowestPillar,
-    primaryKey,
-    secondaryKey,
-    falseConstraint,
-    priorityOrder,
-    dominant,
-    dominantLabel,
-    dominantPct,
-    secondaryApproachLabel,
-    approachPercent,
-    compassX,
-    compassY,
-    plan,
-    diagnosticAdds,
-    clientName,
-    businessName,
-    assessmentDate,
-    orgName,
-  } = view;
-
-  return (
-    <main
-      className={`${newsreader.variable} min-h-screen`}
-      style={{ backgroundColor: "#041731", color: INK }}
-    >
-      <header className="border-b border-white/10 px-5 py-4 text-white print:hidden" style={{ backgroundColor: NAVY_DEEP }}>
+        Print / Save PDF
+      </button>
+"""
+new_topbar = """      <header className="border-b border-white/10 px-5 py-4 text-white print:hidden" style={{ backgroundColor: NAVY_DEEP }}>
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 lg:flex-nowrap">
           <div className="mr-auto flex min-w-[330px] items-center gap-4">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
@@ -715,8 +684,13 @@ export default function InevitableStandardFullDiagnosticClient({
           <div className="rounded-xl border border-white/25 px-3 py-2"><span className="block text-white/40">DATE</span><strong className="mt-1 block text-[12px] text-white">{assessmentDate}</strong></div>
         </div>
       </header>
+"""
+full = replace_once(full, old_button, new_topbar, "Full Diagnostic top header")
 
-      {/* Cover */}
+# Approved hero.
+start = "      {/* Cover */}"
+end = "      {/* Print-only index */}"
+hero = """      {/* Cover */}
       <header
         className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-12 text-white sm:px-10 sm:py-[60px] print:break-after-page"
         style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
@@ -737,35 +711,21 @@ export default function InevitableStandardFullDiagnosticClient({
         </div>
       </header>
 
-      {/* Print-only index */}
-      <div className="mx-auto hidden max-w-6xl px-6 pt-8 sm:px-10 print:block">
-        <p
-          className="text-[10px] font-semibold uppercase tracking-[0.24em]"
-          style={{ color: GOLD_TEXT }}
-        >
-          Report Index
-        </p>
-        <ol className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-[#4b5563]">
-          {sections.map((section, index) => (
-            <li key={section.id}>
-              <span className="tabular-nums" style={{ color: GOLD_TEXT }}>
-                {String(index + 1).padStart(2, "0")}
-              </span>{" "}
-              {section.label}
-            </li>
-          ))}
-        </ol>
-      </div>
+"""
+full = replace_between(full, start, end, hero, "Full Diagnostic hero")
 
-      <div className="mx-auto max-w-[1275px] gap-x-[46px] px-5 py-14 lg:grid lg:grid-cols-[303px_minmax(0,963px)] print:block">
-        <SidebarIndex
-          sections={sections}
-          activeSection={activeSection}
-          readiness={overallPercentage}
-          band={bandDescriptor}
-        />
+# Main report grid dimensions from the approved frame.
+full = replace_once(
+    full,
+    '      <div className="mx-auto max-w-6xl gap-x-12 px-6 py-12 sm:px-10 lg:grid lg:grid-cols-[260px_1fr] lg:py-16 print:block">',
+    '      <div className="mx-auto max-w-[1275px] gap-x-[46px] px-5 py-14 lg:grid lg:grid-cols-[303px_minmax(0,963px)] print:block">',
+    "Full Diagnostic report grid",
+)
 
-        <div className="min-w-0 space-y-10">
+# Add How-To-Read and split diagnosis from readiness.
+insert_marker = """        <div className="min-w-0">
+          {/* Results at a glance */}"""
+insert_replacement = """        <div className="min-w-0 space-y-10">
           <Chapter id="how-to-read" eyebrow="How to Read This Report" title="Your result first, then what it means">
             <p className="max-w-3xl text-[14px] leading-6 text-[#66727d]">
               This report opens with your diagnosis rather than the framework behind it. Read the first two sections for your result. Read the pillar chapters when you want to understand why a result appeared and what to do about it.
@@ -781,117 +741,79 @@ export default function InevitableStandardFullDiagnosticClient({
             </div>
           </Chapter>
 
-          {/* Results at a glance */}
-          <Chapter
+          {/* Results at a glance */}"""
+full = replace_once(full, insert_marker, insert_replacement, "How to Read section")
+
+full = replace_once(
+    full,
+    """          <Chapter
+            id="summary"
+            eyebrow="Results at a Glance"
+            title="Where the business stands, before we go deeper"
+          >""",
+    """          <Chapter
             id="summary"
             eyebrow="Your Diagnosis"
             title="Your Inevitable Standard Readiness"
-          >
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-              <span
-                className="text-[56px] leading-none"
-                style={{ ...serif, color: INK }}
-              >
-                {overallPercentage}%
-              </span>
-              <span className="pb-2 text-xl" style={{ ...serif, color: "#6b7280" }}>
-                {bandDescriptor}
-              </span>
-            </div>
-            <BandMeter percentage={overallPercentage} />
-            {bandMeaning ? (
+          >""",
+    "Readiness chapter heading",
+)
+
+# Add the core explanatory paragraph beneath the readiness result.
+old_band = """            {bandMeaning ? (
               <p className="mt-5 max-w-2xl text-[15px] leading-7 text-[#4b5563]">
                 {bandMeaning}
               </p>
             ) : null}
-            <p className="mt-5 max-w-3xl text-[14px] leading-6 text-[#66727d]">
+"""
+new_band = old_band + """            <p className="mt-5 max-w-3xl text-[14px] leading-6 text-[#66727d]">
               Your Inevitable Standard Readiness shows how deliberately your business is currently built to move revenue through to profit, personal wealth and greater freedom. It is calculated across six areas of the business and is designed to show where the foundations are already working and where greater structure could have the biggest impact.
             </p>
+"""
+full = replace_once(full, old_band, new_band, "Readiness explanatory copy")
 
-            <h3
-              className="mt-12 text-[13px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: GOLD_TEXT }}
-            >
-              The Six Pillars
-            </h3>
-            <div className="mt-4">
-              <PillarSummaryList pillars={pillarView} />
-              <GarLegend />
-            </div>
-
-          </Chapter>
+# Close readiness after the six-pillar list and open the separate diagnosis section.
+needle = '            <div className="mt-12 space-y-8">'
+replacement = """          </Chapter>
 
           <Chapter
             id="diagnosis"
             eyebrow="Your Diagnosis"
             title="What is most likely holding you back"
           >
-            <div className="space-y-4">
-              {primaryKey ? (
-                <ConstraintBlock
-                  label="Primary constraint"
-                  pillarName={pillarLabel(primaryKey)}
-                  body={`The area most likely to be limiting progress right now. ${primaryConstraintSentence(
-                    primaryKey,
-                    view.pillarByKey.get(primaryKey)?.gar ?? "amber",
-                  )}`}
-                />
-              ) : (
-                <p className="text-[15px] leading-7 text-[#4b5563]">
-                  Primary area to strengthen:{" "}
-                  <strong className="font-semibold" style={{ color: INK }}>
-                    {lowestPillar?.label || "not yet available"}
-                  </strong>{" "}
-                  ({lowestPillar?.percentage ?? 0}%).
-                </p>
-              )}
+            <div className="space-y-4">"""
+full = replace_once(full, needle, replacement, "Split diagnosis from readiness")
 
-              {secondaryKey ? (
-                <ConstraintBlock
-                  label="Secondary constraint"
-                  pillarName={pillarLabel(secondaryKey)}
-                  body="The area most likely to reinforce or recreate the primary constraint."
-                />
-              ) : null}
-
-              {falseConstraint ? (
-                <div
-                  className="rounded-sm border p-6"
-                  style={{ borderColor: IVORY_BORDER, backgroundColor: "#faf6ec" }}
-                >
-                  <p
-                    className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-                    style={{ color: GOLD_TEXT }}
-                  >
-                    What may not be the real problem
-                  </p>
-                  <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
-                    The result points less to{" "}
-                    <strong className="font-semibold" style={{ color: INK }}>
-                      {pillarLabel(falseConstraint.stated_pillar)}
-                    </strong>{" "}
-                    and more to{" "}
-                    <strong className="font-semibold" style={{ color: INK }}>
-                      {pillarLabel(falseConstraint.evidence_pillar)}
-                    </strong>
-                    .
-                  </p>
-                  {falseConstraint.explanation ? (
-                    <p className="mt-3 text-[14px] leading-7 text-[#4b5563]">
-                      {falseConstraint.explanation}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div>
+# Remove the duplicate mini decision-approach paragraph from the diagnosis section.
+mini_approach = """              <div>
                 <p
                   className="text-[11px] font-semibold uppercase tracking-[0.18em]"
                   style={{ color: GOLD_TEXT }}
                 >
-                  Priority Fix Order
+                  Commercial decision approach
                 </p>
-                <ol className="mt-5 grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
+                <p className="mt-2 text-[15px] leading-7 text-[#4b5563]">
+                  Your leading approach is{" "}
+                  <strong className="font-semibold" style={{ color: INK }}>
+                    {dominantLabel || "still forming"}
+                  </strong>
+                  {dominant ? ` (${dominantPct}%)` : ""}
+                  {secondaryApproachLabel
+                    ? `, with a secondary influence of ${secondaryApproachLabel}`
+                    : ""}
+                  . The full picture is in the Commercial Decision Intelligence chapter.
+                </p>
+              </div>
+
+"""
+full = replace_once(full, mini_approach, "", "Remove duplicate decision approach")
+
+# Priority order: approved horizontal 01-06 treatment.
+start = """                <ol className="mt-3 border-t" style={{ borderColor: HAIRLINE }}>"""
+end = """                <p className="mt-4 text-[12px] leading-6 text-[#918a7d]">
+                  {PRIORITY_ORDER_NOTE}
+                </p>"""
+priority = """                <ol className="mt-5 grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
                   {priorityOrder.map((key, index) => (
                     <li key={key} className="border-t-2 pt-3" style={{ borderColor: index === 0 ? GOLD : HAIRLINE }}>
                       <p className="text-[9px] text-[#66727d]">{String(index + 1).padStart(2, "0")}</p>
@@ -899,27 +821,45 @@ export default function InevitableStandardFullDiagnosticClient({
                     </li>
                   ))}
                 </ol>
-                <p className="mt-6 text-[12px] leading-6 text-[#66727d]">{PRIORITY_ORDER_NOTE}</p>                <p className="mt-4 text-[12px] leading-6 text-[#918a7d]">
-                  {PRIORITY_ORDER_NOTE}
-                </p>
-              </div>
-            </div>
-          </Chapter>
+                <p className="mt-6 text-[12px] leading-6 text-[#66727d]">{PRIORITY_ORDER_NOTE}</p>"""
+full = replace_between(full, start, end, priority, "Horizontal Priority Fix Order")
 
-          {/* Framework model */}
-          <Chapter
-            id="model"
-            eyebrow="The Model"
-            title="Revenue is the beginning of the pathway, not the destination"
-          >
-            <p className="max-w-3xl text-[15px] leading-7 text-[#66727d]">
+# Model title / copy.
+full = replace_once(
+    full,
+    '            title="How revenue is meant to become freedom"',
+    '            title="Revenue is the beginning of the pathway, not the destination"',
+    "Revenue model title",
+)
+full = replace_once(
+    full,
+    """            <p className="max-w-2xl text-[15px] leading-7 text-[#4b5563]">
+              Every number in this report is in service of one chain. Revenue is only the
+              first link; the point of the business is what the chain produces at the end.
+            </p>""",
+    """            <p className="max-w-3xl text-[15px] leading-7 text-[#66727d]">
               Revenue is the beginning of the pathway, not the destination. The Inevitable Standard looks at whether the structure of the business allows revenue to become retained profit, whether that profit can create value beyond the business itself, and ultimately whether the business is building greater choice and freedom for its owner.
-            </p>
-            <div className="mt-8">
-              <RevenueChainDiagram />
-            </div>
+            </p>""",
+    "Revenue model explanation",
+)
 
-          </Chapter>
+# Split Method layers into their own Figma section.
+old_method_heading = """            <h3
+              className="mt-12 text-[13px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: GOLD_TEXT }}
+            >
+              Identity → Structure → Execution
+            </h3>
+            <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[#4b5563]">
+              The six pillars sit in three layers. Each layer depends on the one before it,
+              which is why a problem that appears in execution can have quieter dependencies
+              elsewhere. The layers explain what helps the intervention hold; they do not
+              override the Primary Constraint as the place to begin.
+            </p>
+            <div className="mt-6">
+              <MethodLayersDiagram pillarView={pillarView} />
+            </div>"""
+new_method_heading = """          </Chapter>
 
           <Chapter
             id="layers"
@@ -931,10 +871,13 @@ export default function InevitableStandardFullDiagnosticClient({
             </p>
             <div className="mt-7">
               <MethodLayersDiagram pillarView={pillarView} primaryKey={primaryKey} secondaryKey={secondaryKey} />
-            </div>
-          </Chapter>
+            </div>"""
+full = replace_once(full, old_method_heading, new_method_heading, "Separate Method-layer section")
 
-          {/* Pillar chapters */}
+# Replace the single long pillar chapter with six Figma-style pillar sections.
+start = "          {/* Pillar chapters */}"
+end = "          {/* In your words */}"
+pillars_block = """          {/* Pillar chapters */}
           {pillarView.map((pillar, index) => {
             const content = getInevitableStandardPillarBandContent(pillar.key, pillar.gar);
             const rows = CHAPTER_SECTIONS.map((section) => ({
@@ -991,57 +934,13 @@ export default function InevitableStandardFullDiagnosticClient({
             );
           })}
 
-          {/* In your words */}
-          {diagnosticAdds ? (
-            <Chapter
-              id="your-words"
-              eyebrow="In Your Words"
-              title="What you told us, and what the diagnostic adds"
-            >
-              {diagnosticAdds.toldUs.length > 0 ? (
-                <div className="space-y-5">
-                  {diagnosticAdds.toldUs.map((item) => (
-                    <div
-                      key={item.prompt}
-                      className="border-l-2 pl-5"
-                      style={{ borderColor: IVORY_BORDER }}
-                    >
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-[#918a7d]">
-                        {item.prompt}
-                      </p>
-                      <p
-                        className="mt-1 text-[17px] leading-7 text-[#3f4652]"
-                        style={serif}
-                      >
-                        &ldquo;{item.quote}&rdquo;
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+"""
+full = replace_between(full, start, end, pillars_block, "Six separate pillar sections")
 
-              {diagnosticAdds.adds ? (
-                <div className="mt-8">
-                  <p
-                    className="text-[11px] font-semibold uppercase tracking-[0.16em]"
-                    style={{ color: GOLD_TEXT }}
-                  >
-                    What your diagnostic adds
-                  </p>
-                  <p className="mt-1.5 max-w-2xl text-[15px] leading-7 text-[#4b5563]">
-                    {diagnosticAdds.adds}
-                  </p>
-                </div>
-              ) : null}
-
-              <p className="mt-6 text-[12px] leading-6 text-[#918a7d]">
-                This is an interpretation of your answers read alongside your pillar scores,
-                not a fixed conclusion.
-              </p>
-            </Chapter>
-          ) : null}
-
-          {/* Commercial decision intelligence */}
+# Figma-style Commercial Decision Intelligence.
+start = "          {/* Commercial decision intelligence */}"
+end = "          {/* Revenue in your structure */}"
+approach_block = """          {/* Commercial decision intelligence */}
           <Chapter
             id="approach"
             eyebrow="Commercial Decision Intelligence"
@@ -1089,7 +988,18 @@ export default function InevitableStandardFullDiagnosticClient({
             ) : null}
           </Chapter>
 
-          {/* 30/60/90 */}
+"""
+full = replace_between(full, start, end, approach_block, "Commercial Decision Intelligence section")
+
+# Remove Revenue in Your Structure section entirely to match the approved Figma report.
+start = "          {/* Revenue in your structure */}"
+end = "          {/* 30/60/90 */}"
+full = replace_between(full, start, end, "", "Remove Revenue-in-Structure from Full Diagnostic")
+
+# Replace plan section with the approved three-column horizon treatment.
+start = "          {/* 30/60/90 */}"
+end = "          {/* Closing */}"
+plan_block = """          {/* 30/60/90 */}
           <Chapter
             id="plan"
             eyebrow="Your Next Ninety Days"
@@ -1103,7 +1013,13 @@ export default function InevitableStandardFullDiagnosticClient({
             </div>
           </Chapter>
 
-          {/* Closing */}
+"""
+full = replace_between(full, start, end, plan_block, "Next Ninety Days section")
+
+# Full-bleed closing panel, not another ivory chapter.
+start = "          {/* Closing */}"
+end = "        </div>\n      </div>\n\n      <footer"
+closing = """          {/* Closing */}
           <section
             id="closing"
             className="scroll-mt-8 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl print:break-before-page"
@@ -1128,15 +1044,24 @@ export default function InevitableStandardFullDiagnosticClient({
             </div>
             <p className="mt-10 text-[11px] text-[#8e9aaa]">Created from The Inevitable Standard Method™ by Genene Wilson, The Wealth Architect.</p>
           </section>
-        </div>
-      </div>
+"""
+full = replace_between(full, start, end, closing, "Full Diagnostic closing panel")
 
-      <footer className="border-t" style={{ borderColor: HAIRLINE }}>
-        <div className="mx-auto max-w-6xl px-6 py-8 text-[11px] leading-6 text-[#9a9384] sm:px-10">
-          The Inevitable Standard™{orgName ? ` · ${orgName}` : ""} · This report is general
-          business information, not financial, tax, legal or accounting advice.
-        </div>
-      </footer>
-    </main>
-  );
-}
+pending[FILES["full"]] = full
+
+# Validate before writing any file.
+for path, content in pending.items():
+    if not content.strip():
+        raise RuntimeError(f"Refusing to write empty file: {path}")
+
+for path, content in pending.items():
+    path.write_text(content, encoding="utf-8")
+
+print("Applied approved Full Diagnostic Figma alignment to:")
+for path in pending:
+    print("  -", path.relative_to(ROOT))
+print("\nNo commit, push, merge, or deployment was performed.")
+print("\nRun next:")
+print("  pnpm --dir apps/web exec vitest run lib/inevitable-standard/constraintEngine.test.ts")
+print("  pnpm --dir apps/web run typecheck")
+print("  git diff --check")

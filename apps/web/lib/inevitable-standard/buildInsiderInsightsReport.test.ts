@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { buildInsiderInsightsReport } from "./buildInsiderInsightsReport";
+import { selectPillarState } from "./content/insiderInsights";
 
-/**
- * A minimal stand-in for the object stored on
- * portal.test_results.totals.inevitable_standard: score result plus the
- * `constraints` and `context_answers` siblings.
- */
 function fakeScore(overrides: Record<string, unknown> = {}) {
   return {
     overall: { percentage: 41.5, label: "Inconsistent" },
@@ -28,7 +24,15 @@ function fakeScore(overrides: Record<string, unknown> = {}) {
       secondary_constraint: "decision",
       false_constraint: null,
       false_constraint_rule_id: null,
-      priority_fix_order: ["sales", "decision", "revenue_model"],
+      // Deliberately stale legacy order. Builder must not trust it.
+      priority_fix_order: [
+        "identity",
+        "positioning",
+        "offer",
+        "revenue_model",
+        "sales",
+        "decision",
+      ],
     },
     context_answers: {
       13: "We keep having great conversations that go nowhere. People love the vision but I never actually close.",
@@ -38,8 +42,8 @@ function fakeScore(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("buildInsiderInsightsReport — five-section structure", () => {
-  it("returns exactly the five report parts, nothing else", () => {
+describe("buildInsiderInsightsReport — approved five-section playbook", () => {
+  it("keeps the approved five-section report contract", () => {
     const report = buildInsiderInsightsReport({ score: fakeScore() })!;
     expect(Object.keys(report).sort()).toEqual(
       [
@@ -48,26 +52,18 @@ describe("buildInsiderInsightsReport — five-section structure", () => {
         "objective",
         "predictiveSignals",
         "qaFlags",
+        "sequenceCaution",
+        "sequenceIntro",
         "snapshot",
         "suggestedSequence",
       ].sort(),
     );
-    // No leftover deep-document section list.
     expect(report).not.toHaveProperty("sections");
   });
 
-  it("1. Snapshot carries the score/constraint data", () => {
-    const { snapshot, meta } = buildInsiderInsightsReport({ score: fakeScore() })!;
-    expect(meta.approachLabel).toBe("Future-Led");
-    expect(snapshot.primaryApproach).toEqual({ label: "Future-Led", percentage: 44 });
-    expect(snapshot.secondaryApproach).toEqual({ label: "Evidence-Led", percentage: 24 });
-    expect(snapshot.primaryConstraint?.label).toBe("Sales");
-    expect(snapshot.primaryConstraint?.gar).toBe("RED");
-    expect(snapshot.secondaryConstraint?.label).toBe("Decision");
-    expect(snapshot.strongestPillar?.label).toBe("Identity");
-    expect(snapshot.pillars).toHaveLength(6);
-    expect(snapshot.pillars[0]).toHaveProperty("descriptor");
-    expect(snapshot.priorityOrder.map((p) => p.label)).toEqual([
+  it("rebuilds Priority Fix Order from Primary + Secondary instead of stale stored order", () => {
+    const { snapshot } = buildInsiderInsightsReport({ score: fakeScore() })!;
+    expect(snapshot.priorityOrder.map((item) => item.label)).toEqual([
       "Sales",
       "Decision",
       "Revenue Model",
@@ -77,26 +73,41 @@ describe("buildInsiderInsightsReport — five-section structure", () => {
     ]);
   });
 
-  it("1. Snapshot renders a false constraint only when a rule matched", () => {
+  it("snapshot carries the live constraint and strongest-pillar evidence", () => {
+    const { snapshot, meta } = buildInsiderInsightsReport({ score: fakeScore() })!;
+    expect(meta.approachLabel).toBe("Future-Led");
+    expect(snapshot.primaryConstraint?.label).toBe("Sales");
+    expect(snapshot.primaryConstraint?.gar).toBe("RED");
+    expect(snapshot.secondaryConstraint?.label).toBe("Decision");
+    expect(snapshot.strongestPillar?.label).toBe("Identity");
+    expect(snapshot.pillars).toHaveLength(6);
+  });
+
+  it("renders a False Constraint only when the evidence rule matched", () => {
     expect(buildInsiderInsightsReport({ score: fakeScore() })!.snapshot.falseConstraint).toBeNull();
-    const withFc = buildInsiderInsightsReport({
+
+    const report = buildInsiderInsightsReport({
       score: fakeScore({
         constraints: {
           primary_constraint: "sales",
           secondary_constraint: "decision",
-          false_constraint: { explanation: "The pattern points to Sales, not lead volume." },
+          false_constraint: {
+            stated_pillar: "positioning",
+            evidence_pillar: "sales",
+            explanation: "The pattern points to Sales, not lead volume.",
+          },
           false_constraint_rule_id: "lead_volume",
-          priority_fix_order: ["sales", "decision"],
+          priority_fix_order: ["identity", "positioning", "sales"],
         },
       }),
     })!;
-    expect(withFc.snapshot.falseConstraint?.label).toContain("more leads");
-    expect(withFc.snapshot.falseConstraint?.note).toBeTruthy();
+
+    expect(report.snapshot.falseConstraint?.label.toLowerCase()).toContain("leads");
+    expect(report.snapshot.falseConstraint?.note).toBeTruthy();
   });
 
-  it("2. Predictive Signals is the 13-row table for the primary approach", () => {
-    const { predictiveSignals } = buildInsiderInsightsReport({ score: fakeScore() })!;
-    expect(predictiveSignals.map((r) => r.label)).toEqual([
+  it("keeps all 13 Figma predictive-signal rows for every approach", () => {
+    const expected = [
       "How they think",
       "How they decide",
       "How they buy",
@@ -110,49 +121,115 @@ describe("buildInsiderInsightsReport — five-section structure", () => {
       "What to challenge",
       "What not to assume",
       "Coaching style",
-    ]);
-    for (const row of predictiveSignals) expect(row.text.length).toBeGreaterThan(0);
-    // Compressed to the lead paragraph, not the whole section.
-    const think = predictiveSignals.find((r) => r.label === "How they think")!;
-    expect(think.text).not.toContain("\n\n");
-  });
+    ];
 
-  it("2. every approach fills all 13 rows (D's challenge / not-assume fallbacks work)", () => {
     for (const dominant of ["A", "B", "C", "D"]) {
       const report = buildInsiderInsightsReport({
         score: fakeScore({
-          approaches: { percentages: { A: 40, B: 25, C: 20, D: 15 }, dominant, secondary: "A" },
+          approaches: {
+            percentages: { A: 40, B: 25, C: 20, D: 15 },
+            dominant,
+            secondary: dominant === "A" ? "D" : "A",
+          },
         }),
       })!;
-      expect(report.predictiveSignals, `approach ${dominant}`).toHaveLength(13);
+      expect(report.predictiveSignals.map((row) => row.label), dominant).toEqual(expected);
     }
   });
 
-  it("3. Founder's Own Words annotates each verbatim answer", () => {
-    const { foundersWords } = buildInsiderInsightsReport({ score: fakeScore() })!;
-    expect(foundersWords.map((w) => w.prompt)).toEqual([
-      "The biggest thing holding the business back",
-      "A decision you know you need to make but have not made",
-    ]);
-    const q13 = foundersWords[0];
-    expect(q13.quote).toContain("great conversations that go nowhere");
-    expect(q13.pillar?.label).toBe("Sales");
-    expect(q13.tags.map((t) => t.kind)).toContain("HYPOTHESIS TO VALIDATE");
-    expect(q13.tags.map((t) => t.kind)).toContain("LISTEN FOR");
-    // Q29 is keyed to the Decision pillar and carries the single GREEN LEVERAGE tag.
-    const q29 = foundersWords[1];
-    expect(q29.pillar?.label).toBe("Decision");
-    expect(q29.tags.map((t) => t.kind)).toContain("GREEN LEVERAGE"); // Identity is Green
-    // GREEN LEVERAGE appears once across the section, not on every card.
-    const greenCount = foundersWords
-      .flatMap((w) => w.tags)
-      .filter((t) => t.kind === "GREEN LEVERAGE").length;
-    expect(greenCount).toBe(1);
-    // The two cards do not surface the same risk signal.
-    expect(q13.riskSignal?.label).not.toBe(q29.riskSignal?.label);
+  it("uses actual Sales state before generic Connection-Led behaviour", () => {
+    const report = buildInsiderInsightsReport({
+      score: fakeScore({
+        approaches: {
+          percentages: { A: 15, B: 55, C: 15, D: 15 },
+          dominant: "B",
+          secondary: "A",
+        },
+        pillars: {
+          identity: { percentage: 78, risk: "low_risk" },
+          positioning: { percentage: 71, risk: "low_risk" },
+          offer: { percentage: 66, risk: "medium_risk" },
+          sales: { percentage: 82, risk: "low_risk" },
+          revenue_model: { percentage: 54, risk: "medium_risk" },
+          decision: { percentage: 59, risk: "medium_risk" },
+        },
+        constraints: {
+          primary_constraint: "sales",
+          secondary_constraint: "decision",
+          false_constraint: null,
+          false_constraint_rule_id: null,
+          priority_fix_order: [],
+        },
+      }),
+    })!;
+
+    const greenSales = selectPillarState("B", "sales", "GREEN")!;
+    const row = report.predictiveSignals.find((item) => item.label === "How they buy")!;
+    const evidenceLead = (greenSales.howThisAffectsBuying ?? "").replace(/\s+/g, " ").trim().slice(0, 45);
+    expect(evidenceLead.length).toBeGreaterThan(15);
+    expect(row.text).toContain(evidenceLead);
   });
 
-  it("3. filler / empty free text produces no cards", () => {
+  it("uses Red Sales evidence when the Sales result is Red", () => {
+    const report = buildInsiderInsightsReport({
+      score: fakeScore({
+        approaches: {
+          percentages: { A: 15, B: 55, C: 15, D: 15 },
+          dominant: "B",
+          secondary: "A",
+        },
+      }),
+    })!;
+
+    const redSales = selectPillarState("B", "sales", "RED")!;
+    const row = report.predictiveSignals.find((item) => item.label === "How they buy")!;
+    const evidenceLead = (redSales.howThisAffectsBuying ?? "").replace(/\s+/g, " ").trim().slice(0, 45);
+    expect(row.text).toContain(evidenceLead);
+  });
+
+  it("Q13 shows the Figma four-card evidence strip and all four adviser tags", () => {
+    const report = buildInsiderInsightsReport({
+      score: fakeScore({
+        constraints: {
+          primary_constraint: "sales",
+          secondary_constraint: "decision",
+          false_constraint: {
+            stated_pillar: "positioning",
+            evidence_pillar: "sales",
+            explanation: "Lead volume is not the first intervention.",
+          },
+          false_constraint_rule_id: "lead_volume",
+          priority_fix_order: [],
+        },
+      }),
+    })!;
+
+    const q13 = report.foundersWords.find((item) => item.questionNumber === 13)!;
+    expect(q13.evidencePillars.map((pillar) => pillar.key)).toEqual([
+      "positioning",
+      "offer",
+      "sales",
+      "decision",
+    ]);
+    expect(q13.tags.map((tag) => tag.kind)).toEqual(
+      expect.arrayContaining([
+        "HYPOTHESIS TO VALIDATE",
+        "LISTEN FOR",
+        "DO NOT ASSUME",
+        "GREEN LEVERAGE",
+      ]),
+    );
+    expect(q13.riskSignal).toBeNull();
+  });
+
+  it("Q29 is the answer-level risk surface, matching the approved Figma treatment", () => {
+    const report = buildInsiderInsightsReport({ score: fakeScore() })!;
+    const q29 = report.foundersWords.find((item) => item.questionNumber === 29)!;
+    expect(q29.evidencePillars).toHaveLength(0);
+    expect(q29.tags).toHaveLength(0);
+  });
+
+  it("filler free text does not create Founder Own Words evidence", () => {
     const report = buildInsiderInsightsReport({
       score: fakeScore({ context_answers: { 13: "n/a", 29: "" } }),
     })!;
@@ -160,32 +237,37 @@ describe("buildInsiderInsightsReport — five-section structure", () => {
     expect(report.qaFlags.join(" ")).toContain("Founder's Own Words");
   });
 
-  it("4. Suggested Sequence is exactly four steps with instructions", () => {
-    const { suggestedSequence } = buildInsiderInsightsReport({ score: fakeScore() })!;
-    expect(suggestedSequence.map((s) => s.step)).toEqual([1, 2, 3, 4]);
-    for (const step of suggestedSequence) {
-      expect(step.title.length).toBeGreaterThan(0);
+  it("Suggested Sequence uses the four approved Figma moves", () => {
+    const report = buildInsiderInsightsReport({ score: fakeScore() })!;
+    expect(report.suggestedSequence.map((step) => step.title)).toEqual([
+      "Open on the strength, not the constraint",
+      "Let them describe the pattern in their own words",
+      "Introduce the contrast, not the diagnosis",
+      "Get one commitment, not a plan",
+    ]);
+    for (const step of report.suggestedSequence) {
       expect(step.instruction.length).toBeGreaterThan(0);
     }
-    // Steps 2–4 quote a real by-primary question; step 1 does not.
-    expect(suggestedSequence[0].example).toBeNull();
-    expect(suggestedSequence[1].example).toBeTruthy();
-    expect(suggestedSequence[3].example).toBeTruthy();
+    expect(report.sequenceIntro).toBeTruthy();
   });
 
-  it("5. The Objective is a single tailored line", () => {
-    const { objective } = buildInsiderInsightsReport({ score: fakeScore() })!;
-    expect(objective).toBeTruthy();
-    expect(objective!.length).toBeLessThan(320);
+  it("The Objective remains tailored to the Primary Constraint block", () => {
+    const report = buildInsiderInsightsReport({ score: fakeScore() })!;
+    expect(report.objective).toBeTruthy();
+    expect(report.objective!.length).toBeGreaterThan(20);
   });
 
-  it("degrades without a primary constraint: 11 signal rows, template objective, no crash", () => {
+  it("degrades safely without a primary constraint", () => {
     const report = buildInsiderInsightsReport({
       score: fakeScore({
-        constraints: { primary_constraint: null, secondary_constraint: null, priority_fix_order: [] },
+        constraints: {
+          primary_constraint: null,
+          secondary_constraint: null,
+          priority_fix_order: [],
+        },
       }),
     })!;
-    expect(report.predictiveSignals).toHaveLength(11); // objection rows dropped
+    expect(report.predictiveSignals).toHaveLength(11);
     expect(report.suggestedSequence).toHaveLength(4);
     expect(report.objective).toBeTruthy();
     expect(report.qaFlags.join(" ")).toContain("primary constraint");
@@ -194,50 +276,65 @@ describe("buildInsiderInsightsReport — five-section structure", () => {
   it("infers the approach from percentages when dominant is absent", () => {
     const report = buildInsiderInsightsReport({
       score: fakeScore({
-        approaches: { percentages: { A: 10, B: 55, C: 20, D: 15 }, secondary: "A" },
+        approaches: {
+          percentages: { A: 10, B: 55, C: 20, D: 15 },
+          secondary: "A",
+        },
       }),
     })!;
     expect(report.meta.approachCode).toBe("B");
     expect(report.qaFlags.join(" ")).toContain("dominant");
   });
 
-  it("returns null when there is no usable score", () => {
+  it("returns null without a usable approach score", () => {
     expect(buildInsiderInsightsReport({ score: null })).toBeNull();
     expect(buildInsiderInsightsReport({ score: {} })).toBeNull();
   });
 
-  it("never emits a source citation into any rendered string", () => {
+  it("never leaks source anchors or content IDs into rendered report strings", () => {
     const banned = [
       /SOURCE ANCHOR/i,
       /CONTENT ID:/i,
       /\bchapter\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d)/i,
       /\bappendix\s+[a-z]\b/i,
     ];
+
     for (const primary of ["identity", "sales", "revenue_model", "decision"]) {
       for (const dominant of ["A", "B", "C", "D"]) {
         const report = buildInsiderInsightsReport({
           score: fakeScore({
-            approaches: { percentages: { A: 40, B: 25, C: 20, D: 15 }, dominant, secondary: "D" },
+            approaches: {
+              percentages: { A: 40, B: 25, C: 20, D: 15 },
+              dominant,
+              secondary: "D",
+            },
             constraints: {
               primary_constraint: primary,
               secondary_constraint: primary === "sales" ? "decision" : "sales",
               false_constraint_rule_id: "lead_volume",
               false_constraint: { explanation: "x" },
-              priority_fix_order: [primary],
+              priority_fix_order: [],
             },
           }),
         })!;
-        const strings: string[] = [
-          ...report.predictiveSignals.map((r) => r.text),
-          ...report.foundersWords.flatMap((w) => [
-            ...w.tags.map((t) => t.text),
-            w.riskSignal?.text ?? "",
-            w.riskSignal?.adviserResponse ?? "",
+
+        const strings = [
+          ...report.predictiveSignals.map((row) => row.text),
+          ...report.foundersWords.flatMap((word) => [
+            ...word.tags.map((tag) => tag.text),
+            word.riskSignal?.text ?? "",
+            word.riskSignal?.adviserResponse ?? "",
           ]),
-          ...report.suggestedSequence.flatMap((s) => [s.instruction, s.example ?? ""]),
+          report.sequenceIntro ?? "",
+          ...report.suggestedSequence.flatMap((step) => [
+            step.instruction,
+            step.example ?? "",
+          ]),
+          report.sequenceCaution ?? "",
           report.objective ?? "",
           report.snapshot.falseConstraint?.note ?? "",
         ];
+
         for (const value of strings) {
           for (const pattern of banned) {
             expect(value, `${dominant}/${primary}`).not.toMatch(pattern);
