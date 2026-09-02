@@ -137,6 +137,10 @@ export type ResultPayload = {
   test_name?: string | null;
   org_name?: string | null;
   completed_at?: string | null;
+  link?: {
+    next_steps_url?: string | null;
+    redirect_url?: string | null;
+  } | null;
   taker?: {
     first_name?: string | null;
     last_name?: string | null;

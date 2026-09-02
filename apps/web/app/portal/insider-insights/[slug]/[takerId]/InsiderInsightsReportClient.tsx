@@ -346,9 +346,11 @@ function SequenceStep({ step }: { step: InsiderSequenceStep }) {
 export default function InsiderInsightsReportClient({
   report,
   backHref,
+  nextStepsHref,
 }: {
   report: InsiderInsightsReport;
   backHref: string;
+  nextStepsHref: string | null;
 }) {
   const { meta, snapshot } = report;
   const [activeSection, setActiveSection] = useState<string>("snapshot");
@@ -555,7 +557,7 @@ export default function InsiderInsightsReportClient({
               Download PDF
             </PrintButton>
             <a
-              href="#suggested-sequence"
+              href={nextStepsHref || "#suggested-sequence"}
               className="mt-2 block w-full rounded-[10px] bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-4 py-3 text-center text-[12px] font-semibold text-white"
             >
               Next step

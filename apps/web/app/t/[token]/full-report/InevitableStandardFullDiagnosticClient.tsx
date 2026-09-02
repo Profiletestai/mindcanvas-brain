@@ -335,11 +335,13 @@ function SidebarIndex({
   activeSection,
   readiness: _readiness,
   band: _band,
+  nextStepsHref,
 }: {
   sections: Array<{ id: string; label: string }>;
   activeSection: string;
   readiness: number;
   band: string;
+  nextStepsHref: string | null;
 }) {
   return (
     <aside className="hidden lg:block print:hidden">
@@ -371,7 +373,7 @@ function SidebarIndex({
           Download PDF
         </button>
         <a
-          href="#plan"
+          href={nextStepsHref || "#plan"}
           className="mt-2 block w-full rounded-[10px] bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-4 py-3 text-center text-[12px] font-semibold text-white"
         >
           Next step
@@ -688,6 +690,10 @@ export default function InevitableStandardFullDiagnosticClient({
     orgName,
   } = view;
 
+  const nextStepsHref =
+    (payload?.link?.next_steps_url || payload?.link?.redirect_url || "").trim() ||
+    null;
+
   return (
     <main
       className={`${newsreader.variable} min-h-screen`}
@@ -715,7 +721,7 @@ export default function InevitableStandardFullDiagnosticClient({
           <button type="button" onClick={() => window.print()} className="rounded-lg px-5 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: GOLD }}>
             Download PDF
           </button>
-          <a href="#plan" className="rounded-lg bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-5 py-2 text-[12px] font-semibold text-white">Next step</a>
+          <a href={nextStepsHref || "#plan"} className="rounded-lg bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-5 py-2 text-[12px] font-semibold text-white">Next step</a>
         </div>
         <div className="mx-auto mt-3 grid max-w-[600px] grid-cols-3 gap-2 text-[10px] lg:ml-auto lg:mr-5 lg:mt-2">
           <div className="rounded-xl border border-white/25 px-3 py-2"><span className="block text-white/40">PREPARED FOR</span><strong className="mt-1 block text-[12px] text-white">{clientName}</strong></div>
@@ -771,6 +777,7 @@ export default function InevitableStandardFullDiagnosticClient({
           activeSection={activeSection}
           readiness={overallPercentage}
           band={bandDescriptor}
+          nextStepsHref={nextStepsHref}
         />
 
         <div className="min-w-0 space-y-10">
