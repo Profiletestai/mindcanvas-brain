@@ -70,14 +70,27 @@ has supplied direct source material for it, then set `status` to `"complete"`.
 `insiderInsights.data.json` is a separate, **adviser-only** content family — the
 private companion to the client reports, extracted from the four master source
 reports by `scripts/insider-insights/extract.ts`. It is keyed per approach
-(A/B/C/D) by the Content ID scheme.
+(A/B/C/D) by the Content ID scheme, and holds the **full** deep content (all 24
+primary-constraint cells, all four approach profiles, seven-stage PROSPER
+sequences, pre-call questions, post-sale coaching, …).
+
+`extract.ts` also runs `hoistProvenance()`: every `SOURCE ANCHOR …` /
+`CONTENT ID: …` paragraph is stripped from prose into per-block `sourceAnchor`
+slots and a per-approach `provenance[]`. Neither is ever rendered. Guardrail
+tests fail if a citation reaches any rendered string.
 
 - `insiderInsights.ts` is the typed accessor (selectors only, no logic).
-- `lib/inevitable-standard/buildInsiderInsightsReport.ts` applies the source's
-  Dynamic Selection Rules to a stored score and assembles the report.
-- Rendered at
-  `app/portal/[slug]/database/[takerId]/insider-insights/` — reachable from the
-  test-taker profile, gated to the owning organisation. Never shown to the taker.
+- `lib/inevitable-standard/buildInsiderInsightsReport.ts` **selects and
+  compresses** the slice that renders for one founder. The report is the
+  approved five-section Figma design — roughly the length of Report 1, NOT the
+  Build & Delivery Guide's 30+-section scope:
+  1. Insider Snapshot · 2. Predictive Signals (the 13-field table for the
+  founder's primary approach) · 3. The Founder's Own Words (Q13/Q29 annotated) ·
+  4. Suggested Sequence (4-step talk-track) · 5. The Objective.
+- Rendered standalone at `app/portal/insider-insights/[slug]/[takerId]/` (not
+  under `/portal/[slug]/*`, so it escapes the portal sidebar / "Welcome"
+  header). Reached from the test-taker profile, gated to the owning
+  organisation. Never shown to the taker.
 
 Re-run `npx tsx scripts/insider-insights/extract.ts` when the master `.txt`
 files change, and bump `INSIDER_INSIGHTS_SOURCE_VERSION` in `insiderInsights.ts`.

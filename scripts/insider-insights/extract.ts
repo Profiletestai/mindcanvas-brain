@@ -288,6 +288,23 @@ function extractCoreProfile(root: Node, reportCode: string, issues: Issues) {
   const challenge = find(root, (n) => n.level === 1 && n.normTitle.startsWith("14 how to challenge") || (n.level === 1 && titleIncludes(n, "how to challenge them")));
   const notAssume = find(root, (n) => n.level === 1 && titleIncludes(n, "what not to assume") && !titleIncludes(n, "pillar"));
 
+  // Report D's source has no standalone "How to Challenge Them" (§14) or "What
+  // Not to Assume" (§15) section. Fall back to the approach-level material that
+  // carries the same intent: the "What to Challenge and What Not to Challenge
+  // Too Early" intro, and the Dynamic Evidence Hierarchy's opening paragraph.
+  const challengeSeqIntro = find(
+    root,
+    (n) => n.level === 1 && titleIncludes(n, "what to challenge and what not to challenge"),
+  );
+  const evidenceHierarchy = find(
+    root,
+    (n) => n.level === 1 && titleIncludes(n, "evidence hierarchy"),
+  );
+  const firstParagraph = (node: Node | null | undefined): string | null => {
+    const body = text(node);
+    return body ? body.split("\n\n")[0].trim() || null : null;
+  };
+
   if (!coreSection) issues.push(`[${reportCode}] core profile section not found`);
   if (!howThink) issues.push(`[${reportCode}] How They Think not found`);
   if (!howDecide) issues.push(`[${reportCode}] How They Decide not found`);
@@ -312,8 +329,8 @@ function extractCoreProfile(root: Node, reportCode: string, issues: Issues) {
     trustReducers: text(trustReducers),
     communicationStyle: text(communication),
     coachingStyle: text(coachingStyle),
-    challengeGuidance: text(challenge),
-    whatNotToAssumeGeneral: text(notAssume),
+    challengeGuidance: text(challenge) ?? firstParagraph(challengeSeqIntro),
+    whatNotToAssumeGeneral: text(notAssume) ?? firstParagraph(evidenceHierarchy),
   };
 }
 
