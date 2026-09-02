@@ -65,6 +65,23 @@ marked `[applied, weak]`. The remaining sections are deliberately blank.
 Treat the Positioning entries as placeholders. Rebuild this pillar once Genene
 has supplied direct source material for it, then set `status` to `"complete"`.
 
+## Insider Insights (`insiderInsights.data.json`)
+
+`insiderInsights.data.json` is a separate, **adviser-only** content family — the
+private companion to the client reports, extracted from the four master source
+reports by `scripts/insider-insights/extract.ts`. It is keyed per approach
+(A/B/C/D) by the Content ID scheme.
+
+- `insiderInsights.ts` is the typed accessor (selectors only, no logic).
+- `lib/inevitable-standard/buildInsiderInsightsReport.ts` applies the source's
+  Dynamic Selection Rules to a stored score and assembles the report.
+- Rendered at
+  `app/portal/[slug]/database/[takerId]/insider-insights/` — reachable from the
+  test-taker profile, gated to the owning organisation. Never shown to the taker.
+
+Re-run `npx tsx scripts/insider-insights/extract.ts` when the master `.txt`
+files change, and bump `INSIDER_INSIGHTS_SOURCE_VERSION` in `insiderInsights.ts`.
+
 ## Where it is read
 
 - `app/t/[token]/report/InevitableStandardReportClient.tsx` (Diagnostic
