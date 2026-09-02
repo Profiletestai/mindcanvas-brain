@@ -1,0 +1,61 @@
+{
+  "counts": {
+    "A": {
+      "pillarStates": 18,
+      "primaryConstraints": 6,
+      "directionalPairs": 30,
+      "falseConstraintsCore": 4,
+      "falseConstraintsProposed": 6,
+      "riskSignals": 8,
+      "strongestPillar": 6,
+      "objections": 6,
+      "questionsByPrimary": 6,
+      "avoidedQuestion": 6,
+      "nextStepPositioning": 6,
+      "progressSignals": 6
+    },
+    "B": {
+      "pillarStates": 18,
+      "primaryConstraints": 6,
+      "directionalPairs": 30,
+      "falseConstraintsCore": 4,
+      "falseConstraintsProposed": 7,
+      "riskSignals": 9,
+      "strongestPillar": 6,
+      "objections": 6,
+      "questionsByPrimary": 6,
+      "avoidedQuestion": 6,
+      "nextStepPositioning": 6,
+      "progressSignals": 6
+    },
+    "C": {
+      "pillarStates": 18,
+      "primaryConstraints": 6,
+      "directionalPairs": 30,
+      "falseConstraintsCore": 4,
+      "falseConstraintsProposed": 8,
+      "riskSignals": 10,
+      "strongestPillar": 6,
+      "objections": 6,
+      "questionsByPrimary": 6,
+      "avoidedQuestion": 6,
+      "nextStepPositioning": 6,
+      "progressSignals": 6
+    },
+    "D": {
+      "pillarStates": 18,
+      "primaryConstraints": 6,
+      "directionalPairs": 30,
+      "falseConstraintsCore": 4,
+      "falseConstraintsProposed": 6,
+      "riskSignals": 8,
+      "strongestPillar": 6,
+      "objections": 6,
+      "questionsByPrimary": 6,
+      "avoidedQuestion": 6,
+      "nextStepPositioning": 6,
+      "progressSignals": 6
+    }
+  },
+  "issues": []
+}
