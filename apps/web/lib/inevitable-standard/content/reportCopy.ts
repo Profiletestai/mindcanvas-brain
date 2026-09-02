@@ -120,7 +120,7 @@ export const INEVITABLE_STANDARD_REPORT_CONTENT: InevitableStandardReportContent
             provenance: "direct",
           },
           pathway_impact: {
-            text: "A business is a system, only as strong as its weakest link. Effort poured into a strong link while identity is the actual constraint moves almost nothing, because the system can only move as much as its narrowest point allows.",
+            text: "A business is a system, only as strong as its weakest link. Effort poured into a stronger link while the binding constraint sits elsewhere moves almost nothing, because the system can only move as much as its narrowest point allows.",
             provenance: "direct",
             note: "The source's binding-constraint logic.",
           },

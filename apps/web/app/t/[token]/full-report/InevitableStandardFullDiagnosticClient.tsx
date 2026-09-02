@@ -153,7 +153,7 @@ function Chapter({
   return (
     <section
       id={id}
-      className="scroll-mt-8 rounded-[20px] p-[22px] sm:p-[27px] print:break-before-page"
+      className="scroll-mt-8 rounded-[20px] p-[22px] sm:p-[27px] print:p-4"
       style={{
         backgroundColor: NAVY_DEEP,
         WebkitPrintColorAdjust: "exact",
@@ -166,7 +166,7 @@ function Chapter({
       >
         {eyebrow}
       </p>
-      <div className="mt-[26px] rounded-[20px] p-6 sm:p-10" style={{ backgroundColor: "#f8f6f1" }}>
+      <div className="mt-[26px] rounded-[20px] p-6 sm:p-10 print:mt-4 print:p-6" style={{ backgroundColor: "#f8f6f1" }}>
         <h2 className="text-[26px] leading-snug sm:text-[32px]" style={{ ...serif, color: INK }}>
           {title}
         </h2>
@@ -199,6 +199,10 @@ function ConstraintBlock({
 }) {
   const isPrimary = label.toLowerCase().includes("primary");
   const tone = isPrimary ? "#a8503f" : "#bd8b3d";
+  const hint = isPrimary
+    ? "The area most likely to be limiting progress right now."
+    : "The area most likely to reinforce or recreate the primary constraint.";
+  const cleanBody = body.startsWith(hint) ? body.slice(hint.length).trim() : body.trim();
   return (
     <div
       className="rounded-[4px] border border-l-[5px] bg-white p-6 sm:p-7"
@@ -208,12 +212,10 @@ function ConstraintBlock({
       <p className="mt-2 text-[22px] font-semibold" style={{ ...serif, color: tone }}>
         {pillarName}
       </p>
-      <p className="mt-2 text-[13px] leading-5 text-[#736c5c]">
-        {isPrimary
-          ? "The area most likely to be limiting progress right now."
-          : "The area most likely to reinforce or recreate the primary constraint."}
-      </p>
-      <p className="mt-4 text-[14px] leading-6 text-[#66727d]">{body}</p>
+      <p className="mt-2 text-[13px] leading-5 text-[#736c5c]">{hint}</p>
+      {cleanBody ? (
+        <p className="mt-4 text-[14px] leading-6 text-[#66727d]">{cleanBody}</p>
+      ) : null}
     </div>
   );
 }
@@ -221,7 +223,7 @@ function ConstraintBlock({
 /** Revenue → Profit → Personal Wealth → Freedom — the primary framework visual. */
 function RevenueChainDiagram() {
   return (
-    <div className="grid gap-[18px] md:grid-cols-4">
+    <div className="grid gap-[18px] md:grid-cols-4 print:grid-cols-4 print:gap-3">
       {REVENUE_CHAIN.map((node, index) => (
         <div
           key={node.label}
@@ -276,7 +278,7 @@ function MethodLayersDiagram({
 
   return (
     <div>
-      <div className="grid gap-[22px] md:grid-cols-3">
+      <div className="grid gap-[22px] md:grid-cols-3 print:grid-cols-3 print:gap-3">
         {METHOD_LAYERS.map((layer) => (
           <div
             key={layer.layer}
@@ -721,7 +723,7 @@ export default function InevitableStandardFullDiagnosticClient({
         className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-12 text-white sm:px-10 sm:py-[60px] print:break-after-page"
         style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
       >
-        <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_263px_388px] xl:items-start">
+        <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_263px_388px] xl:items-start print:grid-cols-[minmax(0,1fr)_190px_280px] print:items-start print:gap-4">
           <div>
             <p className="text-[12px] uppercase tracking-[0.18em]" style={{ color: GOLD }}>The Inevitable Standard Method™</p>
             <h1 className="mt-6 text-[48px] leading-[0.96] sm:text-[64px] xl:text-[80px]" style={serif}>{clientName}</h1>
@@ -891,7 +893,7 @@ export default function InevitableStandardFullDiagnosticClient({
                 >
                   Priority Fix Order
                 </p>
-                <ol className="mt-5 grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
+                <ol className="mt-5 grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3 lg:grid-cols-6 print:grid-cols-6">
                   {priorityOrder.map((key, index) => (
                     <li key={key} className="border-t-2 pt-3" style={{ borderColor: index === 0 ? GOLD : HAIRLINE }}>
                       <p className="text-[9px] text-[#66727d]">{String(index + 1).padStart(2, "0")}</p>
@@ -899,9 +901,7 @@ export default function InevitableStandardFullDiagnosticClient({
                     </li>
                   ))}
                 </ol>
-                <p className="mt-6 text-[12px] leading-6 text-[#66727d]">{PRIORITY_ORDER_NOTE}</p>                <p className="mt-4 text-[12px] leading-6 text-[#918a7d]">
-                  {PRIORITY_ORDER_NOTE}
-                </p>
+                <p className="mt-6 text-[12px] leading-6 text-[#66727d]">{PRIORITY_ORDER_NOTE}</p>
               </div>
             </div>
           </Chapter>
@@ -972,7 +972,7 @@ export default function InevitableStandardFullDiagnosticClient({
                     <div className="mt-2"><GarChip gar={pillar.gar} /></div>
                   </div>
                 </div>
-                <div className="mt-7 grid gap-x-12 gap-y-7 md:grid-cols-2">
+                <div className="mt-7 grid gap-x-12 gap-y-7 md:grid-cols-2 print:grid-cols-2 print:gap-x-8 print:gap-y-5">
                   {rows.map((row) => (
                     <div
                       key={row.heading}
@@ -1054,7 +1054,7 @@ export default function InevitableStandardFullDiagnosticClient({
             <p className="mt-5 max-w-3xl text-[14px] leading-6 text-[#66727d]">
               {dominant ? APPROACH_LENS_COPY[dominant] : "Your approach is a lens, not a label. It describes the information you tend to weigh first when a commercial decision is in front of you."}
             </p>
-            <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_360px] lg:items-start">
+            <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_360px] lg:items-start print:grid-cols-[1fr_300px] print:items-start print:gap-6">
               <div>
                 {APPROACHES.map((approach) => {
                   const pct = approachPercent(approach.code);
@@ -1098,7 +1098,7 @@ export default function InevitableStandardFullDiagnosticClient({
             <p className="max-w-3xl text-[15px] leading-7 text-[#66727d]">
               In sequence. Each horizon assumes the one before it is in place. The first window begins with the Primary Constraint, the second works the reinforcing Secondary Constraint, and the third advances the next most material issue.
             </p>
-            <div className="mt-8 grid gap-5 md:grid-cols-3">
+            <div className="mt-8 grid gap-5 md:grid-cols-3 print:grid-cols-3 print:gap-3">
               {plan.map((phase) => <PhaseBlock key={phase.window} phase={phase} />)}
             </div>
           </Chapter>
@@ -1118,7 +1118,7 @@ export default function InevitableStandardFullDiagnosticClient({
             <p className="mx-auto mt-5 max-w-2xl text-[14px] leading-6 text-[#b9c2ce]">
               The work ahead is narrow: begin with {primaryKey ? pillarLabel(primaryKey) : "the Primary Constraint"}, strengthen {secondaryKey ? pillarLabel(secondaryKey) : "the reinforcing issue"}, and use the Method layers to make the change hold.
             </p>
-            <div className="mx-auto mt-10 grid max-w-[650px] grid-cols-2 text-left sm:grid-cols-4">
+            <div className="mx-auto mt-10 grid max-w-[650px] grid-cols-2 text-left sm:grid-cols-4 print:grid-cols-4">
               {REVENUE_CHAIN.map((node, index) => (
                 <div key={node.label} className={index === 0 ? "px-5 py-4" : "border-l border-white/20 px-5 py-4"}>
                   <p className="text-[12px]" style={{ color: GOLD }}>{String(index + 1).padStart(2, "0")}</p>

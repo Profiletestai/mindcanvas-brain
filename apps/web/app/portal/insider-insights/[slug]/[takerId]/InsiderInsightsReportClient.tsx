@@ -98,7 +98,7 @@ function SectionShell({
   return (
     <section
       id={id}
-      className="scroll-mt-6 rounded-[20px] p-[27px] print:break-inside-avoid"
+      className="scroll-mt-6 rounded-[20px] p-[27px] print:p-4"
       style={{ backgroundColor: FIGMA.navy }}
     >
       <p
@@ -108,7 +108,7 @@ function SectionShell({
         {eyebrow}
       </p>
       <div
-        className="mt-[26px] rounded-[20px] p-6 sm:p-10"
+        className="mt-[26px] rounded-[20px] p-6 sm:p-10 print:mt-4 print:p-6"
         style={{ backgroundColor: FIGMA.panel }}
       >
         {children}
@@ -175,7 +175,7 @@ function HeroPillars({ pillars }: { pillars: InsiderPillarSnapshot[] }) {
 
 function PillarStrip({ pillars }: { pillars: InsiderPillarSnapshot[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 print:grid-cols-6">
       {pillars.map((pillar) => {
         const tone = GAR_TONE[pillar.gar];
         return (
@@ -227,7 +227,7 @@ function QuickReferenceRow({
 function EvidenceStrip({ pillars }: { pillars: InsiderPillarSnapshot[] }) {
   if (pillars.length === 0) return null;
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4">
       {pillars.map((pillar) => {
         const tone = GAR_TONE[pillar.gar];
         return (
@@ -465,7 +465,7 @@ export default function InsiderInsightsReportClient({
 
       {/* Approved Figma hero */}
       <section className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-[60px] text-white sm:px-10">
-        <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_676px]">
+        <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_676px] print:grid-cols-[minmax(0,1fr)_520px] print:gap-5">
           <div>
             <p className="text-[12px] uppercase tracking-[0.18em]" style={{ color: FIGMA.gold }}>
               The Inevitable Standard Method™
@@ -490,7 +490,7 @@ export default function InsiderInsightsReportClient({
           </div>
 
           <div>
-            <div className="grid gap-6 sm:grid-cols-[263px_1fr]">
+            <div className="grid gap-6 sm:grid-cols-[263px_1fr] print:grid-cols-[190px_1fr] print:gap-4">
               <div className="flex flex-col items-center rounded-[10px] border border-white/15 bg-white/[0.05] px-5 py-4">
                 <p className="text-center text-[10px] uppercase tracking-[0.14em] text-[#a9a08a]">
                   Inevitable Standard Readiness
@@ -646,13 +646,13 @@ export default function InsiderInsightsReportClient({
               <h2 className="text-[29px]" style={{ ...serif, color: FIGMA.navy }}>
                 Predictive signals at a glance
               </h2>
-              <div className="mt-6 grid bg-white md:grid-cols-2">
+              <div className="mt-6 grid bg-white md:grid-cols-2 print:grid-cols-2">
                 {report.predictiveSignals.map((row, index) => {
                   const last = index === report.predictiveSignals.length - 1;
                   return (
                     <div
                       key={row.label}
-                      className={`border-b px-5 py-4 ${last ? "md:col-span-2" : ""}`}
+                      className={`border-b px-5 py-4 ${last ? "md:col-span-2 print:col-span-2" : ""}`}
                       style={{ borderColor: FIGMA.hairline }}
                     >
                       <div className="flex items-center gap-3">
@@ -727,7 +727,7 @@ export default function InsiderInsightsReportClient({
           {report.objective ? (
             <section
               id="objective"
-              className="scroll-mt-6 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl print:break-inside-avoid"
+              className="scroll-mt-6 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl print:py-8"
             >
               <p
                 className="text-[15px] font-medium uppercase tracking-[0.18em]"
