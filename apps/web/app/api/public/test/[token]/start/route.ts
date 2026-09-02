@@ -48,8 +48,7 @@ export async function POST(req: Request, { params }: { params: { token: string }
       .insert([{
         org_id: link.org_id,
         test_id: link.test_id,
-        link_token: link.token, // ← critical
-        link_id: link.id,       // ← if column exists
+        link_token: link.token, // ← critical: satisfies NOT NULL, links taker to the link
         first_name, last_name, email, company, role_title,
         status: "in_progress",
       }])

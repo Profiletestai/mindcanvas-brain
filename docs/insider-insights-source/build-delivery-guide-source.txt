@@ -1,0 +1,878 @@
+**THE INEVITABLE STANDARD™  |  INSIDER INSIGHTS BUILD ****&**** DELIVERY GUIDE  |  CONFIDENTIAL**
+
+**THE INEVITABLE STANDARD™**
+
+**INSIDER INSIGHTS**
+
+**Build, Scoring ****&**** Delivery Guide**
+
+**How the Four Predictive Selling ****&**** Coaching Reports Should Be Built, Linked and Used**
+
+**IMPLEMENTATION GUIDE | VERSION 1.0 | 21 AUGUST 2026**
+
+| **CONFIDENTIAL - INTERNAL USE ONLY** This guide governs the internal Insider Insights reports used by Genene Wilson, authorised coaches, advisers, consultants, implementation teams and licensed partners. It contains predictive selling guidance, coaching logic, behavioural interpretation and dynamic rendering rules. None of this internal guidance should be exposed automatically in the client-facing Full Diagnostic. |
+| --- |
+
+Prepared for Lisa and the implementation team
+
+**Genene Wilson | The Wealth Architect**
+
+The Inevitable Standard Diagnostic™
+
+# Table of Contents
+
+| 1. Purpose and Build Outcome | **6** |
+| --- | --- |
+
+| 2. What the Four Insider Reports Are | **6** |
+| --- | --- |
+
+| 3. Relationship to the Client-Facing Reports | **7** |
+| --- | --- |
+
+| 4. The Insider Engine in One Page | **7** |
+| --- | --- |
+
+| 5. Source Hierarchy and Version Control | **8** |
+| --- | --- |
+
+| 6. One Assessment, Four Insider Pathways | **8** |
+| --- | --- |
+
+| 7. Assessment and Pillar Scoring | **9** |
+| --- | --- |
+
+| 8. Overall Inevitable Standard Readiness | **10** |
+| --- | --- |
+
+| 9. Commercial Decision Approach Scoring | **10** |
+| --- | --- |
+
+| 10. Primary and Secondary Influence Selection | **11** |
+| --- | --- |
+
+| 11. Commercial Decision Map | **11** |
+| --- | --- |
+
+| 12. Dynamic Evidence Hierarchy | **11** |
+| --- | --- |
+
+## Table of Contents - continued
+
+| 13. Green, Amber and Red as Active Modifiers | **12** |
+| --- | --- |
+
+| 14. Dynamic Content Families and Coverage | **13** |
+| --- | --- |
+
+| 15. Quick Reference Guide: Page 1 | **13** |
+| --- | --- |
+
+| 16. Predictive Signals: Page 2 | **14** |
+| --- | --- |
+
+| 17. How They Think | **15** |
+| --- | --- |
+
+| 18. How They Decide | **16** |
+| --- | --- |
+
+| 19. How They Buy | **16** |
+| --- | --- |
+
+| 20. Price and Value Interpretation | **17** |
+| --- | --- |
+
+| 21. Trust and Communication Intelligence | **17** |
+| --- | --- |
+
+| 22. Six-Pillar Coaching Intelligence | **18** |
+| --- | --- |
+
+| 23. Strongest Pillar and Green Leverage | **19** |
+| --- | --- |
+
+| 24. Constraint Engine | **19** |
+| --- | --- |
+
+## Table of Contents - continued
+
+| 25. Primary + Secondary Constraint Loop | **19** |
+| --- | --- |
+
+| 26. False Constraint Intelligence | **20** |
+| --- | --- |
+
+| 27. Dynamic Commercial Risk Signals | **20** |
+| --- | --- |
+
+| 28. Objections and What May Sit Underneath | **21** |
+| --- | --- |
+
+| 29. Predictive Conversation Strategy | **21** |
+| --- | --- |
+
+| 30. Pre-Call Preparation and Questions | **22** |
+| --- | --- |
+
+| 31. Challenge Sequence | **22** |
+| --- | --- |
+
+| 32. Buying and Resistance Signals | **23** |
+| --- | --- |
+
+| 33. Recommended Next Step and Offer Fit | **23** |
+| --- | --- |
+
+| 34. Follow-Up Guidance | **24** |
+| --- | --- |
+
+| 35. Post-Sale Coaching Priorities | **24** |
+| --- | --- |
+
+| 36. Accountability and Progress Signals | **24** |
+| --- | --- |
+
+## Table of Contents - continued
+
+| 37. Green and Red Flags for the Adviser | **25** |
+| --- | --- |
+
+| 38. Required Data Fields | **25** |
+| --- | --- |
+
+| 39. Content IDs and Linking Rules | **26** |
+| --- | --- |
+
+| 40. Dynamic Rendering Order | **27** |
+| --- | --- |
+
+| 41. Suppression, Fallback and Tie Rules | **29** |
+| --- | --- |
+
+| 42. Permission Layer and Confidentiality | **29** |
+| --- | --- |
+
+| 43. Coach and Adviser Operating Guide | **30** |
+| --- | --- |
+
+| 44. Ethical and Professional Boundaries | **30** |
+| --- | --- |
+
+| 45. QA and Regression Test Matrix | **30** |
+| --- | --- |
+
+| 46. Build Acceptance Checklist | **31** |
+| --- | --- |
+
+| 47. Source Map and Open Implementation Items | **33** |
+| --- | --- |
+
+# 1. Purpose and Build Outcome
+
+This guide explains how the four Insider Insights reports should be scored, selected, assembled, linked, rendered and used by the internal team. The four reports are not static documents that should be shown in full. They are master internal knowledge bases. The live output is created dynamically from the test taker’s assessment record and should contain only the content that is relevant to that person.
+
+The purpose of the Insider Insights layer is different from the purpose of the client-facing Full Diagnostic. The client report creates recognition and direction for the founder. Insider Insights equips the coach, adviser or consultant to understand the founder more deeply, prepare for the conversation, communicate in a way that is likely to land, identify what to challenge, interpret buying behaviour, guide a clean decision and coach the rebuild after the sale.
+
+| **CORE INTERNAL PRINCIPLE** Approach explains how the founder may operate. Pillar results show what is happening. Constraint logic tells you where to intervene. The book provides the commercial philosophy and coaching intervention. The live conversation validates the hypothesis. |
+| --- |
+
+The build must preserve that order. The internal report should never become a personality-led sales script. A Future-Led, Connection-Led, Timing-Led or Evidence-Led result is a behavioural lens. The six pillar results and Constraint Engine are the commercial evidence. Where the evidence contradicts a generic style assumption, the evidence wins.
+
+# 2. What the Four Insider Reports Are
+
+There are four master Insider Insights knowledge bases. The dominant Commercial Decision Approach selects the master pathway. Each master report then dynamically pulls the relevant secondary influence, six pillar-state blocks, constraint blocks, False Constraint, risk signals, conversation guidance and coaching guidance.
+
+| **Report** | **Primary Approach** | **Core Internal Lens** | **Primary Development Risk** |
+| --- | --- | --- | --- |
+| **Report A** | Future-Led | Possibility, future value, growth, expansion and what could be built. | Vision can outrun structure, completion or current commercial evidence. |
+| **Report B** | Connection-Led | People, trust, relationships, conversation and human response. | Protecting the relationship can begin to replace commercial clarity or decision ownership. |
+| **Report C** | Timing-Led | Readiness, context, practical flow, capacity and grounded judgement. | Waiting can continue after the conditions are already sufficient to move. |
+| **Report D** | Evidence-Led | Proof, logic, numbers, process, risk and commercial certainty. | More evidence can stop improving the decision and start postponing it. |
+
+The four reports must remain structurally comparable even where their section numbering differs in the current Word masters. For implementation, content families and Content IDs are authoritative. Section numbers are navigation aids for humans and should never be used as database keys.
+
+# 3. Relationship to the Client-Facing Reports
+
+Every test taker has one assessment record that can generate two different types of output. The client-facing report explains the result to the founder. The Insider Insights report interprets the same result for the authorised person who will sell to, advise, coach or guide that founder. The two outputs should agree on the underlying diagnosis but have different permission layers and different purposes.
+
+| **Client-Facing Full Diagnostic** | **Insider Insights** |
+| --- | --- |
+| **Explains what is happening in the business.** | Explains how to work with the person behind the result. |
+| **Shows six pillar scores, risk states and the Priority Fix Order.** | Uses those same states to alter selling, coaching and communication guidance. |
+| **Explains the Primary and Secondary Constraint to the founder.** | Explains how the constraint may show up in conversation and what to listen for. |
+| **Provides practical direction without internal persuasion guidance.** | Provides trust signals, objections, buying signals, resistance signals and conversation strategy. |
+| **Does not expose hidden scoring, content IDs or behavioural hypotheses.** | May expose internal content IDs and build notes to authorised users or systems. |
+| **Ends with client-appropriate next steps and disclaimer.** | Continues into coaching priorities, accountability and progress monitoring. |
+
+The live systems should therefore keep the two knowledge bases in separate permission layers. Do not simply append Insider Insights to the client report and hide it with front-end styling. Treat the internal content as a separate authorised resource.
+
+# 4. The Insider Engine in One Page
+
+The engine should be understood as a sequence of evidence and interpretation rather than one combined score. The report becomes more intelligent because several layers are allowed to do different jobs.
+
+| **Layer** | **Question It Answers** | **System Use** |
+| --- | --- | --- |
+| **1. Six Pillar Results** | What is actually happening in the business? | Primary commercial evidence. |
+| **2. Constraint Engine** | Where is the highest leverage and what reinforces it? | Intervention sequence. |
+| **3. Primary Approach** | How may this founder naturally enter or experience the pattern? | Behavioural hypothesis. |
+| **4. Secondary Influence** | What modifies the primary behavioural pattern? | Contextual nuance. |
+| **5. False Constraint + Risk Flags** | What may they misdiagnose or repeat? | Conversation and coaching clues. |
+| **6. Live Conversation** | What is actually true for this person now? | Validation, adjustment and judgement. |
+
+| **RENDERING FLOW** Assessment answers -> pillar raw scores -> pillar percentages and risk states -> overall readiness -> four approach percentages -> primary report -> secondary influence -> strongest pillar -> Constraint Engine -> False Constraint and supported risk flags -> six dynamic pillar blocks -> predictive selling and coaching blocks -> Quick Reference summaries -> final internal report. |
+| --- |
+
+# 5. Source Hierarchy and Version Control
+
+The build team should use a clear source hierarchy so later edits do not accidentally replace the method with generic sales psychology. The Inevitable Standard Knowledge Base v1, based on Book version 5 dated 6 August 2026, is the primary source for Genene Wilson’s worldview, language and commercial philosophy. This includes the Revenue Illusion, Identity Gap, Identity-Structure-Execution, productised offers, pricing and margin logic, PROSPER and the conversation method, rhythm, weakest-link thinking and the Revenue -> Profit -> Personal Wealth -> Freedom pathway.
+
+The Inevitable Standard Diagnostic Framework v0.3 is the source of truth for the six diagnostic pillars, the four Commercial Decision Approaches, the 4 x 6 source-code logic, Constraint Engine concepts, internal versus client-facing separation, licensing principles and behavioural interpretation boundaries. The Client Report Build Briefing is the implementation source for the 30-question architecture, pillar scoring, risk bands, overall readiness, dual-coded behavioural questions, report selection and core data model.
+
+QSC and the earlier Predictive Selling Playbook are structural references for the categories of internal intelligence. They are the reason the new reports include How They Think, How They Decide, How They Buy, what builds trust, what communication lands, likely objections, buying signals, resistance signals and offer positioning. Do not copy the old QSC 4 x 5 profile matrix or old Mindset Levels into The Inevitable Standard.
+
+| **VERSIONING RULE** Store assessment model version, constraint-engine version, knowledge-base content version and rendered-report version separately. Copy can be improved without silently changing scoring. Scoring can be changed only through a deliberate model release and regression test. |
+| --- |
+
+# 6. One Assessment, Four Insider Pathways
+
+There is one 30-question assessment. Do not create four different questionnaires for the four approaches. The dominant Commercial Decision Approach selects the master internal report after the same assessment has produced the six commercial pillar scores.
+
+| **Primary Approach** | **Master Insider Report** | **Allowed Secondary Influence Values** |
+| --- | --- | --- |
+| **Future-Led** | II-A | Connection-Led, Timing-Led, Evidence-Led, Balanced |
+| **Connection-Led** | II-B | Future-Led, Timing-Led, Evidence-Led, Balanced |
+| **Timing-Led** | II-C | Future-Led, Connection-Led, Evidence-Led, Balanced |
+| **Evidence-Led** | II-D | Future-Led, Connection-Led, Timing-Led, Balanced |
+
+The report letter belongs to the primary approach only. A Connection-Led founder with a strong Evidence-Led secondary still receives Report B, with the Connection-Led + Evidence-Led secondary block selected inside it. Do not create hybrid report files or choose the report from the secondary influence.
+
+# 7. Assessment and Pillar Scoring
+
+The assessment contains 30 behavioural scenario questions. Each of the six pillars receives five questions. Every answer carries a hidden pillar-readiness score of 0, 1, 2 or 3. The five values are added to create a raw pillar score from 0 to 15. The pillar percentage is the raw pillar score divided by 15 and multiplied by 100.
+
+| **Raw Score** | **Displayed %** | **Risk State** |
+| --- | --- | --- |
+| **0** | 0% | High Risk |
+| **1** | 6.7% | High Risk |
+| **2** | 13.3% | High Risk |
+| **3** | 20% | High Risk |
+| **4** | 26.7% | High Risk |
+| **5** | 33.3% | High Risk |
+| **6** | 40% | Medium Risk |
+| **7** | 46.7% | Medium Risk |
+| **8** | 53.3% | Medium Risk |
+| **9** | 60% | Medium Risk |
+| **10** | 66.7% | Medium Risk |
+| **11** | 73.3% | Low Risk |
+| **12** | 80% | Low Risk |
+| **13** | 86.7% | Low Risk |
+| **14** | 93.3% | Low Risk |
+| **15** | 100% | Low Risk |
+
+The colour and internal signal are presentation layers. Green means Low Risk and should be interpreted internally as leverage. Amber means Medium Risk and should be interpreted as watch and strengthen. Red means High Risk and should be interpreted as investigate and intervene where commercially relevant. Store both the raw total and displayed percentage for auditability.
+
+| **IMPORTANT** Never alter the pillar-readiness value because an answer is Future-Led, Connection-Led, Timing-Led or Evidence-Led. Readiness and behavioural approach are separate hidden fields. |
+| --- |
+
+# 8. Overall Inevitable Standard Readiness
+
+Overall Inevitable Standard Readiness is the arithmetic average of the six pillar percentages. Add the six percentages and divide by six, then display the result to one decimal place. Do not convert the overall result into Green, Amber or Red because the average can hide very different pillar risk patterns.
+
+| **Overall %** | **Descriptor** | **Internal Use** |
+| --- | --- | --- |
+| **0 to 39%** | Chance-Based | Large parts of the commercial system still depend on effort, circumstance or inconsistent behaviour. |
+| **40 to 59%** | Inconsistent | Important structures exist, but performance varies enough to create meaningful leakage. |
+| **60 to 79%** | Partly Structured | Much of the business is sound, with identifiable weaknesses that can become expensive as the business grows. |
+| **80 to 100%** | Deliberate and Repeatable | The commercial system is strongly structured. Coaching should focus on leverage, accumulation and the remaining constraints rather than starting over. |
+
+Overall readiness is context, not the intervention sequence. A founder with high overall readiness can still have one Red pillar that is commercially important. Conversely, a founder with low overall readiness may have one Green pillar that becomes valuable coaching leverage.
+
+# 9. Commercial Decision Approach Scoring
+
+The current implementation uses 18 dual-coded behavioural questions, three within each pillar. A dual-coded answer carries two separate hidden values: the normal 0/1/2/3 readiness value for its pillar and a separate signal for Commercial Decision Approach. The two values must remain independent in the data model and in the scoring code.
+
+Aggregate the behavioural signals into four totals, then normalise them to percentages that sum to 100%. Store all four percentages. The largest percentage selects the primary approach and therefore the master Insider Insights report. The second-highest percentage informs secondary influence unless the configured rule selects Balanced.
+
+The exact answer-to-approach signal weights belong in the final question-scoring specification and should be stored as versioned configuration. Do not reverse-engineer them from the report copy and do not hard-code them inside the rendering layer.
+
+# 10. Primary and Secondary Influence Selection
+
+The primary approach is the highest normalised approach percentage. The secondary influence is the next most meaningful approach and modifies the primary profile. It does not create a new score, overwrite pillar evidence or change the report letter.
+
+If the primary percentages are exactly tied, use the versioned deterministic tie rule. The current fallback is to select the approach with the greater number of direct behavioural signals. If that also ties, use fixed A, B, C, D order and create an internal tie flag for QA. For secondary influence, use Balanced where second place is exactly tied or where the configured confidence threshold says no single secondary is sufficiently distinct.
+
+| **SECONDARY INFLUENCE RULE** Render exactly one secondary influence block. Do not show all possible secondary variants and do not infer a secondary from pillar scores. |
+| --- |
+
+# 11. Commercial Decision Map
+
+The Commercial Decision Map can be retained in the internal snapshot if useful to advisers. The vertical axis is Commercial Risk Appetite, with Future-Led at the top and Timing-Led at the bottom. The horizontal axis is Decision Basis, with Evidence & Proof on the left and People & Trust on the right.
+
+| **Coordinate** | **Formula** | **Meaning** |
+| --- | --- | --- |
+| **Horizontal** | Connection-Led % minus Evidence-Led % | Positive values move right towards People & Trust. Negative values move left towards Evidence & Proof. |
+| **Vertical** | Future-Led % minus Timing-Led % | Positive values move upward towards greater willingness to move while uncertainty remains. Negative values move downward towards greater readiness and timing preference. |
+
+Do not describe the vertical axis as investment risk and do not describe the horizontal axis as facts versus feelings. These are commercial decision-behaviour dimensions, not investment suitability, psychological diagnosis or value judgements.
+
+# 12. Dynamic Evidence Hierarchy
+
+The internal report must use a hierarchy that prevents style stereotypes from overpowering actual results. The six pillar scores come first. The Constraint Engine comes second. The primary and secondary approaches explain how the pattern may be operating. Risk flags add answer-level nuance. The live conversation then validates the interpretation.
+
+| **Priority** | **Evidence** | **Instruction** |
+| --- | --- | --- |
+| **1** | Six pillar percentages and risk states | Treat as the strongest direct evidence of what is happening. |
+| **2** | Primary and Secondary Constraint | Use to determine intervention sequence and conversation objective. |
+| **3** | Strongest pillar / Green leverage | Use to show what already works and support the rebuild. |
+| **4** | Primary Commercial Decision Approach | Use as behavioural lens, not as proof of a weakness. |
+| **5** | Secondary influence | Use to modify tone, trust needs and decision pattern. |
+| **6** | False Constraint and risk flags | Use only when supported by the mapped answers. |
+| **7** | Live conversation | Validate, refine or reject hypotheses before acting on them. |
+
+| **EXAMPLE** An Evidence-Led founder with Green Decision should not receive generic language that assumes chronic over-analysis. The Green Decision evidence tells the adviser that proof and logic are currently being managed well enough in that pillar. The same founder with Red Decision can receive a much stronger hypothesis around a moving proof threshold and delayed commitment. |
+| --- |
+
+# 13. Green, Amber and Red as Active Modifiers
+
+Green, Amber and Red are not decorative score colours in Insider Insights. They actively modify how the predictive guidance is written and rendered. This is one of the most important differences between a useful internal report and a generic personality profile.
+
+| **State** | **Internal Meaning** | **How It Changes the Report** |
+| --- | --- | --- |
+| **Green / Low Risk** | LEVERAGE | Use the approach-specific strength in this pillar as evidence of what already works. Avoid presenting the normal style risk as though it is established fact. |
+| **Amber / Medium Risk** | WATCH + STRENGTHEN | Describe the approach-specific risk as inconsistent or conditional. Show what can destabilise the rebuild and what the adviser should monitor. |
+| **Red / High Risk** | INVESTIGATE + INTERVENE | The approach-specific mechanism becomes a stronger hypothesis. Provide deeper listening cues, challenge guidance, selling implications and coaching implications, especially if the pillar is Primary or Secondary. |
+
+The actual state must be used throughout the report, including How They Think, How They Decide, How They Buy, objections, trust guidance, coaching style and Quick Reference summaries. Do not generate the deep pillar block correctly and then leave the top-of-report predictive summary generic.
+
+# 14. Dynamic Content Families and Coverage
+
+Each master report contains fixed content plus dynamic families. The live report should select one relevant item from each required family rather than displaying the full knowledge base. Across all four reports, the dynamic library is intentionally large because the same commercial pillar can behave differently under different decision approaches.
+
+| **Dynamic Family** | **Per Report** | **Across Four Reports** | **Selection Rule** |
+| --- | --- | --- | --- |
+| **Secondary influence** | 4 | 16 | Render exactly one. |
+| **Pillar state blocks** | 18 | 72 | Render one state for each of six pillars. |
+| **Strongest pillar** | 6 | 24 | Render the highest pillar result, with deterministic tie fallback. |
+| **Primary Constraint** | 6 | 24 | Render exactly one. |
+| **Directional Primary + Secondary pairs** | 30 | 120 | Render exactly one ordered pair. |
+| **False Constraints** | Core 4 + approach proposals | Varies | Render only where perceived-problem evidence and mapping support it. |
+| **Risk signals** | Approach-specific | Varies | Render only answer-supported flags. |
+| **Questions, objections, next-step framing** | 6 primary routes plus approach lens | 24+ families | Use Primary Constraint as the first selector, then modify with approach and supported states. |
+
+The 72 pillar-state cells are particularly important. They represent six pillars multiplied by three risk states multiplied by four primary approaches. The 120 directional constraint-pair cells are equally important because Sales Primary + Decision Secondary is not the same as Decision Primary + Sales Secondary. Direction must remain part of the Content ID and selection rule.
+
+# 15. Quick Reference Guide: Page 1
+
+The first page after the cover should operate like the Growth Engine Diagnostic fast read. A coach or adviser should be able to open the report shortly before a call and understand the founder’s commercial situation without reading the deep report first. The Quick Reference is not a separate interpretation layer. It is a short-form view of the same selected content blocks used later.
+
+| **Snapshot Field** | **Rule** |
+| --- | --- |
+| **Client** | Display name. |
+| **Primary Approach** | Display report approach and percentage. |
+| **Secondary Influence** | Display the selected secondary or Balanced. |
+| **Overall Readiness** | Display percentage plus descriptor. |
+| **Primary Constraint** | Display one pillar. |
+| **Secondary Constraint** | Display one reinforcing pillar. |
+| **Strongest Pillar** | Display one pillar. |
+| **False Constraint** | Display the supported perceived-problem interpretation or suppress. |
+| **Priority Fix Order** | Display Priority 1, 2 and 3. |
+| **Conversation Objective** | One dynamic sentence derived from Primary Constraint, False Constraint and relevant behavioural evidence. |
+
+## Six-Pillar Signal Strip
+
+Immediately below the snapshot, display all six pillars with percentage and internal signal. Use Green: Leverage, Amber: Watch, Red: Intervene. This makes the internal use of the colour system explicit and keeps the adviser from treating every lower score equally.
+
+| **SYNCHRONISATION RULE** The Quick Reference must source from the same content family as the deep report. If Sales Red changes in the deep knowledge base, the Red Intervention sentence and related buying/coaching summary should be versioned with the same content family. |
+| --- |
+
+# 16. Predictive Signals: Page 2
+
+The second Quick Reference page should summarise the predictive and coaching signals the adviser needs before the conversation. These short summaries are approach-led but must be modified by the actual pillar states and Constraint Engine where the result supplies stronger evidence.
+
+| **Signal** | **What the Live Report Should Show** |
+| --- | --- |
+| **How They Think** | Short approach-led processing summary with relevant pillar modifier. |
+| **How They Decide** | Approach-led decision pattern, strongly modified by Decision Green/Amber/Red. |
+| **How They Buy** | Buying pathway and what the adviser should establish before asking for a decision. |
+| **What Builds Trust** | Primary and secondary approach trust signals, refined by relevant risk flags. |
+| **What Reduces Trust** | Behaviours likely to lower confidence or create resistance. |
+| **Best Communication Style** | Tone, pace, structure and detail level. |
+| **Likely Buying Objection** | Dynamic from Primary Constraint, pillar states and risk flags. |
+| **Green Leverage** | Strongest or most relevant Green pillar. |
+| **Amber Watch** | Relevant Amber pillar or pattern that could destabilise progress. |
+| **Red Intervention** | Red pillars, highlighting which are Primary and Secondary. |
+| **What To Challenge** | One evidence-based belief or behaviour to investigate. |
+| **What Not To Assume** | A guardrail against turning the approach into a stereotype. |
+| **Coaching Style** | How to create action and accountability with this founder. |
+| **Conversation Objective** | The one outcome the next conversation needs to achieve. |
+
+# 17. How They Think
+
+How They Think should remain a major standalone predictive section. It explains how the founder naturally processes commercial information, what she notices first, how she interprets opportunity and risk, how much detail she tends to want and what can happen under pressure. This is adapted from QSC’s predictive intelligence categories but grounded in the new Commercial Decision Approach and actual pillar evidence.
+
+| **Approach** | **Baseline Thinking Pattern** |
+| --- | --- |
+| **Future-Led** | Starts with possibility, future value and strategic upside, then needs structure to make the future credible. |
+| **Connection-Led** | Starts with people, trust, relationship implications and human response, then needs the commercial evidence and decision ownership brought back into view. |
+| **Timing-Led** | Starts with context, readiness, capacity and practical flow, then needs clarity on which conditions are truly required to move. |
+| **Evidence-Led** | Starts with proof, logic, numbers, process and risk, then needs clarity on when additional evidence has stopped improving the decision. |
+
+The live text should be moderated by the pillar evidence. A Future-Led founder with Green Offer should not be told that she cannot translate vision into structure. An Evidence-Led founder with Green Sales should not be warned that she definitely over-explains. The deep pillar blocks are the source of truth for whether the style is currently an asset, an inconsistency or a risk in that area.
+
+# 18. How They Decide
+
+How They Decide is different from how they think. Thinking is how the founder processes the situation. Decision is what creates movement. The section should explain decision filters, speed, confidence requirements, hesitation points, what can reopen a decision and what a clean decision process looks like for this person.
+
+Decision Green, Amber and Red must materially change the wording. Green means the natural approach is currently being managed well enough to support action. Amber means the threshold can become inconsistent. Red means the natural preference may be participating directly in decision delay or instability and deserves deeper validation in the conversation.
+
+| **Approach** | **Typical Decision Question** | **Red-State Risk Hypothesis** |
+| --- | --- | --- |
+| **Future-Led** | Is the future compelling enough? | New possibilities repeatedly compete with decisions already made. |
+| **Connection-Led** | Does this work for the people involved? | Reassurance, approval or broad alignment become substitutes for decision ownership. |
+| **Timing-Led** | Is this sensible now? | The readiness threshold keeps moving and "not yet" becomes the default. |
+| **Evidence-Led** | What proves this makes sense? | The proof threshold moves and information gathering replaces commitment. |
+
+# 19. How They Buy
+
+How They Buy should be one of the strongest parts of the internal report because it translates the diagnostic into ethical sales preparation. It should explain what the founder is likely to evaluate, what creates confidence, what may look like an objection, what kind of information is useful and what the adviser needs to do to help the person reach a clean yes or no.
+
+| **Approach** | **What Usually Creates Initial Engagement** | **What Must Follow** |
+| --- | --- | --- |
+| **Future-Led** | A meaningful future outcome, strategic possibility and what could become possible. | Sequence, scope, evidence and a credible path that prevents excitement from outrunning implementation. |
+| **Connection-Led** | Feeling understood, trusting the person and seeing that the recommendation reflects the conversation. | A clear recommendation, transparent terms and a decision point that does not hide behind warmth. |
+| **Timing-Led** | A practical path that respects current capacity and explains why the move makes sense now. | A precise definition of what must be true before movement and what can be built after starting. |
+| **Evidence-Led** | A coherent commercial case, relevant proof, clear process and defined assumptions. | A decision threshold so additional evidence is gathered only when it could genuinely change the choice. |
+
+Do not infer spending capacity, package size or willingness to invest from the Commercial Decision Approach alone. Style tells us how the founder may evaluate value. Offer fit must use diagnosed need, overall readiness, explicit business context, implementation capacity and the actual offer criteria.
+
+# 20. Price and Value Interpretation
+
+The old QSC concept of pricing tolerance should be adapted carefully. Insider Insights can explain how a person may evaluate price and value, but it should not predict a literal spending limit from behavioural style. The internal guidance should help the adviser understand what the investment needs to represent and what type of risk the founder may be trying to reduce.
+
+| **Approach** | **Price / Value Lens** | **Adviser Focus** |
+| --- | --- | --- |
+| **Future-Led** | Value is often understood through strategic upside and future possibility. | Connect the investment to the larger commercial outcome, then ground it in scope, sequence and evidence. |
+| **Connection-Led** | Value is affected by trust in the person, relevance to the founder and the quality of the relationship. | Make the recommendation clearly personal to what was heard, without using relationship pressure. |
+| **Timing-Led** | Value is judged partly by whether the investment is sensible and implementable now. | Show the practical pathway and separate real timing constraints from discomfort. |
+| **Evidence-Led** | Value is judged through logic, proof, commercial reasoning and a defensible mechanism. | Make the commercial case explicit, then define what evidence is enough to decide. |
+
+Identity, Sales and Revenue Model states should further modify this section. For example, a Red Identity result may create under-claiming or permission issues when the founder is evaluating investment in her own growth. A Red Revenue Model may make cash-flow or margin concerns objectively relevant rather than merely behavioural resistance.
+
+# 21. Trust and Communication Intelligence
+
+Trust guidance should combine primary approach, secondary influence and actual evidence. The adviser needs to know what increases confidence, what reduces it, what pace and level of detail to use, and how to communicate a difficult diagnosis so it can be heard without manipulating the founder.
+
+| **Approach** | **Trust Builders** | **Trust Reducers** |
+| --- | --- | --- |
+| **Future-Led** | Strategic fluency, bigger-picture understanding, a credible pathway, confidence and relevant proof. | Getting lost in detail before relevance, dismissing ambition, generic recommendations or exciting claims with no delivery path. |
+| **Connection-Led** | Being heard, transparent intent, relevant examples, human understanding, respect for choice and consistent follow-through. | Cold generic selling, hidden agendas, dismissing people impact, artificial urgency or warmth without clarity. |
+| **Timing-Led** | Practical understanding, calm confidence, respect for capacity, sequencing and a realistic implementation path. | Hype, overpromising, ignoring current reality or treating caution as weakness. |
+| **Evidence-Led** | Competence, specificity, clear process, transparent assumptions, relevant data and commercial logic. | Vague claims, unsupported certainty, inconsistent logic, weak numbers or inspiration that avoids the commercial case. |
+
+Secondary influence should refine rather than replace the primary pattern. Future + Evidence needs more commercial proof than Future + Connection. Connection + Timing may need stronger reassurance around pace and implementation. Evidence + Connection still needs logical clarity, but relationship credibility may determine whether the evidence is trusted.
+
+# 22. Six-Pillar Coaching Intelligence
+
+Every live Insider Insights report must render one dynamic coaching block for each of the six pillars. The block is selected by primary report and actual pillar state. This is where the 72 approach x pillar x state cells become operational.
+
+| **Required Subsection Inside Each Pillar-State Block** | **Purpose** |
+| --- | --- |
+| **What This Result Tells You** | State the commercial meaning of the Green, Amber or Red result. |
+| **How [Approach] Is Likely to Shape It** | Explain the approach-specific mechanism as a hypothesis. |
+| **How This May Affect How They Think** | Connect the pillar result to information processing. |
+| **How This May Affect How They Decide** | Connect the pillar result to decision behaviour. |
+| **How This May Affect How They Buy** | Explain the likely effect when this founder is the buyer. |
+| **How to Communicate This Result** | Tell the adviser how to explain the insight. |
+| **What to Listen For** | Give phrases, patterns or behaviours that may validate the hypothesis. |
+| **What to Challenge** | Identify the useful commercial challenge. |
+| **What Not to Assume** | Prevent profiling stereotypes. |
+| **Selling Implication** | Translate the result into ethical sales guidance. |
+| **Coaching Implication** | Translate the result into post-sale coaching. |
+| **Commercial Consequence to Track** | Identify measurable evidence of movement or ongoing leakage. |
+
+A live report must render exactly six of these blocks, one for each pillar. Never render Green, Amber and Red alternatives together. Never substitute the client-facing pillar copy for the internal coaching block, because the internal block has a different purpose and permission level.
+
+# 23. Strongest Pillar and Green Leverage
+
+The strongest pillar is the highest pillar percentage. Render the matching Strongest Pillar block and use it as coaching leverage. The internal report should never become a catalogue of deficits. Green areas can demonstrate that the founder already possesses the commercial capability required to rebuild another area.
+
+If pillar scores tie for strongest, use the fixed pillar order as the deterministic fallback unless a later versioned rule is approved. The fixed order is Identity, Positioning, Offer, Sales, Revenue Model, Decision.
+
+| **GREEN LEVERAGE EXAMPLE** If Positioning is Green while Sales and Decision are Red, the adviser can use strong market clarity as evidence that more leads or another repositioning exercise may not be the first answer. The right people may already be reaching the business. The leverage sits in conversion and decision behaviour. |
+| --- |
+
+# 24. Constraint Engine
+
+The Constraint Engine creates the strategic diagnosis that drives the internal report. Primary Constraint is the highest-leverage issue limiting the system now. It is not automatically the numerically lowest pillar. Secondary Constraint is the issue most likely to reinforce or recreate the Primary. False Constraint identifies a perceived problem the founder may be trying to solve too early. Priority Fix Order turns the diagnosis into sequence.
+
+Identity and Decision require override capability because they can suppress otherwise strong structure. A founder can have a strong Offer but under-claim its value. A founder can have strong Positioning and still fail to execute the required commercial actions. The automated algorithm should therefore combine pillar evidence with configurable, versioned override rules rather than simply sorting scores.
+
+| **IMPLEMENTATION STATUS** The reports already contain all six Primary Constraint blocks and all 30 directional Primary + Secondary pair blocks. If the final automated Constraint Engine rules are still being refined, keep them in a versioned configuration layer rather than embedding unchangeable logic in front-end code. |
+| --- |
+
+# 25. Primary + Secondary Constraint Loop
+
+Render exactly one directional Primary + Secondary pair. Direction matters. Sales Primary + Decision Secondary means the immediate commercial leak is Sales and Decision is helping it repeat. Decision Primary + Sales Secondary means action and follow-through are the immediate issue, with Sales one of the areas being suppressed by that decision pattern.
+
+The pair block should be used to explain the repeating loop, not to create two competing priorities. The Primary tells the adviser where to begin. The Secondary tells the adviser what may pull the founder back towards the old pattern if it remains unchanged.
+
+| **Primary** | **Possible Secondary Values** | **Number of Directional Blocks** |
+| --- | --- | --- |
+| **Identity** | Positioning, Offer, Sales, Revenue Model, Decision | 5 |
+| **Positioning** | Identity, Offer, Sales, Revenue Model, Decision | 5 |
+| **Offer** | Identity, Positioning, Sales, Revenue Model, Decision | 5 |
+| **Sales** | Identity, Positioning, Offer, Revenue Model, Decision | 5 |
+| **Revenue Model** | Identity, Positioning, Offer, Sales, Decision | 5 |
+| **Decision** | Identity, Positioning, Offer, Sales, Revenue Model | 5 |
+
+# 26. False Constraint Intelligence
+
+False Constraint is a perceived problem the founder may be trying to solve when the commercial evidence points somewhere else. It should create a useful reframe during the sales or coaching conversation, but only when the assessment contains the relevant perceived-problem signal. Do not assign a False Constraint merely because it fits the person’s approach.
+
+| **Framework-Supported Core False Constraints** | **Typical First Reframe** |
+| --- | --- |
+| **I need more leads.** | If opportunities already exist but Sales or Decision is weak, more volume can increase the same leak. |
+| **My price is too high.** | If strong-fit prospects engage but the founder discounts, over-explains or softens, Identity or Sales may need attention before changing the price. |
+| **I need a new offer.** | If the Offer is clear but promotion, follow-up or decision rhythm is weak, rebuilding the Offer can delay the exposing commercial action. |
+| **I need better systems.** | If the conversation is not reaching a decision, backend systems are unlikely to be the immediate leverage point. |
+
+The four master reports also contain approach-specific proposed False Constraints, such as a bigger opportunity for Future-Led, a bigger community for Connection-Led, more time for Timing-Led and more data for Evidence-Led. Keep these proposed extensions inactive as formal diagnostic outputs until the final perceived-problem fields and mapping rules are approved. They may be used as internal hypotheses only where the assessment evidence supports them.
+
+# 27. Dynamic Commercial Risk Signals
+
+Commercial Risk Signals are answer-level supporting insights. They are not additional pillars and should never compete with the Constraint Engine. The report should render only flags supported by the underlying answer pattern. The approach changes the interpretation of the flag, but the approach alone must never create the flag.
+
+| **Approach** | **Examples Already Present in the Master Knowledge Base** |
+| --- | --- |
+| **Future-Led** | Vision outrunning structure, Positioning churn, Offer expansion, inspiring without closing, scale before margin, optionality and decision drift, future promise risk, novelty as avoidance. |
+| **Connection-Led** | Approval dependency, over-nurturing, soft ask, over-delivery and scope leakage, relationship-based pricing drift, consensus and reassurance delay, people-impact overreach. |
+| **Timing-Led** | Under-claiming, waiting for demand, premium delay, buyer-readiness, slow margin leakage, founder adaptation, safe timing, rhythm risk, decision drift, capacity gate. |
+| **Evidence-Led** | Proof threshold, technical Positioning, complexity, over-explanation, analysis-to-action, certainty, metric-hiding and proof-before-ask. |
+
+Each risk flag should have at least three fields in the content layer: a stable code, an internal interpretation and an adviser response. If the flag influences the Quick Reference or objection guidance, those summaries should source from the same flag code rather than being independently authored.
+
+# 28. Objections and What May Sit Underneath
+
+The internal report should not use canned objection rebuttals. It should help the adviser interpret what a statement may mean and choose the next diagnostic question. The same sentence can have different meanings under different approaches and pillar states.
+
+For example, "I need more time" may represent a real Timing-Led implementation constraint, a Decision delay, an unresolved commercial question or a polite no. "I need more information" may be a legitimate Evidence-Led request or a moving proof threshold. "I need to talk to my team" may be appropriate consultation for a Connection-Led founder or reassurance-seeking when Decision is weak. The adviser should validate rather than assume.
+
+Use Primary Constraint as the first selector for the objection family. Modify the interpretation using relevant pillar states, secondary influence, False Constraint and risk flags. The report should explain what to ask next, not merely what to say back.
+
+# 29. Predictive Conversation Strategy
+
+The Insider Insights reports use Genene’s conversation application of The Inevitable Standard Method rather than manipulative pressure. The objective is a clean decision that serves the founder. The adviser should use the report to improve relevance, diagnosis and clarity, not to exploit behavioural tendencies.
+
+| **Stage** | **Internal Purpose** |
+| --- | --- |
+| **Permission** | Create permission for a commercially honest conversation and establish what the founder wants from it. |
+| **Reframe** | Help the founder see the difference between the perceived problem and the commercial evidence. |
+| **Ownership** | Clarify what belongs to the founder and where behaviour or structure is keeping the pattern in place. |
+| **Structure** | Explain the weak link, sequence and why the recommended order matters. |
+| **Power Questions** | Use questions selected from Primary Constraint and approach to deepen recognition. |
+| **Embodiment** | Help the founder experience what a stronger commercial standard would look like in a real situation. |
+| **Result** | Reach a clear next decision, including a clean no where appropriate, rather than leaving an indefinite maybe. |
+
+The Commercial Decision Approach changes the delivery of the method. Future-Led may need the future outcome established before detail. Connection-Led may need enough relational trust for direct challenge. Timing-Led may need the conditions for action made explicit. Evidence-Led may need the commercial logic and proof threshold made clear.
+
+# 30. Pre-Call Preparation and Questions
+
+The report should support a short pre-call preparation routine. The adviser should be able to review the Quick Reference, confirm the Primary and Secondary Constraint, identify Green leverage, note the likely False Constraint and risk flags, and select the questions most likely to validate the central hypothesis.
+
+| **Pre-Call Check** | **Question for the Adviser** |
+| --- | --- |
+| **Primary Constraint** | What is the one commercial issue I need to understand more deeply? |
+| **Secondary Constraint** | What may be recreating the Primary problem? |
+| **Green leverage** | What existing strength can I use to avoid unnecessary rebuilding? |
+| **False Constraint** | What problem does the founder appear likely to solve first, and what evidence would show it is secondary? |
+| **Approach** | What type of framing, proof, trust or pacing is likely to help the insight land? |
+| **Risk flags** | Which answer-level behaviours are worth validating rather than assuming? |
+| **Next step** | What outcome would make this conversation useful even if the founder does not buy? |
+
+The deep report should also provide question sets by Primary Constraint and one "question they may be avoiding" for each pillar. These are coaching and diagnostic prompts, not scripts that must be read verbatim.
+
+# 31. Challenge Sequence
+
+Each report includes guidance on what to challenge and what not to challenge too early. This is essential because a correct interpretation delivered at the wrong point in the conversation can reduce trust and make the insight harder to hear. The build should preserve the sequence guidance rather than extracting isolated challenge phrases into a generic script library.
+
+The adviser should normally validate the founder’s stated concern, establish enough evidence for the commercial reframe, and then challenge the behaviour or assumption that is actually relevant. Where a risk flag is only a hypothesis, the language should remain investigative rather than declarative.
+
+| **COACHING RULE** Challenge the pattern, not the person. Use the founder’s own answers and commercial evidence. A behavioural hypothesis becomes useful only when the conversation confirms that it is actually operating. |
+| --- |
+
+# 32. Buying and Resistance Signals
+
+Buying Signals and Resistance Signals help the adviser read movement without pretending to predict the future with certainty. They should be described as likely signals, not guarantees. A signal should influence the next question, not replace the direct ask.
+
+| **Approach** | **Examples of Buying Movement** | **Examples of Resistance or Drift** |
+| --- | --- | --- |
+| **Future-Led** | Begins speaking about the future as achievable, connects the recommendation to a larger objective, asks about implementation or next-stage possibilities. | Keeps opening unrelated possibilities, becomes excited but will not choose a next step, disengages when implementation becomes concrete. |
+| **Connection-Led** | Uses collaborative language, asks about support and relationship, reflects trust in the adviser, begins discussing who else needs to be involved appropriately. | Stays warm but non-committal, seeks repeated reassurance, introduces more people to avoid ownership, protects harmony from a direct decision. |
+| **Timing-Led** | Begins defining practical start conditions, asks how implementation fits capacity, identifies a realistic decision point. | Adds another condition after each one is met, repeatedly moves the start date, uses time without naming what new information it will create. |
+| **Evidence-Led** | Begins testing implementation detail, narrows remaining questions, accepts assumptions and starts discussing the specific commercial case. | Keeps widening the evidence set, requests more proof without a decision purpose, introduces new comparisons after earlier concerns are resolved. |
+
+# 33. Recommended Next Step and Offer Fit
+
+The recommended next step should be selected from the actual diagnosed need and offer-routing rules, then positioned in language appropriate to the founder’s approach. Do not choose an offer from personality style alone. The primary approach changes how the recommendation is explained, not which package the founder can afford or what the business objectively needs.
+
+Primary Constraint should be the main selector for the value proposition. Overall readiness, business context, implementation capacity and explicit commercial facts can then influence fit. The report may also use the Priority Fix Order to explain why one pathway should come before another.
+
+| **OFFER-FIT BOUNDARY** Do not infer spending level, creditworthiness, financial suitability or willingness to invest from the Commercial Decision Approach. Insider Insights is behavioural and commercial guidance, not financial profiling. |
+| --- |
+
+# 34. Follow-Up Guidance
+
+Follow-up should be approach-aware and evidence-aware. The report should tell the adviser what to reiterate, which uncertainty may need resolving, what additional proof or clarity could help, and what not to send. Follow-up should not become an automated pressure sequence simply because the report predicts a likely objection.
+
+Where the founder has not decided, use the earlier conversation to determine what remains unresolved. For Timing-Led, clarify whether more time has a defined purpose. For Evidence-Led, clarify whether additional evidence could change the decision. For Connection-Led, keep the relationship warm without allowing the decision to disappear. For Future-Led, reconnect the recommendation to the strategic outcome and then bring it back to the agreed next step.
+
+# 35. Post-Sale Coaching Priorities
+
+Once the founder becomes a client, the same internal report becomes a coaching map. The coach should not discard the predictive selling layer and start again. The approach, pillar states, Primary and Secondary Constraint, Green leverage and risk flags continue to explain how the founder is likely to respond to the rebuild.
+
+Use Priority 1 as the main coaching focus. Use Priority 2 to identify what may recreate the problem. Use Priority 3 only after the first two are moving unless the live evidence requires a change. Green pillars should be used to support confidence and transfer proven behaviour into the constrained area.
+
+The book should remain the intervention library. Identity coaching should return to value, visibility, asking and the Identity Gap. Offer coaching should return to productisation, outcome, ladder, scope and margin. Sales coaching should return to clean decisions and the conversation method. Decision coaching should return to rhythm, pre-decided revenue actions and follow-through. Revenue Model coaching should return to margin, retained value and the Revenue-To-Freedom chain.
+
+# 36. Accountability and Progress Signals
+
+Accountability should be behavioural and commercially observable. The coach should avoid measuring progress only through how confident or clear the founder says she feels. Each pillar has observable evidence of movement.
+
+| **Pillar** | **Examples of Progress Evidence** |
+| --- | --- |
+| **Identity** | Price stated without unnecessary softening, clearer asks, stronger boundaries, less discounting, more visible authority. |
+| **Positioning** | Clearer audience and problem signal, stronger lead fit, less message churn, shorter explanation required. |
+| **Offer** | Defined scope, stronger ladder, cleaner premium pathway, improved margin, less bespoke rebuilding. |
+| **Sales** | More direct recommendations, consistent follow-up, more closed loops, improved conversion and shorter unresolved cycles. |
+| **Revenue Model** | Improved margin, stronger repeat revenue, healthier owner value, lower dependency and clearer client progression. |
+| **Decision** | Fewer open loops, clearer deadlines, protected revenue rhythm, less reopening, faster implementation of already-decided work. |
+
+The approach changes how accountability is delivered. Future-Led often benefits from fewer active priorities and visible completion. Connection-Led may need boundaries and permission to tolerate relational discomfort. Timing-Led benefits from measurable readiness thresholds and dates. Evidence-Led benefits from explicit decision criteria and limits on additional analysis.
+
+# 37. Green and Red Flags for the Adviser
+
+The reports include adviser-level Green Flags and Red Flags. These are not pillar colours. They are call-management and coaching signals that help the adviser decide whether to proceed, slow down, ask for more evidence, challenge a pattern, change the intervention or refer the founder to another professional where appropriate.
+
+Green Flags might include clear ownership, the ability to describe the commercial problem accurately, willingness to act on evidence, realistic expectations, strong fit between need and recommended pathway, and an existing Green pillar that can support the rebuild. Red Flags might include unsupported urgency, refusal to engage with the actual constraint, material financial or legal issues outside scope, expectations of guaranteed outcomes, or a mismatch between the recommended intervention and the founder’s actual needs.
+
+# 38. Required Data Fields
+
+Store enough structured information to regenerate the report, audit the scoring, support CRM workflows and compare later reassessments. Field names can differ technically, but the underlying information should be retained.
+
+| **Field** | **Purpose** |
+| --- | --- |
+| **client_name** | Display name. |
+| **report_date** | Assessment/report date. |
+| **model_version** | Scoring model version. |
+| **constraint_version** | Constraint Engine rule version. |
+| **content_version** | Insider knowledge-base copy version. |
+| **future_pct / connection_pct / timing_pct / evidence_pct** | All four Commercial Decision Approach percentages. |
+| **primary_approach** | Future-Led / Connection-Led / Timing-Led / Evidence-Led. |
+| **secondary_influence** | One secondary approach or Balanced. |
+| **readiness_pct** | Overall Inevitable Standard Readiness. |
+| **readiness_descriptor** | Chance-Based / Inconsistent / Partly Structured / Deliberate and Repeatable. |
+| **identity_pct / risk** | Identity result and state. |
+| **positioning_pct / risk** | Positioning result and state. |
+| **offer_pct / risk** | Offer result and state. |
+| **sales_pct / risk** | Sales result and state. |
+| **revenue_model_pct / risk** | Revenue Model result and state. |
+| **decision_pct / risk** | Decision result and state. |
+| **primary_constraint** | Highest-leverage constraint. |
+| **secondary_constraint** | Reinforcing constraint. |
+| **strongest_pillar** | Highest pillar result. |
+| **false_constraint_code** | Supported perceived-problem mapping. |
+| **priority_1 / priority_2 / priority_3** | Priority Fix Order. |
+| **risk_flag_codes[]** | Supported internal behavioural/commercial flags. |
+| **recommended_next_step_code** | Configured coaching or commercial pathway. |
+| **lead_status / value** | Optional CRM fields where used. |
+| **selected_content_ids[]** | Exact content blocks used in the rendered report. |
+| **qa_flags[]** | Tie, missing value or other internal QA state. |
+
+# 39. Content IDs and Linking Rules
+
+Stable Content IDs are the primary linking mechanism between scoring, content storage and report rendering. Do not use visible headings or section numbers as keys because headings can be rewritten and the current A/B/C/D masters do not have identical section numbering.
+
+| **Family** | **Canonical Pattern** | **Example** |
+| --- | --- | --- |
+| **Quick Reference snapshot** | II-{REPORT}-QR-SNAPSHOT | II-A-QR-SNAPSHOT |
+| **Predictive signals** | II-{REPORT}-QR-PREDICTIVE-SIGNALS | II-C-QR-PREDICTIVE-SIGNALS |
+| **Secondary influence** | II-{REPORT}-05-SECONDARY-{SECONDARY} | II-B-05-SECONDARY-EVIDENCE_LED |
+| **Pillar state** | II-{REPORT}-PILLAR-{PILLAR}-{STATE} | II-D-PILLAR-SALES-RED |
+| **Primary Constraint** | II-{REPORT}-PRIMARY-{PILLAR} | II-A-PRIMARY-REVENUE_MODEL |
+| **Directional pair** | II-{REPORT}-PAIR-{PRIMARY}-{SECONDARY} | II-C-PAIR-DECISION-SALES |
+| **False Constraint** | II-{REPORT}-FALSE-{CODE} | II-D-FALSE-MORE_LEADS |
+| **Risk signal** | II-{REPORT}-RISK-{CODE} | II-D-RISK-PROOF_THRESHOLD |
+
+The D master currently exposes item-level Content IDs for False Constraints and risk flags more explicitly than A, B and C. For implementation, normalise all four pathways to the same item-level storage convention even where a current Word master groups several items under one container ID. Keep the original master documents as content sources, but create stable child IDs in the content store so individual flags and False Constraints can be selected and versioned independently.
+
+Store the selected Content IDs on the rendered-report record. This makes QA, support, later localisation and retrospective analysis much easier because the team can see exactly which content was shown without reconstructing the whole scoring event.
+
+# 40. Dynamic Rendering Order
+
+The four Word masters use slightly different human section numbers, but the live product should follow one canonical functional order. The sequence below is the recommended internal rendering order.
+
+| **#** | **Section** |
+| --- | --- |
+| **1** | Cover and confidentiality notice |
+| **2** | Quick Reference Page 1: Insider Snapshot |
+| **3** | Quick Reference Page 2: Predictive Signals |
+| **4** | Table of Contents |
+| **5** | Purpose and Dynamic Evidence Hierarchy |
+| **6** | Primary Approach Core Profile |
+| **7** | Secondary Influence |
+| **8** | How They Think |
+| **9** | How They Decide |
+| **10** | How They Buy |
+| **11** | Price and Value |
+| **12** | Trust Builders and Trust Reducers |
+| **13** | Communication Style |
+| **14** | Coaching Style and Challenge Guidance |
+| **15** | Six dynamic pillar-state blocks |
+| **16** | Strongest Pillar / Green Leverage |
+| **17** | Primary Constraint |
+| **18** | Primary + Secondary Constraint Loop |
+| **19** | False Constraint |
+| **20** | Supported Risk Signals |
+| **21** | Likely Objections and underlying meanings |
+| **22** | Predictive Conversation Strategy |
+| **23** | Pre-Call Preparation |
+| **24** | Questions by Primary Constraint |
+| **25** | Question They May Be Avoiding |
+| **26** | What to Challenge and what not to challenge too early |
+| **27** | Buying and Resistance Signals |
+| **28** | Recommended Next Step positioning |
+| **29** | Follow-Up Guidance |
+| **30** | Post-Sale Coaching Priorities |
+| **31** | Accountability |
+| **32** | Progress Signals |
+| **33** | Adviser Green and Red Flags |
+| **34** | Final Insider Summary |
+| **35** | Developer / rendering metadata if visible to implementation users |
+| **36** | Source Map and Ethical Boundaries |
+
+The system may suppress build-only sections in the version shown to a coach. For example, content ID indexes, source maps and developer specifications can remain available to implementation administrators while the authorised coach receives the operational report. The content and permission layers should support both views.
+
+# 41. Suppression, Fallback and Tie Rules
+
+The live report should never display unresolved placeholders, unused alternative branches or internal source-code options. If a dynamic value is missing, suppress the dependent content and create an internal QA flag. If primary approach or Primary Constraint is missing, the Insider Insights report should not be issued until the scoring record is complete.
+
+| **Rule** | **Required Behaviour** |
+| --- | --- |
+| **Pillar states** | Render exactly one Green, Amber or Red block per pillar. |
+| **Secondary influence** | Render exactly one block. |
+| **Strongest pillar** | Render one block. Use fixed pillar order as tie fallback unless versioned rule changes. |
+| **Primary Constraint** | Render exactly one. |
+| **Secondary interaction** | Render exactly one directional pair when Secondary is available. |
+| **False Constraint** | Render only when perceived-problem evidence and mapping support it. |
+| **Risk flags** | Render zero or more, only when mapped evidence supports them. |
+| **Missing required value** | Suppress dependent block, log QA flag, never show [PLACEHOLDER]. |
+| **Exact primary-approach tie** | Use direct behavioural-signal count, then fixed A/B/C/D order if still tied, and flag internally. |
+| **Secondary ambiguity** | Use Balanced when tied or below the configured distinctiveness threshold. |
+
+# 42. Permission Layer and Confidentiality
+
+Insider Insights is confidential internal material. It contains behavioural hypotheses, trust and resistance signals, objection interpretations, adviser responses, pre-call guidance, coaching strategy and implementation logic. These should not appear automatically in the client-facing report or be exposed through public report URLs.
+
+Authorised users may include Genene Wilson, approved advisers, coaches, consultants, implementation personnel and licensed partners according to contractual permissions. The platform should support role-based access, and rendered report URLs should respect that permission layer.
+
+| **CLIENT BOUNDARY** The founder can receive the commercial diagnosis, their Commercial Decision Approach and practical guidance. The insider can receive hypotheses about how to communicate, sell, challenge, coach and interpret resistance. Keep those layers distinct unless a future product release explicitly approves a client-facing version of an internal insight. |
+| --- |
+
+# 43. Coach and Adviser Operating Guide
+
+The internal report is a preparation and coaching aid, not a substitute for judgement. Advisers should read the Quick Reference before the call, use the deeper sections where relevant, and validate the hypotheses through conversation. They should not read the report aloud to the founder or announce inferred traits as fixed facts.
+
+| **Before the Call** | **During the Call** | **After the Call** |
+| --- | --- | --- |
+| **Review Primary/Secondary Constraint, Green leverage, False Constraint, relevant risk flags and conversation objective.** | Use the approach to improve communication, then test the commercial hypothesis through questions. Keep the weak link central. | Record what was validated, what changed, the next decision, and any content/risk interpretation that proved inaccurate. |
+| **Select 3 to 5 useful questions rather than trying to use every prompt.** | Use a clean decision process. Do not manufacture urgency or use the profile to corner the founder. | If the founder becomes a client, convert the same report into coaching priorities and measurable progress signals. |
+| **Know what not to challenge too early.** | Use Green pillars as evidence of existing capability and avoid unnecessary rebuilding. | Update CRM notes separately from the immutable assessment result. Do not rewrite the original score because the conversation added nuance. |
+
+If the live conversation contradicts the behavioural hypothesis, the coach should trust the person and the evidence from the conversation. The report is designed to improve preparation, not to prove itself right. Capture repeated contradictions for model review because they may indicate copy, mapping or scoring improvements.
+
+# 44. Ethical and Professional Boundaries
+
+Insider Insights should help the adviser make a conversation more relevant, respectful and commercially clear. It must not be used for coercion, hidden manipulation or unsupported claims about psychology. The Commercial Decision Approach is a commercial behavioural framework, not a clinical diagnosis or fixed personality type.
+
+The report can discuss Revenue, Profit, Personal Wealth and Freedom as commercial concepts, but it is not personal financial, investment, tax, legal, accounting or credit advice. Do not use the profile to infer financial capacity, investment suitability, creditworthiness or personal wealth. Where the conversation moves into regulated or professional advice, refer the founder to an appropriately licensed or qualified practitioner.
+
+No part of the report should imply guaranteed revenue, profit, wealth, business, coaching or investment outcomes. Buying and resistance signals are hypotheses. Objections are interpretations to investigate. Recommended next steps require real fit and informed choice.
+
+# 45. QA and Regression Test Matrix
+
+Before release, test the internal engine with scenarios designed to exercise every dynamic family. Do not limit QA to visually average reports. The purpose is to prove that report selection, state modification, Content ID linking and permission rules all behave correctly at the edges.
+
+| **Test Scenario** | **What It Must Prove** |
+| --- | --- |
+| **All six Green, Future-Led primary** | Confirms style risks are not rendered as established weaknesses and Green leverage dominates. |
+| **All six Amber, Connection-Led primary** | Confirms all six Amber blocks and watch language render. |
+| **All six Red, Timing-Led primary** | Confirms intervention language, constraint priority and no accidental overload of equal priorities. |
+| **Mixed states, Evidence-Led primary** | Confirms Green/Amber/Red modifiers alter predictive guidance correctly. |
+| **Sales Red under A/B/C/D** | Confirms four materially different Sales mechanisms render from the same commercial state. |
+| **Decision Green under A/B/C/D** | Confirms no generic indecision stereotype is shown. |
+| **Revenue Model Red with strong overall readiness** | Confirms overall score does not suppress a serious pillar issue. |
+| **Primary + Secondary reversed** | Confirms directional pair content changes. |
+| **Exact primary approach tie** | Confirms deterministic rule and internal tie flag. |
+| **Balanced secondary** | Confirms one Balanced block renders and no arbitrary secondary is chosen. |
+| **No False Constraint** | Confirms section suppresses or uses approved neutral handling. |
+| **Multiple supported risk flags** | Confirms all supported flags render without becoming extra pillars. |
+| **No risk flags** | Confirms empty group suppresses cleanly. |
+| **Missing primary constraint** | Confirms report generation fails safely rather than exposing placeholders. |
+| **Client permission user opens insider URL** | Confirms access is denied and internal content is not leaked. |
+| **Content version update** | Confirms historical rendered report retains its original selected content/version record. |
+| **Reassessment** | Confirms new result can be compared without mutating the earlier assessment record. |
+
+QA should also include copy-parity checks across A, B, C and D. Report-specific labels must never drift, such as a Connection-Led document accidentally carrying a Future-Led section label. This is another reason Content IDs and structured metadata should be authoritative rather than copied headings.
+
+# 46. Build Acceptance Checklist
+
+| **Status** | **Acceptance Requirement** |
+| --- | --- |
+| **□** | One 30-question assessment produces six pillar scores and four approach percentages. |
+| **□** | Pillar scoring uses five questions per pillar and hidden 0/1/2/3 readiness values. |
+| **□** | The six pillar percentages and Green/Amber/Red states match the client report exactly. |
+| **□** | Overall Readiness matches the client report and displays the correct descriptor. |
+| **□** | Primary approach selects exactly one of II-A, II-B, II-C or II-D. |
+| **□** | One secondary influence or Balanced is selected. |
+| **□** | All six dynamic pillar-state blocks use the correct primary approach and actual state. |
+| **□** | The strongest pillar block matches the highest pillar result. |
+| **□** | Primary and Secondary Constraints match the versioned Constraint Engine result. |
+| **□** | The directional Primary + Secondary pair is correct. |
+| **□** | False Constraint appears only when mapped evidence supports it. |
+| **□** | Risk flags appear only when answer-level mappings support them. |
+| **□** | Quick Reference short-form signals remain synchronised with deep content families. |
+| **□** | How They Think, Decide and Buy are modified by relevant pillar evidence and do not rely on stereotypes. |
+| **□** | Offer fit is not inferred from personality style or assumed spending power. |
+| **□** | The recommended next step is routed from diagnosed need and approved offer criteria. |
+| **□** | Client-facing and Insider Insights permission layers are separate. |
+| **□** | Selected Content IDs and content version are stored on the rendered report record. |
+| **□** | No unresolved placeholders are visible. |
+| **□** | All four reports pass parity, tie, suppression and permission regression tests. |
+| **□** | The system preserves assessment history for reassessment and future benchmarking. |
+
+# 47. Source Map and Open Implementation Items
+
+| **Source** | **Role in the Build** |
+| --- | --- |
+| **The Inevitable Standard Knowledge Base v1, based on Book version 5, 6 August 2026** | Primary language and philosophy source. Use for Revenue Illusion, Identity Gap, Identity-Structure-Execution, Offer and margin, sales conversation method, rhythm, weakest-link thinking and Revenue -> Profit -> Personal Wealth -> Freedom. |
+| **The Inevitable Standard Diagnostic Framework v0.3** | Diagnostic architecture. Use for six pillars, four approaches, 4 x 6 source-code cells, Constraint Engine concepts, internal/client separation and validation principles. |
+| **The Inevitable Standard Client Report Build Briefing for Lisa v1** | Scoring and implementation source for 30 questions, pillar percentages, risk bands, overall readiness, approach aggregation, map, required data fields and client-report synchronisation. |
+| **Insider Insights Report A: Future-Led v1** | Master internal content for II-A. |
+| **Insider Insights Report B: Connection-Led v1** | Master internal content for II-B. |
+| **Insider Insights Report C: Timing-Led v1** | Master internal content for II-C. |
+| **Insider Insights Report D: Evidence-Led v1** | Master internal content for II-D. |
+| **QSC Entrepreneur Framework / Predictive Selling Playbook** | Reference for predictive intelligence categories. Do not import the old QSC 4 x 5 profile model or Mindset Levels. |
+
+## Open Implementation Items to Lock Before Production
+
+The current report architecture is complete enough to build, but several rules should remain configurable until formally signed off. The exact answer-to-approach weights for the 18 dual-coded behavioural questions belong in the final scoring specification. The exact confidence threshold for selecting a named secondary influence versus Balanced should also be versioned. The automated Constraint Engine should remain configurable until its override logic has been validated against real cases.
+
+The approach-specific False Constraint extensions are useful internal hypotheses but should not become formal diagnostic outputs until the perceived-problem fields and mapping rules are approved. The same principle applies to risk flags: every flag needs a documented answer-level trigger, not an inference from approach alone.
+
+For content storage, normalise item-level Content IDs across A, B, C and D, particularly False Constraints and risk signals. The Word masters are authoritative content sources, but the production content service should use a consistent schema even where the current documents group some items differently.
+
+| **FINAL BUILD STANDARD** The live Insider Insights report should feel highly personalised because the content is assembled from real evidence, not because the system makes more assumptions. Use the six pillar states to modify the behavioural lens, use the Constraint Engine to determine sequence, use the book to guide the intervention, and use the live conversation to validate what is true. |
+| --- |
+
+Genene Wilson | The Wealth Architect  |  Page

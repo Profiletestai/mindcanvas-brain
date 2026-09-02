@@ -44,14 +44,14 @@ export async function POST(req: Request, { params }: { params: { token: string }
       }
     }
 
-    // Create taker — include link_token (and link_id if the column exists)
+    // Create taker — link_token ties the taker to the link (test_takers has no
+    // link_id column; PostgREST rejects unknown columns rather than ignoring them).
     const { data: taker, error: takerErr } = await sb
       .from("test_takers")
       .insert([{
         org_id: link.org_id,
         test_id: link.test_id,
         link_token: link.token,   // ← critical: satisfies NOT NULL constraint
-        link_id: link.id,         // ← if your table has this column it will populate; otherwise DB ignores
         first_name, last_name, email, company, role_title,
         status: "in_progress",
       }])
