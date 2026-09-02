@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import ReportGateClient from "./ReportGateClient";
+import InevitableStandardReportClient from "./InevitableStandardReportClient";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -100,6 +101,22 @@ function looksLikeQscTest(test: PortalTestRow | null) {
   );
 }
 
+function looksLikeInevitableStandardTest(test: PortalTestRow | null) {
+  const slug = String(test?.slug || "").toLowerCase().trim();
+  const name = String(test?.name || "").toLowerCase().trim();
+  const meta = test?.meta && typeof test.meta === "object" ? test.meta : {};
+  const engineKey = String(meta?.engine_key || "").toLowerCase().trim();
+
+  return (
+    meta?.is_inevitable_standard === true ||
+    engineKey === "inevitable_standard" ||
+    engineKey === "inevitable-standard" ||
+    slug === "inevitable-standard" ||
+    slug.startsWith("inevitable-standard-") ||
+    name.includes("inevitable standard")
+  );
+}
+
 function looksLikeTeamPuzzleRhythmTest(test: PortalTestRow | null) {
   const slug = String(test?.slug || "").toLowerCase();
   const name = String(test?.name || "").toLowerCase();
@@ -173,6 +190,7 @@ export default async function ReportPage({
   }
 
   let redirectTarget: string | null = null;
+  let renderInevitableStandard = false;
 
   try {
     const sb = portal();
@@ -202,15 +220,24 @@ export default async function ReportPage({
       // This keeps the RHYTHM Edition report separate from the existing generic report.
       if (!redirectTarget) {
         const wrapperTestRow = await fetchPortalTestRow(sb, link.test_id);
+        const effectiveTestRow = await resolveEffectiveTestRow(sb, wrapperTestRow);
 
-        if (looksLikeTeamPuzzleRhythmTest(wrapperTestRow)) {
+        if (
+          looksLikeInevitableStandardTest(wrapperTestRow) ||
+          looksLikeInevitableStandardTest(effectiveTestRow)
+        ) {
+          renderInevitableStandard = true;
+        }
+
+        if (
+          !renderInevitableStandard &&
+          looksLikeTeamPuzzleRhythmTest(wrapperTestRow)
+        ) {
           redirectTarget = `/t/${encodeURIComponent(token)}/team-puzzle-rhythm-report?${commonQs}`;
         }
 
         // 3) Resolve wrapper + effective source for robust QSC detection
-        if (!redirectTarget) {
-          const effectiveTestRow = await resolveEffectiveTestRow(sb, wrapperTestRow);
-
+        if (!renderInevitableStandard && !redirectTarget) {
           const isQsc =
             looksLikeQscTest(wrapperTestRow) || looksLikeQscTest(effectiveTestRow);
 
@@ -231,6 +258,10 @@ export default async function ReportPage({
   // to the old ReportGateClient instead of redirecting.
   if (redirectTarget) {
     redirect(redirectTarget);
+  }
+
+  if (renderInevitableStandard) {
+    return <InevitableStandardReportClient token={token} tid={tid} />;
   }
 
   return <ReportGateClient token={token} tid={tid} src={src} />;

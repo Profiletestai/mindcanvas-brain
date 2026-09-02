@@ -430,6 +430,13 @@ export default async function TakerDetail({
       (typeof meta?.frameworkType === "string" &&
         meta.frameworkType.toLowerCase() === "qsc"));
 
+  const isInevitableStandard =
+    Boolean((totalsRaw as any)?.inevitable_standard?.pillars) ||
+    meta?.is_inevitable_standard === true ||
+    slugLower === "inevitable-standard" ||
+    slugLower.startsWith("inevitable-standard-") ||
+    testNameLower.includes("inevitable standard");
+
   let gedDiagnostics: GedDiagnostics | null = null;
   let gedCompletedAt: string | null = null;
 
@@ -545,6 +552,13 @@ export default async function TakerDetail({
         )}/database/${encodeURIComponent(
           taker.id
         )}/profile-extended-report`
+      : null;
+
+  const insiderInsightsUrl =
+    isInevitableStandard && latest?.id
+      ? `/portal/insider-insights/${encodeURIComponent(slug)}/${encodeURIComponent(
+          taker.id,
+        )}`
       : null;
 
   return (
@@ -735,6 +749,17 @@ export default async function TakerDetail({
                   {isVisibility
                     ? "Open Visibility Report"
                     : "Open test-taker report in new tab"}
+                </Link>
+              )}
+
+              {insiderInsightsUrl && (
+                <Link
+                  href={insiderInsightsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md border border-amber-500 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
+                >
+                  Open Insider Insights (adviser-only)
                 </Link>
               )}
             </div>

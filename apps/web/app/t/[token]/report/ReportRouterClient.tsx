@@ -3,19 +3,43 @@
 import { useEffect, useState } from "react";
 import { getBaseUrl } from "@/lib/server-url";
 
-// IMPORTANT:
-// - LegacyReportClient is your existing working Team Puzzle / CC report page code,
-//   moved into a component (no logic changes).
 import LegacyReportClient from "./LegacyReportClient";
-
-// New renderer for storage/framework-driven reports
 import FrameworkReportClient from "./FrameworkReportClient";
+import InevitableStandardReportClient from "./InevitableStandardReportClient";
 
 type AnyJson = any;
 
+function getReportMeta(metaJson: AnyJson) {
+  const root = metaJson?.data ?? metaJson ?? {};
+  return root?.meta ?? root?.test?.meta ?? root?.row?.meta ?? root?.test_meta ?? null;
+}
+
+function isInevitableStandard(metaJson: AnyJson): boolean {
+  const root = metaJson?.data ?? metaJson ?? {};
+  const meta = getReportMeta(metaJson) || {};
+  const engineKey = String(meta?.engine_key || root?.engine_key || "")
+    .toLowerCase()
+    .trim();
+  const slug = String(meta?.slug || root?.slug || root?.test?.slug || "")
+    .toLowerCase()
+    .trim();
+  const name = String(meta?.assessment_name || root?.test_name || root?.test?.name || "")
+    .toLowerCase()
+    .trim();
+
+  return (
+    meta?.is_inevitable_standard === true ||
+    engineKey === "inevitable_standard" ||
+    engineKey === "inevitable-standard" ||
+    slug === "inevitable-standard" ||
+    slug.startsWith("inevitable-standard-") ||
+    name.includes("inevitable standard")
+  );
+}
+
 function pickReportFramework(metaJson: AnyJson) {
   const root = metaJson?.data ?? metaJson ?? {};
-  const meta = root?.meta ?? root?.test?.meta ?? root?.row?.meta ?? root?.test_meta ?? null;
+  const meta = getReportMeta(metaJson);
   const rf =
     meta?.reportFramework ||
     root?.reportFramework ||
@@ -31,7 +55,9 @@ function pickReportFramework(metaJson: AnyJson) {
 }
 
 export default function ReportRouterClient({ token, tid }: { token: string; tid: string }) {
-  const [mode, setMode] = useState<"loading" | "framework" | "legacy">("loading");
+  const [mode, setMode] = useState<
+    "loading" | "inevitable_standard" | "framework" | "legacy"
+  >("loading");
   const [rf, setRf] = useState<{ bucket: string; path: string; version?: string } | null>(null);
 
   useEffect(() => {
@@ -40,8 +66,6 @@ export default function ReportRouterClient({ token, tid }: { token: string; tid:
     async function run() {
       try {
         const base = await getBaseUrl();
-
-        // 1) Try read the public test meta endpoint
         const metaRes = await fetch(`${base}/api/public/test/${encodeURIComponent(token)}`, {
           cache: "no-store",
         });
@@ -52,9 +76,13 @@ export default function ReportRouterClient({ token, tid }: { token: string; tid:
         }
 
         const metaJson = await metaRes.json().catch(() => null);
-        const reportFramework = pickReportFramework(metaJson);
 
-        // If a reportFramework is present => use the new renderer
+        if (isInevitableStandard(metaJson)) {
+          if (!cancelled) setMode("inevitable_standard");
+          return;
+        }
+
+        const reportFramework = pickReportFramework(metaJson);
         if (reportFramework) {
           if (cancelled) return;
           setRf(reportFramework);
@@ -62,7 +90,6 @@ export default function ReportRouterClient({ token, tid }: { token: string; tid:
           return;
         }
 
-        // Otherwise => legacy renderer
         if (!cancelled) setMode("legacy");
       } catch {
         if (!cancelled) setMode("legacy");
@@ -76,7 +103,6 @@ export default function ReportRouterClient({ token, tid }: { token: string; tid:
   }, [token]);
 
   if (!tid) {
-    // Both renderers expect tid; keep a single friendly message here.
     return (
       <div className="mx-auto max-w-4xl p-6 text-white">
         <h1 className="text-2xl font-semibold">Personalised report</h1>
@@ -94,6 +120,10 @@ export default function ReportRouterClient({ token, tid }: { token: string; tid:
         <p className="mt-3 text-sm text-slate-300">Loading…</p>
       </div>
     );
+  }
+
+  if (mode === "inevitable_standard") {
+    return <InevitableStandardReportClient token={token} tid={tid} />;
   }
 
   if (mode === "framework" && rf) {

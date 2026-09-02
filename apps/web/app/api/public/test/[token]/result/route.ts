@@ -277,10 +277,12 @@ export async function GET(
   let orgSlug: string | null = null;
   let orgName: string | null = null;
   let testName: string | null = null;
+  let testSlug: string | null = null;
+  let testMeta: any = null;
 
   const testRes = await sb
     .from("tests")
-    .select("id, name, org_id")
+    .select("id, name, slug, org_id, meta")
     .eq("id", testId)
     .maybeSingle();
 
@@ -288,6 +290,8 @@ export async function GET(
     console.warn("[test result] error loading test metadata", testRes.error);
   } else if (testRes.data) {
     testName = (testRes.data as any).name ?? null;
+    testSlug = (testRes.data as any).slug ?? null;
+    testMeta = (testRes.data as any).meta ?? null;
 
     const orgId = (testRes.data as any).org_id as string | null | undefined;
     if (orgId) {
@@ -308,10 +312,11 @@ export async function GET(
 
   let takerFirst: string | null = null;
   let takerLast: string | null = null;
+  let takerCompany: string | null = null;
 
   const takerRes = await sb
     .from("test_takers")
-    .select("first_name, last_name")
+    .select("first_name, last_name, company")
     .eq("id", tid)
     .maybeSingle();
 
@@ -320,6 +325,7 @@ export async function GET(
   } else if (takerRes.data) {
     takerFirst = (takerRes.data as any).first_name ?? null;
     takerLast = (takerRes.data as any).last_name ?? null;
+    takerCompany = (takerRes.data as any).company ?? null;
   }
 
   let rawTotals: any = null;
@@ -333,13 +339,15 @@ export async function GET(
 
   const r2 = await sb
     .from("test_submissions")
-    .select("totals, raw_answers, answers_json")
+    .select("totals, raw_answers, answers_json, created_at")
     .eq("taker_id", tid)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   rawTotals = r1.data?.totals ?? r2.data?.totals ?? null;
+  const submissionCompletedAt: string | null =
+    (r2.data as any)?.created_at ?? null;
 
   const ra = Array.isArray(r2.data?.raw_answers)
     ? r2.data?.raw_answers
@@ -357,6 +365,74 @@ export async function GET(
       text: a?.text ?? null,
     }))
     .filter((x) => x.question_id);
+
+  const engineKey = String(testMeta?.engine_key || "").toLowerCase().trim();
+  const normalizedSlug = String(testSlug || "").toLowerCase().trim();
+  const normalizedName = String(testName || "").toLowerCase().trim();
+  const isInevitableStandard =
+    testMeta?.is_inevitable_standard === true ||
+    engineKey === "inevitable_standard" ||
+    engineKey === "inevitable-standard" ||
+    normalizedSlug === "inevitable-standard" ||
+    normalizedSlug.startsWith("inevitable-standard-") ||
+    normalizedName.includes("inevitable standard");
+
+  if (isInevitableStandard) {
+    const inevitableStandard =
+      rawTotals && typeof rawTotals === "object"
+        ? rawTotals.inevitable_standard
+        : null;
+
+    if (!inevitableStandard || typeof inevitableStandard !== "object") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "The Inevitable Standard score is not available for this test taker.",
+        },
+        { status: 409 },
+      );
+    }
+
+    // Constraint Engine and Revenue-in-Structure results are stored as sibling
+    // keys on the score object. Submissions completed before these shipped will
+    // not have them - degrade gracefully and surface null rather than 409, so
+    // existing report links keep working.
+    const inevitableStandardRecord = inevitableStandard as Record<string, unknown>;
+    const constraints =
+      inevitableStandardRecord.constraints &&
+      typeof inevitableStandardRecord.constraints === "object"
+        ? inevitableStandardRecord.constraints
+        : null;
+    const revenueInStructure =
+      inevitableStandardRecord.revenue_in_structure &&
+      typeof inevitableStandardRecord.revenue_in_structure === "object"
+        ? inevitableStandardRecord.revenue_in_structure
+        : null;
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        org_slug: orgSlug,
+        org_name: orgName,
+        test_name: testName,
+        assessment_type: "inevitable_standard",
+        link: linkMeta,
+        taker: {
+          id: tid,
+          first_name: takerFirst,
+          last_name: takerLast,
+          company: takerCompany,
+        },
+        completed_at: submissionCompletedAt,
+        inevitable_standard: {
+          ...inevitableStandardRecord,
+          constraints,
+          revenue_in_structure: revenueInStructure,
+        },
+        version: "inevitable-standard-v1",
+      },
+    });
+  }
 
   let frequencyTotals = normalizeFreqTotals(rawTotals);
   let profileTotals = normalizeProfileTotals(rawTotals);
