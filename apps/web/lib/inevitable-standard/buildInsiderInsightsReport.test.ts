@@ -229,6 +229,61 @@ describe("buildInsiderInsightsReport — approved five-section playbook", () => 
     expect(q29.tags).toHaveLength(0);
   });
 
+  it("does not infer a Q29 risk signal from a one-word answer or approach alone", () => {
+    const report = buildInsiderInsightsReport({
+      score: fakeScore({
+        context_answers: {
+          13: "leads",
+          29: "Sales",
+        },
+        approaches: {
+          percentages: { A: 16.7, B: 41.7, C: 33.3, D: 8.3 },
+          dominant: "B",
+          secondary: "C",
+        },
+      }),
+    })!;
+
+    const q29 = report.foundersWords.find((item) => item.questionNumber === 29)!;
+    expect(q29.riskSignal).toBeNull();
+    expect(report.qaFlags.join(" ")).toContain("too brief");
+  });
+
+  it("does not label an Amber strongest pillar as GREEN LEVERAGE", () => {
+    const report = buildInsiderInsightsReport({
+      score: fakeScore({
+        pillars: {
+          identity: { percentage: 41.7, risk: "medium_risk" },
+          positioning: { percentage: 50, risk: "medium_risk" },
+          offer: { percentage: 66.7, risk: "medium_risk" },
+          sales: { percentage: 33.3, risk: "high_risk" },
+          revenue_model: { percentage: 66.7, risk: "medium_risk" },
+          decision: { percentage: 58.3, risk: "medium_risk" },
+        },
+        approaches: {
+          percentages: { A: 16.7, B: 41.7, C: 33.3, D: 8.3 },
+          dominant: "B",
+          secondary: "C",
+        },
+        constraints: {
+          primary_constraint: "sales",
+          secondary_constraint: "identity",
+          false_constraint: null,
+          false_constraint_rule_id: null,
+          priority_fix_order: [],
+        },
+        context_answers: {
+          13: "leads",
+          29: "Sales",
+        },
+      }),
+    })!;
+
+    const q13 = report.foundersWords.find((item) => item.questionNumber === 13)!;
+    expect(q13.tags.map((tag) => tag.kind)).not.toContain("GREEN LEVERAGE");
+    expect(report.snapshot.strongestPillar?.gar).toBe("AMBER");
+  });
+
   it("filler free text does not create Founder Own Words evidence", () => {
     const report = buildInsiderInsightsReport({
       score: fakeScore({ context_answers: { 13: "n/a", 29: "" } }),

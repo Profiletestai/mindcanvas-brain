@@ -693,6 +693,12 @@ export default function InevitableStandardFullDiagnosticClient({
       className={`${newsreader.variable} min-h-screen`}
       style={{ backgroundColor: "#041731", color: INK }}
     >
+      <style>{`
+        @media print {
+          @page { margin: 0; }
+          html, body { background: #041731 !important; }
+        }
+      `}</style>
       <header className="border-b border-white/10 px-5 py-4 text-white print:hidden" style={{ backgroundColor: NAVY_DEEP }}>
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 lg:flex-nowrap">
           <div className="mr-auto flex min-w-[330px] items-center gap-4">
@@ -720,7 +726,7 @@ export default function InevitableStandardFullDiagnosticClient({
 
       {/* Cover */}
       <header
-        className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-12 text-white sm:px-10 sm:py-[60px] print:break-after-page"
+        className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-12 text-white sm:px-10 sm:py-[60px]"
         style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
       >
         <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_263px_388px] xl:items-start print:grid-cols-[minmax(0,1fr)_190px_280px] print:items-start print:gap-4">
@@ -1106,7 +1112,7 @@ export default function InevitableStandardFullDiagnosticClient({
           {/* Closing */}
           <section
             id="closing"
-            className="scroll-mt-8 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl print:break-before-page"
+            className="scroll-mt-8 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl"
           >
             <p className="text-[15px] font-medium uppercase tracking-[0.18em]" style={{ color: GOLD }}>In Closing</p>
             <h2 className="mx-auto mt-8 max-w-3xl text-[28px] leading-9 sm:text-[34px]" style={serif}>
@@ -1131,7 +1137,7 @@ export default function InevitableStandardFullDiagnosticClient({
         </div>
       </div>
 
-      <footer className="border-t" style={{ borderColor: HAIRLINE }}>
+      <footer className="border-t print:hidden" style={{ borderColor: HAIRLINE }}>
         <div className="mx-auto max-w-6xl px-6 py-8 text-[11px] leading-6 text-[#9a9384] sm:px-10">
           The Inevitable Standard™{orgName ? ` · ${orgName}` : ""} · This report is general
           business information, not financial, tax, legal or accounting advice.

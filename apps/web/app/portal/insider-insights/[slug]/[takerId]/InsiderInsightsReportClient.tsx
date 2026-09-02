@@ -408,6 +408,8 @@ export default function InsiderInsightsReportClient({
       {/* Keep platform/help overlays out of generated PDFs. */}
       <style>{`
         @media print {
+          @page { margin: 0; }
+          html, body { background: #041731 !important; }
           body .fixed,
           body [style*="position: fixed"],
           body [style*="position:fixed"],

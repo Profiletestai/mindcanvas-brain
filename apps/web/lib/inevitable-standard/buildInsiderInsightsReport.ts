@@ -668,7 +668,7 @@ export function buildInsiderInsightsReport(
       });
     }
 
-    if (strongest && strongest.gar !== "RED" && strongestBlurb) {
+    if (strongest && strongest.gar === "GREEN" && strongestBlurb) {
       tags.push({
         kind: "GREEN LEVERAGE",
         text: compact(strongestBlurb, 440),
@@ -698,12 +698,19 @@ export function buildInsiderInsightsReport(
   }
 
   if (q29present) {
-    const riskContext = [
-      cleanText(contextAnswers[29]),
-      "decision certainty analysis",
-      cleanText(pc?.approachMechanism),
-      cleanText(decisionState?.commercialConsequence),
-    ].join(" ");
+    const riskContext = cleanText(contextAnswers[29]);
+    const riskSignal =
+      riskContext.split(/\s+/).filter(Boolean).length >= 4
+        ? toRiskSignalCard(
+            pickRiskSignal(approachData.riskSignals ?? [], riskContext),
+          )
+        : null;
+
+    if (!riskSignal && riskContext.split(/\s+/).filter(Boolean).length < 4) {
+      qaFlags.push(
+        "Q29 answer is too brief for an answer-level risk signal — risk card suppressed",
+      );
+    }
 
     foundersWords.push({
       questionNumber: 29,
@@ -719,9 +726,7 @@ export function buildInsiderInsightsReport(
         : null,
       evidencePillars: [],
       tags: [],
-      riskSignal: toRiskSignalCard(
-        pickRiskSignal(approachData.riskSignals ?? [], riskContext),
-      ),
+      riskSignal,
     });
   }
 
