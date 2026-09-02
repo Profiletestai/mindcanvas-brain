@@ -556,9 +556,9 @@ export default async function TakerDetail({
 
   const insiderInsightsUrl =
     isInevitableStandard && latest?.id
-      ? `/portal/${encodeURIComponent(
-          slug
-        )}/database/${encodeURIComponent(taker.id)}/insider-insights`
+      ? `/portal/insider-insights/${encodeURIComponent(slug)}/${encodeURIComponent(
+          taker.id,
+        )}`
       : null;
 
   return (

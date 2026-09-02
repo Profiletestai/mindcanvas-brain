@@ -188,6 +188,51 @@ function text(node: Node | null | undefined): string | null {
 }
 
 /**
+ * A provenance paragraph the master documents append to prose blocks — e.g.
+ * "SOURCE ANCHOR Chapter Two, The Identity Gap; …" or "CONTENT ID: II-A-…".
+ * These must never reach a rendered field.
+ */
+const PROVENANCE_PARAGRAPH = /^\s*(SOURCE ANCHOR|CONTENT ID)\b/i;
+
+/**
+ * Recursively strip every provenance paragraph from every string in `node`.
+ * Where the containing object carries a `sourceAnchor` slot the stripped text is
+ * moved there; everything else is collected into `sink` so the approach keeps a
+ * complete, non-rendered `provenance` record. Mutates `node` in place.
+ */
+function hoistProvenance(node: unknown, sink: string[]): unknown {
+  if (typeof node === "string") {
+    const kept: string[] = [];
+    for (const para of node.split(/\n{2,}/)) {
+      if (PROVENANCE_PARAGRAPH.test(para)) sink.push(para.trim());
+      else kept.push(para);
+    }
+    return kept.join("\n\n").trim();
+  }
+  if (Array.isArray(node)) {
+    return node.map((item) => hoistProvenance(item, sink));
+  }
+  if (node && typeof node === "object") {
+    const obj = node as Record<string, unknown>;
+    const hasAnchorSlot = "sourceAnchor" in obj;
+    const local: string[] = [];
+    for (const key of Object.keys(obj)) {
+      if (key === "sourceAnchor") continue;
+      obj[key] = hoistProvenance(obj[key], hasAnchorSlot ? local : sink);
+    }
+    if (hasAnchorSlot) {
+      const existing =
+        typeof obj.sourceAnchor === "string" ? [obj.sourceAnchor] : [];
+      const unique = [...new Set([...existing, ...local].map((s) => s.trim()).filter(Boolean))];
+      obj.sourceAnchor = unique.length ? unique.join("\n\n") : null;
+      for (const anchor of local) sink.push(anchor);
+    }
+    return obj;
+  }
+  return node;
+}
+
+/**
  * Body text with any bullet list flattened to a single paragraph. Some reports
  * write a section as prose and others as a `* ` / `• ` list (e.g. D's adviser
  * green/red flags); this normalises both to the prose shape the data layer
@@ -872,6 +917,14 @@ function main() {
       progressSignals,
       adviserFlags,
     };
+
+    // Move every "SOURCE ANCHOR …" / "CONTENT ID: …" provenance paragraph the
+    // master documents append to prose blocks out of the rendered fields. Fills
+    // the per-block `sourceAnchor` slots; the remainder is kept, deduped, as a
+    // non-rendered `provenance` record on the approach.
+    const provenance: string[] = [];
+    hoistProvenance(result[report.code], provenance);
+    result[report.code].provenance = [...new Set(provenance)];
 
     counts[report.code] = {
       pillarStates: Object.keys(pillarStates).length,

@@ -254,6 +254,14 @@ export type InsiderInsightsApproachData = {
   accountability: InsiderAccountability;
   progressSignals: Partial<Record<InsiderPillarId, string>>;
   adviserFlags: InsiderAdviserFlags;
+  /**
+   * Non-rendered. Every "SOURCE ANCHOR …" / "CONTENT ID: …" provenance
+   * paragraph the extractor lifted out of the prose fields. Kept for
+   * traceability; never shown to a coach or a founder. The `sourceAnchor`
+   * slots on pillar states / primary constraints hold the same text scoped to
+   * their block.
+   */
+  provenance: string[];
 };
 
 export type InsiderInsightsData = Record<

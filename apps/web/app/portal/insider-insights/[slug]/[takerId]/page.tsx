@@ -1,7 +1,12 @@
-// apps/web/app/portal/[slug]/database/[takerId]/insider-insights/page.tsx
+// apps/web/app/portal/insider-insights/[slug]/[takerId]/page.tsx
 //
 // Insider Insights — the private, adviser-facing companion report for an
-// Inevitable Standard test taker. Sibling of ../profile-extended-report.
+// Inevitable Standard test taker. Reached from the "Open Insider Insights"
+// button on /portal/[slug]/database/[takerId].
+//
+// Deliberately NOT under /portal/[slug]/* : that segment's layout wraps every
+// child in the portal sidebar + "Welcome" header. This report renders
+// standalone, matching the client-facing Reports 1 and 2 under /t/[token]/*.
 //
 // Access: middleware.ts guarantees a signed-in portal user; requirePortalOrgAccess
 // then enforces session -> org -> membership. A caller outside the org (or the

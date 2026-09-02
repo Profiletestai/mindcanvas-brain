@@ -14,8 +14,6 @@ import type {
   InsiderInsightsReport,
 } from "@/lib/inevitable-standard/buildInsiderInsightsReport";
 import {
-  BandMeter,
-  GAR,
   GOLD,
   GOLD_TEXT,
   HAIRLINE,
@@ -24,14 +22,21 @@ import {
   IVORY_BORDER,
   IVORY_PANEL,
   NAVY_DEEP,
+  PILLARS,
+  PillarSummaryList,
   ReadinessDonut,
   newsreader,
   round1,
   serif,
+  type Gar,
 } from "@/app/t/[token]/report/inevitableStandardShared";
 import PrintButton from "@/app/t/[token]/report/PrintButton";
 
 const GAR_KEY = { GREEN: "green", AMBER: "amber", RED: "red" } as const;
+
+const PILLAR_DESCRIPTOR: Record<string, string> = Object.fromEntries(
+  PILLARS.map((pillar) => [pillar.key, pillar.descriptor]),
+);
 
 function Block({ block }: { block: InsiderBlock }) {
   if (block.type === "list") {
@@ -289,7 +294,7 @@ export default function InsiderInsightsReportClient({
                   </div>
                 </div>
 
-                {/* Pillars */}
+                {/* Pillars — same 0–100 severity bar + G/A/R chip as Reports 1 & 2 */}
                 <div className="mt-6 border-t pt-5" style={{ borderColor: HAIRLINE }}>
                   <p
                     className="text-[11px] font-semibold uppercase tracking-[0.16em]"
@@ -297,30 +302,17 @@ export default function InsiderInsightsReportClient({
                   >
                     Six pillars
                   </p>
-                  <ul className="mt-3 space-y-3">
-                    {snapshot.pillars.map((pillar) => {
-                      const gar = GAR[GAR_KEY[pillar.gar]];
-                      return (
-                        <li key={pillar.key} className="grid grid-cols-[130px_minmax(0,1fr)_84px] items-center gap-3">
-                          <span className="text-[13px]" style={{ color: INK }}>
-                            {pillar.label}
-                          </span>
-                          <BandMeter percentage={pillar.percentage} />
-                          <span className="flex items-center justify-end gap-2 text-[12px]">
-                            <span className="tabular-nums text-[#6b7280]">
-                              {round1(pillar.percentage)}%
-                            </span>
-                            <span
-                              className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{ backgroundColor: gar.chipBg, color: gar.chipText }}
-                            >
-                              {gar.name}
-                            </span>
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <div className="mt-1">
+                    <PillarSummaryList
+                      pillars={snapshot.pillars.map((pillar) => ({
+                        key: pillar.key,
+                        label: pillar.label,
+                        descriptor: PILLAR_DESCRIPTOR[pillar.key] ?? "",
+                        percentage: pillar.percentage,
+                        gar: GAR_KEY[pillar.gar] as Gar,
+                      }))}
+                    />
+                  </div>
                 </div>
 
                 {snapshot.priorityOrder.length > 0 ? (

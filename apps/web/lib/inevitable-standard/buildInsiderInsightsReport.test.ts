@@ -139,6 +139,38 @@ describe("buildInsiderInsightsReport", () => {
     expect(report.qaFlags.join(" ")).toContain("dominant");
   });
 
+  it("never emits a source citation into a rendered section block", () => {
+    const banned = [
+      /SOURCE ANCHOR/i,
+      /CONTENT ID:/i,
+      /\bchapter\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d)/i,
+      /\bappendix\s+[a-z]\b/i,
+    ];
+    for (const primary of ["identity", "sales", "revenue_model", "decision"]) {
+      for (const dominant of ["A", "B", "C", "D"]) {
+        const report = buildInsiderInsightsReport({
+          score: fakeScore({
+            approaches: { percentages: { A: 40, B: 25, C: 20, D: 15 }, dominant, secondary: "D" },
+            constraints: {
+              primary_constraint: primary,
+              secondary_constraint: primary === "sales" ? "decision" : "sales",
+              false_constraint_rule_id: "lead_volume",
+              priority_fix_order: [primary],
+            },
+          }),
+        })!;
+        for (const section of report.sections) {
+          for (const block of section.blocks) {
+            const text = block.type === "list" ? block.items.join(" ") : block.text;
+            for (const pattern of banned) {
+              expect(text, `${dominant}/${primary} ${section.id}`).not.toMatch(pattern);
+            }
+          }
+        }
+      }
+    }
+  });
+
   it("returns null when there is no usable score", () => {
     expect(buildInsiderInsightsReport({ score: null })).toBeNull();
     expect(buildInsiderInsightsReport({ score: {} })).toBeNull();

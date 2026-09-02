@@ -60,6 +60,38 @@ describe("insiderInsights data integrity", () => {
         expect(data.preCall.questions).toHaveLength(8);
       });
 
+      it("keeps source-document citations out of every rendered string", () => {
+        // "SOURCE ANCHOR …" / "CONTENT ID: …" / chapter + appendix references
+        // are provenance from the master documents. They must live only in the
+        // non-rendered `provenance` list and the per-block `sourceAnchor`
+        // slots — never in a field a coach or founder reads. The extractor's
+        // hoistProvenance() pass enforces this; this test fails if it regresses.
+        const banned: RegExp[] = [
+          /SOURCE ANCHOR/i,
+          /CONTENT ID:/i,
+          /\bchapter\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d)/i,
+          /\bappendix\s+[a-z]\b/i,
+          /\(ch\.?\s?\d/i,
+          /knowledge base v\d/i,
+          /framework v0\.\d/i,
+        ];
+        const offenders: string[] = [];
+        const walk = (node: unknown, path: string, key: string) => {
+          if (key === "provenance" || key === "sourceAnchor") return;
+          if (typeof node === "string") {
+            for (const pattern of banned) {
+              if (pattern.test(node)) offenders.push(`${path} ~ ${pattern}`);
+            }
+          } else if (Array.isArray(node)) {
+            node.forEach((v, i) => walk(v, `${path}[${i}]`, key));
+          } else if (node && typeof node === "object") {
+            for (const [k, v] of Object.entries(node)) walk(v, `${path}.${k}`, k);
+          }
+        };
+        walk(data, code, "");
+        expect(offenders).toEqual([]);
+      });
+
       it("carries no leftover bullet markers in any string value", () => {
         const offenders: string[] = [];
         const walk = (node: unknown, path: string) => {
