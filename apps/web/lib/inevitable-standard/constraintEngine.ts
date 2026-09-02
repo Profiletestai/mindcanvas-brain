@@ -14,8 +14,8 @@ import type { InevitableStandardScoreResult } from "./scoreInevitableStandard";
  *  - Secondary Constraint - the next-lowest pillar, the reinforcing issue.
  *  - False Constraint     - what the founder's Q13/Q29 free text says the
  *    problem is, versus what the evidence shows.
- *  - Priority Fix Order   - the constrained pillars sequenced by Method layer
- *    (Identity -> Structure -> Execution).
+ *  - Priority Fix Order   - a diagnosis-led full ranking: Primary first,
+ *    Secondary second, then the remaining pillars by current severity.
  *  - Confidence           - High / Medium / Directional.
  *
  * This is a pure function: it reads only the scored pillar percentages and the
@@ -212,7 +212,7 @@ export type InevitableStandardConstraintResult = {
   false_constraint: InevitableStandardFalseConstraint | null;
   /** Which keyword rule matched, or null. Diagnostic aid, mirrors qa_flags. */
   false_constraint_rule_id: string | null;
-  /** 2-3 pillars, ordered Identity -> Structure -> Execution. */
+  /** Full 6-pillar diagnosis-led sequence: Primary, Secondary, then severity. */
   priority_fix_order: InevitableStandardPillar[];
   confidence: InevitableStandardConstraintConfidence;
   /** True when Identity/Decision was promoted over a numerically-lower pillar. */
@@ -364,17 +364,27 @@ export function deriveInevitableStandardConstraints(
     };
   }
 
-  // 4) Priority fix order: the FULL 6-pillar ranking, sequenced strictly by
-  //    Method layer (Identity -> Structure -> Execution) regardless of which
-  //    pillar is numerically lowest, then by severity (lowest % first) within
-  //    each layer. Reports slice this single list: the Diagnostic Snapshot
-  //    shows the top 3, the Full Diagnostic shows all 6 (spec section 3).
-  const priorityFixOrder = [...INEVITABLE_STANDARD_PILLARS].sort(
-    (a, b) =>
-      methodLayerIndex(a) - methodLayerIndex(b) ||
-      pillarPercentage(score, a) - pillarPercentage(score, b) ||
-      pillarOrderIndex(a) - pillarOrderIndex(b),
+  // 4) Priority fix order: diagnosis first.
+  //
+  //    The Primary Constraint is the highest-leverage intervention point.
+  //    The Secondary Constraint is the issue most likely to reinforce or
+  //    recreate it. Those two therefore lead the sequence. The remaining four
+  //    pillars follow by current severity (lowest percentage first), with the
+  //    canonical pillar order as a deterministic tie-break.
+  //
+  //    Identity -> Structure -> Execution remains the Method architecture used
+  //    to explain dependencies and what helps a change hold. It does not
+  //    override the diagnostic intervention sequence.
+  const remainingBySeverity = rankedPillars.filter(
+    (pillar) =>
+      pillar !== primaryConstraint && pillar !== secondaryConstraint,
   );
+
+  const priorityFixOrder: InevitableStandardPillar[] = [
+    primaryConstraint,
+    secondaryConstraint,
+    ...remainingBySeverity,
+  ];
 
   // 5) Confidence.
   const allPercentages = INEVITABLE_STANDARD_PILLARS.map((pillar) =>

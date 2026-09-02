@@ -765,24 +765,45 @@ export function buildPillarView(score: InevitableStandardScore): PillarView[] {
 }
 
 /**
- * Full 6-pillar priority order. Uses the stored constraint engine order when
- * present; otherwise falls back to ascending pillar percentage (lowest first),
- * matching how Report 1 degrades.
+ * Full 6-pillar diagnosis-led priority order.
+ *
+ * Older completed assessments may carry a stored priority_fix_order generated
+ * by the earlier Method-layer sorter. Do not trust that stale order at render
+ * time. Rebuild the sequence from the stored Primary/Secondary diagnosis and
+ * current pillar percentages so existing reports are corrected immediately.
+ *
+ * Order:
+ *   1. Primary Constraint
+ *   2. Secondary Constraint
+ *   3-6. Remaining pillars by severity, canonical order as tie-break
+ *
+ * Identity -> Structure -> Execution remains the dependency architecture used
+ * to explain what helps a change hold; it does not override where the diagnosis
+ * says to begin.
  */
 export function resolvePriorityOrder(
   constraints: ConstraintResult | null,
   pillarView: PillarView[],
 ): PillarKey[] {
-  const stored = Array.isArray(constraints?.priority_fix_order)
-    ? (constraints!.priority_fix_order!.filter(Boolean) as string[])
-    : [];
+  const isPillarKey = (value: unknown): value is PillarKey =>
+    typeof value === "string" &&
+    PILLARS.some((pillar) => pillar.key === value);
 
-  const ordered = stored.filter((key): key is PillarKey =>
-    PILLARS.some((pillar) => pillar.key === key),
+  const ordered: PillarKey[] = [];
+  const primary = constraints?.primary_constraint;
+  const secondary = constraints?.secondary_constraint;
+
+  if (isPillarKey(primary)) ordered.push(primary);
+  if (isPillarKey(secondary) && secondary !== primary) ordered.push(secondary);
+
+  const severitySorted = [...pillarView].sort(
+    (a, b) =>
+      a.percentage - b.percentage ||
+      PILLARS.findIndex((pillar) => pillar.key === a.key) -
+        PILLARS.findIndex((pillar) => pillar.key === b.key),
   );
 
-  // Ensure all six appear even if stored data is a short pre-change list.
-  for (const pillar of [...pillarView].sort((a, b) => a.percentage - b.percentage)) {
+  for (const pillar of severitySorted) {
     if (!ordered.includes(pillar.key)) ordered.push(pillar.key);
   }
 

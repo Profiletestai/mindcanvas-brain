@@ -238,9 +238,9 @@ function MethodLayersDiagram({ pillarView }: { pillarView: PillarView[] }) {
         </div>
       ))}
       <p className="text-[12px] leading-6 text-[#918a7d]">
-        Work sequences top to bottom: Identity must hold before Structure, and Structure
-        before Execution. That is why the priorities and the 30/60/90-day focus follow this
-        order rather than starting with whichever pillar scores lowest.
+        These layers explain what helps a change hold; they do not replace the diagnosis.
+        The Primary Constraint tells you where to begin, the Secondary Constraint shows
+        what may recreate it, and the layers show what needs to support the change around them.
       </p>
     </div>
   );
@@ -443,7 +443,6 @@ export default function InevitableStandardFullDiagnosticClient({
 
     const priorityOrder = resolvePriorityOrder(constraints, pillarView);
 
-    const primaryFixPosition = primaryKey ? priorityOrder.indexOf(primaryKey) : -1;
 
     const dominant = approaches.dominant || null;
     const dominantLabel = dominant
@@ -484,15 +483,6 @@ export default function InevitableStandardFullDiagnosticClient({
         pillarView.map((pillar) => [pillar.key, pillar.percentage]),
       ) as Partial<Record<PillarKey, number>>,
     });
-    const planPillars = new Set(plan.map((phase) => phase.pillar));
-    const primaryOutsidePlan =
-      !!primaryKey && !planPillars.has(primaryKey) && primaryFixPosition >= 0;
-    const layersBeforePrimary =
-      primaryKey && METHOD_LAYER_LABEL[primaryKey] === "Execution"
-        ? "Identity and Structure"
-        : primaryKey && METHOD_LAYER_LABEL[primaryKey] === "Structure"
-          ? "Identity"
-          : "";
 
     const diagnosticAdds = buildDiagnosticAdds({
       q13: contextAnswers?.[13] ?? null,
@@ -530,7 +520,6 @@ export default function InevitableStandardFullDiagnosticClient({
       secondaryKey,
       falseConstraint,
       priorityOrder,
-      primaryFixPosition,
       dominant,
       dominantLabel,
       dominantPct,
@@ -539,8 +528,6 @@ export default function InevitableStandardFullDiagnosticClient({
       compassX,
       compassY,
       plan,
-      primaryOutsidePlan,
-      layersBeforePrimary,
       diagnosticAdds,
       revenueInStructure,
       clientName,
@@ -637,8 +624,6 @@ export default function InevitableStandardFullDiagnosticClient({
     compassX,
     compassY,
     plan,
-    primaryOutsidePlan,
-    layersBeforePrimary,
     diagnosticAdds,
     revenueInStructure,
     clientName,
@@ -922,8 +907,10 @@ export default function InevitableStandardFullDiagnosticClient({
               Identity → Structure → Execution
             </h3>
             <p className="mt-3 max-w-2xl text-[15px] leading-7 text-[#4b5563]">
-              The six pillars group into three layers. The chain above only moves if these
-              hold in order.
+              The six pillars sit in three layers. Each layer depends on the one before it,
+              which is why a problem that appears in execution can have quieter dependencies
+              elsewhere. The layers explain what helps the intervention hold; they do not
+              override the Primary Constraint as the place to begin.
             </p>
             <div className="mt-6">
               <MethodLayersDiagram pillarView={pillarView} />
@@ -1175,20 +1162,6 @@ export default function InevitableStandardFullDiagnosticClient({
               ))}
             </div>
 
-            {primaryOutsidePlan && layersBeforePrimary ? (
-              <p
-                className="mt-6 border-l-2 pl-5 text-[13px] leading-6 text-[#4b5563]"
-                style={{ borderColor: GOLD }}
-              >
-                <strong className="font-semibold" style={{ color: INK }}>
-                  {pillarLabel(primaryKey)}
-                </strong>{" "}
-                is your primary constraint. It sits later in this sequence because{" "}
-                {layersBeforePrimary} work compounds first — the same logic as the priority
-                order. It is not being deferred; it is being set up to hold.
-              </p>
-            ) : null}
-
             <p className="mt-6 text-[12px] leading-6 text-[#918a7d]">
               Focus areas and actions in this section are generated from your constraint
               results, not drawn from the method text.
@@ -1207,9 +1180,9 @@ export default function InevitableStandardFullDiagnosticClient({
               <RevenueChainDiagram />
             </div>
             <p className="mt-8 max-w-2xl text-[15px] leading-7 text-[#4b5563]">
-              Everything in this report points at the earliest link that is not yet holding.
-              Strengthen that, in sequence, and the rest of the chain has something solid to
-              move against.
+              Everything in this report points at the highest-leverage constraint in the
+              current system. Strengthen that first, then the issue most likely to recreate
+              it, while using the Method layers to make the change hold.
             </p>
           </Chapter>
         </div>

@@ -98,9 +98,10 @@ const PILLAR_OUTCOME: Record<InevitableStandardPillar, string> = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Three phases, one per 30-day window, following the resolved 6-pillar priority
- * fix order (Method-layer sequenced) — the same order the reports show. Each
- * phase is tagged with how its pillar relates to the constraint findings.
+ * Three phases, one per 30-day window, following the resolved diagnosis-led
+ * priority order — Primary Constraint first, Secondary Constraint second, then
+ * the next most severe pillar. Each phase is tagged with how its pillar relates
+ * to the constraint findings.
  *
  * Degraded input (no priority order): falls back to the three lowest-scoring
  * pillars, ascending.
