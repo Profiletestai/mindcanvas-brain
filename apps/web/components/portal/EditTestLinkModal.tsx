@@ -31,6 +31,9 @@ export type EditableLink = {
   max_uses: number | null;
   expires_at: string | null;
   report_variant?: ReportVariant | null;
+  report_paywall_enabled?: boolean;
+  report_price_cents?: number | null;
+  report_currency?: "GBP" | "USD" | "EUR" | "ZAR";
 };
 
 // yyyy-mm-dd for <input type="date">.
@@ -69,6 +72,12 @@ export default function EditTestLinkModal({
     contactOwner: link.contact_owner ?? "",
     emailReport: !!link.email_report,
     reportVariant: link.report_variant === "lite" ? "lite" : "full",
+    reportPaywallEnabled: !!link.report_paywall_enabled,
+    reportPrice:
+      typeof link.report_price_cents === "number"
+        ? (link.report_price_cents / 100).toFixed(2)
+        : "49.00",
+    reportCurrency: link.report_currency || "GBP",
   });
 
   const [saving, setSaving] = useState(false);
@@ -124,6 +133,11 @@ export default function EditTestLinkModal({
               ? values.hiddenResultsMessage.trim()
               : null,
           report_variant: supportsLite ? values.reportVariant : "full",
+          reportPaywallEnabled: values.reportPaywallEnabled,
+          reportPriceCents: values.reportPaywallEnabled
+            ? Math.round(Number(values.reportPrice) * 100)
+            : null,
+          reportCurrency: values.reportCurrency,
           max_uses: limitMode === "count" ? parseInt(maxUses, 10) : null,
           expiresAt: expiresDate
             ? new Date(expiresDate).toISOString()

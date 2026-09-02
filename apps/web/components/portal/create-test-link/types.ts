@@ -13,6 +13,7 @@ export type ModelOption = {
 export type Experience = "show" | "hide" | "host" | "review";
 export type LimitMode = "none" | "count" | "date";
 export type ReportVariant = "lite" | "full";
+export type ReportCurrency = "GBP" | "USD" | "EUR" | "ZAR";
 
 // The link fields shared by the create wizard's advanced step and the
 // edit-link modal, which renders the same controls as one flat form.
@@ -23,6 +24,9 @@ export type AdvancedLinkValues = {
   contactOwner: string;
   emailReport: boolean;
   reportVariant: ReportVariant;
+  reportPaywallEnabled: boolean;
+  reportPrice: string;
+  reportCurrency: ReportCurrency;
 };
 
 export type CreateTestLinkFormValues = AdvancedLinkValues & {
@@ -101,6 +105,14 @@ export function supportsLiteReport(
     orgSlug === "whatswhats-global" &&
     /visibility ladder/i.test(testName || "")
   );
+}
+
+export function reportPriceToCents(value: string): number | null {
+  const normalized = value.trim().replace(/,/g, ".");
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount < 1 || amount > 10000) return null;
+  return Math.round(amount * 100);
 }
 
 // Wizard step indexes — 5 input steps followed by the success screen.
