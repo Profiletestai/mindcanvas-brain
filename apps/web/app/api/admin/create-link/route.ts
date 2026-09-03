@@ -197,6 +197,9 @@ export async function POST(req: Request) {
 
       meta: {
         report_variant: reportVariant,
+        report_paywall_enabled: !!body.reportPaywallEnabled,
+        report_price_cents: body.reportPaywallEnabled ? body.reportPriceCents : null,
+        report_currency: (body.reportCurrency || "GBP").toLowerCase(),
       },
     };
 

@@ -367,6 +367,70 @@ async function callPurchaseRpc(
   return data;
 }
 
+async function fulfillReportUpgrade(
+  purchaseId: string,
+  eventId: string,
+  session: Stripe.Checkout.Session,
+): Promise<unknown> {
+  const sb = portalAdmin();
+  const purchase = await sb
+    .from("purchases")
+    .select("id, purchase_type, stripe_mode, gross_amount, currency, status, metadata")
+    .eq("id", purchaseId)
+    .maybeSingle();
+
+  if (purchase.error) {
+    throw new Error(`report_purchase_lookup_failed:${purchase.error.message}`);
+  }
+  if (!purchase.data) throw new Error("report_purchase_not_found");
+  if (purchase.data.purchase_type !== "report_upgrade") {
+    throw new Error("report_purchase_type_mismatch");
+  }
+  if (purchase.data.stripe_mode !== getStripeMode()) {
+    throw new Error("purchase_stripe_mode_mismatch");
+  }
+  if (session.amount_total !== purchase.data.gross_amount) {
+    throw new Error("purchase_amount_mismatch");
+  }
+  if ((session.currency || "").toLowerCase() !== purchase.data.currency) {
+    throw new Error("purchase_currency_mismatch");
+  }
+  if (purchase.data.status === "paid") return { ok: true, duplicate: true };
+  if (["refunded", "disputed"].includes(purchase.data.status)) {
+    throw new Error(`purchase_not_fulfillable:${purchase.data.status}`);
+  }
+
+  const paymentIntentId = getExpandableId(session.payment_intent);
+  if (!paymentIntentId) throw new Error("payment_intent_unresolved");
+
+  const updated = await sb
+    .from("purchases")
+    .update({
+      status: "paid",
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: paymentIntentId,
+      paid_at: new Date().toISOString(),
+      failed_at: null,
+      reconciliation_required: false,
+      metadata: {
+        ...((purchase.data.metadata as Record<string, unknown> | null) || {}),
+        paid_event_id: eventId,
+      },
+    })
+    .eq("id", purchaseId);
+
+  if (updated.error) {
+    throw new Error(`report_purchase_fulfilment_failed:${updated.error.message}`);
+  }
+
+  return {
+    ok: true,
+    duplicate: false,
+    purchase_id: purchaseId,
+    purchase_type: "report_upgrade",
+  };
+}
+
 async function handleOneOffCheckoutEvent(
   event: Stripe.Event,
 ): Promise<OneOffEventResult> {
@@ -388,7 +452,7 @@ async function handleOneOffCheckoutEvent(
 
   // Never send an unrelated payment-mode Checkout Session through the
   // subscription entitlement RPC.
-  if (!purchaseId || purchaseType !== "usage_bundle") {
+  if (!purchaseId || !["usage_bundle", "report_upgrade"].includes(purchaseType || "")) {
     return {
       handled: true,
       result: { ignored: "unmanaged_payment_checkout" },
@@ -423,6 +487,11 @@ async function handleOneOffCheckoutEvent(
   if (!paymentIntentId) throw new Error("payment_intent_unresolved");
   if (session.amount_total === null) throw new Error("amount_total_unresolved");
   if (!session.currency) throw new Error("currency_unresolved");
+
+  if (purchaseType === "report_upgrade") {
+    const result = await fulfillReportUpgrade(purchaseId, event.id, session);
+    return { handled: true, result };
+  }
 
   const result = await callPurchaseRpc("fn_fulfill_one_off_purchase", {
     p_purchase_id: purchaseId,
