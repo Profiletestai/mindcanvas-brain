@@ -11,6 +11,7 @@ import {
 } from "@/lib/inevitable-standard/mapSubmission";
 import { deriveInevitableStandardConstraints } from "@/lib/inevitable-standard/constraintEngine";
 import { calculateInevitableStandardRevenueInStructure } from "@/lib/inevitable-standard/revenueInStructure";
+import { syncInevitableStandardToGhl } from "@/lib/server/ghl/inevitableStandardContact";
 
 type AB = "A" | "B" | "C" | "D";
 type AnswerCode = "A" | "B" | "C" | "D" | "E";
@@ -3605,6 +3606,85 @@ export async function POST(
     }
 
     /*
+     * The Inevitable Standard -> Genene Tekmatix/LeadConnector ring-fence.
+     *
+     * Configure one of:
+     *   INEVITABLE_STANDARD_ALLOWED_ORG_ID=<portal.orgs.id>
+     *   INEVITABLE_STANDARD_ALLOWED_ORG_SLUG=<portal.orgs.slug>
+     *
+     * If neither is configured, assessment submission still succeeds but the
+     * Tekmatix sync is skipped.
+     */
+    const inevitableAllowedOrgId = normalizeText(
+      process.env.INEVITABLE_STANDARD_ALLOWED_ORG_ID
+    );
+    const inevitableAllowedOrgSlug = normalizeSlug(
+      process.env.INEVITABLE_STANDARD_ALLOWED_ORG_SLUG
+    );
+
+    const isAllowedInevitableOrg = inevitableAllowedOrgId
+      ? String(taker.org_id) === inevitableAllowedOrgId
+      : Boolean(
+          inevitableAllowedOrgSlug &&
+            orgSlug === inevitableAllowedOrgSlug
+        );
+
+    let inevitableStandardGhlSyncResult: GhlSyncResult | null = null;
+
+    if (
+      isInevitableStandardTest &&
+      inevitableStandardScore &&
+      isAllowedInevitableOrg
+    ) {
+      const completedAt = new Date().toISOString();
+      const fullReportUrl = `${origin}/t/${encodeURIComponent(
+        token
+      )}/full-report?tid=${encodeURIComponent(taker.id)}`;
+
+      inevitableStandardGhlSyncResult = await syncInevitableStandardToGhl({
+        taker,
+        testLinkName: linkAssessmentName || null,
+        snapshotUrl: baseReportUrl,
+        fullReportUrl,
+        completedAt,
+        score: inevitableStandardScore,
+        constraints: inevitableStandardConstraints,
+      });
+
+      if (
+        !inevitableStandardGhlSyncResult.ok &&
+        !inevitableStandardGhlSyncResult.skipped
+      ) {
+        console.error(
+          "[submit] Inevitable Standard Tekmatix sync failed",
+          inevitableStandardGhlSyncResult
+        );
+      } else if (inevitableStandardGhlSyncResult.skipped) {
+        console.warn(
+          "[submit] Inevitable Standard Tekmatix sync skipped",
+          inevitableStandardGhlSyncResult
+        );
+      }
+    } else if (isInevitableStandardTest) {
+      inevitableStandardGhlSyncResult = {
+        ok: true,
+        skipped: true,
+        message:
+          inevitableAllowedOrgId || inevitableAllowedOrgSlug
+            ? "Skipped Inevitable Standard Tekmatix sync because the submission belongs to a different organisation."
+            : "Skipped Inevitable Standard Tekmatix sync because INEVITABLE_STANDARD_ALLOWED_ORG_ID or INEVITABLE_STANDARD_ALLOWED_ORG_SLUG is not configured.",
+      };
+
+      console.info("[submit] Inevitable Standard Tekmatix sync ring-fenced", {
+        taker_id: taker.id,
+        submission_org_id: String(taker.org_id),
+        submission_org_slug: orgSlug || null,
+        allowed_org_id: inevitableAllowedOrgId || null,
+        allowed_org_slug: inevitableAllowedOrgSlug || null,
+      });
+    }
+
+    /*
      * GED -> Profiletest.ai GHL ring-fence
      *
      * A GED wrapper can be used by many organisations, so `isGedTest` alone is
@@ -3750,6 +3830,11 @@ export async function POST(
             stabilising_drivers: rhythmScore.stabilisingDrivers,
             frustration_drivers: rhythmScore.frustrationDrivers,
             raw_scores: rhythmScore.rawScores,
+          }
+        : null,
+      inevitable_standard: isInevitableStandardTest
+        ? {
+            ghl_sync: inevitableStandardGhlSyncResult,
           }
         : null,
       ged: isGedTest
