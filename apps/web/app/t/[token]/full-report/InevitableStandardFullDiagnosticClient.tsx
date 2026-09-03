@@ -37,6 +37,7 @@ import {
   PillarSummaryList,
   PRIORITY_ORDER_NOTE,
   ReadinessDonut,
+  RevenueInStructurePanel,
   REVENUE_CHAIN,
   bandLabelFor,
   buildPillarView,
@@ -607,10 +608,13 @@ export default function InevitableStandardFullDiagnosticClient({
     );
     if (view.diagnosticAdds) list.push({ id: "your-words", label: "In your words" });
     list.push({ id: "approach", label: "Commercial Decision Intelligence" });
+    if (score?.revenue_in_structure) {
+      list.push({ id: "revenue-structure", label: "Revenue in your structure" });
+    }
     list.push({ id: "plan", label: "Your next ninety days" });
     list.push({ id: "closing", label: "In closing" });
     return list;
-  }, [view]);
+  }, [view, score]);
 
   useEffect(() => {
     if (!view || typeof IntersectionObserver === "undefined") return;
@@ -1101,6 +1105,31 @@ export default function InevitableStandardFullDiagnosticClient({
               </div>
             ) : null}
           </Chapter>
+
+          {/* Revenue in Your Structure — existing RRE calculation, restored */}
+          {score.revenue_in_structure ? (
+            <Chapter
+              id="revenue-structure"
+              eyebrow="Revenue in Your Structure"
+              title="The commercial value sitting inside the current build"
+            >
+              <p className="max-w-3xl text-[15px] leading-7 text-[#66727d]">
+                This is a modelled estimate of the commercial value most closely associated
+                with the Primary Constraint — value that a more deliberate structure could
+                make easier to convert, retain or release. It is a location and a scale, not
+                a forecast.
+              </p>
+              <div
+                className="mt-8 rounded-[12px] border bg-[#fffdf9] p-6 sm:p-8 print:break-inside-avoid"
+                style={{ borderColor: IVORY_BORDER }}
+              >
+                <RevenueInStructurePanel
+                  rre={score.revenue_in_structure}
+                  variant="full"
+                />
+              </div>
+            </Chapter>
+          ) : null}
 
           {/* 30/60/90 */}
           <Chapter
