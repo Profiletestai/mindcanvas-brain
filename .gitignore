@@ -29,3 +29,6 @@ apps/web/node_modules
 
 # Supabase
 supabase/.temp/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
