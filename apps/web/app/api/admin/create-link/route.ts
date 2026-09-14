@@ -1,4 +1,4 @@
-//apps/web/app/api/admin/create-link/route.ts
+// apps/web/app/api/admin/create-link/route.ts
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
@@ -25,7 +25,9 @@ function absoluteUrl(path: string) {
     process.env.VERCEL_PROJECT_PRODUCTION_URL ||
     process.env.VERCEL_URL ||
     "http://localhost:3000";
+
   const base = host.startsWith("http") ? host : `https://${host}`;
+
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -37,7 +39,10 @@ export async function POST(req: Request) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: formatZodError(parsed.error) },
+        {
+          ok: false,
+          error: formatZodError(parsed.error),
+        },
         { status: 400 },
       );
     }
@@ -62,9 +67,13 @@ export async function POST(req: Request) {
     // Links are created with the service-role client, so membership of the
     // target org is checked here rather than relying on RLS.
     const access = await requireOrgAccess(orgId);
+
     if (!access.ok) {
       return NextResponse.json(
-        { ok: false, error: access.error },
+        {
+          ok: false,
+          error: access.error,
+        },
         { status: access.status },
       );
     }
@@ -77,7 +86,9 @@ export async function POST(req: Request) {
 
     const sb = createClient().schema("portal");
 
-    // Enforce the same permission used by the test dropdown.
+    // ---------------------------------------------------------
+    // Resolve the requested test.
+    // ---------------------------------------------------------
     const { data: testRow, error: testErr } = await sb
       .from("tests")
       .select("id, org_id, status")
@@ -86,66 +97,189 @@ export async function POST(req: Request) {
 
     if (testErr) {
       return NextResponse.json(
-        { ok: false, error: testErr.message },
+        {
+          ok: false,
+          error: testErr.message,
+        },
         { status: 500 },
       );
     }
 
     if (!testRow) {
       return NextResponse.json(
-        { ok: false, error: "Test not found" },
+        {
+          ok: false,
+          error: "Test not found",
+        },
         { status: 404 },
       );
     }
 
     if (testRow.status !== "active") {
       return NextResponse.json(
-        { ok: false, error: "This test is not active" },
+        {
+          ok: false,
+          error: "This test is not active",
+        },
         { status: 403 },
       );
     }
 
-    let hasTestAccess = testRow.org_id === orgId;
+    // ---------------------------------------------------------
+    // Resolve billing source.
+    //
+    // Legacy organisations can have several historical tests that
+    // are still technically owned by their org. Ownership alone must
+    // not override an explicit manual whitelist.
+    // ---------------------------------------------------------
+    const { data: billingAccount, error: billingErr } = await sb
+      .from("billing_accounts")
+      .select("billing_source")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (!hasTestAccess) {
-      const { data: billingAccount, error: billingErr } = await sb
-        .from("billing_accounts")
-        .select("billing_source")
-        .eq("org_id", orgId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    if (billingErr) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: billingErr.message,
+        },
+        { status: 500 },
+      );
+    }
 
-      if (billingErr) {
-        return NextResponse.json(
-          { ok: false, error: billingErr.message },
-          { status: 500 },
-        );
-      }
+    const isLegacyBilling =
+      billingAccount?.billing_source === "legacy";
 
-      const isLegacyBilling = billingAccount?.billing_source === "legacy";
+    let hasTestAccess = false;
 
-      const { data: accessRow, error: accessErr } = await sb
-        .from("user_test_access")
+    // ---------------------------------------------------------
+    // LEGACY ACCESS
+    //
+    // If a legacy organisation has one or more active MANUAL
+    // org_test_access rows, those rows are an explicit whitelist.
+    //
+    // This means historical org ownership does NOT grant access to
+    // an old test outside the whitelist.
+    //
+    // Legacy orgs without a manual whitelist retain the historical
+    // behaviour: owned tests + explicit user_test_access.
+    // ---------------------------------------------------------
+    if (isLegacyBilling) {
+      const {
+        data: manualAccessRows,
+        error: manualAccessErr,
+      } = await sb
+        .from("org_test_access")
         .select("test_id")
         .eq("org_id", orgId)
-        .eq("test_id", testId)
-        .limit(1)
-        .maybeSingle();
+        .eq("status", "active")
+        .eq("source", "manual");
 
-      if (accessErr) {
+      if (manualAccessErr) {
         return NextResponse.json(
-          { ok: false, error: accessErr.message },
+          {
+            ok: false,
+            error: manualAccessErr.message,
+          },
           { status: 500 },
         );
       }
 
-      hasTestAccess = Boolean(accessRow);
+      const manualIds = Array.from(
+        new Set(
+          (manualAccessRows ?? [])
+            .map(
+              (row: { test_id?: string | null }) =>
+                row.test_id,
+            )
+            .filter(
+              (id): id is string =>
+                Boolean(id),
+            ),
+        ),
+      );
 
-      // Modern billing grants tests through org_test_access. Legacy billing
-      // deliberately ignores tier-wide access and preserves explicit tests.
-      if (!hasTestAccess && !isLegacyBilling) {
-        const { data: orgAccessRow, error: orgAccessErr } = await sb
+      if (manualIds.length > 0) {
+        // Explicit legacy whitelist wins over test ownership.
+        hasTestAccess = manualIds.includes(testId);
+      } else {
+        // Preserve historical legacy behaviour when no manual
+        // whitelist has been configured.
+        hasTestAccess =
+          testRow.org_id === orgId;
+
+        if (!hasTestAccess) {
+          const {
+            data: accessRow,
+            error: accessErr,
+          } = await sb
+            .from("user_test_access")
+            .select("test_id")
+            .eq("org_id", orgId)
+            .eq("test_id", testId)
+            .limit(1)
+            .maybeSingle();
+
+          if (accessErr) {
+            return NextResponse.json(
+              {
+                ok: false,
+                error: accessErr.message,
+              },
+              { status: 500 },
+            );
+          }
+
+          hasTestAccess =
+            Boolean(accessRow);
+        }
+      }
+    } else {
+      // -------------------------------------------------------
+      // MODERN ACCESS
+      //
+      // Preserve the existing hierarchy:
+      // 1. Org owns test
+      // 2. Explicit user_test_access
+      // 3. Active org_test_access
+      // -------------------------------------------------------
+      hasTestAccess =
+        testRow.org_id === orgId;
+
+      if (!hasTestAccess) {
+        const {
+          data: accessRow,
+          error: accessErr,
+        } = await sb
+          .from("user_test_access")
+          .select("test_id")
+          .eq("org_id", orgId)
+          .eq("test_id", testId)
+          .limit(1)
+          .maybeSingle();
+
+        if (accessErr) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: accessErr.message,
+            },
+            { status: 500 },
+          );
+        }
+
+        hasTestAccess =
+          Boolean(accessRow);
+      }
+
+      if (!hasTestAccess) {
+        const {
+          data: orgAccessRow,
+          error: orgAccessErr,
+        } = await sb
           .from("org_test_access")
           .select("test_id")
           .eq("org_id", orgId)
@@ -156,12 +290,16 @@ export async function POST(req: Request) {
 
         if (orgAccessErr) {
           return NextResponse.json(
-            { ok: false, error: orgAccessErr.message },
+            {
+              ok: false,
+              error: orgAccessErr.message,
+            },
             { status: 500 },
           );
         }
 
-        hasTestAccess = Boolean(orgAccessRow);
+        hasTestAccess =
+          Boolean(orgAccessRow);
       }
     }
 
@@ -169,27 +307,43 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: "This organisation does not have access to this test",
+          error:
+            "This organisation does not have access to this test",
         },
         { status: 403 },
       );
     }
 
-    const { count: existingLinkCount, error: existingLinkCountErr } = await sb
+    // ---------------------------------------------------------
+    // Determine whether this is the organisation's first-ever
+    // test link.
+    // ---------------------------------------------------------
+    const {
+      count: existingLinkCount,
+      error: existingLinkCountErr,
+    } = await sb
       .from("test_links")
-      .select("id", { count: "exact", head: true })
+      .select("id", {
+        count: "exact",
+        head: true,
+      })
       .eq("org_id", orgId);
 
     if (existingLinkCountErr) {
       return NextResponse.json(
-        { ok: false, error: existingLinkCountErr.message },
+        {
+          ok: false,
+          error: existingLinkCountErr.message,
+        },
         { status: 500 },
       );
     }
 
-    const isFirstEverLink = (existingLinkCount ?? 0) === 0;
+    const isFirstEverLink =
+      (existingLinkCount ?? 0) === 0;
 
-    const token = crypto.randomUUID().replace(/-/g, "");
+    const token =
+      crypto.randomUUID().replace(/-/g, "");
 
     const insertPayload: any = {
       token,
@@ -201,41 +355,72 @@ export async function POST(req: Request) {
       email_report: !!emailReport,
       is_active: true,
 
-      hidden_results_message: showResults ? null : hiddenResultsMessage || null,
-      redirect_url: showResults ? null : redirectUrl || null,
+      hidden_results_message: showResults
+        ? null
+        : hiddenResultsMessage || null,
+
+      redirect_url: showResults
+        ? null
+        : redirectUrl || null,
 
       // Keep this available on the link either way.
-      next_steps_url: nextStepsUrl || null,
+      next_steps_url:
+        nextStepsUrl || null,
 
       max_uses: maxUses,
 
       meta: {
-        report_variant: reportVariant,
-        report_paywall_enabled: !!body.reportPaywallEnabled,
-        report_price_cents: body.reportPaywallEnabled ? body.reportPriceCents : null,
-        report_currency: (body.reportCurrency || "GBP").toLowerCase(),
+        report_variant:
+          reportVariant,
+
+        report_paywall_enabled:
+          !!body.reportPaywallEnabled,
+
+        report_price_cents:
+          body.reportPaywallEnabled
+            ? body.reportPriceCents
+            : null,
+
+        report_currency:
+          (
+            body.reportCurrency ||
+            "GBP"
+          ).toLowerCase(),
       },
     };
 
     if (expiresAt) {
-      insertPayload.expires_at = new Date(expiresAt).toISOString();
+      insertPayload.expires_at =
+        new Date(expiresAt).toISOString();
     }
 
-    const { data: linkRow, error: insErr } = await sb
+    const {
+      data: linkRow,
+      error: insErr,
+    } = await sb
       .from("test_links")
       .insert(insertPayload)
-      .select("token, show_results, redirect_url, next_steps_url, meta")
+      .select(
+        "token, show_results, redirect_url, next_steps_url, meta",
+      )
       .single();
 
     if (insErr) {
       return NextResponse.json(
-        { ok: false, error: insErr.message },
+        {
+          ok: false,
+          error: insErr.message,
+        },
         { status: 500 },
       );
     }
 
-    const publicUrl = absoluteUrl(`/t/${linkRow.token}`);
+    const publicUrl =
+      absoluteUrl(`/t/${linkRow.token}`);
 
+    // ---------------------------------------------------------
+    // FOUNDING 100
+    // ---------------------------------------------------------
     let founding100OfferEligible = false;
     let firstLinkOfferEligible = false;
 
@@ -253,7 +438,10 @@ export async function POST(req: Request) {
             "campaign_key",
             "founding_100",
           )
-          .eq("org_id", orgId)
+          .eq(
+            "org_id",
+            orgId,
+          )
           .maybeSingle();
 
         if (campaignOfferError) {
@@ -266,11 +454,12 @@ export async function POST(req: Request) {
             String(campaignOffer.status),
           )
         ) {
-          const offerExpiry = Date.parse(
-            String(
-              campaignOffer.expires_at,
-            ),
-          );
+          const offerExpiry =
+            Date.parse(
+              String(
+                campaignOffer.expires_at,
+              ),
+            );
 
           const now = Date.now();
 
@@ -330,7 +519,8 @@ export async function POST(req: Request) {
             ) {
               const reservedCount =
                 (
-                  reservedResult.data ?? []
+                  reservedResult.data ??
+                  []
                 ).filter((row) => {
                   if (
                     row.status ===
@@ -396,10 +586,16 @@ export async function POST(req: Request) {
       }
     }
 
+    // ---------------------------------------------------------
+    // FIRST LINK PROMOTION
+    // ---------------------------------------------------------
     if (
       isFirstEverLink &&
       !founding100OfferEligible &&
-      Boolean(process.env.STRIPE_FIRST_LINK_PROMOTION_CODE_ID)
+      Boolean(
+        process.env
+          .STRIPE_FIRST_LINK_PROMOTION_CODE_ID,
+      )
     ) {
       try {
         const [
@@ -409,46 +605,89 @@ export async function POST(req: Request) {
         ] = await Promise.all([
           sb
             .from("entitlements")
-            .select("id", { count: "exact", head: true })
-            .eq("org_id", orgId)
-            .eq("status", "active"),
+            .select(
+              "id",
+              {
+                count: "exact",
+                head: true,
+              },
+            )
+            .eq(
+              "org_id",
+              orgId,
+            )
+            .eq(
+              "status",
+              "active",
+            ),
+
           sb
             .from("org_engines")
-            .select("engine_key, source")
-            .eq("org_id", orgId)
-            .eq("status", "active"),
+            .select(
+              "engine_key, source",
+            )
+            .eq(
+              "org_id",
+              orgId,
+            )
+            .eq(
+              "status",
+              "active",
+            ),
+
           sb
-            .from("engine_trial_allocations")
-            .select("engine_key, reference")
-            .eq("org_id", orgId)
-            .eq("allocation_type", "trial"),
+            .from(
+              "engine_trial_allocations",
+            )
+            .select(
+              "engine_key, reference",
+            )
+            .eq(
+              "org_id",
+              orgId,
+            )
+            .eq(
+              "allocation_type",
+              "trial",
+            ),
         ]);
 
-        if (activeEntitlementResult.error) {
+        if (
+          activeEntitlementResult.error
+        ) {
           throw activeEntitlementResult.error;
         }
 
-        if (activeEnginesResult.error) {
+        if (
+          activeEnginesResult.error
+        ) {
           throw activeEnginesResult.error;
         }
 
-        if (trialAllocationsResult.error) {
+        if (
+          trialAllocationsResult.error
+        ) {
           throw trialAllocationsResult.error;
         }
 
         const activeEngines =
-          activeEnginesResult.data ?? [];
+          activeEnginesResult.data ??
+          [];
 
         const trialAllocations =
-          trialAllocationsResult.data ?? [];
+          trialAllocationsResult.data ??
+          [];
 
         const onboardingTrialEngines =
           new Set(
             trialAllocations
               .filter(
                 (allocation) =>
-                  typeof allocation.reference === "string" &&
-                  allocation.reference.startsWith("onboarding:"),
+                  typeof allocation.reference ===
+                    "string" &&
+                  allocation.reference.startsWith(
+                    "onboarding:",
+                  ),
               )
               .map(
                 (allocation) =>
@@ -457,39 +696,47 @@ export async function POST(req: Request) {
           );
 
         const isFreeTrial =
-          (activeEntitlementResult.count ?? 0) === 0 &&
+          (
+            activeEntitlementResult.count ??
+            0
+          ) === 0 &&
           activeEngines.length > 0 &&
           activeEngines.every(
             (engine) =>
-              engine.source === "onboarding" &&
+              engine.source ===
+                "onboarding" &&
               onboardingTrialEngines.has(
                 engine.engine_key,
               ),
           );
 
         if (isFreeTrial) {
-          const { error: offerError } =
-            await sb
-              .from("first_link_offers")
-              .upsert(
-                {
-                  org_id: orgId,
-                  offer_key:
-                    "first_link_70_3m",
-                  status: "offered",
-                },
-                {
-                  onConflict:
-                    "org_id,offer_key",
-                  ignoreDuplicates: true,
-                },
-              );
+          const {
+            error: offerError,
+          } = await sb
+            .from("first_link_offers")
+            .upsert(
+              {
+                org_id: orgId,
+                offer_key:
+                  "first_link_70_3m",
+                status:
+                  "offered",
+              },
+              {
+                onConflict:
+                  "org_id,offer_key",
+                ignoreDuplicates:
+                  true,
+              },
+            );
 
           if (offerError) {
             throw offerError;
           }
 
-          firstLinkOfferEligible = true;
+          firstLinkOfferEligible =
+            true;
         }
       } catch (offerError) {
         // Never break successful test-link creation because the optional
@@ -501,22 +748,32 @@ export async function POST(req: Request) {
       }
     }
 
+    // ---------------------------------------------------------
+    // OPTIONAL EMAIL DELIVERY
+    // ---------------------------------------------------------
     let emailResult: any = null;
     let emailError: string | null = null;
 
     if (recipientEmail) {
       if (!RESEND_API_KEY) {
-        emailError = "Missing RESEND_API_KEY or EMAIL_FROM env vars.";
+        emailError =
+          "Missing RESEND_API_KEY or EMAIL_FROM env vars.";
       } else {
         try {
-          const resend = new Resend(RESEND_API_KEY);
-          const to = recipientName?.trim()
-            ? `${recipientName} <${recipientEmail}>`
-            : recipientEmail;
+          const resend =
+            new Resend(
+              RESEND_API_KEY,
+            );
 
-          const subject = testDisplayName
-            ? `Your ${testDisplayName} link`
-            : "Your MindCanvas test link";
+          const to =
+            recipientName?.trim()
+              ? `${recipientName} <${recipientEmail}>`
+              : recipientEmail;
+
+          const subject =
+            testDisplayName
+              ? `Your ${testDisplayName} link`
+              : "Your MindCanvas test link";
 
           const html = `
             <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.6;">
@@ -538,36 +795,57 @@ export async function POST(req: Request) {
             </div>
           `;
 
-          emailResult = await resend.emails.send({
-            from: EMAIL_FROM,
-            to,
-            subject,
-            html,
-          });
+          emailResult =
+            await resend.emails.send({
+              from:
+                EMAIL_FROM,
+              to,
+              subject,
+              html,
+            });
         } catch (e: any) {
-          emailError = e?.message || "Email send failed.";
+          emailError =
+            e?.message ||
+            "Email send failed.";
         }
       }
     }
 
     return NextResponse.json({
       ok: true,
-      token: linkRow.token,
-      url: publicUrl,
-      show_results: linkRow.show_results,
-      redirect_url: linkRow.redirect_url,
-      next_steps_url: linkRow.next_steps_url,
+      token:
+        linkRow.token,
+      url:
+        publicUrl,
+      show_results:
+        linkRow.show_results,
+      redirect_url:
+        linkRow.redirect_url,
+      next_steps_url:
+        linkRow.next_steps_url,
       report_variant:
-        linkRow?.meta?.report_variant === "lite" ? "lite" : "full",
-      emailed: !!recipientEmail && !emailError,
-      emailResultId: emailResult?.id ?? null,
+        linkRow?.meta
+          ?.report_variant === "lite"
+          ? "lite"
+          : "full",
+      emailed:
+        !!recipientEmail &&
+        !emailError,
+      emailResultId:
+        emailResult?.id ??
+        null,
       emailError,
       founding100OfferEligible,
       firstLinkOfferEligible,
     });
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: e?.message || "Unexpected error" },
+      {
+        ok: false,
+        error:
+          e?.message ||
+          "Unexpected error",
+      },
       { status: 500 },
     );
   }

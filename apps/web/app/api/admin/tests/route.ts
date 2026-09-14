@@ -1,4 +1,4 @@
-//apps/web/app/api/admin/tests/route.ts
+// apps/web/app/api/admin/tests/route.ts
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
@@ -37,7 +37,10 @@ function pickName(row: TestRow): string {
 
 function toOutput(row: TestRow): Out | null {
   const id = pickId(row);
-  if (!id) return null;
+
+  if (!id) {
+    return null;
+  }
 
   return {
     id,
@@ -56,11 +59,20 @@ export async function GET(req: Request) {
     const orgId = searchParams.get("orgId");
 
     if (!orgId) {
-      return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing orgId" },
+        { status: 400 },
+      );
     }
 
     const sb = createClient().schema("portal");
 
+    // ---------------------------------------------------------
+    // Resolve billing type.
+    //
+    // Legacy organisations may have historical org-owned tests
+    // that should no longer automatically appear in the portal.
+    // ---------------------------------------------------------
     const { data: billingAccount, error: billingErr } = await sb
       .from("billing_accounts")
       .select("billing_source")
@@ -70,37 +82,144 @@ export async function GET(req: Request) {
       .maybeSingle();
 
     if (billingErr) {
-      return NextResponse.json({ error: billingErr.message }, { status: 500 });
+      return NextResponse.json(
+        { error: billingErr.message },
+        { status: 500 },
+      );
     }
 
-    const isLegacyBilling = billingAccount?.billing_source === "legacy";
+    const isLegacyBilling =
+      billingAccount?.billing_source === "legacy";
+
+    // ---------------------------------------------------------
+    // LEGACY MANUAL WHITELIST
+    //
+    // A legacy organisation may have multiple historical tests
+    // assigned to / owned by it.
+    //
+    // If it has one or more ACTIVE MANUAL org_test_access rows,
+    // those rows become an explicit whitelist.
+    //
+    // This is used for accounts such as:
+    // - Brett Gordon -> 5D Leadership Compass only
+    // - Competency Coach -> Competency Coach only
+    //
+    // Legacy accounts without a manual whitelist continue through
+    // the historical behaviour below unchanged.
+    // ---------------------------------------------------------
+    if (isLegacyBilling) {
+      const {
+        data: manualAccessRows,
+        error: manualAccessErr,
+      } = await sb
+        .from("org_test_access")
+        .select("test_id")
+        .eq("org_id", orgId)
+        .eq("status", "active")
+        .eq("source", "manual");
+
+      if (manualAccessErr) {
+        return NextResponse.json(
+          { error: manualAccessErr.message },
+          { status: 500 },
+        );
+      }
+
+      const whitelistIds = Array.from(
+        new Set(
+          (manualAccessRows ?? [])
+            .map(
+              (row: { test_id?: string | null }) =>
+                row.test_id,
+            )
+            .filter(
+              (id): id is string =>
+                Boolean(id),
+            ),
+        ),
+      );
+
+      if (whitelistIds.length > 0) {
+        const {
+          data: whitelistRows,
+          error: whitelistErr,
+        } = await sb
+          .from("tests")
+          .select(
+            "id, name, mode, status, org_id, created_at",
+          )
+          .in("id", whitelistIds)
+          .eq("status", "active")
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (whitelistErr) {
+          return NextResponse.json(
+            { error: whitelistErr.message },
+            { status: 500 },
+          );
+        }
+
+        const out = (whitelistRows ?? [])
+          .map(toOutput)
+          .filter(
+            (row): row is Out =>
+              row !== null,
+          );
+
+        return NextResponse.json(out);
+      }
+    }
+
+    // ---------------------------------------------------------
+    // EXISTING ACCESS BEHAVIOUR
+    //
+    // No manual legacy whitelist exists, so preserve the existing
+    // rules for normal and older legacy organisations.
+    // ---------------------------------------------------------
 
     // Every organisation can use active tests it owns.
     const { data: ownedRows, error: ownedErr } = await sb
       .from("tests")
-      .select("id, name, mode, status, org_id, created_at")
+      .select(
+        "id, name, mode, status, org_id, created_at",
+      )
       .eq("org_id", orgId)
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
     if (ownedErr) {
-      return NextResponse.json({ error: ownedErr.message }, { status: 500 });
+      return NextResponse.json(
+        { error: ownedErr.message },
+        { status: 500 },
+      );
     }
 
+    // Explicit user-level assignments.
     const { data: accessRows, error: accessErr } = await sb
       .from("user_test_access")
       .select("test_id")
       .eq("org_id", orgId);
 
     if (accessErr) {
-      return NextResponse.json({ error: accessErr.message }, { status: 500 });
+      return NextResponse.json(
+        { error: accessErr.message },
+        { status: 500 },
+      );
     }
 
     const assignedIds = Array.from(
       new Set(
         (accessRows ?? [])
-          .map((row: { test_id?: string | null }) => row.test_id)
-          .filter((id): id is string => Boolean(id)),
+          .map(
+            (row: { test_id?: string | null }) =>
+              row.test_id,
+          )
+          .filter(
+            (id): id is string =>
+              Boolean(id),
+          ),
       ),
     );
 
@@ -109,25 +228,40 @@ export async function GET(req: Request) {
     if (assignedIds.length > 0) {
       const { data, error } = await sb
         .from("tests")
-        .select("id, name, mode, status, org_id, created_at")
+        .select(
+          "id, name, mode, status, org_id, created_at",
+        )
         .in("id", assignedIds)
         .eq("status", "active")
-        .order("created_at", { ascending: false });
+        .order("created_at", {
+          ascending: false,
+        });
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 },
+        );
       }
 
       assignedRows = data ?? [];
     }
 
-    // Modern billing provisions tests through org_test_access. Legacy billing
-    // must preserve the organisation's explicit assignments instead of gaining
-    // the complete tier bundle.
+    // ---------------------------------------------------------
+    // Modern billing provisions tests through org_test_access.
+    //
+    // Legacy billing does NOT automatically inherit the complete
+    // tier bundle. Legacy organisations continue to rely on their
+    // owned tests / explicit assignments unless they have the
+    // manual whitelist handled above.
+    // ---------------------------------------------------------
     let billingAccessRows: TestRow[] = [];
 
     if (!isLegacyBilling) {
-      const { data: orgAccessRows, error: orgAccessErr } = await sb
+      const {
+        data: orgAccessRows,
+        error: orgAccessErr,
+      } = await sb
         .from("org_test_access")
         .select("test_id")
         .eq("org_id", orgId)
@@ -143,29 +277,46 @@ export async function GET(req: Request) {
       const billingAccessIds = Array.from(
         new Set(
           (orgAccessRows ?? [])
-            .map((row: { test_id?: string | null }) => row.test_id)
-            .filter((id): id is string => Boolean(id)),
+            .map(
+              (row: { test_id?: string | null }) =>
+                row.test_id,
+            )
+            .filter(
+              (id): id is string =>
+                Boolean(id),
+            ),
         ),
       );
 
       if (billingAccessIds.length > 0) {
         const { data, error } = await sb
           .from("tests")
-          .select("id, name, mode, status, org_id, created_at")
+          .select(
+            "id, name, mode, status, org_id, created_at",
+          )
           .in("id", billingAccessIds)
           .eq("status", "active")
-          .order("created_at", { ascending: false });
+          .order("created_at", {
+            ascending: false,
+          });
 
         if (error) {
-          return NextResponse.json({ error: error.message }, { status: 500 });
+          return NextResponse.json(
+            { error: error.message },
+            { status: 500 },
+          );
         }
 
         billingAccessRows = data ?? [];
       }
     }
 
-    // De-duplicate tests that may be both owned and explicitly assigned.
-    const accessibleTests = new Map<string, TestRow>();
+    // ---------------------------------------------------------
+    // De-duplicate tests that may appear through more than one
+    // access mechanism.
+    // ---------------------------------------------------------
+    const accessibleTests =
+      new Map<string, TestRow>();
 
     for (const row of [
       ...(ownedRows ?? []),
@@ -173,24 +324,46 @@ export async function GET(req: Request) {
       ...billingAccessRows,
     ]) {
       const id = pickId(row);
-      if (id && !accessibleTests.has(id)) {
-        accessibleTests.set(id, row);
+
+      if (
+        id &&
+        !accessibleTests.has(id)
+      ) {
+        accessibleTests.set(
+          id,
+          row,
+        );
       }
     }
 
-    const out = Array.from(accessibleTests.values())
+    const out = Array.from(
+      accessibleTests.values(),
+    )
       .sort((a, b) => {
-        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        const aTime = a.created_at
+          ? new Date(a.created_at).getTime()
+          : 0;
+
+        const bTime = b.created_at
+          ? new Date(b.created_at).getTime()
+          : 0;
+
         return bTime - aTime;
       })
       .map(toOutput)
-      .filter((row): row is Out => row !== null);
+      .filter(
+        (row): row is Out =>
+          row !== null,
+      );
 
     return NextResponse.json(out);
   } catch (e: any) {
     return NextResponse.json(
-      { error: e?.message || "Unexpected error" },
+      {
+        error:
+          e?.message ||
+          "Unexpected error",
+      },
       { status: 500 },
     );
   }
