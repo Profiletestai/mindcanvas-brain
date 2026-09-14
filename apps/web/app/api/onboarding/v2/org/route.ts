@@ -44,6 +44,10 @@ type ExistingAttributionRow = {
   id: string;
 };
 
+type PortalOrgWithTier = PortalOrg & {
+  selected_tier?: number | null;
+};
+
 export const dynamic = "force-dynamic";
 
 function errorResponse(
@@ -88,15 +92,40 @@ function clearReferralCookie(
   return response;
 }
 
-/**
- * Convert the browser's temporary first-touch referral cookie into
- * permanent organisation attribution.
- *
- * Tracking is deliberately non-blocking:
- * onboarding must still succeed if referral attribution fails.
- *
- * Returns true when the referral cookie should be cleared.
- */
+async function getSignupTierForUser(
+  userId: string,
+  orgTier?: number | null
+) {
+  const normalisedOrgTier =
+    normaliseSignupTier(orgTier);
+
+  if (normalisedOrgTier !== null) {
+    return normalisedOrgTier;
+  }
+
+  const {
+    data: selection,
+    error: selectionError,
+  } = await portalAdmin()
+    .from("onboarding_selections")
+    .select("user_id, selected_tier")
+    .eq("user_id", userId)
+    .maybeSingle<SelectionRow>();
+
+  if (selectionError) {
+    console.error(
+      "[onboarding/org] referral tier fallback lookup failed",
+      selectionError
+    );
+
+    return null;
+  }
+
+  return normaliseSignupTier(
+    selection?.selected_tier
+  );
+}
+
 async function captureReferralAttribution({
   request,
   userId,
@@ -120,12 +149,6 @@ async function captureReferralAttribution({
 
     const admin = portalAdmin();
 
-    // -------------------------------------------------------
-    // First referral wins permanently.
-    //
-    // If this organisation has already been attributed,
-    // never replace that attribution.
-    // -------------------------------------------------------
     const {
       data: existingAttribution,
       error: existingAttributionError,
@@ -145,19 +168,9 @@ async function captureReferralAttribution({
     }
 
     if (existingAttribution?.id) {
-      // Permanent attribution already exists, so the browser
-      // no longer needs the temporary referral cookie.
       return true;
     }
 
-    // -------------------------------------------------------
-    // Validate the click.
-    //
-    // It must:
-    // - exist
-    // - be a first-touch click
-    // - still be inside the 30-day attribution window
-    // -------------------------------------------------------
     const {
       data: click,
       error: clickError,
@@ -184,18 +197,9 @@ async function captureReferralAttribution({
     }
 
     if (!click?.id || !click.partner_id) {
-      // Cookie is invalid or expired.
-      // Remove it so it cannot keep being retried.
       return true;
     }
 
-    // -------------------------------------------------------
-    // Persist immutable referral conversion.
-    //
-    // signup_tier is the tier selected at conversion time.
-    // Current billing status/tier will later be derived from
-    // portal.billing_accounts in the referral dashboard.
-    // -------------------------------------------------------
     const {
       error: attributionError,
     } = await admin
@@ -214,8 +218,6 @@ async function captureReferralAttribution({
       });
 
     if (attributionError) {
-      // A duplicate means another concurrent request already
-      // created the immutable attribution. That is safe.
       if (
         attributionError.code === "23505"
       ) {
@@ -288,16 +290,6 @@ export async function POST(
 
     const admin = portalAdmin();
 
-    // -------------------------------------------------------
-    // Idempotency:
-    //
-    // If Checkout or an earlier onboarding request already
-    // created the organisation, return the same organisation.
-    //
-    // We ALSO attempt referral capture here. This means an
-    // interrupted onboarding can still receive attribution
-    // when it resumes.
-    // -------------------------------------------------------
     const {
       data: existing,
       error: existingError,
@@ -320,68 +312,38 @@ export async function POST(
     }
 
     if (existing?.org_id) {
-  const org = existing.orgs;
+      const org = existing.orgs;
 
-  // Normally fn_create_onboarding_org copies selected_tier onto the
-  // organisation. If Checkout created the organisation earlier and
-  // the value is not available yet, fall back to the original
-  // onboarding selection so referral reporting keeps the true
-  // conversion plan.
-  let existingSignupTier =
-    org?.selected_tier ?? null;
+      const existingSignupTier =
+        await getSignupTierForUser(
+          user.id,
+          org?.selected_tier ?? null
+        );
 
-  if (existingSignupTier === null) {
-    const {
-      data: existingSelection,
-      error: existingSelectionError,
-    } = await admin
-      .from("onboarding_selections")
-      .select(
-        "user_id, selected_tier"
-      )
-      .eq("user_id", user.id)
-      .maybeSingle<SelectionRow>();
+      const shouldClearReferral =
+        await captureReferralAttribution({
+          request: req,
+          userId: user.id,
+          orgId: existing.org_id,
+          signupTier:
+            existingSignupTier,
+        });
 
-    if (existingSelectionError) {
-      console.error(
-        "[onboarding/org] referral tier fallback lookup failed",
-        existingSelectionError
-      );
-    } else {
-      existingSignupTier =
-        existingSelection?.selected_tier ??
-        null;
+      const response =
+        NextResponse.json({
+          ok: true,
+          org: {
+            id: existing.org_id,
+            slug: org?.slug ?? null,
+            name: org?.name ?? null,
+          },
+        });
+
+      return shouldClearReferral
+        ? clearReferralCookie(response)
+        : response;
     }
-  }
 
-  const shouldClearReferral =
-    await captureReferralAttribution({
-      request: req,
-      userId: user.id,
-      orgId: existing.org_id,
-      signupTier:
-        existingSignupTier,
-    });
-
-  const response =
-    NextResponse.json({
-      ok: true,
-      org: {
-        id: existing.org_id,
-        slug: org?.slug ?? null,
-        name: org?.name ?? null,
-      },
-    });
-
-  return shouldClearReferral
-    ? clearReferralCookie(response)
-    : response;
-}
-
-    // -------------------------------------------------------
-    // The user must have selected their subscription plan
-    // before an organisation can be created.
-    // -------------------------------------------------------
     const {
       data: selection,
       error: selectionError,
@@ -410,11 +372,6 @@ export async function POST(
     const slug =
       await generateUniqueSlug(name);
 
-    // -------------------------------------------------------
-    // Create the normal MindCanvas organisation.
-    //
-    // Referral functionality does NOT alter this RPC.
-    // -------------------------------------------------------
     const {
       data: orgId,
       error: rpcError,
@@ -443,9 +400,6 @@ export async function POST(
       );
     }
 
-    // -------------------------------------------------------
-    // Existing consent behaviour.
-    // -------------------------------------------------------
     const nowIso =
       new Date().toISOString();
 
@@ -466,13 +420,6 @@ export async function POST(
       );
     }
 
-    // -------------------------------------------------------
-    // Referral conversion.
-    //
-    // This happens AFTER successful organisation creation.
-    // A referral database failure cannot roll back or prevent
-    // the customer from completing onboarding.
-    // -------------------------------------------------------
     const shouldClearReferral =
       await captureReferralAttribution({
         request: req,
@@ -505,7 +452,7 @@ export async function POST(
 }
 
 export async function PATCH(
-  req: Request
+  req: NextRequest
 ) {
   try {
     const {
@@ -551,7 +498,7 @@ export async function PATCH(
     } = await admin
       .from("user_orgs")
       .select(
-        "org_id, orgs(id, name, slug, last_completed_step)"
+        "org_id, orgs(id, name, slug, selected_tier, last_completed_step)"
       )
       .eq("user_id", user.id)
       .maybeSingle<{
@@ -583,9 +530,6 @@ export async function PATCH(
           ?.last_completed_step ?? 0
       ) < 5;
 
-    // During onboarding, the organisation slug must follow the
-    // real name the user entered. This also repairs placeholders
-    // or an old test name reused while validating the flow.
     const shouldRefreshSlug =
       stillInOnboarding ||
       currentName === "" ||
@@ -599,9 +543,6 @@ export async function PATCH(
         : membership.orgs?.slug ??
           null;
 
-    // Save the organisation details first. Name is deliberately
-    // written in a second, final update below so no placeholder/
-    // slug workflow can leave the old organisation title in place.
     const {
       error: detailsError,
     } = await admin
@@ -641,7 +582,7 @@ export async function PATCH(
         membership.org_id
       )
       .select("*")
-      .single<PortalOrg>();
+      .single<PortalOrgWithTier>();
 
     if (nameError) {
       return errorResponse(
@@ -650,8 +591,6 @@ export async function PATCH(
       );
     }
 
-    // Do not advance to Organisation Created unless the database
-    // confirms the exact organisation name submitted here.
     if (
       !org ||
       org.name?.trim() !== name
@@ -662,10 +601,33 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      org,
-    });
+    const signupTier =
+      await getSignupTierForUser(
+        user.id,
+        org.selected_tier ??
+          membership.orgs
+            ?.selected_tier ??
+          null
+      );
+
+    const shouldClearReferral =
+      await captureReferralAttribution({
+        request: req,
+        userId: user.id,
+        orgId:
+          membership.org_id,
+        signupTier,
+      });
+
+    const response =
+      NextResponse.json({
+        ok: true,
+        org,
+      });
+
+    return shouldClearReferral
+      ? clearReferralCookie(response)
+      : response;
   } catch (error: any) {
     return errorResponse(
       error?.message ||
@@ -675,7 +637,9 @@ export async function PATCH(
   }
 }
 
-export async function GET() {
+export async function GET(
+  req: NextRequest
+) {
   try {
     const {
       user,
@@ -697,7 +661,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .maybeSingle<{
         org_id: string;
-        orgs: PortalOrg | null;
+        orgs: PortalOrgWithTier | null;
       }>();
 
     if (error) {
@@ -714,10 +678,30 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({
-      ok: true,
-      org: data.orgs,
-    });
+    const signupTier =
+      await getSignupTierForUser(
+        user.id,
+        data.orgs?.selected_tier ??
+          null
+      );
+
+    const shouldClearReferral =
+      await captureReferralAttribution({
+        request: req,
+        userId: user.id,
+        orgId: data.org_id,
+        signupTier,
+      });
+
+    const response =
+      NextResponse.json({
+        ok: true,
+        org: data.orgs,
+      });
+
+    return shouldClearReferral
+      ? clearReferralCookie(response)
+      : response;
   } catch (error: any) {
     return errorResponse(
       error?.message ||
