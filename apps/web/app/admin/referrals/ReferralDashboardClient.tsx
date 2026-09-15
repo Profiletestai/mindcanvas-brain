@@ -107,7 +107,10 @@ const RANGE_OPTIONS: {
 ];
 
 const card =
-  "rounded-2xl border border-white/10 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]";
+  "rounded-2xl border border-white/10 bg-white/[0.045] shadow-lg shadow-black/10";
+
+const inputClass =
+  "mt-1.5 w-full rounded-xl border border-white/10 bg-[#07111f]/80 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/40 focus:ring-2 focus:ring-sky-300/10";
 
 function percent(value: number) {
   if (!Number.isFinite(value)) return "0%";
@@ -115,12 +118,12 @@ function percent(value: number) {
 }
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
+  if (!value) return "-";
 
   const date = new Date(value);
 
   if (!Number.isFinite(date.getTime())) {
-    return "—";
+    return "-";
   }
 
   return date.toLocaleDateString(undefined, {
@@ -151,16 +154,16 @@ function PaymentPill({
     state === "paid"
       ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"
       : state === "trial"
-      ? "border-sky-300/25 bg-sky-300/10 text-sky-200"
-      : state === "overdue"
-      ? "border-red-300/25 bg-red-300/10 text-red-200"
-      : state === "setup_required"
-      ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
-      : state === "paused"
-      ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
-      : state === "complimentary"
-      ? "border-violet-300/25 bg-violet-300/10 text-violet-200"
-      : "border-white/10 bg-white/5 text-white/60";
+        ? "border-sky-300/25 bg-sky-300/10 text-sky-200"
+        : state === "overdue"
+          ? "border-red-300/25 bg-red-300/10 text-red-200"
+          : state === "setup_required"
+            ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
+            : state === "paused"
+              ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
+              : state === "complimentary"
+                ? "border-violet-300/25 bg-violet-300/10 text-violet-200"
+                : "border-white/10 bg-white/5 text-white/60";
 
   return (
     <span
@@ -179,7 +182,7 @@ function StatusPill({
   const classes =
     status === "active"
       ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"
-      : "border-white/10 bg-white/5 text-white/60";
+      : "border-amber-300/20 bg-amber-300/10 text-amber-200";
 
   return (
     <span
@@ -194,27 +197,135 @@ function StatCard({
   label,
   value,
   subtext,
+  emphasis = false,
 }: {
   label: string;
   value: string | number;
   subtext?: string;
+  emphasis?: boolean;
 }) {
   return (
-    <div className={`${card} p-5`}>
-      <div className="text-xs uppercase tracking-[0.18em] text-white/45">
+    <div
+      className={`${card} relative overflow-hidden p-5 ${
+        emphasis ? "border-sky-300/20" : ""
+      }`}
+    >
+      {emphasis ? (
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/70 to-transparent" />
+      ) : null}
+
+      <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
         {label}
       </div>
 
-      <div className="mt-2 text-3xl font-semibold text-white">
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-white">
         {value}
       </div>
 
       {subtext ? (
-        <div className="mt-2 text-xs text-white/45">
+        <div className="mt-2 text-xs leading-5 text-white/45">
           {subtext}
         </div>
       ) : null}
     </div>
+  );
+}
+
+function FunnelStep({
+  label,
+  value,
+  helper,
+  emphasis = false,
+}: {
+  label: string;
+  value: number;
+  helper: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className={`flex-1 rounded-2xl border px-5 py-4 ${
+        emphasis
+          ? "border-sky-300/20 bg-sky-300/[0.07]"
+          : "border-white/10 bg-black/10"
+      }`}
+    >
+      <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+        {label}
+      </div>
+      <div className="mt-2 text-3xl font-semibold text-white">
+        {value}
+      </div>
+      <div className="mt-1 text-xs text-white/45">
+        {helper}
+      </div>
+    </div>
+  );
+}
+
+function FunnelArrow({
+  label,
+}: {
+  label: string;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-center gap-2 px-1 py-1 text-xs text-sky-200/75 md:flex-col md:px-2">
+      <span className="font-medium">{label}</span>
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+        className="rotate-90 md:rotate-0"
+      >
+        <path
+          d="M5 12h14M14 7l5 5-5 5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M6 6l12 12M18 6 6 18"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M12 5v14M5 12h14"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -228,6 +339,8 @@ export default function ReferralDashboardClient() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
+  const [showCreateModal, setShowCreateModal] =
+    useState(false);
   const [changingPartnerId, setChangingPartnerId] =
     useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
@@ -287,6 +400,27 @@ export default function ReferralDashboardClient() {
     );
   }, [totals]);
 
+  const planMixRows = useMemo(() => {
+    return [
+      {
+        label: "Starter",
+        value: totals?.planMix.starter ?? 0,
+      },
+      {
+        label: "Pro",
+        value: totals?.planMix.pro ?? 0,
+      },
+      {
+        label: "Growth",
+        value: totals?.planMix.growth ?? 0,
+      },
+      {
+        label: "Enterprise",
+        value: totals?.planMix.enterprise ?? 0,
+      },
+    ];
+  }, [totals]);
+
   function updateForm<K extends keyof CreatePartnerForm>(
     key: K,
     value: CreatePartnerForm[K]
@@ -308,6 +442,19 @@ export default function ReferralDashboardClient() {
     }));
   }
 
+  function openCreateModal() {
+    setCreateError("");
+    setCreateSuccess("");
+    setForm(EMPTY_FORM);
+    setShowCreateModal(true);
+  }
+
+  function closeCreateModal() {
+    if (creating) return;
+    setShowCreateModal(false);
+    setCreateError("");
+  }
+
   async function createPartner(event: FormEvent) {
     event.preventDefault();
 
@@ -316,6 +463,8 @@ export default function ReferralDashboardClient() {
     setCreateSuccess("");
 
     try {
+      const partnerName = form.name;
+
       const response = await fetch(
         "/api/admin/referrals",
         {
@@ -344,9 +493,10 @@ export default function ReferralDashboardClient() {
       }
 
       setCreateSuccess(
-        `Referral partner "${form.name}" created.`
+        `Referral partner "${partnerName}" created.`
       );
       setForm(EMPTY_FORM);
+      setShowCreateModal(false);
       await load();
     } catch (error) {
       setCreateError(
@@ -426,65 +576,73 @@ export default function ReferralDashboardClient() {
 
   return (
     <div className="fixed inset-0 mc-bg overflow-auto text-white">
-      <div className="mx-auto max-w-7xl space-y-8 px-6 py-10">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto max-w-7xl space-y-7 px-6 py-10">
+        <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Admin · Commercial
+              Admin - Commercial
             </div>
 
-            <h1 className="mt-1 text-3xl font-semibold">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
               Referral Tracking
             </h1>
 
-            <p className="mt-2 max-w-3xl text-sm text-white/60">
-              Create referral links and track partner traffic,
-              attributed sign-ups, plan selection and current
-              payment status. Commissions remain manual in this
-              MVP.
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/60">
+              Track referral acquisition, attributed sign-ups
+              and paid conversion across MindCanvas partners.
+              Commission management remains manual in this MVP.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/admin"
-              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium transition hover:bg-white/10"
+              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-white/10"
             >
               Back to Admin
             </Link>
+
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-sky-950/20 transition hover:brightness-110"
+            >
+              <PlusIcon />
+              Create referral partner
+            </button>
           </div>
         </header>
 
-        <section className={`${card} p-5`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold">Reporting period</h2>
-              <p className="mt-1 text-xs text-white/45">
-                Partner count is all-time. Clicks and conversions
-                respect the selected reporting period.
-              </p>
+        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-4 shadow-lg shadow-black/10 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-medium text-white">
+              Reporting period
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              {RANGE_OPTIONS.map((option) => {
-                const active = range === option.key;
-
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => setRange(option.key)}
-                    className={`rounded-xl border px-3 py-2 text-sm transition ${
-                      active
-                        ? "border-sky-300/30 bg-sky-300/15 text-sky-100"
-                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+            <div className="mt-1 text-xs text-white/40">
+              Partner count is all-time. Traffic and conversion
+              metrics use the selected period.
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {RANGE_OPTIONS.map((option) => {
+              const active = range === option.key;
+
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setRange(option.key)}
+                  className={`rounded-xl border px-3.5 py-2 text-sm font-medium transition ${
+                    active
+                      ? "border-sky-300/30 bg-sky-300/15 text-sky-100 shadow-sm"
+                      : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -494,9 +652,15 @@ export default function ReferralDashboardClient() {
           </div>
         ) : null}
 
+        {createSuccess ? (
+          <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+            {createSuccess}
+          </div>
+        ) : null}
+
         {loading && !data ? (
           <div className={`${card} p-8 text-center text-white/55`}>
-            Loading referral data…
+            Loading referral data...
           </div>
         ) : (
           <>
@@ -508,7 +672,7 @@ export default function ReferralDashboardClient() {
               />
 
               <StatCard
-                label="Clicks"
+                label="Referral clicks"
                 value={totals?.clicks ?? 0}
                 subtext="Tracked referral-link visits"
               />
@@ -527,6 +691,7 @@ export default function ReferralDashboardClient() {
                 label="Paid customers"
                 value={totals?.paidCustomers ?? 0}
                 subtext="Active Stripe subscriptions"
+                emphasis
               />
 
               <StatCard
@@ -536,349 +701,311 @@ export default function ReferralDashboardClient() {
                     ? percent(totals.paidConversion)
                     : "0%"
                 }
-                subtext="Sign-up → currently paid"
+                subtext="Sign-up to currently paid"
+                emphasis
               />
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-[1.05fr_1.95fr]">
+            <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
               <div className={`${card} p-6`}>
                 <div>
-                  <h2 className="text-lg font-semibold">
-                    Create referral partner
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                    Acquisition
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold">
+                    Referral funnel
                   </h2>
-                  <p className="mt-1 text-sm text-white/55">
-                    This creates a first-party tracked link with a
-                    30-day first-touch attribution window.
+                  <p className="mt-1 text-sm text-white/50">
+                    How partner traffic is progressing from
+                    referral visit to currently paid customer.
                   </p>
                 </div>
 
-                <form
-                  onSubmit={createPartner}
-                  className="mt-6 space-y-4"
-                >
-                  {createError ? (
-                    <div className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
-                      {createError}
+                <div className="mt-6 flex flex-col gap-2 md:flex-row md:items-stretch">
+                  <FunnelStep
+                    label="Clicks"
+                    value={totals?.clicks ?? 0}
+                    helper="Referral visits"
+                  />
+
+                  <FunnelArrow
+                    label={
+                      totals
+                        ? percent(totals.signupConversion)
+                        : "0%"
+                    }
+                  />
+
+                  <FunnelStep
+                    label="Sign-ups"
+                    value={totals?.signups ?? 0}
+                    helper="Attributed organisations"
+                  />
+
+                  <FunnelArrow
+                    label={
+                      totals
+                        ? percent(totals.paidConversion)
+                        : "0%"
+                    }
+                  />
+
+                  <FunnelStep
+                    label="Paid"
+                    value={totals?.paidCustomers ?? 0}
+                    helper="Active subscriptions"
+                    emphasis
+                  />
+                </div>
+
+                <div className="mt-5 rounded-xl border border-white/10 bg-black/10 px-4 py-3 text-xs leading-5 text-white/40">
+                  Attribution uses a 30-day first-touch window.
+                  Current paid status is derived from Stripe
+                  billing records.
+                </div>
+              </div>
+
+              <div className={`${card} p-6`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                      Customers
                     </div>
-                  ) : null}
-
-                  {createSuccess ? (
-                    <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100">
-                      {createSuccess}
-                    </div>
-                  ) : null}
-
-                  <div>
-                    <label className="text-sm font-medium">
-                      Partner name
-                    </label>
-                    <input
-                      value={form.name}
-                      onChange={(event) =>
-                        handleNameChange(event.target.value)
-                      }
-                      required
-                      placeholder="e.g. Coach Network"
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm outline-none focus:border-sky-300/40"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={form.email}
-                      onChange={(event) =>
-                        updateForm(
-                          "email",
-                          event.target.value
-                        )
-                      }
-                      placeholder="Optional"
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-sm outline-none focus:border-sky-300/40"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">
-                      Referral code
-                    </label>
-                    <input
-                      value={form.code}
-                      onChange={(event) =>
-                        updateForm(
-                          "code",
-                          normaliseCode(event.target.value)
-                        )
-                      }
-                      required
-                      placeholder="coach-network"
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 font-mono text-sm outline-none focus:border-sky-300/40"
-                    />
-                    <p className="mt-1 text-xs text-white/40">
-                      Link:{" "}
-                      <span className="font-mono">
-                        {origin || "https://profiletest.ai"}/r/
-                        {form.code || "partner-code"}
-                      </span>
+                    <h2 className="mt-1 text-lg font-semibold">
+                      Paid plan mix
+                    </h2>
+                    <p className="mt-1 text-sm text-white/50">
+                      Current plan distribution for referred
+                      customers with an active subscription.
                     </p>
                   </div>
 
-                  <div>
-                    <label className="text-sm font-medium">
-                      Destination
-                    </label>
-                    <input
-                      value={form.destination_path}
-                      onChange={(event) =>
-                        updateForm(
-                          "destination_path",
-                          event.target.value
-                        )
-                      }
-                      required
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 font-mono text-sm outline-none focus:border-sky-300/40"
-                    />
-                    <p className="mt-1 text-xs text-white/40">
-                      Internal MindCanvas path only.
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={creating}
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-4 py-2.5 text-sm font-medium shadow transition hover:brightness-110 disabled:opacity-60"
-                  >
-                    {creating
-                      ? "Creating…"
-                      : "Create referral link"}
-                  </button>
-                </form>
-              </div>
-
-              <div className={`${card} overflow-hidden`}>
-                <div className="border-b border-white/10 px-6 py-5">
-                  <h2 className="text-lg font-semibold">
-                    Partner performance
-                  </h2>
-                  <p className="mt-1 text-sm text-white/55">
-                    Traffic and conversion performance for the
-                    selected period.
-                  </p>
-                </div>
-
-                {copyMessage ? (
-                  <div className="border-b border-sky-300/15 bg-sky-300/10 px-6 py-2 text-xs text-sky-100">
-                    {copyMessage}
-                  </div>
-                ) : null}
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-white/40">
-                      <tr>
-                        <th className="px-6 py-3 font-medium">
-                          Partner
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Clicks
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Sign-ups
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Paid
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Sign-up %
-                        </th>
-                        <th className="px-4 py-3 text-right font-medium">
-                          Paid %
-                        </th>
-                        <th className="px-6 py-3 text-right font-medium">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {(data?.partners ?? []).map((partner) => (
-                        <tr
-                          key={partner.id}
-                          className="border-b border-white/5 last:border-0"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium">
-                                {partner.name}
-                              </span>
-                              <StatusPill
-                                status={partner.status}
-                              />
-                            </div>
-
-                            <div className="mt-1 text-xs text-white/45">
-                              {partner.email || "No email"}
-                            </div>
-
-                            <div className="mt-1 font-mono text-xs text-sky-200/80">
-                              /r/{partner.code}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-4 text-right">
-                            {partner.clicks}
-                          </td>
-
-                          <td className="px-4 py-4 text-right">
-                            {partner.signups}
-                          </td>
-
-                          <td className="px-4 py-4 text-right">
-                            {partner.paidCustomers}
-                          </td>
-
-                          <td className="px-4 py-4 text-right">
-                            {percent(
-                              partner.signupConversion
-                            )}
-                          </td>
-
-                          <td className="px-4 py-4 text-right">
-                            {percent(
-                              partner.paidConversion
-                            )}
-                          </td>
-
-                          <td className="px-6 py-4">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  copyReferralLink(
-                                    partner.code
-                                  )
-                                }
-                                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs transition hover:bg-white/10"
-                              >
-                                Copy link
-                              </button>
-
-                              <button
-                                type="button"
-                                disabled={
-                                  changingPartnerId ===
-                                  partner.id
-                                }
-                                onClick={() =>
-                                  changePartnerStatus(
-                                    partner
-                                  )
-                                }
-                                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
-                              >
-                                {changingPartnerId ===
-                                partner.id
-                                  ? "Saving…"
-                                  : partner.status ===
-                                    "active"
-                                  ? "Pause"
-                                  : "Reactivate"}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-
-                      {(data?.partners ?? []).length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={7}
-                            className="px-6 py-10 text-center text-white/45"
-                          >
-                            No referral partners yet.
-                          </td>
-                        </tr>
-                      ) : null}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
-
-            <section className={`${card} p-6`}>
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    Paid plan mix
-                  </h2>
-                  <p className="mt-1 text-sm text-white/55">
-                    Current plan distribution across referred
-                    customers with an active Stripe subscription.
-                  </p>
-                </div>
-
-                <div className="text-sm text-white/45">
-                  {planMixTotal} currently paid
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-white/10 bg-black/10 p-4">
-                  <div className="text-xs text-white/45">
-                    Starter
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {totals?.planMix.starter ?? 0}
+                  <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/50">
+                    {planMixTotal} currently paid
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-black/10 p-4">
-                  <div className="text-xs text-white/45">
-                    Pro
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {totals?.planMix.pro ?? 0}
-                  </div>
-                </div>
+                <div className="mt-6 space-y-4">
+                  {planMixRows.map((row) => {
+                    const share =
+                      planMixTotal > 0
+                        ? (row.value / planMixTotal) * 100
+                        : 0;
 
-                <div className="rounded-xl border border-white/10 bg-black/10 p-4">
-                  <div className="text-xs text-white/45">
-                    Growth
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {totals?.planMix.growth ?? 0}
-                  </div>
-                </div>
+                    return (
+                      <div key={row.label}>
+                        <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                          <span className="text-white/70">
+                            {row.label}
+                          </span>
+                          <span className="font-medium text-white">
+                            {row.value}
+                          </span>
+                        </div>
 
-                <div className="rounded-xl border border-white/10 bg-black/10 p-4">
-                  <div className="text-xs text-white/45">
-                    Enterprise
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {totals?.planMix.enterprise ?? 0}
-                  </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#64bae2] to-[#2d8fc4] transition-all"
+                            style={{
+                              width: `${share}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </section>
 
             <section className={`${card} overflow-hidden`}>
-              <div className="border-b border-white/10 px-6 py-5">
-                <h2 className="text-lg font-semibold">
-                  Referred customer conversions
-                </h2>
-                <p className="mt-1 text-sm text-white/55">
-                  Original plan at sign-up alongside the
-                  organisation&apos;s current plan and billing
-                  state.
-                </p>
+              <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                    Partners
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold">
+                    Partner performance
+                  </h2>
+                  <p className="mt-1 text-sm text-white/50">
+                    Traffic, sign-up and paid conversion performance
+                    for the selected reporting period.
+                  </p>
+                </div>
+
+                <div className="text-xs text-white/40">
+                  {(data?.partners ?? []).length} partner
+                  {(data?.partners ?? []).length === 1
+                    ? ""
+                    : "s"}
+                </div>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-white/10 text-xs uppercase tracking-wider text-white/40">
+                  <thead className="border-b border-white/10 bg-black/[0.08] text-[11px] uppercase tracking-[0.14em] text-white/35">
+                    <tr>
+                      <th className="px-6 py-3 font-medium">
+                        Partner
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Clicks
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Sign-ups
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Paid
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Sign-up %
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Paid %
+                      </th>
+                      <th className="px-6 py-3 text-right font-medium">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {(data?.partners ?? []).map((partner) => (
+                      <tr
+                        key={partner.id}
+                        className="border-b border-white/5 transition last:border-0 hover:bg-white/[0.025]"
+                      >
+                        <td className="px-6 py-5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-white">
+                              {partner.name}
+                            </span>
+                            <StatusPill
+                              status={partner.status}
+                            />
+                          </div>
+
+                          <div className="mt-1 text-xs text-white/40">
+                            {partner.email || "No email"}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              copyReferralLink(
+                                partner.code
+                              )
+                            }
+                            className="mt-2 inline-flex items-center rounded-lg border border-sky-300/10 bg-sky-300/[0.05] px-2.5 py-1 font-mono text-xs text-sky-200/80 transition hover:bg-sky-300/10"
+                            title="Copy referral link"
+                          >
+                            /r/{partner.code}
+                          </button>
+                        </td>
+
+                        <td className="px-4 py-5 text-right text-white/80">
+                          {partner.clicks}
+                        </td>
+
+                        <td className="px-4 py-5 text-right text-white/80">
+                          {partner.signups}
+                        </td>
+
+                        <td className="px-4 py-5 text-right font-medium text-white">
+                          {partner.paidCustomers}
+                        </td>
+
+                        <td className="px-4 py-5 text-right text-white/70">
+                          {percent(
+                            partner.signupConversion
+                          )}
+                        </td>
+
+                        <td className="px-4 py-5 text-right font-medium text-sky-100">
+                          {percent(
+                            partner.paidConversion
+                          )}
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                copyReferralLink(
+                                  partner.code
+                                )
+                              }
+                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+                            >
+                              Copy link
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                changingPartnerId ===
+                                partner.id
+                              }
+                              onClick={() =>
+                                changePartnerStatus(
+                                  partner
+                                )
+                              }
+                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                            >
+                              {changingPartnerId ===
+                              partner.id
+                                ? "Saving..."
+                                : partner.status ===
+                                    "active"
+                                  ? "Pause"
+                                  : "Reactivate"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {(data?.partners ?? []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="px-6 py-12 text-center text-white/40"
+                        >
+                          No referral partners yet.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className={`${card} overflow-hidden`}>
+              <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                    Conversions
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold">
+                    Referred customer conversions
+                  </h2>
+                  <p className="mt-1 text-sm text-white/50">
+                    Original plan at sign-up alongside the
+                    organisation&apos;s current plan and billing
+                    state.
+                  </p>
+                </div>
+
+                <div className="text-xs text-white/40">
+                  {(data?.conversions ?? []).length} in period
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-white/10 bg-black/[0.08] text-[11px] uppercase tracking-[0.14em] text-white/35">
                     <tr>
                       <th className="px-6 py-3 font-medium">
                         Organisation
@@ -906,37 +1033,41 @@ export default function ReferralDashboardClient() {
                       (conversion) => (
                         <tr
                           key={conversion.id}
-                          className="border-b border-white/5 last:border-0"
+                          className="border-b border-white/5 transition last:border-0 hover:bg-white/[0.025]"
                         >
-                          <td className="px-6 py-4">
-                            <div className="font-medium">
+                          <td className="px-6 py-5">
+                            <div className="font-medium text-white">
                               {conversion.orgName}
                             </div>
-                            <div className="mt-1 text-xs text-white/40">
+                            <div className="mt-1 text-xs text-white/35">
                               {conversion.orgSlug ||
                                 conversion.orgId}
                             </div>
                           </td>
 
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-5 text-white/75">
                             {conversion.partnerName}
                           </td>
 
-                          <td className="px-5 py-4 text-white/70">
+                          <td className="px-5 py-5 text-white/55">
                             {formatDate(
                               conversion.signupAt
                             )}
                           </td>
 
-                          <td className="px-5 py-4">
-                            {conversion.signupPlan}
+                          <td className="px-5 py-5">
+                            <span className="inline-flex rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70">
+                              {conversion.signupPlan}
+                            </span>
                           </td>
 
-                          <td className="px-5 py-4">
-                            {conversion.currentPlan}
+                          <td className="px-5 py-5">
+                            <span className="inline-flex rounded-lg border border-sky-300/10 bg-sky-300/[0.05] px-2.5 py-1 text-xs text-sky-100/80">
+                              {conversion.currentPlan}
+                            </span>
                           </td>
 
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-5">
                             <PaymentPill
                               state={
                                 conversion.paymentState
@@ -954,7 +1085,7 @@ export default function ReferralDashboardClient() {
                       <tr>
                         <td
                           colSpan={6}
-                          className="px-6 py-10 text-center text-white/45"
+                          className="px-6 py-12 text-center text-white/40"
                         >
                           No attributed sign-ups in this reporting
                           period.
@@ -968,6 +1099,170 @@ export default function ReferralDashboardClient() {
           </>
         )}
       </div>
+
+      {copyMessage ? (
+        <div className="fixed bottom-6 left-1/2 z-50 max-w-[calc(100vw-3rem)] -translate-x-1/2 rounded-xl border border-sky-300/20 bg-[#0b1724] px-4 py-3 text-center text-xs text-sky-100 shadow-2xl shadow-black/40">
+          {copyMessage}
+        </div>
+      ) : null}
+
+      {showCreateModal ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/65 px-4 py-8 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-referral-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeCreateModal();
+            }
+          }}
+        >
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#0b1724] shadow-2xl shadow-black/50">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+              <div>
+                <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                  Referral partner
+                </div>
+                <h2
+                  id="create-referral-title"
+                  className="mt-1 text-xl font-semibold text-white"
+                >
+                  Create referral partner
+                </h2>
+                <p className="mt-1 text-sm leading-5 text-white/50">
+                  Create a tracked MindCanvas link with a 30-day
+                  first-touch attribution window.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeCreateModal}
+                disabled={creating}
+                aria-label="Close create referral partner"
+                className="rounded-lg border border-white/10 bg-white/5 p-2 text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <form
+              onSubmit={createPartner}
+              className="space-y-5 px-6 py-6"
+            >
+              {createError ? (
+                <div className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
+                  {createError}
+                </div>
+              ) : null}
+
+              <div>
+                <label className="text-sm font-medium text-white/80">
+                  Partner name
+                </label>
+                <input
+                  value={form.name}
+                  onChange={(event) =>
+                    handleNameChange(event.target.value)
+                  }
+                  required
+                  placeholder="e.g. Coach Network"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white/80">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(event) =>
+                    updateForm(
+                      "email",
+                      event.target.value
+                    )
+                  }
+                  placeholder="Optional"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white/80">
+                  Referral code
+                </label>
+                <input
+                  value={form.code}
+                  onChange={(event) =>
+                    updateForm(
+                      "code",
+                      normaliseCode(
+                        event.target.value
+                      )
+                    )
+                  }
+                  required
+                  placeholder="coach-network"
+                  className={`${inputClass} font-mono`}
+                />
+
+                <div className="mt-2 rounded-xl border border-sky-300/10 bg-sky-300/[0.05] px-3 py-2.5">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-white/35">
+                    Link preview
+                  </div>
+                  <div className="mt-1 break-all font-mono text-xs text-sky-100/75">
+                    {`${origin || "https://profiletest.ai"}/r/${form.code || "partner-code"}`}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-white/80">
+                  Destination
+                </label>
+                <input
+                  value={form.destination_path}
+                  onChange={(event) =>
+                    updateForm(
+                      "destination_path",
+                      event.target.value
+                    )
+                  }
+                  required
+                  className={`${inputClass} font-mono`}
+                />
+                <p className="mt-1.5 text-xs text-white/35">
+                  Internal MindCanvas path only.
+                </p>
+              </div>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  disabled={creating}
+                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-sky-950/20 transition hover:brightness-110 disabled:opacity-60"
+                >
+                  {creating
+                    ? "Creating..."
+                    : "Create referral partner"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
