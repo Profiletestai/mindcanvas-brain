@@ -29,10 +29,16 @@ type RouteContext = {
   }>;
 };
 
-type ReferralPartner = {
+type ReferralLink = {
   id: string;
+  partner_id: string;
   code: string;
   destination_path: string | null;
+  status: string;
+};
+
+type ReferralPartner = {
+  id: string;
   status: string;
 };
 
@@ -130,26 +136,59 @@ export async function GET(
     const portal = portalAdmin();
 
     // -------------------------------------------------------
-    // Resolve an active referral partner.
+    // Resolve the exact active referral link.
     //
-    // Paused / invalid referral links still send the visitor
-    // into normal onboarding, but they do not receive credit.
+    // A partner can now own multiple links/campaigns while
+    // preserving the public /r/{code} URL format.
+    // -------------------------------------------------------
+    const {
+      data: link,
+      error: linkError,
+    } = await portal
+      .from("referral_links")
+      .select(
+        "id, partner_id, code, destination_path, status"
+      )
+      .eq("code", code)
+      .eq("status", "active")
+      .maybeSingle<ReferralLink>();
+
+    if (linkError) {
+      console.error(
+        `[referral] link lookup failed code=${code}`,
+        linkError
+      );
+
+      return redirectResponse(
+        request,
+        fallback
+      );
+    }
+
+    if (!link?.id || !link.partner_id) {
+      return redirectResponse(
+        request,
+        fallback
+      );
+    }
+
+    // -------------------------------------------------------
+    // The link may be active while the whole partner is
+    // paused. Partner status acts as the global kill switch.
     // -------------------------------------------------------
     const {
       data: partner,
       error: partnerError,
     } = await portal
       .from("referral_partners")
-      .select(
-        "id, code, destination_path, status"
-      )
-      .eq("code", code)
+      .select("id, status")
+      .eq("id", link.partner_id)
       .eq("status", "active")
       .maybeSingle<ReferralPartner>();
 
     if (partnerError) {
       console.error(
-        `[referral] partner lookup failed code=${code}`,
+        `[referral] partner lookup failed partner=${link.partner_id} code=${code}`,
         partnerError
       );
 
@@ -168,14 +207,14 @@ export async function GET(
 
     const destinationPath =
       safeReferralDestination(
-        partner.destination_path
+        link.destination_path
       );
 
     // -------------------------------------------------------
     // First-touch attribution.
     //
     // If the visitor already has a valid referral cookie,
-    // another partner must NOT overwrite it.
+    // another link/partner must NOT overwrite it.
     //
     // We still record the new click for traffic reporting.
     // -------------------------------------------------------
@@ -193,7 +232,8 @@ export async function GET(
       !alreadyAttributed;
 
     // -------------------------------------------------------
-    // Record this click.
+    // Record this click against both the partner and the exact
+    // referral link.
     // -------------------------------------------------------
     const {
       data: click,
@@ -202,6 +242,7 @@ export async function GET(
       .from("referral_clicks")
       .insert({
         partner_id: partner.id,
+        link_id: link.id,
         destination_path:
           destinationPath,
         is_first_touch:
@@ -212,7 +253,7 @@ export async function GET(
 
     if (clickError || !click?.id) {
       console.error(
-        `[referral] click insert failed partner=${partner.id} code=${code}`,
+        `[referral] click insert failed partner=${partner.id} link=${link.id} code=${code}`,
         clickError
       );
 

@@ -779,10 +779,52 @@ export async function POST(req: Request) {
       );
     }
 
+    const createdPartner =
+      partner as unknown as ReferralPartner;
+
+    // During the migration to multi-link referrals, every new partner
+    // receives one Primary link using the existing code/destination.
+    // This preserves the current dashboard contract while allowing
+    // additional links to be added from the Partner Profile later.
+    const {
+      error: primaryLinkError,
+    } = await portal
+      .from("referral_links")
+      .insert({
+        partner_id: createdPartner.id,
+        name: "Primary link",
+        code,
+        destination_path: destinationPath,
+        status,
+        created_by: userId,
+      });
+
+    if (primaryLinkError) {
+      // Avoid leaving an unusable partner row behind if its Primary
+      // link cannot be created.
+      await portal
+        .from("referral_partners")
+        .delete()
+        .eq("id", createdPartner.id);
+
+      if (primaryLinkError.code === "23505") {
+        return jsonError(
+          "That referral code is already in use.",
+          409
+        );
+      }
+
+      return jsonError(
+        primaryLinkError.message ||
+          "Could not create the referral link.",
+        500
+      );
+    }
+
     return NextResponse.json(
       {
         ok: true,
-        partner,
+        partner: createdPartner,
       },
       {
         status: 201,
@@ -871,9 +913,33 @@ export async function PATCH(req: Request) {
       );
     }
 
+    const updatedPartner =
+      partner as unknown as ReferralPartner;
+
+    // The current dashboard Pause/Reactivate action is partner-level.
+    // Keep the original Primary link aligned with that action while
+    // future secondary links retain their own independent status.
+    const {
+      error: primaryLinkError,
+    } = await portal
+      .from("referral_links")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("partner_id", partnerId)
+      .eq("code", updatedPartner.code);
+
+    if (primaryLinkError) {
+      return jsonError(
+        primaryLinkError.message,
+        500
+      );
+    }
+
     return NextResponse.json({
       ok: true,
-      partner,
+      partner: updatedPartner,
     });
   } catch (error) {
     const message =
