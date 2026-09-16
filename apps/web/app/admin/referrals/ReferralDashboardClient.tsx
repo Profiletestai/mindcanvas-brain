@@ -107,18 +107,25 @@ const RANGE_OPTIONS: {
 ];
 
 const card =
-  "rounded-2xl border border-white/10 bg-white/[0.045] shadow-lg shadow-black/10";
+  "rounded-2xl border border-slate-200 bg-white shadow-sm";
 
 const inputClass =
-  "mt-1.5 w-full rounded-xl border border-white/10 bg-[#07111f]/80 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/40 focus:ring-2 focus:ring-sky-300/10";
+  "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-100";
 
 function percent(value: number) {
-  if (!Number.isFinite(value)) return "0%";
+  if (!Number.isFinite(value)) {
+    return "0%";
+  }
+
   return `${Math.round(value * 100)}%`;
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
+function formatDate(
+  value: string | null | undefined
+) {
+  if (!value) {
+    return "-";
+  }
 
   const date = new Date(value);
 
@@ -152,18 +159,20 @@ function PaymentPill({
 }) {
   const classes =
     state === "paid"
-      ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
       : state === "trial"
-        ? "border-sky-300/25 bg-sky-300/10 text-sky-200"
+        ? "border-sky-200 bg-sky-50 text-sky-700"
         : state === "overdue"
-          ? "border-red-300/25 bg-red-300/10 text-red-200"
+          ? "border-red-200 bg-red-50 text-red-700"
           : state === "setup_required"
-            ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
+            ? "border-amber-200 bg-amber-50 text-amber-700"
             : state === "paused"
-              ? "border-amber-300/25 bg-amber-300/10 text-amber-200"
+              ? "border-amber-200 bg-amber-50 text-amber-700"
               : state === "complimentary"
-                ? "border-violet-300/25 bg-violet-300/10 text-violet-200"
-                : "border-white/10 bg-white/5 text-white/60";
+                ? "border-violet-200 bg-violet-50 text-violet-700"
+                : state === "cancelled"
+                  ? "border-slate-200 bg-slate-100 text-slate-600"
+                  : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
     <span
@@ -181,8 +190,8 @@ function StatusPill({
 }) {
   const classes =
     status === "active"
-      ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200"
-      : "border-amber-300/20 bg-amber-300/10 text-amber-200";
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : "border-amber-200 bg-amber-50 text-amber-700";
 
   return (
     <span
@@ -207,23 +216,23 @@ function StatCard({
   return (
     <div
       className={`${card} relative overflow-hidden p-5 ${
-        emphasis ? "border-sky-300/20" : ""
+        emphasis ? "border-sky-200" : ""
       }`}
     >
       {emphasis ? (
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/70 to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-1 bg-sky-500" />
       ) : null}
 
-      <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         {label}
       </div>
 
-      <div className="mt-2 text-3xl font-semibold tracking-tight text-white">
+      <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
         {value}
       </div>
 
       {subtext ? (
-        <div className="mt-2 text-xs leading-5 text-white/45">
+        <div className="mt-2 text-xs leading-5 text-slate-500">
           {subtext}
         </div>
       ) : null}
@@ -246,17 +255,19 @@ function FunnelStep({
     <div
       className={`flex-1 rounded-2xl border px-5 py-4 ${
         emphasis
-          ? "border-sky-300/20 bg-sky-300/[0.07]"
-          : "border-white/10 bg-black/10"
+          ? "border-sky-200 bg-sky-50"
+          : "border-slate-200 bg-slate-50"
       }`}
     >
-      <div className="text-[11px] uppercase tracking-[0.16em] text-white/40">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
         {label}
       </div>
-      <div className="mt-2 text-3xl font-semibold text-white">
+
+      <div className="mt-2 text-3xl font-semibold text-slate-950">
         {value}
       </div>
-      <div className="mt-1 text-xs text-white/45">
+
+      <div className="mt-1 text-xs text-slate-500">
         {helper}
       </div>
     </div>
@@ -269,8 +280,9 @@ function FunnelArrow({
   label: string;
 }) {
   return (
-    <div className="flex shrink-0 items-center justify-center gap-2 px-1 py-1 text-xs text-sky-200/75 md:flex-col md:px-2">
+    <div className="flex shrink-0 items-center justify-center gap-2 px-1 py-1 text-xs text-sky-700 md:flex-col md:px-2">
       <span className="font-medium">{label}</span>
+
       <svg
         width="18"
         height="18"
@@ -329,99 +341,221 @@ function PlusIcon() {
   );
 }
 
+function ArrowIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M5 12h14M14 7l5 5-5 5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function WorkflowCard({
+  eyebrow,
+  title,
+  description,
+  href,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
+    >
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        {eyebrow}
+      </div>
+
+      <h3 className="mt-2 text-base font-semibold text-slate-950">
+        {title}
+      </h3>
+
+      <p className="mt-2 text-sm leading-6 text-slate-500">
+        {description}
+      </p>
+
+      <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-sky-700">
+        {action}
+        <ArrowIcon />
+      </div>
+    </Link>
+  );
+}
+
 export default function ReferralDashboardClient() {
-  const [range, setRange] = useState<RangeKey>("30d");
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [range, setRange] =
+    useState<RangeKey>("30d");
+
+  const [data, setData] =
+    useState<Payload | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState("");
+
   const [form, setForm] =
-    useState<CreatePartnerForm>(EMPTY_FORM);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [createSuccess, setCreateSuccess] = useState("");
-  const [showCreateModal, setShowCreateModal] =
+    useState<CreatePartnerForm>(
+      EMPTY_FORM
+    );
+
+  const [creating, setCreating] =
     useState(false);
-  const [changingPartnerId, setChangingPartnerId] =
-    useState<string | null>(null);
-  const [copyMessage, setCopyMessage] = useState("");
-  const [origin, setOrigin] = useState("");
+
+  const [createError, setCreateError] =
+    useState("");
+
+  const [createSuccess, setCreateSuccess] =
+    useState("");
+
+  const [
+    showCreateModal,
+    setShowCreateModal,
+  ] = useState(false);
+
+  const [
+    changingPartnerId,
+    setChangingPartnerId,
+  ] = useState<string | null>(null);
+
+  const [copyMessage, setCopyMessage] =
+    useState("");
+
+  const [origin, setOrigin] =
+    useState("");
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    setOrigin(
+      window.location.origin
+    );
   }, []);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setLoadError("");
+  const load =
+    useCallback(
+      async () => {
+        try {
+          setLoading(true);
+          setLoadError("");
 
-      const response = await fetch(
-        `/api/admin/referrals?range=${range}`,
-        {
-          cache: "no-store",
+          const response =
+            await fetch(
+              `/api/admin/referrals?range=${range}`,
+              {
+                cache:
+                  "no-store",
+              }
+            );
+
+          const json =
+            await response.json();
+
+          if (
+            !response.ok ||
+            json?.ok === false
+          ) {
+            throw new Error(
+              json?.error ||
+                `HTTP ${response.status}`
+            );
+          }
+
+          setData(
+            json as Payload
+          );
+        } catch (
+          error
+        ) {
+          setData(null);
+
+          setLoadError(
+            error instanceof
+              Error
+              ? error.message
+              : "Could not load referral data."
+          );
+        } finally {
+          setLoading(false);
         }
-      );
-
-      const json = await response.json();
-
-      if (!response.ok || json?.ok === false) {
-        throw new Error(
-          json?.error || `HTTP ${response.status}`
-        );
-      }
-
-      setData(json as Payload);
-    } catch (error) {
-      setData(null);
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Could not load referral data."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [range]);
+      },
+      [range]
+    );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const totals = data?.totals;
+  const totals =
+    data?.totals;
 
-  const planMixTotal = useMemo(() => {
-    if (!totals) return 0;
+  const planMixTotal =
+    useMemo(() => {
+      if (!totals) {
+        return 0;
+      }
 
-    return (
-      totals.planMix.starter +
-      totals.planMix.pro +
-      totals.planMix.growth +
-      totals.planMix.enterprise
-    );
-  }, [totals]);
+      return (
+        totals.planMix
+          .starter +
+        totals.planMix.pro +
+        totals.planMix
+          .growth +
+        totals.planMix
+          .enterprise
+      );
+    }, [totals]);
 
-  const planMixRows = useMemo(() => {
-    return [
-      {
-        label: "Starter",
-        value: totals?.planMix.starter ?? 0,
-      },
-      {
-        label: "Pro",
-        value: totals?.planMix.pro ?? 0,
-      },
-      {
-        label: "Growth",
-        value: totals?.planMix.growth ?? 0,
-      },
-      {
-        label: "Enterprise",
-        value: totals?.planMix.enterprise ?? 0,
-      },
-    ];
-  }, [totals]);
+  const planMixRows =
+    useMemo(() => {
+      return [
+        {
+          label: "Starter",
+          value:
+            totals?.planMix
+              .starter ?? 0,
+        },
+        {
+          label: "Pro",
+          value:
+            totals?.planMix
+              .pro ?? 0,
+        },
+        {
+          label: "Growth",
+          value:
+            totals?.planMix
+              .growth ?? 0,
+        },
+        {
+          label: "Enterprise",
+          value:
+            totals?.planMix
+              .enterprise ??
+            0,
+        },
+      ];
+    }, [totals]);
 
-  function updateForm<K extends keyof CreatePartnerForm>(
+  function updateForm<
+    K extends keyof CreatePartnerForm
+  >(
     key: K,
     value: CreatePartnerForm[K]
   ) {
@@ -431,13 +565,18 @@ export default function ReferralDashboardClient() {
     }));
   }
 
-  function handleNameChange(value: string) {
+  function handleNameChange(
+    value: string
+  ) {
     setForm((current) => ({
       ...current,
       name: value,
       code:
-        current.code.length === 0
-          ? normaliseCode(value)
+        current.code
+          .length === 0
+          ? normaliseCode(
+              value
+            )
           : current.code,
     }));
   }
@@ -450,12 +589,17 @@ export default function ReferralDashboardClient() {
   }
 
   function closeCreateModal() {
-    if (creating) return;
+    if (creating) {
+      return;
+    }
+
     setShowCreateModal(false);
     setCreateError("");
   }
 
-  async function createPartner(event: FormEvent) {
+  async function createPartner(
+    event: FormEvent
+  ) {
     event.preventDefault();
 
     setCreating(true);
@@ -463,29 +607,41 @@ export default function ReferralDashboardClient() {
     setCreateSuccess("");
 
     try {
-      const partnerName = form.name;
+      const partnerName =
+        form.name;
 
-      const response = await fetch(
-        "/api/admin/referrals",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: form.name,
-            email: form.email,
-            code: form.code,
-            destination_path:
-              form.destination_path,
-            status: "active",
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/admin/referrals",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                name:
+                  form.name,
+                email:
+                  form.email,
+                code:
+                  form.code,
+                destination_path:
+                  form.destination_path,
+                status:
+                  "active",
+              }),
+          }
+        );
 
-      const json = await response.json();
+      const json =
+        await response.json();
 
-      if (!response.ok || json?.ok === false) {
+      if (
+        !response.ok ||
+        json?.ok === false
+      ) {
         throw new Error(
           json?.error ||
             "Could not create referral partner."
@@ -495,8 +651,10 @@ export default function ReferralDashboardClient() {
       setCreateSuccess(
         `Referral partner "${partnerName}" created.`
       );
+
       setForm(EMPTY_FORM);
       setShowCreateModal(false);
+
       await load();
     } catch (error) {
       setCreateError(
@@ -513,31 +671,44 @@ export default function ReferralDashboardClient() {
     partner: PartnerRow
   ) {
     const nextStatus =
-      partner.status === "active"
+      partner.status ===
+      "active"
         ? "paused"
         : "active";
 
-    setChangingPartnerId(partner.id);
+    setChangingPartnerId(
+      partner.id
+    );
+
     setLoadError("");
 
     try {
-      const response = await fetch(
-        "/api/admin/referrals",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            partner_id: partner.id,
-            status: nextStatus,
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/admin/referrals",
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                partner_id:
+                  partner.id,
+                status:
+                  nextStatus,
+              }),
+          }
+        );
 
-      const json = await response.json();
+      const json =
+        await response.json();
 
-      if (!response.ok || json?.ok === false) {
+      if (
+        !response.ok ||
+        json?.ok === false
+      ) {
         throw new Error(
           json?.error ||
             "Could not update referral partner."
@@ -552,60 +723,86 @@ export default function ReferralDashboardClient() {
           : "Could not update referral partner."
       );
     } finally {
-      setChangingPartnerId(null);
+      setChangingPartnerId(
+        null
+      );
     }
   }
 
-  async function copyReferralLink(code: string) {
+  async function copyReferralLink(
+    code: string
+  ) {
     const base =
-      origin || "https://profiletest.ai";
+      origin ||
+      "https://profiletest.ai";
 
-    const link = `${base}/r/${code}`;
+    const link =
+      `${base}/r/${code}`;
 
     try {
-      await navigator.clipboard.writeText(link);
-      setCopyMessage(`Copied ${link}`);
+      await navigator
+        .clipboard
+        .writeText(link);
+
+      setCopyMessage(
+        `Copied ${link}`
+      );
     } catch {
       setCopyMessage(link);
     }
 
-    window.setTimeout(() => {
-      setCopyMessage("");
-    }, 3000);
+    window.setTimeout(
+      () => {
+        setCopyMessage("");
+      },
+      3000
+    );
   }
 
   return (
-    <div className="fixed inset-0 mc-bg overflow-auto text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-7 px-6 py-10">
         <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-white/45">
-              Admin - Commercial
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Admin · Commercial
             </div>
 
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
               Referral Tracking
             </h1>
 
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/60">
-              Track referral acquisition, attributed sign-ups
-              and paid conversion across MindCanvas partners.
-              Commission management remains manual in this MVP.
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              One place to move from
+              referral traffic, to a
+              partner&apos;s links and
+              customers, and then into
+              Stripe reconciliation and
+              exports.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/admin"
-              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-white/10"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
               Back to Admin
             </Link>
 
+            <Link
+              href="/admin/referrals/reconciliations"
+              className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-medium text-sky-700 shadow-sm transition hover:bg-sky-100"
+            >
+              Reconciliation & exports
+            </Link>
+
             <button
               type="button"
-              onClick={openCreateModal}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-sky-950/20 transition hover:brightness-110"
+              onClick={
+                openCreateModal
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700"
             >
               <PlusIcon />
               Create referral partner
@@ -613,53 +810,96 @@ export default function ReferralDashboardClient() {
           </div>
         </header>
 
-        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.035] px-5 py-4 shadow-lg shadow-black/10 sm:flex-row sm:items-center sm:justify-between">
+        <section className="grid gap-4 md:grid-cols-3">
+          <WorkflowCard
+            eyebrow="1 · Manage"
+            title="Partner records & links"
+            description="Open a partner to edit its internal record, create or pause individual referral links, inspect traffic and view attributed customers."
+            href="#partners"
+            action="Go to partners"
+          />
+
+          <WorkflowCard
+            eyebrow="2 · Verify"
+            title="Attributed customers"
+            description="Review referred organisations, original and current plans, and payment state. Jump straight back to the responsible partner record."
+            href="#conversions"
+            action="Go to conversions"
+          />
+
+          <WorkflowCard
+            eyebrow="3 · Reconcile"
+            title="Stripe reconciliation & exports"
+            description="Create an immutable period snapshot, then download the Partner Summary or customer-level Conversion Detail CSV."
+            href="/admin/referrals/reconciliations"
+            action="Open reconciliation"
+          />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-sm font-medium text-white">
+            <div className="text-sm font-medium text-slate-900">
               Reporting period
             </div>
-            <div className="mt-1 text-xs text-white/40">
-              Partner count is all-time. Traffic and conversion
-              metrics use the selected period.
+
+            <div className="mt-1 text-xs text-slate-500">
+              Partner count is all-time.
+              Traffic and conversion
+              metrics use the selected
+              period.
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {RANGE_OPTIONS.map((option) => {
-              const active = range === option.key;
+            {RANGE_OPTIONS.map(
+              (option) => {
+                const active =
+                  range ===
+                  option.key;
 
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setRange(option.key)}
-                  className={`rounded-xl border px-3.5 py-2 text-sm font-medium transition ${
-                    active
-                      ? "border-sky-300/30 bg-sky-300/15 text-sky-100 shadow-sm"
-                      : "border-white/10 bg-white/5 text-white/55 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={
+                      option.key
+                    }
+                    type="button"
+                    onClick={() =>
+                      setRange(
+                        option.key
+                      )
+                    }
+                    className={`rounded-xl border px-3.5 py-2 text-sm font-medium transition ${
+                      active
+                        ? "border-sky-200 bg-sky-50 text-sky-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {
+                      option.label
+                    }
+                  </button>
+                );
+              }
+            )}
           </div>
         </section>
 
         {loadError ? (
-          <div className="rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-100">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {loadError}
           </div>
         ) : null}
 
         {createSuccess ? (
-          <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
             {createSuccess}
           </div>
         ) : null}
 
         {loading && !data ? (
-          <div className={`${card} p-8 text-center text-white/55`}>
+          <div
+            className={`${card} p-8 text-center text-slate-500`}
+          >
             Loading referral data...
           </div>
         ) : (
@@ -667,29 +907,37 @@ export default function ReferralDashboardClient() {
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               <StatCard
                 label="Partners"
-                value={totals?.partners ?? 0}
+                value={
+                  totals?.partners ??
+                  0
+                }
                 subtext={`${totals?.activePartners ?? 0} active`}
               />
 
               <StatCard
                 label="Referral clicks"
-                value={totals?.clicks ?? 0}
+                value={
+                  totals?.clicks ??
+                  0
+                }
                 subtext="Tracked referral-link visits"
               />
 
               <StatCard
                 label="Sign-ups"
-                value={totals?.signups ?? 0}
-                subtext={`${
-                  totals
-                    ? percent(totals.signupConversion)
-                    : "0%"
-                } of clicks`}
+                value={
+                  totals?.signups ??
+                  0
+                }
+                subtext={`${totals ? percent(totals.signupConversion) : "0%"} of clicks`}
               />
 
               <StatCard
                 label="Paid customers"
-                value={totals?.paidCustomers ?? 0}
+                value={
+                  totals?.paidCustomers ??
+                  0
+                }
                 subtext="Active Stripe subscriptions"
                 emphasis
               />
@@ -698,7 +946,9 @@ export default function ReferralDashboardClient() {
                 label="Paid conversion"
                 value={
                   totals
-                    ? percent(totals.paidConversion)
+                    ? percent(
+                        totals.paidConversion
+                      )
                     : "0%"
                 }
                 subtext="Sign-up to currently paid"
@@ -707,228 +957,256 @@ export default function ReferralDashboardClient() {
             </section>
 
             <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-              <div className={`${card} p-6`}>
-                <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-                    Acquisition
-                  </div>
-                  <h2 className="mt-1 text-lg font-semibold">
-                    Referral funnel
-                  </h2>
-                  <p className="mt-1 text-sm text-white/50">
-                    How partner traffic is progressing from
-                    referral visit to currently paid customer.
-                  </p>
+              <div
+                className={`${card} p-6`}
+              >
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Acquisition
                 </div>
+
+                <h2 className="mt-1 text-lg font-semibold text-slate-950">
+                  Referral funnel
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  How partner traffic is
+                  moving from referral
+                  visit to currently paid
+                  customer.
+                </p>
 
                 <div className="mt-6 flex flex-col gap-2 md:flex-row md:items-stretch">
                   <FunnelStep
                     label="Clicks"
-                    value={totals?.clicks ?? 0}
+                    value={
+                      totals?.clicks ??
+                      0
+                    }
                     helper="Referral visits"
                   />
 
                   <FunnelArrow
                     label={
                       totals
-                        ? percent(totals.signupConversion)
+                        ? percent(
+                            totals.signupConversion
+                          )
                         : "0%"
                     }
                   />
 
                   <FunnelStep
                     label="Sign-ups"
-                    value={totals?.signups ?? 0}
+                    value={
+                      totals?.signups ??
+                      0
+                    }
                     helper="Attributed organisations"
                   />
 
                   <FunnelArrow
                     label={
                       totals
-                        ? percent(totals.paidConversion)
+                        ? percent(
+                            totals.paidConversion
+                          )
                         : "0%"
                     }
                   />
 
                   <FunnelStep
                     label="Paid"
-                    value={totals?.paidCustomers ?? 0}
+                    value={
+                      totals?.paidCustomers ??
+                      0
+                    }
                     helper="Active subscriptions"
                     emphasis
                   />
                 </div>
 
-                <div className="mt-5 rounded-xl border border-white/10 bg-black/10 px-4 py-3 text-xs leading-5 text-white/40">
-                  Attribution uses a 30-day first-touch window.
-                  Current paid status is derived from Stripe
+                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">
+                  Attribution uses a 30-day
+                  first-touch window.
+                  Current paid status is
+                  derived from Stripe
                   billing records.
                 </div>
               </div>
 
-              <div className={`${card} p-6`}>
+              <div
+                className={`${card} p-6`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                       Customers
                     </div>
-                    <h2 className="mt-1 text-lg font-semibold">
+
+                    <h2 className="mt-1 text-lg font-semibold text-slate-950">
                       Paid plan mix
                     </h2>
-                    <p className="mt-1 text-sm text-white/50">
-                      Current plan distribution for referred
-                      customers with an active subscription.
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Current plan
+                      distribution for
+                      referred customers
+                      with an active
+                      subscription.
                     </p>
                   </div>
 
-                  <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/50">
-                    {planMixTotal} currently paid
+                  <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500">
+                    {planMixTotal} currently
+                    paid
                   </div>
                 </div>
 
                 <div className="mt-6 space-y-4">
-                  {planMixRows.map((row) => {
-                    const share =
-                      planMixTotal > 0
-                        ? (row.value / planMixTotal) * 100
-                        : 0;
+                  {planMixRows.map(
+                    (row) => {
+                      const share =
+                        planMixTotal >
+                        0
+                          ? (row.value /
+                              planMixTotal) *
+                            100
+                          : 0;
 
-                    return (
-                      <div key={row.label}>
-                        <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
-                          <span className="text-white/70">
-                            {row.label}
-                          </span>
-                          <span className="font-medium text-white">
-                            {row.value}
-                          </span>
-                        </div>
+                      return (
+                        <div
+                          key={
+                            row.label
+                          }
+                        >
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
+                            <span className="text-slate-600">
+                              {
+                                row.label
+                              }
+                            </span>
 
-                        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-[#64bae2] to-[#2d8fc4] transition-all"
-                            style={{
-                              width: `${share}%`,
-                            }}
-                          />
+                            <span className="font-medium text-slate-900">
+                              {
+                                row.value
+                              }
+                            </span>
+                          </div>
+
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full bg-sky-500 transition-all"
+                              style={{
+                                width:
+                                  `${share}%`,
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    }
+                  )}
                 </div>
               </div>
             </section>
 
-            <section className={`${card} overflow-hidden`}>
-              <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <section
+              id="partners"
+              className={`${card} scroll-mt-6 overflow-hidden`}
+            >
+              <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                     Partners
                   </div>
-                  <h2 className="mt-1 text-lg font-semibold">
+
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950">
                     Partner performance
                   </h2>
-                  <p className="mt-1 text-sm text-white/50">
-                    Traffic, sign-up and paid conversion performance
-                    for the selected reporting period.
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Open any partner to manage
+                    all of its links, internal
+                    details and attributed
+                    customers.
                   </p>
                 </div>
 
-                <div className="text-xs text-white/40">
-                  {(data?.partners ?? []).length} partner
-                  {(data?.partners ?? []).length === 1
+                <div className="text-xs text-slate-400">
+                  {(data?.partners ?? [])
+                    .length}{" "}
+                  partner
+                  {(data?.partners ?? [])
+                    .length === 1
                     ? ""
                     : "s"}
                 </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-white/10 bg-black/[0.08] text-[11px] uppercase tracking-[0.14em] text-white/35">
+                <table className="min-w-[1050px] w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                     <tr>
-                      <th className="px-6 py-3 font-medium">
+                      <th className="px-6 py-3">
                         Partner
                       </th>
-                      <th className="px-4 py-3 text-right font-medium">
+                      <th className="px-4 py-3 text-right">
                         Clicks
                       </th>
-                      <th className="px-4 py-3 text-right font-medium">
+                      <th className="px-4 py-3 text-right">
                         Sign-ups
                       </th>
-                      <th className="px-4 py-3 text-right font-medium">
+                      <th className="px-4 py-3 text-right">
                         Paid
                       </th>
-                      <th className="px-4 py-3 text-right font-medium">
+                      <th className="px-4 py-3 text-right">
                         Sign-up %
                       </th>
-                      <th className="px-4 py-3 text-right font-medium">
+                      <th className="px-4 py-3 text-right">
                         Paid %
                       </th>
-                      <th className="px-6 py-3 text-right font-medium">
+                      <th className="px-6 py-3 text-right">
                         Actions
                       </th>
                     </tr>
                   </thead>
 
-                  <tbody>
-                    {(data?.partners ?? []).map((partner) => (
-                      <tr
-                        key={partner.id}
-                        className="border-b border-white/5 transition last:border-0 hover:bg-white/[0.025]"
-                      >
-                        <td className="px-6 py-5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-white">
-                              {partner.name}
-                            </span>
-                            <StatusPill
-                              status={partner.status}
-                            />
-                          </div>
+                  <tbody className="divide-y divide-slate-100">
+                    {(data?.partners ??
+                      []
+                    ).map(
+                      (
+                        partner
+                      ) => (
+                        <tr
+                          key={
+                            partner.id
+                          }
+                          className="transition hover:bg-slate-50"
+                        >
+                          <td className="px-6 py-5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                href={`/admin/referrals/${partner.id}`}
+                                className="font-medium text-slate-950 transition hover:text-sky-700"
+                              >
+                                {
+                                  partner.name
+                                }
+                              </Link>
 
-                          <div className="mt-1 text-xs text-white/40">
-                            {partner.email || "No email"}
-                          </div>
+                              <StatusPill
+                                status={
+                                  partner.status
+                                }
+                              />
+                            </div>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              copyReferralLink(
-                                partner.code
-                              )
-                            }
-                            className="mt-2 inline-flex items-center rounded-lg border border-sky-300/10 bg-sky-300/[0.05] px-2.5 py-1 font-mono text-xs text-sky-200/80 transition hover:bg-sky-300/10"
-                            title="Copy referral link"
-                          >
-                            /r/{partner.code}
-                          </button>
-                        </td>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {partner.email ||
+                                "No email"}
+                            </div>
 
-                        <td className="px-4 py-5 text-right text-white/80">
-                          {partner.clicks}
-                        </td>
-
-                        <td className="px-4 py-5 text-right text-white/80">
-                          {partner.signups}
-                        </td>
-
-                        <td className="px-4 py-5 text-right font-medium text-white">
-                          {partner.paidCustomers}
-                        </td>
-
-                        <td className="px-4 py-5 text-right text-white/70">
-                          {percent(
-                            partner.signupConversion
-                          )}
-                        </td>
-
-                        <td className="px-4 py-5 text-right font-medium text-sky-100">
-                          {percent(
-                            partner.paidConversion
-                          )}
-                        </td>
-
-                        <td className="px-6 py-5">
-                          <div className="flex justify-end gap-2">
                             <button
                               type="button"
                               onClick={() =>
@@ -936,44 +1214,103 @@ export default function ReferralDashboardClient() {
                                   partner.code
                                 )
                               }
-                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+                              className="mt-2 inline-flex items-center rounded-lg border border-sky-100 bg-sky-50 px-2.5 py-1 font-mono text-xs text-sky-700 transition hover:bg-sky-100"
+                              title="Copy primary referral link"
                             >
-                              Copy link
+                              /r/
+                              {
+                                partner.code
+                              }
                             </button>
+                          </td>
 
-                            <button
-                              type="button"
-                              disabled={
-                                changingPartnerId ===
+                          <td className="px-4 py-5 text-right text-slate-700">
+                            {
+                              partner.clicks
+                            }
+                          </td>
+
+                          <td className="px-4 py-5 text-right text-slate-700">
+                            {
+                              partner.signups
+                            }
+                          </td>
+
+                          <td className="px-4 py-5 text-right font-medium text-slate-950">
+                            {
+                              partner.paidCustomers
+                            }
+                          </td>
+
+                          <td className="px-4 py-5 text-right text-slate-600">
+                            {percent(
+                              partner.signupConversion
+                            )}
+                          </td>
+
+                          <td className="px-4 py-5 text-right font-medium text-sky-700">
+                            {percent(
+                              partner.paidConversion
+                            )}
+                          </td>
+
+                          <td className="px-6 py-5">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Link
+                                href={`/admin/referrals/${partner.id}`}
+                                className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100"
+                              >
+                                Open record
+                              </Link>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  copyReferralLink(
+                                    partner.code
+                                  )
+                                }
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-50"
+                              >
+                                Copy primary link
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  changingPartnerId ===
+                                  partner.id
+                                }
+                                onClick={() =>
+                                  changePartnerStatus(
+                                    partner
+                                  )
+                                }
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                {changingPartnerId ===
                                 partner.id
-                              }
-                              onClick={() =>
-                                changePartnerStatus(
-                                  partner
-                                )
-                              }
-                              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
-                            >
-                              {changingPartnerId ===
-                              partner.id
-                                ? "Saving..."
-                                : partner.status ===
-                                    "active"
-                                  ? "Pause"
-                                  : "Reactivate"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                                  ? "Saving..."
+                                  : partner.status ===
+                                      "active"
+                                    ? "Pause partner"
+                                    : "Reactivate partner"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    )}
 
-                    {(data?.partners ?? []).length === 0 ? (
+                    {(data?.partners ?? [])
+                      .length === 0 ? (
                       <tr>
                         <td
                           colSpan={7}
-                          className="px-6 py-12 text-center text-white/40"
+                          className="px-6 py-12 text-center text-slate-500"
                         >
-                          No referral partners yet.
+                          No referral partners
+                          yet.
                         </td>
                       </tr>
                     ) : null}
@@ -982,88 +1319,119 @@ export default function ReferralDashboardClient() {
               </div>
             </section>
 
-            <section className={`${card} overflow-hidden`}>
-              <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <section
+              id="conversions"
+              className={`${card} scroll-mt-6 overflow-hidden`}
+            >
+              <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                     Conversions
                   </div>
-                  <h2 className="mt-1 text-lg font-semibold">
+
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950">
                     Referred customer conversions
                   </h2>
-                  <p className="mt-1 text-sm text-white/50">
-                    Original plan at sign-up alongside the
-                    organisation&apos;s current plan and billing
-                    state.
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Original plan at sign-up
+                    alongside the
+                    organisation&apos;s current
+                    plan and billing state.
+                    Open the partner to inspect
+                    the exact referral link and
+                    Stripe identifiers.
                   </p>
                 </div>
 
-                <div className="text-xs text-white/40">
-                  {(data?.conversions ?? []).length} in period
+                <div className="text-xs text-slate-400">
+                  {(data?.conversions ??
+                    []).length}{" "}
+                  in period
                 </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="border-b border-white/10 bg-black/[0.08] text-[11px] uppercase tracking-[0.14em] text-white/35">
+                <table className="min-w-[950px] w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                     <tr>
-                      <th className="px-6 py-3 font-medium">
+                      <th className="px-6 py-3">
                         Organisation
                       </th>
-                      <th className="px-5 py-3 font-medium">
+                      <th className="px-5 py-3">
                         Partner
                       </th>
-                      <th className="px-5 py-3 font-medium">
+                      <th className="px-5 py-3">
                         Signed up
                       </th>
-                      <th className="px-5 py-3 font-medium">
+                      <th className="px-5 py-3">
                         Sign-up plan
                       </th>
-                      <th className="px-5 py-3 font-medium">
+                      <th className="px-5 py-3">
                         Current plan
                       </th>
-                      <th className="px-6 py-3 font-medium">
+                      <th className="px-6 py-3">
                         Payment
                       </th>
                     </tr>
                   </thead>
 
-                  <tbody>
-                    {(data?.conversions ?? []).map(
-                      (conversion) => (
+                  <tbody className="divide-y divide-slate-100">
+                    {(data?.conversions ??
+                      []
+                    ).map(
+                      (
+                        conversion
+                      ) => (
                         <tr
-                          key={conversion.id}
-                          className="border-b border-white/5 transition last:border-0 hover:bg-white/[0.025]"
+                          key={
+                            conversion.id
+                          }
+                          className="transition hover:bg-slate-50"
                         >
                           <td className="px-6 py-5">
-                            <div className="font-medium text-white">
-                              {conversion.orgName}
+                            <div className="font-medium text-slate-950">
+                              {
+                                conversion.orgName
+                              }
                             </div>
-                            <div className="mt-1 text-xs text-white/35">
+
+                            <div className="mt-1 text-xs text-slate-400">
                               {conversion.orgSlug ||
                                 conversion.orgId}
                             </div>
                           </td>
 
-                          <td className="px-5 py-5 text-white/75">
-                            {conversion.partnerName}
+                          <td className="px-5 py-5">
+                            <Link
+                              href={`/admin/referrals/${conversion.partnerId}`}
+                              className="font-medium text-sky-700 transition hover:text-sky-900"
+                            >
+                              {
+                                conversion.partnerName
+                              }
+                            </Link>
                           </td>
 
-                          <td className="px-5 py-5 text-white/55">
+                          <td className="px-5 py-5 text-slate-500">
                             {formatDate(
                               conversion.signupAt
                             )}
                           </td>
 
                           <td className="px-5 py-5">
-                            <span className="inline-flex rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70">
-                              {conversion.signupPlan}
+                            <span className="inline-flex rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-600">
+                              {
+                                conversion.signupPlan
+                              }
                             </span>
                           </td>
 
                           <td className="px-5 py-5">
-                            <span className="inline-flex rounded-lg border border-sky-300/10 bg-sky-300/[0.05] px-2.5 py-1 text-xs text-sky-100/80">
-                              {conversion.currentPlan}
+                            <span className="inline-flex rounded-lg border border-sky-100 bg-sky-50 px-2.5 py-1 text-xs text-sky-700">
+                              {
+                                conversion.currentPlan
+                              }
                             </span>
                           </td>
 
@@ -1081,13 +1449,15 @@ export default function ReferralDashboardClient() {
                       )
                     )}
 
-                    {(data?.conversions ?? []).length === 0 ? (
+                    {(data?.conversions ??
+                      []).length === 0 ? (
                       <tr>
                         <td
                           colSpan={6}
-                          className="px-6 py-12 text-center text-white/40"
+                          className="px-6 py-12 text-center text-slate-500"
                         >
-                          No attributed sign-ups in this reporting
+                          No attributed sign-ups
+                          in this reporting
                           period.
                         </td>
                       </tr>
@@ -1096,111 +1466,180 @@ export default function ReferralDashboardClient() {
                 </table>
               </div>
             </section>
+
+            <section className="rounded-2xl border border-sky-100 bg-sky-50 px-6 py-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-600">
+                    Commercial reconciliation
+                  </div>
+
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950">
+                    Ready to reconcile the period?
+                  </h2>
+
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                    Freeze the current referral
+                    and billing state into an
+                    immutable snapshot, then
+                    download the partner summary
+                    or detailed Stripe matching
+                    export.
+                  </p>
+                </div>
+
+                <Link
+                  href="/admin/referrals/reconciliations"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700"
+                >
+                  Open reconciliation
+                  <ArrowIcon />
+                </Link>
+              </div>
+            </section>
           </>
         )}
       </div>
 
       {copyMessage ? (
-        <div className="fixed bottom-6 left-1/2 z-50 max-w-[calc(100vw-3rem)] -translate-x-1/2 rounded-xl border border-sky-300/20 bg-[#0b1724] px-4 py-3 text-center text-xs text-sky-100 shadow-2xl shadow-black/40">
+        <div className="fixed bottom-6 left-1/2 z-50 max-w-[calc(100vw-3rem)] -translate-x-1/2 rounded-xl border border-sky-200 bg-white px-4 py-3 text-center text-xs text-sky-700 shadow-xl">
           {copyMessage}
         </div>
       ) : null}
 
       {showCreateModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/65 px-4 py-8 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/45 px-4 py-8 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="create-referral-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+          onMouseDown={(
+            event
+          ) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
               closeCreateModal();
             }
           }}
         >
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#0b1724] shadow-2xl shadow-black/50">
-            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                   Referral partner
                 </div>
+
                 <h2
                   id="create-referral-title"
-                  className="mt-1 text-xl font-semibold text-white"
+                  className="mt-1 text-xl font-semibold text-slate-950"
                 >
                   Create referral partner
                 </h2>
-                <p className="mt-1 text-sm leading-5 text-white/50">
-                  Create a tracked MindCanvas link with a 30-day
-                  first-touch attribution window.
+
+                <p className="mt-1 text-sm leading-5 text-slate-500">
+                  Creates the internal partner
+                  record and its first tracked
+                  referral link.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={closeCreateModal}
-                disabled={creating}
+                onClick={
+                  closeCreateModal
+                }
+                disabled={
+                  creating
+                }
                 aria-label="Close create referral partner"
-                className="rounded-lg border border-white/10 bg-white/5 p-2 text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                className="rounded-lg border border-slate-200 bg-white p-2 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 disabled:opacity-50"
               >
                 <CloseIcon />
               </button>
             </div>
 
             <form
-              onSubmit={createPartner}
+              onSubmit={
+                createPartner
+              }
               className="space-y-5 px-6 py-6"
             >
               {createError ? (
-                <div className="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {createError}
                 </div>
               ) : null}
 
               <div>
-                <label className="text-sm font-medium text-white/80">
+                <label className="text-sm font-medium text-slate-700">
                   Partner name
                 </label>
+
                 <input
-                  value={form.name}
-                  onChange={(event) =>
-                    handleNameChange(event.target.value)
+                  value={
+                    form.name
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    handleNameChange(
+                      event.target
+                        .value
+                    )
                   }
                   required
                   placeholder="e.g. Coach Network"
-                  className={inputClass}
+                  className={
+                    inputClass
+                  }
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white/80">
+                <label className="text-sm font-medium text-slate-700">
                   Email
                 </label>
+
                 <input
                   type="email"
-                  value={form.email}
-                  onChange={(event) =>
+                  value={
+                    form.email
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     updateForm(
                       "email",
-                      event.target.value
+                      event.target
+                        .value
                     )
                   }
                   placeholder="Optional"
-                  className={inputClass}
+                  className={
+                    inputClass
+                  }
                 />
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white/80">
+                <label className="text-sm font-medium text-slate-700">
                   Referral code
                 </label>
+
                 <input
-                  value={form.code}
-                  onChange={(event) =>
+                  value={
+                    form.code
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     updateForm(
                       "code",
                       normaliseCode(
-                        event.target.value
+                        event.target
+                          .value
                       )
                     )
                   }
@@ -1209,51 +1648,66 @@ export default function ReferralDashboardClient() {
                   className={`${inputClass} font-mono`}
                 />
 
-                <div className="mt-2 rounded-xl border border-sky-300/10 bg-sky-300/[0.05] px-3 py-2.5">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-white/35">
+                <div className="mt-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2.5">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                     Link preview
                   </div>
-                  <div className="mt-1 break-all font-mono text-xs text-sky-100/75">
+
+                  <div className="mt-1 break-all font-mono text-xs text-sky-700">
                     {`${origin || "https://profiletest.ai"}/r/${form.code || "partner-code"}`}
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-white/80">
+                <label className="text-sm font-medium text-slate-700">
                   Destination
                 </label>
+
                 <input
-                  value={form.destination_path}
-                  onChange={(event) =>
+                  value={
+                    form.destination_path
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     updateForm(
                       "destination_path",
-                      event.target.value
+                      event.target
+                        .value
                     )
                   }
                   required
                   className={`${inputClass} font-mono`}
                 />
-                <p className="mt-1.5 text-xs text-white/35">
+
+                <p className="mt-1.5 text-xs text-slate-400">
                   Internal MindCanvas path only.
                 </p>
               </div>
 
-              <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:justify-end">
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={closeCreateModal}
-                  disabled={creating}
-                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                  onClick={
+                    closeCreateModal
+                  }
+                  disabled={
+                    creating
+                  }
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={creating}
-                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-[#64bae2] to-[#2d8fc4] px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-sky-950/20 transition hover:brightness-110 disabled:opacity-60"
+                  disabled={
+                    creating
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-sky-700 disabled:opacity-50"
                 >
+                  <PlusIcon />
                   {creating
                     ? "Creating..."
                     : "Create referral partner"}
