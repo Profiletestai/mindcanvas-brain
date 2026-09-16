@@ -1,9 +1,13 @@
 import "server-only";
+
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { requirePortalOrgAccess } from "@/lib/portal/authz";
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,20 +45,25 @@ function computeRange(
   if (fromParam && toParam) {
     const from = new Date(fromParam);
     const to = new Date(toParam);
+
     if (isNaN(+from) || isNaN(+to)) {
       throw new Error("Invalid from/to date");
     }
+
     return { from, to, label: "custom" as const };
   }
 
   const now = new Date();
   const year = now.getUTCFullYear();
-  const month = now.getUTCMonth(); // 0-11
+  const month = now.getUTCMonth();
   const day = now.getUTCDate();
 
   const startOfDay = new Date(Date.UTC(year, month, day));
   const startOfWeek = new Date(startOfDay);
-  startOfWeek.setUTCDate(startOfDay.getUTCDate() - startOfDay.getUTCDay()); // Sunday as start
+  startOfWeek.setUTCDate(
+    startOfDay.getUTCDate() - startOfDay.getUTCDay()
+  );
+
   const startOfMonth = new Date(Date.UTC(year, month, 1));
   const startOfYear = new Date(Date.UTC(year, 0, 1));
 
@@ -69,15 +78,20 @@ function computeRange(
       to.setUTCDate(to.getUTCDate() + 7);
       label = "this_week";
       break;
+
     case "last_week": {
       const endOfLastWeek = startOfWeek;
       const startOfLastWeek = new Date(endOfLastWeek);
-      startOfLastWeek.setUTCDate(endOfLastWeek.getUTCDate() - 7);
+      startOfLastWeek.setUTCDate(
+        endOfLastWeek.getUTCDate() - 7
+      );
+
       from = startOfLastWeek;
       to = endOfLastWeek;
       label = "last_week";
       break;
     }
+
     case "last_month": {
       const startOfThisMonth = startOfMonth;
       const startOfLastMonth = new Date(
@@ -87,34 +101,31 @@ function computeRange(
           1
         )
       );
-      const startOfThisMonthCopy = new Date(startOfThisMonth);
+
       from = startOfLastMonth;
-      to = startOfThisMonthCopy;
+      to = new Date(startOfThisMonth);
       label = "last_month";
       break;
     }
+
     case "this_year":
       from = startOfYear;
       to = new Date(Date.UTC(year + 1, 0, 1));
       label = "this_year";
       break;
+
     case "last_year":
       from = new Date(Date.UTC(year - 1, 0, 1));
       to = new Date(Date.UTC(year, 0, 1));
       label = "last_year";
       break;
+
     case "this_month":
-    default: {
-      // default = this_month
-      const startOfThisMonth = startOfMonth;
-      const startOfNextMonth = new Date(
-        Date.UTC(year, month + 1, 1)
-      );
-      from = startOfThisMonth;
-      to = startOfNextMonth;
+    default:
+      from = startOfMonth;
+      to = new Date(Date.UTC(year, month + 1, 1));
       label = "this_month";
       break;
-    }
   }
 
   return { from, to, label };
@@ -125,45 +136,101 @@ function groupBy<T, K extends string>(
   rows: T[],
   keyFn: (row: T) => K | null | undefined
 ) {
-  const map = new Map<K, { key: K; count: number; sample?: T }>();
+  const map = new Map<
+    K,
+    { key: K; count: number; sample?: T }
+  >();
+
   for (const r of rows) {
     const key = keyFn(r);
     if (!key) continue;
+
     const existing = map.get(key);
+
     if (existing) {
       existing.count += 1;
     } else {
-      map.set(key, { key, count: 1, sample: r });
+      map.set(key, {
+        key,
+        count: 1,
+        sample: r,
+      });
     }
   }
-  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+
+  return Array.from(map.values()).sort(
+    (a, b) => b.count - a.count
+  );
 }
 
 export async function GET(req: Request) {
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json(
-        { ok: false, error: "Supabase env not configured" },
+        {
+          ok: false,
+          error: "Supabase env not configured",
+        },
         { status: 500 }
       );
     }
 
     const url = new URL(req.url);
-    const orgSlug = (url.searchParams.get("org") || "").trim();
-    const testSlug = (url.searchParams.get("test") || "").trim() || null;
-    const rangeParam = (url.searchParams.get("range") || "").trim() || null;
+
+    const orgSlug = (
+      url.searchParams.get("org") || ""
+    ).trim();
+
+    const testSlug =
+      (url.searchParams.get("test") || "").trim() ||
+      null;
+
+    const rangeParam =
+      (url.searchParams.get("range") || "").trim() ||
+      null;
+
     const fromParam = url.searchParams.get("from");
     const toParam = url.searchParams.get("to");
-    const includeDetails = url.searchParams.get("details") === "1";
+
+    const includeDetails =
+      url.searchParams.get("details") === "1";
 
     if (!orgSlug) {
       return NextResponse.json(
-        { ok: false, error: "Missing ?org=slug" },
+        {
+          ok: false,
+          error: "Missing ?org=slug",
+        },
         { status: 400 }
       );
     }
 
-    const { from, to, label: rangeLabel } = computeRange(
+    // SECURITY:
+    // This route uses the Supabase service role below, which bypasses RLS.
+    // The caller-supplied org slug therefore cannot be treated as
+    // authorization. Verify the signed-in user belongs to the organisation
+    // (or is a platform superadmin) before reading any tenant data.
+    const access = await requirePortalOrgAccess({
+      slug: orgSlug,
+      permission: "read",
+    });
+
+    if (!access.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: access.error,
+          code: access.code,
+        },
+        { status: access.status }
+      );
+    }
+
+    const {
+      from,
+      to,
+      label: rangeLabel,
+    } = computeRange(
       rangeParam,
       fromParam,
       toParam
@@ -171,30 +238,44 @@ export async function GET(req: Request) {
 
     const supabase: any = createClient(
       SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY
+      SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
     );
+
     const portal = supabase.schema("portal");
 
     // We limit details but still get a full count from Supabase.
     const maxDetails = includeDetails ? 1000 : 300;
 
-    const query = portal
+    let query = portal
       .from("v_usage_submissions")
-      .select("*", { count: "exact", head: false })
+      .select("*", {
+        count: "exact",
+        head: false,
+      })
       .eq("org_slug", orgSlug)
       .gte("completed_at", from.toISOString())
       .lt("completed_at", to.toISOString())
-      .order("completed_at", { ascending: false })
+      .order("completed_at", {
+        ascending: false,
+      })
       .limit(maxDetails);
 
     if (testSlug) {
-      query.eq("test_slug", testSlug);
+      query = query.eq("test_slug", testSlug);
     }
 
     const { data, error, count } = await query;
 
     if (error) {
-      throw new Error(error.message || "Supabase query failed");
+      throw new Error(
+        error.message || "Supabase query failed"
+      );
     }
 
     const rows = (data || []) as UsageRow[];
@@ -202,40 +283,63 @@ export async function GET(req: Request) {
 
     // ---- summaries ----
 
-    // by test
-    const byTestRaw = groupBy(rows, (r) => (r.test_slug || undefined) as string);
+    const byTestRaw = groupBy(
+      rows,
+      (r) =>
+        (r.test_slug || undefined) as string
+    );
+
     const byTest = byTestRaw.map((g) => ({
       test_slug: g.key,
-      test_name: g.sample?.test_name || g.key,
+      test_name:
+        g.sample?.test_name || g.key,
       count: g.count,
     }));
 
-    // by link
-    const byLinkRaw = groupBy(rows, (r) => (r.link_token || undefined) as string);
+    const byLinkRaw = groupBy(
+      rows,
+      (r) =>
+        (r.link_token || undefined) as string
+    );
+
     const byLink = byLinkRaw.map((g) => ({
       link_token: g.key,
-      link_name: g.sample?.link_name || g.key,
-      contact_owner: g.sample?.link_contact_owner || null,
+      link_name:
+        g.sample?.link_name || g.key,
+      contact_owner:
+        g.sample?.link_contact_owner || null,
       count: g.count,
     }));
 
-    // simple time series (per day)
     const byDayMap = new Map<
       string,
-      { date: string; count: number }
+      {
+        date: string;
+        count: number;
+      }
     >();
+
     for (const r of rows) {
       const d = new Date(r.completed_at);
-      // yyyy-mm-dd in UTC
-      const key = d.toISOString().slice(0, 10);
+      const key = d
+        .toISOString()
+        .slice(0, 10);
+
       const existing = byDayMap.get(key);
+
       if (existing) {
         existing.count += 1;
       } else {
-        byDayMap.set(key, { date: key, count: 1 });
+        byDayMap.set(key, {
+          date: key,
+          count: 1,
+        });
       }
     }
-    const byDay = Array.from(byDayMap.values()).sort((a, b) =>
+
+    const byDay = Array.from(
+      byDayMap.values()
+    ).sort((a, b) =>
       a.date.localeCompare(b.date)
     );
 
@@ -246,7 +350,6 @@ export async function GET(req: Request) {
       by_day: byDay,
     };
 
-    // limit details payload to what’s useful in UI
     const details = includeDetails
       ? rows.map((r) => ({
           submission_id: r.submission_id,
@@ -257,10 +360,13 @@ export async function GET(req: Request) {
           link_name: r.link_name,
           link_token: r.link_token,
           taker_email: r.taker_email,
-          taker_first_name: r.taker_first_name,
-          taker_last_name: r.taker_last_name,
+          taker_first_name:
+            r.taker_first_name,
+          taker_last_name:
+            r.taker_last_name,
           taker_company: r.taker_company,
-          taker_role_title: r.taker_role_title,
+          taker_role_title:
+            r.taker_role_title,
         }))
       : undefined;
 
@@ -270,7 +376,8 @@ export async function GET(req: Request) {
         filters: {
           org: orgSlug,
           test: testSlug,
-          range: rangeParam || rangeLabel,
+          range:
+            rangeParam || rangeLabel,
           from: from.toISOString(),
           to: to.toISOString(),
         },
@@ -281,7 +388,11 @@ export async function GET(req: Request) {
     );
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: e?.message ?? "Server error" },
+      {
+        ok: false,
+        error:
+          e?.message ?? "Server error",
+      },
       { status: 500 }
     );
   }
