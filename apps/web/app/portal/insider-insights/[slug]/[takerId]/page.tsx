@@ -73,11 +73,24 @@ export default async function InsiderInsightsPage({
 
   const sb = createClient().schema("portal");
 
-  const { data: taker } = await sb
-    .from("test_takers")
-    .select("id, org_id, test_id, first_name, last_name, email, company")
-    .eq("id", takerId)
-    .maybeSingle();
+  const { data: taker, error: takerError } = await sb
+  .from("test_takers")
+  .select(
+    "id, org_id, test_id, link_token, first_name, last_name, email, company"
+  )
+  .eq("id", takerId)
+  .maybeSingle();
+
+if (takerError) {
+  console.error("[Insider Insights] Unable to load test taker:", {
+    takerId,
+    error: takerError.message,
+  });
+
+  throw takerError;
+}
+
+if (!taker) return notFound();
 
   if (!taker) return notFound();
 
@@ -122,6 +135,31 @@ export default async function InsiderInsightsPage({
   const score = inevitableStandardScore(totals, test);
   if (!score) return notFound();
 
+let nextStepsHref: string | null = null;
+
+if (taker.link_token) {
+  const { data: originatingLink, error: linkError } = await sb
+    .from("test_links")
+    .select("next_steps_url, redirect_url")
+    .eq("token", taker.link_token)
+    .maybeSingle();
+
+  if (linkError) {
+    console.warn("[Insider Insights] Unable to load originating link:", {
+      takerId,
+      linkToken: taker.link_token,
+      error: linkError.message,
+    });
+  }
+
+  nextStepsHref =
+    (
+      originatingLink?.next_steps_url ||
+      originatingLink?.redirect_url ||
+      ""
+    ).trim() || null;
+  }
+
   const fullName = [taker.first_name, taker.last_name]
     .filter(Boolean)
     .join(" ")
@@ -143,6 +181,7 @@ export default async function InsiderInsightsPage({
       backHref={`/portal/${encodeURIComponent(slug)}/database/${encodeURIComponent(
         taker.id,
       )}`}
+      nextStepsHref={nextStepsHref}
     />
   );
 }

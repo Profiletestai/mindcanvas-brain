@@ -130,6 +130,15 @@ export async function GET(req: Request) {
       max_uses: r.max_uses ?? null,
 
       report_variant: normalizeReportVariant(r?.meta?.report_variant),
+      report_paywall_enabled: r?.meta?.report_paywall_enabled === true,
+      report_price_cents:
+        typeof r?.meta?.report_price_cents === "number"
+          ? r.meta.report_price_cents
+          : null,
+      report_currency:
+        typeof r?.meta?.report_currency === "string"
+          ? r.meta.report_currency.toUpperCase()
+          : "GBP",
     }));
 
     return NextResponse.json(rows);

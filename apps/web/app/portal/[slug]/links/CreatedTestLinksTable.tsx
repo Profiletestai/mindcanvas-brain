@@ -32,6 +32,9 @@ type LinkRow = {
   hidden_results_message: string | null;
 
   report_variant?: ReportVariant | null;
+  report_paywall_enabled?: boolean;
+  report_price_cents?: number | null;
+  report_currency?: "GBP" | "USD" | "EUR" | "ZAR";
 };
 
 export default function CreatedTestLinksTable({

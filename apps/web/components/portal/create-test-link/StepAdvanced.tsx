@@ -27,6 +27,9 @@ export default function StepAdvanced({
     contactOwner: watch("contactOwner"),
     emailReport: watch("emailReport"),
     reportVariant: watch("reportVariant"),
+    reportPaywallEnabled: watch("reportPaywallEnabled"),
+    reportPrice: watch("reportPrice"),
+    reportCurrency: watch("reportCurrency"),
   };
 
   return (

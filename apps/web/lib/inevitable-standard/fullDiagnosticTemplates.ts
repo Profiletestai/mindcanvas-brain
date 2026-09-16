@@ -38,7 +38,7 @@ const METHOD_LAYER: Record<
   "Identity" | "Structure" | "Execution"
 > = {
   identity: "Identity",
-  positioning: "Structure",
+  positioning: "Identity",
   offer: "Structure",
   revenue_model: "Structure",
   sales: "Execution",

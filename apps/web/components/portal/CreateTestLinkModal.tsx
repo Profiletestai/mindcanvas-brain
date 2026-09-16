@@ -29,6 +29,7 @@ import {
   TOTAL_STEPS,
   showsResults,
   supportsLiteReport,
+  reportPriceToCents,
   type CreateTestLinkFormValues,
   type ModelOption,
 } from "./create-test-link/types";
@@ -67,6 +68,9 @@ export default function CreateTestLinkModal({
         contactOwner: "",
         emailReport: true,
         reportVariant: "full",
+        reportPaywallEnabled: false,
+        reportPrice: "49.00",
+        reportCurrency: "GBP",
       },
     });
 
@@ -77,6 +81,8 @@ export default function CreateTestLinkModal({
   const [error, setError] = useState<string | null>(null);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [founding100OfferEligible, setFounding100OfferEligible] = useState(false);
+  const [firstLinkOfferEligible, setFirstLinkOfferEligible] = useState(false);
 
   const modelId = watch("modelId");
   const limitMode = watch("limitMode");
@@ -85,6 +91,8 @@ export default function CreateTestLinkModal({
   const experience = watch("experience");
   const nextStepsUrl = watch("nextStepsUrl");
   const redirectUrl = watch("redirectUrl");
+  const reportPaywallEnabled = watch("reportPaywallEnabled");
+  const reportPrice = watch("reportPrice");
 
   // Close on Escape.
   useEffect(() => {
@@ -131,6 +139,7 @@ export default function CreateTestLinkModal({
       // redirect URL whenever the taker never sees the report.
       if (!isValidUrl(nextStepsUrl)) return false;
       if (!showResults && !isValidUrl(redirectUrl)) return false;
+      if (reportPaywallEnabled && reportPriceToCents(reportPrice) == null) return false;
       return true;
     }
     return true;
@@ -143,6 +152,8 @@ export default function CreateTestLinkModal({
     nextStepsUrl,
     redirectUrl,
     showResults,
+    reportPaywallEnabled,
+    reportPrice,
   ]);
 
   const submit = handleSubmit(async (values) => {
@@ -165,6 +176,11 @@ export default function CreateTestLinkModal({
             ? values.hiddenResultsMessage.trim()
             : null,
         report_variant: supportsLite ? values.reportVariant : "full",
+        reportPaywallEnabled: values.reportPaywallEnabled,
+        reportPriceCents: values.reportPaywallEnabled
+          ? reportPriceToCents(values.reportPrice)
+          : null,
+        reportCurrency: values.reportCurrency,
         max_uses:
           values.limitMode === "count" ? parseInt(values.maxUses, 10) : null,
         expiresAt:
@@ -184,6 +200,8 @@ export default function CreateTestLinkModal({
       }
 
       setCreatedToken(data.token || null);
+      setFounding100OfferEligible(data.founding100OfferEligible === true);
+      setFirstLinkOfferEligible(data.firstLinkOfferEligible === true);
       setStep(STEP_SUCCESS);
       try {
         window.dispatchEvent(new CustomEvent("links:changed"));
@@ -311,6 +329,8 @@ export default function CreateTestLinkModal({
               orgId={orgId}
               orgSlug={orgSlug}
               testName={selectedModel?.name}
+              founding100OfferEligible={founding100OfferEligible}
+              firstLinkOfferEligible={firstLinkOfferEligible}
             />
           )}
         </div>

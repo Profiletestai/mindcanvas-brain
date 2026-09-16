@@ -21,6 +21,8 @@ const maxUsesInput = z
   .union([z.number(), z.string(), z.null()])
   .optional();
 
+const reportCurrencySchema = z.enum(["GBP", "USD", "EUR", "ZAR"]);
+
 export const createLinkSchema = z
   .object({
     orgId: z.string().trim().min(1, "Missing orgId"),
@@ -43,6 +45,9 @@ export const createLinkSchema = z
 
     reportVariant: reportVariantSchema.nullish(),
     report_variant: reportVariantSchema.nullish(),
+    reportPaywallEnabled: z.boolean().optional().default(false),
+    reportPriceCents: z.number().int().min(100).max(1000000).nullable().optional(),
+    reportCurrency: reportCurrencySchema.optional().default("GBP"),
 
     max_uses: maxUsesInput,
   })
@@ -53,6 +58,13 @@ export const createLinkSchema = z
         code: z.ZodIssueCode.custom,
         path: ["redirectUrl"],
         message: "Redirect URL is required when results are hidden",
+      });
+    }
+    if (value.reportPaywallEnabled && !value.reportPriceCents) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reportPriceCents"],
+        message: "A report price is required when charging for the full report",
       });
     }
   });
@@ -82,6 +94,9 @@ export const patchLinkSchema = z.object({
 
   reportVariant: reportVariantSchema.nullish(),
   report_variant: reportVariantSchema.nullish(),
+  reportPaywallEnabled: z.boolean().optional(),
+  reportPriceCents: z.number().int().min(100).max(1000000).nullable().optional(),
+  reportCurrency: reportCurrencySchema.optional(),
 
   max_uses: maxUsesInput,
 });

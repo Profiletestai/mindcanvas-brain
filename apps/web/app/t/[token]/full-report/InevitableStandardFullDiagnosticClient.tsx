@@ -37,6 +37,7 @@ import {
   PillarSummaryList,
   PRIORITY_ORDER_NOTE,
   ReadinessDonut,
+  RevenueInStructurePanel,
   REVENUE_CHAIN,
   bandLabelFor,
   buildPillarView,
@@ -335,11 +336,13 @@ function SidebarIndex({
   activeSection,
   readiness: _readiness,
   band: _band,
+  nextStepsHref,
 }: {
   sections: Array<{ id: string; label: string }>;
   activeSection: string;
   readiness: number;
   band: string;
+  nextStepsHref: string | null;
 }) {
   return (
     <aside className="hidden lg:block print:hidden">
@@ -371,7 +374,7 @@ function SidebarIndex({
           Download PDF
         </button>
         <a
-          href="#plan"
+          href={nextStepsHref || "#plan"}
           className="mt-2 block w-full rounded-[10px] bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-4 py-3 text-center text-[12px] font-semibold text-white"
         >
           Next step
@@ -605,10 +608,13 @@ export default function InevitableStandardFullDiagnosticClient({
     );
     if (view.diagnosticAdds) list.push({ id: "your-words", label: "In your words" });
     list.push({ id: "approach", label: "Commercial Decision Intelligence" });
+    if (score?.revenue_in_structure) {
+      list.push({ id: "revenue-structure", label: "Revenue in your structure" });
+    }
     list.push({ id: "plan", label: "Your next ninety days" });
     list.push({ id: "closing", label: "In closing" });
     return list;
-  }, [view]);
+  }, [view, score]);
 
   useEffect(() => {
     if (!view || typeof IntersectionObserver === "undefined") return;
@@ -688,11 +694,21 @@ export default function InevitableStandardFullDiagnosticClient({
     orgName,
   } = view;
 
+  const nextStepsHref =
+    (payload?.link?.next_steps_url || payload?.link?.redirect_url || "").trim() ||
+    null;
+
   return (
     <main
       className={`${newsreader.variable} min-h-screen`}
       style={{ backgroundColor: "#041731", color: INK }}
     >
+      <style>{`
+        @media print {
+          @page { margin: 0; }
+          html, body { background: #041731 !important; }
+        }
+      `}</style>
       <header className="border-b border-white/10 px-5 py-4 text-white print:hidden" style={{ backgroundColor: NAVY_DEEP }}>
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 lg:flex-nowrap">
           <div className="mr-auto flex min-w-[330px] items-center gap-4">
@@ -709,7 +725,7 @@ export default function InevitableStandardFullDiagnosticClient({
           <button type="button" onClick={() => window.print()} className="rounded-lg px-5 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: GOLD }}>
             Download PDF
           </button>
-          <a href="#plan" className="rounded-lg bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-5 py-2 text-[12px] font-semibold text-white">Next step</a>
+          <a href={nextStepsHref || "#plan"} className="rounded-lg bg-gradient-to-r from-[#5a7a9e] via-[#2563c8] to-[#14263d] px-5 py-2 text-[12px] font-semibold text-white">Next step</a>
         </div>
         <div className="mx-auto mt-3 grid max-w-[600px] grid-cols-3 gap-2 text-[10px] lg:ml-auto lg:mr-5 lg:mt-2">
           <div className="rounded-xl border border-white/25 px-3 py-2"><span className="block text-white/40">PREPARED FOR</span><strong className="mt-1 block text-[12px] text-white">{clientName}</strong></div>
@@ -720,7 +736,7 @@ export default function InevitableStandardFullDiagnosticClient({
 
       {/* Cover */}
       <header
-        className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-12 text-white sm:px-10 sm:py-[60px] print:break-after-page"
+        className="bg-gradient-to-b from-[#14263d] to-[#1f2c46] px-6 py-12 text-white sm:px-10 sm:py-[60px]"
         style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
       >
         <div className="mx-auto grid max-w-[1275px] gap-8 xl:grid-cols-[1fr_263px_388px] xl:items-start print:grid-cols-[minmax(0,1fr)_190px_280px] print:items-start print:gap-4">
@@ -765,6 +781,7 @@ export default function InevitableStandardFullDiagnosticClient({
           activeSection={activeSection}
           readiness={overallPercentage}
           band={bandDescriptor}
+          nextStepsHref={nextStepsHref}
         />
 
         <div className="min-w-0 space-y-10">
@@ -1089,6 +1106,31 @@ export default function InevitableStandardFullDiagnosticClient({
             ) : null}
           </Chapter>
 
+          {/* Revenue in Your Structure — existing RRE calculation, restored */}
+          {score.revenue_in_structure ? (
+            <Chapter
+              id="revenue-structure"
+              eyebrow="Revenue in Your Structure"
+              title="The commercial value sitting inside the current build"
+            >
+              <p className="max-w-3xl text-[15px] leading-7 text-[#66727d]">
+                This is a modelled estimate of the commercial value most closely associated
+                with the Primary Constraint — value that a more deliberate structure could
+                make easier to convert, retain or release. It is a location and a scale, not
+                a forecast.
+              </p>
+              <div
+                className="mt-8 rounded-[12px] border bg-[#fffdf9] p-6 sm:p-8 print:break-inside-avoid"
+                style={{ borderColor: IVORY_BORDER }}
+              >
+                <RevenueInStructurePanel
+                  rre={score.revenue_in_structure}
+                  variant="full"
+                />
+              </div>
+            </Chapter>
+          ) : null}
+
           {/* 30/60/90 */}
           <Chapter
             id="plan"
@@ -1106,7 +1148,7 @@ export default function InevitableStandardFullDiagnosticClient({
           {/* Closing */}
           <section
             id="closing"
-            className="scroll-mt-8 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl print:break-before-page"
+            className="scroll-mt-8 rounded-[20px] bg-gradient-to-r from-[#14263d] to-[#1f2c46] px-8 py-12 text-center text-white shadow-xl"
           >
             <p className="text-[15px] font-medium uppercase tracking-[0.18em]" style={{ color: GOLD }}>In Closing</p>
             <h2 className="mx-auto mt-8 max-w-3xl text-[28px] leading-9 sm:text-[34px]" style={serif}>
@@ -1131,7 +1173,7 @@ export default function InevitableStandardFullDiagnosticClient({
         </div>
       </div>
 
-      <footer className="border-t" style={{ borderColor: HAIRLINE }}>
+      <footer className="border-t print:hidden" style={{ borderColor: HAIRLINE }}>
         <div className="mx-auto max-w-6xl px-6 py-8 text-[11px] leading-6 text-[#9a9384] sm:px-10">
           The Inevitable Standard™{orgName ? ` · ${orgName}` : ""} · This report is general
           business information, not financial, tax, legal or accounting advice.

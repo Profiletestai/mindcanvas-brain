@@ -21,6 +21,8 @@ type EventMeta = {
   stripePriceId: string | null;
   periodStart: string | null;
   periodEnd: string | null;
+  offerKey: string | null;
+  certifiedConsultantAddOn: boolean;
 };
 
 type SubscriptionWithPeriods = Stripe.Subscription & {
@@ -173,6 +175,20 @@ function applySubscriptionMeta(
   meta.subId = subscription.id;
   meta.customer = getExpandableId(subscription.customer);
   meta.orgId = subscription.metadata?.org_id?.trim() || meta.orgId;
+  meta.offerKey =
+    subscription.metadata?.offer_key?.trim() || meta.offerKey;
+
+  const certificationMeta =
+    subscription.metadata?.certified_consultant_add_on;
+
+  if (
+    certificationMeta === "true" ||
+    certificationMeta === "false"
+  ) {
+    meta.certifiedConsultantAddOn =
+      certificationMeta === "true";
+  }
+
   meta.stripeStatus = subscription.status;
   meta.stripePriceId =
     subscription.items.data[0]?.price?.id ?? null;
@@ -234,6 +250,8 @@ async function extractMeta(
     stripePriceId: null,
     periodStart: null,
     periodEnd: null,
+    offerKey: null,
+    certifiedConsultantAddOn: false,
   };
 
   switch (event.type) {
@@ -244,6 +262,9 @@ async function extractMeta(
 
       meta.orgId =
         session.metadata?.org_id?.trim() || session.client_reference_id || null;
+      meta.offerKey = session.metadata?.offer_key?.trim() || null;
+      meta.certifiedConsultantAddOn =
+        session.metadata?.certified_consultant_add_on === "true";
       meta.customer = getExpandableId(session.customer);
       meta.subId = getExpandableId(session.subscription);
 
@@ -367,6 +388,70 @@ async function callPurchaseRpc(
   return data;
 }
 
+async function fulfillReportUpgrade(
+  purchaseId: string,
+  eventId: string,
+  session: Stripe.Checkout.Session,
+): Promise<unknown> {
+  const sb = portalAdmin();
+  const purchase = await sb
+    .from("purchases")
+    .select("id, purchase_type, stripe_mode, gross_amount, currency, status, metadata")
+    .eq("id", purchaseId)
+    .maybeSingle();
+
+  if (purchase.error) {
+    throw new Error(`report_purchase_lookup_failed:${purchase.error.message}`);
+  }
+  if (!purchase.data) throw new Error("report_purchase_not_found");
+  if (purchase.data.purchase_type !== "report_upgrade") {
+    throw new Error("report_purchase_type_mismatch");
+  }
+  if (purchase.data.stripe_mode !== getStripeMode()) {
+    throw new Error("purchase_stripe_mode_mismatch");
+  }
+  if (session.amount_total !== purchase.data.gross_amount) {
+    throw new Error("purchase_amount_mismatch");
+  }
+  if ((session.currency || "").toLowerCase() !== purchase.data.currency) {
+    throw new Error("purchase_currency_mismatch");
+  }
+  if (purchase.data.status === "paid") return { ok: true, duplicate: true };
+  if (["refunded", "disputed"].includes(purchase.data.status)) {
+    throw new Error(`purchase_not_fulfillable:${purchase.data.status}`);
+  }
+
+  const paymentIntentId = getExpandableId(session.payment_intent);
+  if (!paymentIntentId) throw new Error("payment_intent_unresolved");
+
+  const updated = await sb
+    .from("purchases")
+    .update({
+      status: "paid",
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: paymentIntentId,
+      paid_at: new Date().toISOString(),
+      failed_at: null,
+      reconciliation_required: false,
+      metadata: {
+        ...((purchase.data.metadata as Record<string, unknown> | null) || {}),
+        paid_event_id: eventId,
+      },
+    })
+    .eq("id", purchaseId);
+
+  if (updated.error) {
+    throw new Error(`report_purchase_fulfilment_failed:${updated.error.message}`);
+  }
+
+  return {
+    ok: true,
+    duplicate: false,
+    purchase_id: purchaseId,
+    purchase_type: "report_upgrade",
+  };
+}
+
 async function handleOneOffCheckoutEvent(
   event: Stripe.Event,
 ): Promise<OneOffEventResult> {
@@ -388,7 +473,7 @@ async function handleOneOffCheckoutEvent(
 
   // Never send an unrelated payment-mode Checkout Session through the
   // subscription entitlement RPC.
-  if (!purchaseId || purchaseType !== "usage_bundle") {
+  if (!purchaseId || !["usage_bundle", "report_upgrade"].includes(purchaseType || "")) {
     return {
       handled: true,
       result: { ignored: "unmanaged_payment_checkout" },
@@ -423,6 +508,11 @@ async function handleOneOffCheckoutEvent(
   if (!paymentIntentId) throw new Error("payment_intent_unresolved");
   if (session.amount_total === null) throw new Error("amount_total_unresolved");
   if (!session.currency) throw new Error("currency_unresolved");
+
+  if (purchaseType === "report_upgrade") {
+    const result = await fulfillReportUpgrade(purchaseId, event.id, session);
+    return { handled: true, result };
+  }
 
   const result = await callPurchaseRpc("fn_fulfill_one_off_purchase", {
     p_purchase_id: purchaseId,
@@ -517,6 +607,90 @@ async function handleOneOffEvent(
   if (refundResult.handled) return refundResult;
 
   return handleDisputeEvent(stripe, event);
+}
+
+async function releaseFoundingCheckoutClaim(
+  session: Stripe.Checkout.Session,
+): Promise<unknown> {
+  if (
+    session.mode !== "subscription" ||
+    session.metadata?.offer_key?.trim() !== "founding_100"
+  ) {
+    return { ignored: "not_founding_100" };
+  }
+
+  const orgId =
+    session.metadata?.org_id?.trim() ||
+    session.client_reference_id ||
+    null;
+
+  if (!orgId) {
+    throw new Error("founding_100_org_id_unresolved");
+  }
+
+  const { data, error } = await portalAdmin().rpc(
+    "fn_release_campaign_claim",
+    {
+      p_org_id: orgId,
+      p_campaign_key: "founding_100",
+      p_checkout_session_id: session.id,
+    } as never,
+  );
+
+  if (error) {
+    throw new Error(
+      `founding_100_claim_release_failed:${error.message}`,
+    );
+  }
+
+  return data;
+}
+
+async function handleFoundingCheckoutExpiry(
+  event: Stripe.Event,
+): Promise<OneOffEventResult> {
+  if (event.type !== "checkout.session.expired") {
+    return { handled: false };
+  }
+
+  const session =
+    event.data.object as Stripe.Checkout.Session;
+
+  if (
+    session.mode !== "subscription" ||
+    session.metadata?.offer_key?.trim() !== "founding_100"
+  ) {
+    return { handled: false };
+  }
+
+  const result =
+    await releaseFoundingCheckoutClaim(session);
+
+  return {
+    handled: true,
+    result,
+  };
+}
+
+function isPaidFoundingEvent(
+  event: Stripe.Event,
+): boolean {
+  if (event.type === "invoice.paid") {
+    return true;
+  }
+
+  if (
+    event.type === "checkout.session.completed" ||
+    event.type ===
+      "checkout.session.async_payment_succeeded"
+  ) {
+    const session =
+      event.data.object as Stripe.Checkout.Session;
+
+    return session.payment_status === "paid";
+  }
+
+  return false;
 }
 
 function isDuplicateInsert(error: {
@@ -656,7 +830,24 @@ export async function POST(req: Request) {
 
     if (oneOff.handled) {
       await finishEvent(event.id, "ok");
-      return NextResponse.json({ ok: true, one_off: true, result: oneOff.result });
+      return NextResponse.json({
+        ok: true,
+        one_off: true,
+        result: oneOff.result,
+      });
+    }
+
+    const foundingExpiry =
+      await handleFoundingCheckoutExpiry(event);
+
+    if (foundingExpiry.handled) {
+      await finishEvent(event.id, "ok");
+
+      return NextResponse.json({
+        ok: true,
+        founding_100_claim_released: true,
+        result: foundingExpiry.result,
+      });
     }
 
     if (!SUBSCRIPTION_HANDLED.has(event.type)) {
@@ -695,6 +886,93 @@ export async function POST(req: Request) {
         { ok: false, error: `rpc_failed:${rpcError.message}` },
         { status: 500 },
       );
+    }
+
+    if (
+      meta.offerKey === "first_link_70_3m" &&
+      meta.subId &&
+      isPaidFoundingEvent(event) &&
+      ["active", "trialing"].includes(
+        meta.stripeStatus || "",
+      )
+    ) {
+      const { error: firstLinkRedeemError } =
+        await portalAdmin()
+          .from("first_link_offers")
+          .update({
+            status: "redeemed",
+            redeemed_at: new Date().toISOString(),
+          })
+          .eq("org_id", meta.orgId)
+          .eq(
+            "offer_key",
+            "first_link_70_3m",
+          )
+          .in("status", [
+            "offered",
+            "claimed",
+          ]);
+
+      if (firstLinkRedeemError) {
+        // Billing has already succeeded. Do not invalidate a valid
+        // subscription because conversion-offer tracking failed.
+        console.error(
+          "[stripe-webhook] First-link offer redemption tracking failed:",
+          firstLinkRedeemError,
+        );
+      }
+    }
+
+    if (
+      meta.offerKey === "founding_100" &&
+      event.type === "checkout.session.async_payment_failed"
+    ) {
+      const session =
+        event.data.object as Stripe.Checkout.Session;
+
+      await releaseFoundingCheckoutClaim(session);
+    }
+
+    if (
+      meta.offerKey === "founding_100" &&
+      meta.subId &&
+      isPaidFoundingEvent(event) &&
+      ["active", "trialing"].includes(
+        meta.stripeStatus || "",
+      )
+    ) {
+      const { error: foundingRedeemError } =
+        await portalAdmin().rpc(
+          "fn_redeem_campaign_offer",
+          {
+            p_org_id: meta.orgId,
+            p_campaign_key: "founding_100",
+            p_stripe_subscription_id: meta.subId,
+            p_stripe_event_id: event.id,
+            p_certification_purchased:
+              meta.certifiedConsultantAddOn,
+          } as never,
+        );
+
+      if (foundingRedeemError) {
+        // Founding membership state is commercially authoritative.
+        // Fail this webhook so Stripe retries rather than silently
+        // leaving a paid customer without their campaign entitlement.
+        await finishEvent(
+          event.id,
+          "failed",
+          foundingRedeemError.message,
+        );
+
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              `founding_100_redeem_failed:${foundingRedeemError.message}`,
+          },
+          { status: 500 },
+        );
+      }
     }
 
     // The subscription RPC marks the event complete transactionally. This is

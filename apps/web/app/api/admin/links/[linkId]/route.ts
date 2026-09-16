@@ -148,11 +148,33 @@ export async function PATCH(
     }
 
     const variantInput = body.report_variant ?? body.reportVariant;
-    if (variantInput !== undefined && variantInput !== null) {
-      update.meta = {
-        ...((existing.meta as Record<string, any> | null) ?? {}),
-        report_variant: normalizeReportVariant(variantInput),
-      };
+    const touchesReportMeta =
+      variantInput !== undefined ||
+      body.reportPaywallEnabled !== undefined ||
+      body.reportPriceCents !== undefined ||
+      body.reportCurrency !== undefined;
+
+    if (touchesReportMeta) {
+      const nextMeta = { ...((existing.meta as Record<string, any> | null) ?? {}) };
+      if (variantInput !== undefined && variantInput !== null) {
+        nextMeta.report_variant = normalizeReportVariant(variantInput);
+      }
+      if (body.reportPaywallEnabled !== undefined) {
+        nextMeta.report_paywall_enabled = body.reportPaywallEnabled;
+      }
+      if (body.reportPriceCents !== undefined) {
+        nextMeta.report_price_cents = body.reportPriceCents;
+      }
+      if (body.reportCurrency !== undefined) {
+        nextMeta.report_currency = body.reportCurrency.toLowerCase();
+      }
+      if (nextMeta.report_paywall_enabled && !nextMeta.report_price_cents) {
+        return NextResponse.json(
+          { ok: false, error: "A report price is required when charging for the full report" },
+          { status: 400 },
+        );
+      }
+      update.meta = nextMeta;
     }
 
     if (Object.keys(update).length === 0) {

@@ -133,6 +133,42 @@ export default function AdvancedFields({
         onClick={() => onChange("emailReport", !values.emailReport)}
       />
 
+      {showResults && (
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.025] p-4">
+          <OptionRow
+            selected={values.reportPaywallEnabled}
+            title="Charge for the full report"
+            hint="The test taker sees their results, then pays MindCanvas to unlock the full report"
+            onClick={() => onChange("reportPaywallEnabled", !values.reportPaywallEnabled)}
+          />
+          {values.reportPaywallEnabled && (
+            <div className="mt-4 grid grid-cols-[110px_1fr] gap-3">
+              <select
+                className={darkInputClass}
+                value={values.reportCurrency}
+                onChange={(e) => onChange("reportCurrency", e.target.value as any)}
+              >
+                <option value="GBP">GBP</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="ZAR">ZAR</option>
+              </select>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="49.00"
+                className={darkInputClass}
+                value={values.reportPrice}
+                onChange={(e) => onChange("reportPrice", e.target.value)}
+              />
+              <p className="col-span-2 text-[11.5px] font-light text-white/[0.36]">
+                MindCanvas receives the payment. Access is granted only to the completed submission that was purchased.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {supportsLite && (
         <div>
           <div className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/[0.36]">
