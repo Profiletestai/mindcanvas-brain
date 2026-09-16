@@ -459,6 +459,14 @@ export default async function AdminOrgsPage() {
             </Link>
 
             <Link
+              href="/admin/referrals"
+              className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-white/10"
+              title="Manage referral partners and track referral conversions"
+            >
+              Referral Tracking
+            </Link>
+
+            <Link
               href="/admin/orgs/new"
               className="inline-flex items-center justify-center rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-4 py-2 text-sm font-medium text-white shadow transition hover:brightness-110"
             >
