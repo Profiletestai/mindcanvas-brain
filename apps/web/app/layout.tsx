@@ -1,15 +1,23 @@
+// apps/web/app/layout.tsx
+
 import "./globals.css";
 import "../styles/branding.css";
+import "./pdf-print.css";
+
 import type { ReactNode } from "react";
-import Script from "next/script";
+
 import {
   DM_Sans,
   Inter,
   Manrope,
   Plus_Jakarta_Sans,
 } from "next/font/google";
-import { GoogleAnalytics } from "@next/third-parties/google";
-import "./pdf-print.css";
+
+import { ConsentProvider } from "@/components/privacy/ConsentProvider";
+import { CookieBanner } from "@/components/privacy/CookieBanner";
+import { CookiePreferences } from "@/components/privacy/CookiePreferences";
+import { CookieSettingsButton } from "@/components/privacy/CookieSettingsButton";
+import { ThirdPartyScripts } from "@/components/privacy/ThirdPartyScripts";
 
 /** Inter remains the default font across the existing platform. */
 const inter = Inter({
@@ -40,29 +48,47 @@ const dmSans = DM_Sans({
 });
 
 const googleAnalyticsId =
-  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
+  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || null;
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/**
+ * Existing production HighLevel / LeadConnector widget.
+ *
+ * Keeping the current widget ID here avoids changing the existing chat
+ * configuration as part of the privacy remediation.
+ */
+const highLevelWidgetId =
+  "6a7c977a93aa928cd2874e74";
+
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <html
       lang="en"
       className={`${inter.variable} ${manrope.variable} ${plusJakarta.variable} ${dmSans.variable}`}
     >
-      {/* Inter remains the default font everywhere else in the platform. */}
-      <body className={inter.className} suppressHydrationWarning>
-        {children}
+      <body
+        className={inter.className}
+        suppressHydrationWarning
+      >
+        <ConsentProvider
+          googleAnalyticsId={googleAnalyticsId}
+        >
+          {children}
 
-        {googleAnalyticsId ? (
-          <GoogleAnalytics gaId={googleAnalyticsId} />
-        ) : null}
+          <ThirdPartyScripts
+            googleAnalyticsId={googleAnalyticsId}
+            highLevelWidgetId={highLevelWidgetId}
+          />
 
-        <Script
-          id="ghl-chat-widget-loader"
-          src="https://widgets.leadconnectorhq.com/loader.js"
-          data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js"
-          data-widget-id="6a7c977a93aa928cd2874e74"
-          strategy="afterInteractive"
-        />
+          <CookieBanner />
+
+          <CookiePreferences />
+
+          <CookieSettingsButton />
+        </ConsentProvider>
       </body>
     </html>
   );
