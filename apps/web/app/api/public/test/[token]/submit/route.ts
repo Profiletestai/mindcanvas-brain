@@ -160,12 +160,19 @@ function supa() {
 }
 
 function visSupa() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE ||
-    process.env.SUPABASE_ANON_KEY!;
-  return createClient(url, key, { db: { schema: "visibility" } });
+    "";
+
+  if (!url || !key) {
+    throw new Error("Missing Supabase service-role configuration");
+  }
+
+  return createClient(url, key, {
+    db: { schema: "visibility" },
+  });
 }
 
 function isUuidLike(s: string) {
