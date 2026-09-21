@@ -68,6 +68,14 @@ function getKey() {
   );
 }
 
+function getVisibilityKey() {
+  return (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    ""
+  );
+}
+
 function sbPortal() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = getKey();
@@ -79,9 +87,13 @@ function sbPortal() {
 }
 
 function sbVisibility() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = getKey();
-  if (!url || !key) throw new Error("Missing Supabase env vars");
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = getVisibilityKey();
+
+  if (!url || !key) {
+    throw new Error("Missing Supabase service-role configuration");
+  }
+
   return createClient(url, key, {
     db: { schema: "visibility" },
     auth: { persistSession: false },
