@@ -2,6 +2,7 @@
 import { notFound } from "next/navigation";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+import { requirePortalOrgAccess } from "@/lib/portal/authz";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import ProfileExtendedReportClient from "./ProfileExtendedReportClient";
 import {
@@ -18,7 +19,6 @@ function getServiceRoleKey() {
   return (
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE ||
-    process.env.SUPABASE_ANON_KEY ||
     ""
   );
 }
@@ -90,18 +90,18 @@ export default async function ProfileExtendedReportPage({
 }: {
   params: { slug: string; takerId: string };
 }) {
-  const portal = createClient().schema("portal");
-  const vis = visibilityAdmin();
-
   const { slug, takerId } = params;
 
-  const { data: org } = await portal
-    .from("orgs")
-    .select("id, slug, name")
-    .eq("slug", slug)
-    .maybeSingle();
+  const guard = await requirePortalOrgAccess({
+    slug,
+    permission: "read",
+  });
 
-  if (!org) return notFound();
+  if (!guard.ok) return notFound();
+
+  const org = guard.access.org;
+  const portal = createClient().schema("portal");
+  const vis = visibilityAdmin();
 
   const { data: taker } = await portal
     .from("test_takers")
@@ -112,6 +112,38 @@ export default async function ProfileExtendedReportPage({
     .maybeSingle();
 
   if (!taker) return notFound();
+
+  let allowed = taker.org_id === org.id;
+
+  if (!allowed) {
+    const { data: subs } = await portal
+      .from("test_submissions")
+      .select("test_id")
+      .eq("taker_id", taker.id)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    const testIds = Array.from(
+      new Set(
+        (subs || [])
+          .map((s: any) => s?.test_id)
+          .filter(Boolean)
+      )
+    ) as string[];
+
+    if (testIds.length) {
+      const { data: testsForSubs } = await portal
+        .from("tests")
+        .select("id, org_id")
+        .in("id", testIds);
+
+      allowed = (testsForSubs || []).some(
+        (testRow: any) => testRow?.org_id === org.id
+      );
+    }
+  }
+
+  if (!allowed) return notFound();
 
   const { data: test } = await portal
     .from("tests")

@@ -4,6 +4,7 @@
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { requirePortalOrgAccess } from "@/lib/portal/authz";
 import { createClient } from "@/lib/server/supabaseAdmin";
 import { StandardResultGraphs, QscResultGraphs } from "./ResultGraphs";
 
@@ -179,15 +180,16 @@ export default async function TakerDetail({
   params: { slug: string; takerId: string };
 }) {
   const { slug, takerId } = params;
+
+  const guard = await requirePortalOrgAccess({
+    slug,
+    permission: "read",
+  });
+
+  if (!guard.ok) return notFound();
+
+  const org = guard.access.org;
   const sb = createClient().schema("portal");
-
-  const { data: org } = await sb
-    .from("orgs")
-    .select("id, slug, name")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (!org) return notFound();
 
   const { data: taker } = await sb
     .from("test_takers")

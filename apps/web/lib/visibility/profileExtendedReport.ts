@@ -178,7 +178,6 @@ function getServiceRoleKey() {
   return (
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.SUPABASE_SERVICE_ROLE ||
-    process.env.SUPABASE_ANON_KEY ||
     ""
   );
 }
