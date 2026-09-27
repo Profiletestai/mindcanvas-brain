@@ -1,5 +1,6 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { requireSuperadminApi } from '@/lib/server/adminApiAuth';
 
 export const runtime = 'nodejs';
 
@@ -34,6 +35,15 @@ export const runtime = 'nodejs';
  * Returns: { text: string }
  */
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   try {
     const body = await req.json();
     const {

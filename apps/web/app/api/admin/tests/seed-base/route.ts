@@ -2,6 +2,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import { getServiceClient } from "../../../../_lib/supabase";
 
 type Opt = { onum: number; text: string; points: number; profile_index: number; frequency: "A"|"B"|"C"|"D" };
@@ -101,6 +102,15 @@ const DATA: Q[] = [
 ];
 
 export async function POST() {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const supabase = getServiceClient();
 
   // Clear and seed

@@ -1,6 +1,7 @@
 //apps/web/app/api/admin/mcas/behavioural-dataset/export/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +62,15 @@ function getOsRankValue(
 }
 
 export async function GET(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   try {
     const url = new URL(req.url);
     const datasetVersion = url.searchParams.get("version") || "v1";

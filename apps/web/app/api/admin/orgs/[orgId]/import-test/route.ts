@@ -1,6 +1,7 @@
 // apps/web/app/api/admin/orgs/[orgId]/import-test/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import {
   TestImportPayload,
   transformImportToDbRows,
@@ -10,10 +11,17 @@ export async function POST(
   req: Request,
   { params }: { params: { orgId: string } }
 ) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = createClient().schema("portal");
   const orgId = params.orgId;
-
-  // TODO: super-admin auth check here (if you have one)
 
   let payload: TestImportPayload;
   try {

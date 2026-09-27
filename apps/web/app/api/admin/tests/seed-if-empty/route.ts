@@ -1,6 +1,7 @@
 // apps/web/app/api/admin/tests/seed-if-empty/route.ts
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/app/_lib/portal';
+import { requireSuperadminApi } from '@/lib/server/adminApiAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,15 @@ function defaultForSlug(slug: string) {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   try {
     const url = new URL(req.url);
     const orgSlug = (url.searchParams.get('org') || '').trim();
