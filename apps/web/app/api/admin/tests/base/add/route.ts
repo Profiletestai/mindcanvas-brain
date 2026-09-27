@@ -2,9 +2,19 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import { getServiceClient } from "../../../../../_lib/supabase";
 
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const supabase = getServiceClient();
   const body = await req.json().catch(()=> ({}));
 

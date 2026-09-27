@@ -2,6 +2,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import { getServiceClient } from "../../../../_lib/supabase";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -285,6 +286,15 @@ async function insertAnswers(sb: any, insQuestions: any) {
 /* ---------------- route ---------------- */
 
 export async function GET() {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = getServiceClient();
 
   // 1) Ensure parent (org_test_defs + framework if present)
