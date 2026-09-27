@@ -2,6 +2,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 
 export const runtime = "nodejs";
 
@@ -54,6 +55,15 @@ function toOutput(row: TestRow): Out | null {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const orgId = searchParams.get("orgId");
