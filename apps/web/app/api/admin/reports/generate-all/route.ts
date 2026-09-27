@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServiceClient } from "../../../../_lib/supabase";
 import { draftReportSections, buildProfileCopy } from "../../../../_lib/ai";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 
 function freqNamesFromLegacy(legacy: any) {
   return {
@@ -78,6 +79,15 @@ async function ensureFrameworkAndProfiles(sb: any, orgId: string) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = getServiceClient();
 
   const c = await cookies();

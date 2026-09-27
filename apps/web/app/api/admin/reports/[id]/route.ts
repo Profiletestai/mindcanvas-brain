@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServiceClient } from "../../../../_lib/supabase";
 import { draftReportSections } from "../../../../_lib/ai";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 
 async function getOrgId() {
   const c = await cookies();                        // ⬅️ await here
@@ -19,6 +20,15 @@ function getIdFromUrl(req: Request): string | null {
 }
 
 export async function GET(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = getServiceClient();
   const orgId = await getOrgId();
   const pid = getIdFromUrl(req);
@@ -77,6 +87,15 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = getServiceClient();
   const orgId = await getOrgId();
   const pid = getIdFromUrl(req);

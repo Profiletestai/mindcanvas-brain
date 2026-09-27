@@ -1,6 +1,7 @@
 // apps/web/app/api/admin/mcas/test-lab/[runId]/submit/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import {
   scoreMcasV2,
   type McasAnswers,
@@ -23,6 +24,15 @@ export async function POST(
   req: Request,
   props: { params: Promise<{ runId: string }> }
 ) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   try {
     const { runId } = await props.params;
 
