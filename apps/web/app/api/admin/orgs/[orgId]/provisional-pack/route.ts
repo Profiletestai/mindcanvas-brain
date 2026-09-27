@@ -1,15 +1,23 @@
 // apps/web/app/api/admin/orgs/[orgId]/provision-pack/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/server/supabaseAdmin";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import { ORG_TEMPLATE_PACKS } from "@/lib/orgTemplatePacks";
 
 export async function POST(
   req: Request,
   { params }: { params: { orgId: string } }
 ) {
-  const sb = createClient().schema("portal");
+  const auth = await requireSuperadminApi();
 
-  // TODO: super-admin auth check
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
+  const sb = createClient().schema("portal");
 
   const body = await req.json();
   const { packId } = body as { packId: string };
