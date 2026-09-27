@@ -6,8 +6,6 @@ import { getServiceClient } from "../../../../../../_lib/supabase";
 import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import OpenAI from "openai";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
 export async function POST(req: Request) {
   const auth = await requireSuperadminApi();
 
@@ -17,6 +15,8 @@ export async function POST(req: Request) {
       { status: auth.status },
     );
   }
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
   const url = new URL(req.url);
   const qnum = Number(url.searchParams.get("q"));
