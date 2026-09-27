@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import { getServiceClient } from "../../../../_lib/supabase";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -134,7 +135,17 @@ function makeSlug(len = 8) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = getServiceClient();
+
   try {
     const body = await req.json().catch(() => ({}));
     const modeReq: "free" | "full" = (body?.mode === "free" || body?.mode === "full") ? body.mode : "full";
