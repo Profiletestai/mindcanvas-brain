@@ -1,6 +1,7 @@
 //api/admin/mcas/behavioural-dataset-v2/export/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -167,6 +168,15 @@ function scoreAnswers(params: { answers: Record<string, string>; questions: Fram
 }
 
 export async function POST(req: Request, props: { params: Promise<{ runId: string }> }) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   try {
     const { runId } = await props.params;
     const body = await req.json().catch(() => ({}));
