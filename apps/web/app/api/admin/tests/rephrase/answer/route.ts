@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getServiceClient } from "../../../../../_lib/supabase";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 
 // TODO: replace with real org resolution (query param, session, etc.)
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -80,6 +81,15 @@ async function getOnboardingContext(sb: any) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const sb = getServiceClient();
   try {
     const body = await req.json().catch(() => ({}));

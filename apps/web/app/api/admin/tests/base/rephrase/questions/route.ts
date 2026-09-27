@@ -3,11 +3,21 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { getServiceClient } from "../../../../../../_lib/supabase";
+import { requireSuperadminApi } from "@/lib/server/adminApiAuth";
 import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 export async function POST(req: Request) {
+  const auth = await requireSuperadminApi();
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
+  }
+
   const url = new URL(req.url);
   const qnum = Number(url.searchParams.get("q"));
   const questionId = url.searchParams.get("question_id");
