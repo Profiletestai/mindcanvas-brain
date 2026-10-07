@@ -50,7 +50,7 @@ type ReportBlock =
   | { type: "divider" }
   | { type: "spacer"; size?: "sm" | "md" | "lg" }
   | { type: "h1" | "h2" | "h3" | "h4"; text?: string }
-  | { type: "profile_map" } // ✅ embedded radar chart block
+  | { type: "profile_map" }
   | {
       type: "image";
       src?: string;
@@ -85,13 +85,21 @@ function fullName(first?: string | null, last?: string | null) {
 
 function profileKeyVariants(code: string) {
   const c = String(code || "").toUpperCase().trim();
-  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c;
-  const asPROFILE = c.startsWith("P") ? c.replace(/^P/, "PROFILE_") : c;
+
+  const asP = c.startsWith("PROFILE_")
+    ? c.replace("PROFILE_", "P")
+    : c;
+
+  const asPROFILE = /^P[1-8]$/.test(c)
+    ? c.replace(/^P/, "PROFILE_")
+    : c;
+
   return Array.from(new Set([c, asP, asPROFILE]));
 }
 
 function profileNameToImageFile(profileName: string) {
   const n = String(profileName || "").toLowerCase();
+
   if (n.includes("activator")) return "activator.png";
   if (n.includes("messenger")) return "messenger.png";
   if (n.includes("integrator")) return "integrator.png";
@@ -100,33 +108,64 @@ function profileNameToImageFile(profileName: string) {
   if (n.includes("planner")) return "planner.png";
   if (n.includes("evaluator")) return "evaluator.png";
   if (n.includes("vision")) return "vision-engineer.png";
+
   return "";
 }
 
-function GlassCard(props: { children: React.ReactNode; className?: string }) {
+function GlassCard(props: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={`rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6 ${props.className || ""}`}>
+    <div
+      className={`rounded-2xl border border-white/10 bg-white/5 p-4 md:p-6 ${
+        props.className || ""
+      }`}
+    >
       {props.children}
     </div>
   );
 }
 
-function WhiteCard(props: { children: React.ReactNode; className?: string }) {
+function WhiteCard(props: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={`rounded-2xl bg-white p-4 md:p-6 text-slate-900 shadow-sm ${props.className || ""}`}>
+    <div
+      className={`rounded-2xl bg-white p-4 md:p-6 text-slate-900 shadow-sm ${
+        props.className || ""
+      }`}
+    >
       {props.children}
     </div>
   );
 }
 
 function MiniDivider() {
-  return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />;
+  return (
+    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+  );
 }
 
-function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>; pct: Record<AB, number> }) {
-  const items = props.labels.map((f) => ({ ...f, v: clamp01(props.pct?.[f.code] ?? 0) }));
+function VerticalDriversChart(props: {
+  labels: Array<{ code: AB; name: string }>;
+  pct: Record<AB, number>;
+}) {
+  const items = props.labels.map((f) => ({
+    ...f,
+    v: clamp01(props.pct?.[f.code] ?? 0),
+  }));
+
   const barColor = (code: AB) =>
-    code === "A" ? "bg-red-500" : code === "B" ? "bg-amber-500" : code === "C" ? "bg-emerald-500" : "bg-blue-500";
+    code === "A"
+      ? "bg-red-500"
+      : code === "B"
+      ? "bg-amber-500"
+      : code === "C"
+      ? "bg-emerald-500"
+      : "bg-blue-500";
+
   const ticks = [100, 80, 60, 40, 20, 0];
 
   return (
@@ -135,7 +174,9 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
         <div className="hidden sm:block w-8 md:w-10 shrink-0">
           {ticks.map((t) => (
             <div key={t} className="relative h-7">
-              <div className="absolute right-0 top-[-2px] text-[10px] font-semibold text-slate-400">{t}</div>
+              <div className="absolute right-0 top-[-2px] text-[10px] font-semibold text-slate-400">
+                {t}
+              </div>
             </div>
           ))}
         </div>
@@ -153,14 +194,32 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
             <div className="absolute inset-0 flex items-end justify-around px-3 sm:px-4 md:px-6 pb-3 sm:pb-4">
               {items.map((it) => {
                 const h = Math.round(it.v * 100);
+
                 return (
-                  <div key={it.code} className="flex w-14 sm:w-16 flex-col items-center gap-2">
-                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">{Math.round(it.v * 100)}%</div>
-                    <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
-                      <div className={`absolute bottom-0 left-0 right-0 ${barColor(it.code)}`} style={{ height: `${h}%` }} />
+                  <div
+                    key={it.code}
+                    className="flex w-14 sm:w-16 flex-col items-center gap-2"
+                  >
+                    <div className="text-[11px] sm:text-xs font-semibold text-slate-600">
+                      {Math.round(it.v * 100)}%
                     </div>
-                    <div className="text-xs font-bold text-slate-900">{it.code}</div>
-                    <div className="text-[10px] sm:text-[11px] text-slate-600 text-center leading-tight">{it.name}</div>
+
+                    <div className="relative h-[200px] sm:h-[230px] md:h-[240px] w-9 sm:w-10 rounded-lg bg-white border border-slate-200 overflow-hidden">
+                      <div
+                        className={`absolute bottom-0 left-0 right-0 ${barColor(
+                          it.code
+                        )}`}
+                        style={{ height: `${h}%` }}
+                      />
+                    </div>
+
+                    <div className="text-xs font-bold text-slate-900">
+                      {it.code}
+                    </div>
+
+                    <div className="text-[10px] sm:text-[11px] text-slate-600 text-center leading-tight">
+                      {it.name}
+                    </div>
                   </div>
                 );
               })}
@@ -172,52 +231,112 @@ function VerticalDriversChart(props: { labels: Array<{ code: AB; name: string }>
   );
 }
 
-function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLabels: Array<{ code: string; name: string }> }) {
-  const labels = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"] as const;
+function ProfileOnlyRadar(props: {
+  profilePct: Record<string, number>;
+  profileLabels: Array<{ code: string; name: string }>;
+}) {
+  const labels = [
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5",
+    "P6",
+    "P7",
+    "P8",
+  ] as const;
 
   const rawVal = (p: string) => {
     const asPROFILE = p.replace(/^P/, "PROFILE_");
-    return clamp01(props.profilePct[p] ?? props.profilePct[asPROFILE] ?? 0);
+
+    return clamp01(
+      props.profilePct[p] ??
+        props.profilePct[asPROFILE] ??
+        0
+    );
   };
 
   const getProfileName = (p: string) => {
-    const asPROFILE = p.replace(/^P/, "PROFILE_");
-    return props.profileLabels.find((x) => x.code === asPROFILE)?.name || p;
+    const wantedVariants = profileKeyVariants(p);
+
+    const match = props.profileLabels.find((profile) => {
+      const profileVariants = profileKeyVariants(profile.code);
+
+      return profileVariants.some((variant) =>
+        wantedVariants.includes(variant)
+      );
+    });
+
+    return match?.name || p;
   };
 
-  // ✅ zoom in (outer ring = 50%)
+  // Outer ring represents 50%.
   const MAX = 0.5;
-  const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  // ViewBox stays constant; render size is responsive via CSS.
+  const val = (p: string) =>
+    clamp01(rawVal(p) / MAX);
+
   const size = 520;
   const cx = size / 2;
   const cy = size / 2;
   const r = 205;
 
   function pt(i: number, v: number) {
-    const angle = (Math.PI * 2 * i) / labels.length - Math.PI / 2;
-    return { x: cx + Math.cos(angle) * r * v, y: cy + Math.sin(angle) * r * v };
+    const angle =
+      (Math.PI * 2 * i) / labels.length - Math.PI / 2;
+
+    return {
+      x: cx + Math.cos(angle) * r * v,
+      y: cy + Math.sin(angle) * r * v,
+    };
   }
 
   const rings = [0.1, 0.2, 0.3, 0.4, 0.5];
-  const pts = labels.map((k, i) => pt(i, val(k)));
-  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") + " Z";
-  const ringLabelY = (rv: number) => cy - r * (rv / MAX);
+
+  const pts = labels.map((k, i) =>
+    pt(i, val(k))
+  );
+
+  const path =
+    pts
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"} ${p.x.toFixed(
+            2
+          )} ${p.y.toFixed(2)}`
+      )
+      .join(" ") + " Z";
+
+  const ringLabelY = (rv: number) =>
+    cy - r * (rv / MAX);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-semibold text-slate-900">Your Personality Map (Profiles)</div>
-        <div className="hidden sm:block text-xs text-slate-500">Higher = stronger pattern</div>
+        <div className="text-sm font-semibold text-slate-900">
+          Your Personality Map (Profiles)
+        </div>
+
+        <div className="hidden sm:block text-xs text-slate-500">
+          Higher = stronger pattern
+        </div>
       </div>
 
       <div className="mt-3 flex justify-center">
-        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto max-w-[420px] sm:max-w-[520px]" aria-label="Profile radar chart">
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          className="w-full h-auto max-w-[420px] sm:max-w-[520px]"
+          aria-label="Profile radar chart"
+        >
           {rings.map((rv) => (
             <polygon
               key={rv}
-              points={labels.map((_, i) => pt(i, clamp01(rv / MAX))).map((p) => `${p.x},${p.y}`).join(" ")}
+              points={labels
+                .map((_, i) =>
+                  pt(i, clamp01(rv / MAX))
+                )
+                .map((p) => `${p.x},${p.y}`)
+                .join(" ")}
               fill="none"
               stroke="rgba(15,23,42,0.12)"
             />
@@ -239,18 +358,48 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
 
           {labels.map((k, i) => {
             const p = pt(i, 1);
-            return <line key={k} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(15,23,42,0.12)" />;
+
+            return (
+              <line
+                key={k}
+                x1={cx}
+                y1={cy}
+                x2={p.x}
+                y2={p.y}
+                stroke="rgba(15,23,42,0.12)"
+              />
+            );
           })}
 
           {labels.map((k, i) => {
             const p = pt(i, 1.16);
             const name = getProfileName(k);
+
+            // P3 and P7 sit on the extreme right/left of the chart.
+            // Point their text inward so the full label stays inside the SVG.
+            const isRight = i === 2;
+            const isLeft = i === 6;
+
+            const textAnchor: "start" | "middle" | "end" =
+              isRight
+                ? "end"
+                : isLeft
+                ? "start"
+                : "middle";
+
+            const xOffset =
+              isRight
+                ? -8
+                : isLeft
+                ? 8
+                : 0;
+
             return (
               <text
                 key={k}
-                x={p.x}
+                x={p.x + xOffset}
                 y={p.y}
-                textAnchor="middle"
+                textAnchor={textAnchor}
                 dominantBaseline="middle"
                 fontSize="12"
                 fontWeight={600}
@@ -261,8 +410,19 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
             );
           })}
 
-          <path d={path} fill="rgba(20,184,166,0.12)" stroke="rgba(20,184,166,0.92)" strokeWidth="2.75" />
-          <circle cx={cx} cy={cy} r="2.75" fill="rgba(15,23,42,0.5)" />
+          <path
+            d={path}
+            fill="rgba(20,184,166,0.12)"
+            stroke="rgba(20,184,166,0.92)"
+            strokeWidth="2.75"
+          />
+
+          <circle
+            cx={cx}
+            cy={cy}
+            r="2.75"
+            fill="rgba(15,23,42,0.5)"
+          />
 
           {labels.map((k, i) => {
             const vScaled = val(k);
@@ -270,11 +430,21 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
             const p = pt(i, vScaled);
 
             const show = vRaw > 0.001;
-            const labelPt = pt(i, Math.min(1, vScaled + 0.16));
+
+            const labelPt = pt(
+              i,
+              Math.min(1, vScaled + 0.16)
+            );
 
             return (
               <g key={`pt-${k}`}>
-                <circle cx={p.x} cy={p.y} r="4" fill="rgba(20,184,166,0.95)" />
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r="4"
+                  fill="rgba(20,184,166,0.95)"
+                />
+
                 {show ? (
                   <text
                     x={labelPt.x}
@@ -293,49 +463,102 @@ function ProfileOnlyRadar(props: { profilePct: Record<string, number>; profileLa
         </svg>
       </div>
 
-      <div className="mt-2 sm:hidden text-xs text-slate-500 text-center">Higher = stronger pattern</div>
+      <div className="mt-2 sm:hidden text-xs text-slate-500 text-center">
+        Higher = stronger pattern
+      </div>
     </div>
   );
 }
 
-function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
-  const inBlocks = Array.isArray(blocks) ? blocks : [];
+function normaliseDocBlocks(
+  blocks: ReportBlock[]
+): ReportBlock[] {
+  const inBlocks = Array.isArray(blocks)
+    ? blocks
+    : [];
+
   const out: ReportBlock[] = [];
 
-  const isH = (b: any, lvl: "h3" | "h4") => String(b?.type || "").toLowerCase() === lvl;
-  const getText = (b: any) => safeText(b?.text).trim();
+  const isH = (
+    b: any,
+    lvl: "h3" | "h4"
+  ) =>
+    String(b?.type || "").toLowerCase() === lvl;
+
+  const getText = (b: any) =>
+    safeText(b?.text).trim();
 
   let i = 0;
+
   while (i < inBlocks.length) {
     const b = inBlocks[i];
-    const t = String((b as any)?.type || "").toLowerCase();
+
+    const t = String(
+      (b as any)?.type || ""
+    ).toLowerCase();
 
     if (t === "h4") {
       const items: string[] = [];
-      while (i < inBlocks.length && isH(inBlocks[i], "h4")) {
+
+      while (
+        i < inBlocks.length &&
+        isH(inBlocks[i], "h4")
+      ) {
         const txt = getText(inBlocks[i]);
+
         if (txt) items.push(txt);
+
         i++;
       }
-      if (items.length) out.push({ type: "ul", items });
+
+      if (items.length) {
+        out.push({
+          type: "ul",
+          items,
+        });
+      }
+
       continue;
     }
 
-    if (t === "h3" && i + 1 < inBlocks.length && (isH(inBlocks[i + 1], "h3") || isH(inBlocks[i + 1], "h4"))) {
+    if (
+      t === "h3" &&
+      i + 1 < inBlocks.length &&
+      (isH(inBlocks[i + 1], "h3") ||
+        isH(inBlocks[i + 1], "h4"))
+    ) {
       out.push(b);
+
       const items: string[] = [];
+
       i++;
 
       while (i < inBlocks.length) {
-        const tt = String((inBlocks[i] as any)?.type || "").toLowerCase();
-        if (tt !== "h3" && tt !== "h4") break;
+        const tt = String(
+          (inBlocks[i] as any)?.type || ""
+        ).toLowerCase();
+
+        if (
+          tt !== "h3" &&
+          tt !== "h4"
+        ) {
+          break;
+        }
 
         const txt = getText(inBlocks[i]);
+
         if (txt) items.push(txt);
+
         i++;
       }
 
-      if (items.length) out.push({ type: "ul", items });
+      if (items.length) {
+        out.push({
+          type: "ul",
+          items,
+        });
+      }
+
       continue;
     }
 
@@ -346,50 +569,132 @@ function normaliseDocBlocks(blocks: ReportBlock[]): ReportBlock[] {
   return out;
 }
 
-function stripLeadingTitleBlock(blocks: ReportBlock[]): ReportBlock[] {
-  if (!Array.isArray(blocks) || blocks.length === 0) return [];
+function stripLeadingTitleBlock(
+  blocks: ReportBlock[]
+): ReportBlock[] {
+  if (
+    !Array.isArray(blocks) ||
+    blocks.length === 0
+  ) {
+    return [];
+  }
+
   const first = blocks[0];
-  const type = String((first as any)?.type || "").toLowerCase();
-  if (type === "h1" || type === "h2") return blocks.slice(1);
+
+  const type = String(
+    (first as any)?.type || ""
+  ).toLowerCase();
+
+  if (
+    type === "h1" ||
+    type === "h2"
+  ) {
+    return blocks.slice(1);
+  }
+
   return blocks;
 }
 
-function resolveBlockImageSrc(rawSrc: string, topProfileName: string) {
+function resolveBlockImageSrc(
+  rawSrc: string,
+  topProfileName: string
+) {
   const raw = String(rawSrc || "").trim();
+
   if (!raw) return "";
 
-  if (raw.startsWith("/") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (
+    raw.startsWith("/") ||
+    raw.startsWith("http://") ||
+    raw.startsWith("https://")
+  ) {
+    return raw;
+  }
 
   if (raw === "{{TOP_PROFILE_IMAGE}}") {
-    const file = profileNameToImageFile(topProfileName);
-    return file ? `/images/operatingframe-full-test/profile-cards/${file}` : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+    const file =
+      profileNameToImageFile(topProfileName);
+
+    return file
+      ? `/images/operatingframe-full-test/profile-cards/${file}`
+      : "/images/operatingframe-full-test/profile-cards/bio-image.png";
   }
 
   return raw;
 }
 
-function BlockRenderer(props: { block: any; topProfileName: string; data: ResultData }) {
+function BlockRenderer(props: {
+  block: any;
+  topProfileName: string;
+  data: ResultData;
+}) {
   const b = props.block;
-  const type = String(b?.type || "").toLowerCase();
 
-  // ✅ Embed the live Profile Map inside any section via: { "type": "profile_map" }
+  const type = String(
+    b?.type || ""
+  ).toLowerCase();
+
   if (type === "profile_map") {
-    return <ProfileOnlyRadar profilePct={props.data.profile_percentages} profileLabels={props.data.profile_labels} />;
+    return (
+      <ProfileOnlyRadar
+        profilePct={props.data.profile_percentages}
+        profileLabels={props.data.profile_labels}
+      />
+    );
   }
 
-  if (type === "h1") return <h1 className="text-2xl font-bold tracking-tight text-slate-900">{safeText(b.text)}</h1>;
-  if (type === "h2") return <h2 className="text-xl font-semibold tracking-tight text-slate-900">{safeText(b.text)}</h2>;
-  if (type === "h3") return <h3 className="text-lg font-semibold text-slate-900">{safeText(b.text)}</h3>;
-  if (type === "h4") return <div className="text-sm font-normal text-slate-700">{safeText(b.text)}</div>;
+  if (type === "h1") {
+    return (
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        {safeText(b.text)}
+      </h1>
+    );
+  }
 
-  if (type === "p") return <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">{safeText(b.text)}</p>;
+  if (type === "h2") {
+    return (
+      <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+        {safeText(b.text)}
+      </h2>
+    );
+  }
+
+  if (type === "h3") {
+    return (
+      <h3 className="text-lg font-semibold text-slate-900">
+        {safeText(b.text)}
+      </h3>
+    );
+  }
+
+  if (type === "h4") {
+    return (
+      <div className="text-sm font-normal text-slate-700">
+        {safeText(b.text)}
+      </div>
+    );
+  }
+
+  if (type === "p") {
+    return (
+      <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+        {safeText(b.text)}
+      </p>
+    );
+  }
 
   if (type === "ul") {
-    const items = Array.isArray(b.items) ? b.items : [];
+    const items = Array.isArray(b.items)
+      ? b.items
+      : [];
+
     return (
       <ul className="list-disc pl-5 text-sm font-normal text-slate-700 space-y-1">
         {items.map((it: any, i: number) => (
-          <li key={i} className="font-normal text-slate-700">
+          <li
+            key={i}
+            className="font-normal text-slate-700"
+          >
             {safeText(it)}
           </li>
         ))}
@@ -398,11 +703,17 @@ function BlockRenderer(props: { block: any; topProfileName: string; data: Result
   }
 
   if (type === "ol") {
-    const items = Array.isArray(b.items) ? b.items : [];
+    const items = Array.isArray(b.items)
+      ? b.items
+      : [];
+
     return (
       <ol className="list-decimal pl-5 text-sm font-normal text-slate-700 space-y-1">
         {items.map((it: any, i: number) => (
-          <li key={i} className="font-normal text-slate-700">
+          <li
+            key={i}
+            className="font-normal text-slate-700"
+          >
             {safeText(it)}
           </li>
         ))}
@@ -413,27 +724,64 @@ function BlockRenderer(props: { block: any; topProfileName: string; data: Result
   if (type === "quote") {
     const t = safeText(b.text).trim();
     const cite = safeText(b.cite).trim();
+
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-        <p className="text-sm italic text-slate-700">“{t}”</p>
-        {cite ? <p className="mt-2 text-xs text-slate-500">— {cite}</p> : null}
+        <p className="text-sm italic text-slate-700">
+          “{t}”
+        </p>
+
+        {cite ? (
+          <p className="mt-2 text-xs text-slate-500">
+            — {cite}
+          </p>
+        ) : null}
       </div>
     );
   }
 
   if (type === "image") {
-    const src = resolveBlockImageSrc(String(b?.src || ""), props.topProfileName);
+    const src =
+      resolveBlockImageSrc(
+        String(b?.src || ""),
+        props.topProfileName
+      );
+
     if (!src) return null;
 
-    const align = String(b?.align || "center").toLowerCase();
-    const justify = align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center";
-    const maxH = typeof b?.max_h === "number" ? b.max_h : 360;
+    const align = String(
+      b?.align || "center"
+    ).toLowerCase();
+
+    const justify =
+      align === "left"
+        ? "justify-start"
+        : align === "right"
+        ? "justify-end"
+        : "justify-center";
+
+    const maxH =
+      typeof b?.max_h === "number"
+        ? b.max_h
+        : 360;
 
     const wantsBorder =
-      b?.border === false || b?.no_border === true || String(src).toLowerCase().includes("nick-pye") ? false : true;
+      b?.border === false ||
+      b?.no_border === true ||
+      String(src)
+        .toLowerCase()
+        .includes("nick-pye")
+        ? false
+        : true;
 
-    const rounded = b?.rounded === false ? "rounded-none" : "rounded-2xl";
-    const chrome = wantsBorder ? "border border-slate-200 bg-white shadow-sm" : "border-0 bg-transparent shadow-none";
+    const rounded =
+      b?.rounded === false
+        ? "rounded-none"
+        : "rounded-2xl";
+
+    const chrome = wantsBorder
+      ? "border border-slate-200 bg-white shadow-sm"
+      : "border-0 bg-transparent shadow-none";
 
     return (
       <figure className="my-4">
@@ -448,13 +796,35 @@ function BlockRenderer(props: { block: any; topProfileName: string; data: Result
             }}
           />
         </div>
-        {b?.caption ? <figcaption className="mt-2 text-xs text-slate-500">{safeText(b.caption)}</figcaption> : null}
+
+        {b?.caption ? (
+          <figcaption className="mt-2 text-xs text-slate-500">
+            {safeText(b.caption)}
+          </figcaption>
+        ) : null}
       </figure>
     );
   }
 
-  if (type === "divider") return <hr className="my-6 border-slate-200" />;
-  if (type === "spacer") return <div className={b.size === "lg" ? "h-10" : b.size === "sm" ? "h-3" : "h-6"} />;
+  if (type === "divider") {
+    return (
+      <hr className="my-6 border-slate-200" />
+    );
+  }
+
+  if (type === "spacer") {
+    return (
+      <div
+        className={
+          b.size === "lg"
+            ? "h-10"
+            : b.size === "sm"
+            ? "h-3"
+            : "h-6"
+        }
+      />
+    );
+  }
 
   return null;
 }
@@ -467,25 +837,52 @@ export default function OperatingFrameReportClient(props: {
   framework: any;
 }) {
   const { data, framework } = props;
-  const reportRef = useRef<HTMLDivElement | null>(null);
 
-  const participant = fullName(data.taker?.first_name, data.taker?.last_name);
-  const orgName = data.org_name || "Organisation";
-  const testName = data.test_name || "OperatingFrame™";
+  const reportRef =
+    useRef<HTMLDivElement | null>(null);
 
-  const keys = profileKeyVariants(data.top_profile_code);
-  const profile = keys.map((k) => framework?.profiles?.[k]).find(Boolean) || null;
+  const participant = fullName(
+    data.taker?.first_name,
+    data.taker?.last_name
+  );
 
-  const topProfileName = profile?.name || data.top_profile_name || "Top Profile";
-  const topFreqCode = data.top_freq;
-  const topFreqName = data.frequency_labels.find((f) => f.code === topFreqCode)?.name || topFreqCode;
+  const orgName =
+    data.org_name || "Organisation";
 
-  const orgLogoSrc = "/images/operatingframe-full-test/org-logo.png";
+  const testName =
+    data.test_name || "OperatingFrame™";
 
-  const profileFile = profileNameToImageFile(topProfileName);
-  const profileHeroSrc = profileFile
-    ? `/images/operatingframe-full-test/profile-cards/${profileFile}`
-    : "/images/operatingframe-full-test/profile-cards/bio-image.png";
+  const keys =
+    profileKeyVariants(data.top_profile_code);
+
+  const profile =
+    keys
+      .map((k) => framework?.profiles?.[k])
+      .find(Boolean) || null;
+
+  const topProfileName =
+    profile?.name ||
+    data.top_profile_name ||
+    "Top Profile";
+
+  const topFreqCode =
+    data.top_freq;
+
+  const topFreqName =
+    data.frequency_labels.find(
+      (f) => f.code === topFreqCode
+    )?.name || topFreqCode;
+
+  const orgLogoSrc =
+    "/images/operatingframe-full-test/org-logo.png";
+
+  const profileFile =
+    profileNameToImageFile(topProfileName);
+
+  const profileHeroSrc =
+    profileFile
+      ? `/images/operatingframe-full-test/profile-cards/${profileFile}`
+      : "/images/operatingframe-full-test/profile-cards/bio-image.png";
 
   function openNextSteps() {
     const direct =
@@ -496,7 +893,14 @@ export default function OperatingFrameReportClient(props: {
       "";
 
     const url = String(direct || "").trim();
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+
+    if (url) {
+      window.open(
+        url,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    }
   }
 
   function downloadPdfViaPrint() {
@@ -504,39 +908,107 @@ export default function OperatingFrameReportClient(props: {
   }
 
   const sections = useMemo(() => {
-    const common = framework?.common || {};
-    const p = profile?.sections || {};
+    const common =
+      framework?.common || {};
 
-    const makeSection = (fallbackTitle: string, raw: any) => {
-      const title = safeText(raw?.title).trim() || fallbackTitle;
-      const blocks = stripLeadingTitleBlock(normaliseDocBlocks(raw?.blocks || []));
-      return { title, blocks };
+    const p =
+      profile?.sections || {};
+
+    const makeSection = (
+      fallbackTitle: string,
+      raw: any
+    ) => {
+      const title =
+        safeText(raw?.title).trim() ||
+        fallbackTitle;
+
+      const blocks =
+        stripLeadingTitleBlock(
+          normaliseDocBlocks(
+            raw?.blocks || []
+          )
+        );
+
+      return {
+        title,
+        blocks,
+      };
     };
 
     return [
-      makeSection("Welcome", common?.welcome),
-      makeSection("Section 1 – Executive Summary", p?.section_1),
-      makeSection("Section 2 – Your Leadership Drivers", p?.section_2),
-      makeSection("Section 3 – Your Operating Style", p?.section_3),
-      makeSection("Section 4 – How Your Drivers Combine", p?.section_4),
-      makeSection("Section 5 – Team Contribution", p?.section_5),
-      makeSection("Section 6 – Stress Operating Summary", p?.section_6),
-      makeSection("Section 7 – Decision Pattern", p?.section_7),
-      makeSection("Section 8 – Decision Pattern", p?.section_8),
-      makeSection("Section 9 – Development Roadmap", p?.section_9),
+      makeSection(
+        "Welcome",
+        common?.welcome
+      ),
+
+      makeSection(
+        "Section 1 – Executive Summary",
+        p?.section_1
+      ),
+
+      makeSection(
+        "Section 2 – Your Leadership Drivers",
+        p?.section_2
+      ),
+
+      makeSection(
+        "Section 3 – Your Operating Style",
+        p?.section_3
+      ),
+
+      makeSection(
+        "Section 4 – How Your Drivers Combine",
+        p?.section_4
+      ),
+
+      makeSection(
+        "Section 5 – Team Contribution",
+        p?.section_5
+      ),
+
+      makeSection(
+        "Section 6 – Stress Operating Summary",
+        p?.section_6
+      ),
+
+      makeSection(
+        "Section 7 – Decision Pattern",
+        p?.section_7
+      ),
+
+      makeSection(
+        "Section 8 – Decision Pattern",
+        p?.section_8
+      ),
+
+      makeSection(
+        "Section 9 – Development Roadmap",
+        p?.section_9
+      ),
     ];
   }, [framework, profile]);
 
   const driversIntro =
-    safeText(framework?.common?.drivers_intro?.blocks?.[0]?.text) ||
+    safeText(
+      framework?.common
+        ?.drivers_intro?.blocks?.[0]
+        ?.text
+    ) ||
     "OperatingFrame helps you understand four core drivers behind your leadership: Direction, Connection, Structure, and Precision.";
 
   const mapIntro =
-    safeText(framework?.common?.profile_map_intro?.blocks?.[0]?.text) ||
+    safeText(
+      framework?.common
+        ?.profile_map_intro
+        ?.blocks?.[0]?.text
+    ) ||
     "This map shows your overall pattern across Profiles. It helps you see what you naturally lean on (strength), and what may require support or structure (risk).";
 
   return (
-    <div ref={reportRef} className="relative min-h-screen bg-[#050914] text-white overflow-hidden">
+    <div
+      ref={reportRef}
+      className="relative min-h-screen bg-[#050914] text-white overflow-hidden"
+    >
       <AppBackground />
 
       <div className="relative z-10 mx-auto max-w-6xl px-3 sm:px-4 py-6 md:px-6 md:py-8">
@@ -555,30 +1027,51 @@ export default function OperatingFrameReportClient(props: {
                     alt={orgName}
                     className="h-full w-full object-cover"
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      e.currentTarget.style.display =
+                        "none";
                     }}
                   />
                 </div>
 
                 <div className="min-w-0">
-                  <div className="text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">Organisation</div>
-                  <div className="mt-1 text-sm font-semibold text-white truncate">{orgName}</div>
+                  <div className="text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">
+                    Organisation
+                  </div>
 
-                  <div className="mt-3 text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">Test Name</div>
-                  <div className="mt-1 text-sm font-semibold text-white truncate">{testName}</div>
+                  <div className="mt-1 text-sm font-semibold text-white truncate">
+                    {orgName}
+                  </div>
+
+                  <div className="mt-3 text-[11px] font-semibold tracking-[0.22em] text-white/70 uppercase">
+                    Test Name
+                  </div>
+
+                  <div className="mt-1 text-sm font-semibold text-white truncate">
+                    {testName}
+                  </div>
                 </div>
               </div>
 
               <h1 className="mt-4 text-[22px] sm:text-2xl md:text-3xl font-bold tracking-tight leading-tight">
-                Personalised Report for <span className="text-white/90">{participant}</span>
+                Personalised Report for{" "}
+                <span className="text-white/90">
+                  {participant}
+                </span>
               </h1>
 
               <div className="mt-3 grid gap-2">
                 <div className="text-sm text-white/80">
-                  <span className="font-semibold text-white">Top Profile:</span> {topProfileName}
+                  <span className="font-semibold text-white">
+                    Top Profile:
+                  </span>{" "}
+                  {topProfileName}
                 </div>
+
                 <div className="text-sm text-white/80">
-                  <span className="font-semibold text-white">Driver:</span> {topFreqName} ({topFreqCode})
+                  <span className="font-semibold text-white">
+                    Driver:
+                  </span>{" "}
+                  {topFreqName} ({topFreqCode})
                 </div>
               </div>
 
@@ -606,7 +1099,8 @@ export default function OperatingFrameReportClient(props: {
                   alt={topProfileName}
                   className="h-full w-full object-cover"
                   onError={(e) => {
-                    e.currentTarget.style.display = "none";
+                    e.currentTarget.style.display =
+                      "none";
                   }}
                 />
               </div>
@@ -619,18 +1113,36 @@ export default function OperatingFrameReportClient(props: {
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <WhiteCard>
-              <div className="text-sm font-semibold text-slate-900">Drivers</div>
-              <div className="mt-2 text-sm text-slate-700">{driversIntro}</div>
+              <div className="text-sm font-semibold text-slate-900">
+                Drivers
+              </div>
+
+              <div className="mt-2 text-sm text-slate-700">
+                {driversIntro}
+              </div>
+
               <div className="mt-4">
-                <VerticalDriversChart labels={data.frequency_labels} pct={data.frequency_percentages} />
+                <VerticalDriversChart
+                  labels={data.frequency_labels}
+                  pct={data.frequency_percentages}
+                />
               </div>
             </WhiteCard>
 
             <WhiteCard>
-              <div className="text-sm font-semibold text-slate-900">Profile Map</div>
-              <div className="mt-2 text-sm text-slate-700">{mapIntro}</div>
+              <div className="text-sm font-semibold text-slate-900">
+                Profile Map
+              </div>
+
+              <div className="mt-2 text-sm text-slate-700">
+                {mapIntro}
+              </div>
+
               <div className="mt-4">
-                <ProfileOnlyRadar profilePct={data.profile_percentages} profileLabels={data.profile_labels} />
+                <ProfileOnlyRadar
+                  profilePct={data.profile_percentages}
+                  profileLabels={data.profile_labels}
+                />
               </div>
             </WhiteCard>
           </div>
@@ -638,13 +1150,26 @@ export default function OperatingFrameReportClient(props: {
 
         <div className="mt-6 space-y-4">
           {sections.map((s, idx) => (
-            <section key={idx} className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
+            <section
+              key={idx}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5"
+            >
               <WhiteCard>
-                <h2 className="text-lg sm:text-xl font-semibold text-slate-900">{s.title}</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
+                  {s.title}
+                </h2>
+
                 <div className="mt-4 space-y-3">
-                  {(s.blocks || []).map((b: any, i: number) => (
-                    <BlockRenderer key={i} block={b} topProfileName={topProfileName} data={data} />
-                  ))}
+                  {(s.blocks || []).map(
+                    (b: any, i: number) => (
+                      <BlockRenderer
+                        key={i}
+                        block={b}
+                        topProfileName={topProfileName}
+                        data={data}
+                      />
+                    )
+                  )}
                 </div>
               </WhiteCard>
             </section>
@@ -659,7 +1184,9 @@ export default function OperatingFrameReportClient(props: {
             </button>
           </div>
 
-          <footer className="pt-4 text-xs text-slate-400">© {new Date().getFullYear()} Powered by Profiletest.ai</footer>
+          <footer className="pt-4 text-xs text-slate-400">
+            © {new Date().getFullYear()} Powered by Profiletest.ai
+          </footer>
         </div>
       </div>
     </div>
