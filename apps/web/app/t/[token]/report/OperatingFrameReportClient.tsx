@@ -85,7 +85,11 @@ function fullName(first?: string | null, last?: string | null) {
 
 function profileKeyVariants(code: string) {
   const c = String(code || "").toUpperCase().trim();
-  const asP = c.startsWith("PROFILE_") ? c.replace("PROFILE_", "P") : c;
+
+  const asP = c.startsWith("PROFILE_")
+    ? c.replace("PROFILE_", "P")
+    : c;
+
   const asPROFILE = /^P[1-8]$/.test(c)
     ? c.replace(/^P/, "PROFILE_")
     : c;
@@ -266,11 +270,12 @@ function ProfileOnlyRadar(props: {
     return match?.name || p;
   };
 
-  // Zoom in (outer ring = 50%)
+  // Outer ring represents 50%.
   const MAX = 0.5;
-  const val = (p: string) => clamp01(rawVal(p) / MAX);
 
-  // ViewBox stays constant; render size is responsive via CSS.
+  const val = (p: string) =>
+    clamp01(rawVal(p) / MAX);
+
   const size = 520;
   const cx = size / 2;
   const cy = size / 2;
@@ -288,7 +293,9 @@ function ProfileOnlyRadar(props: {
 
   const rings = [0.1, 0.2, 0.3, 0.4, 0.5];
 
-  const pts = labels.map((k, i) => pt(i, val(k)));
+  const pts = labels.map((k, i) =>
+    pt(i, val(k))
+  );
 
   const path =
     pts
@@ -368,12 +375,31 @@ function ProfileOnlyRadar(props: {
             const p = pt(i, 1.16);
             const name = getProfileName(k);
 
+            // P3 and P7 sit on the extreme right/left of the chart.
+            // Point their text inward so the full label stays inside the SVG.
+            const isRight = i === 2;
+            const isLeft = i === 6;
+
+            const textAnchor: "start" | "middle" | "end" =
+              isRight
+                ? "end"
+                : isLeft
+                ? "start"
+                : "middle";
+
+            const xOffset =
+              isRight
+                ? -8
+                : isLeft
+                ? 8
+                : 0;
+
             return (
               <text
                 key={k}
-                x={p.x}
+                x={p.x + xOffset}
                 y={p.y}
-                textAnchor="middle"
+                textAnchor={textAnchor}
                 dominantBaseline="middle"
                 fontSize="12"
                 fontWeight={600}
@@ -457,8 +483,7 @@ function normaliseDocBlocks(
     b: any,
     lvl: "h3" | "h4"
   ) =>
-    String(b?.type || "").toLowerCase() ===
-    lvl;
+    String(b?.type || "").toLowerCase() === lvl;
 
   const getText = (b: any) =>
     safeText(b?.text).trim();
@@ -586,13 +611,9 @@ function resolveBlockImageSrc(
     return raw;
   }
 
-  if (
-    raw === "{{TOP_PROFILE_IMAGE}}"
-  ) {
+  if (raw === "{{TOP_PROFILE_IMAGE}}") {
     const file =
-      profileNameToImageFile(
-        topProfileName
-      );
+      profileNameToImageFile(topProfileName);
 
     return file
       ? `/images/operatingframe-full-test/profile-cards/${file}`
@@ -613,18 +634,11 @@ function BlockRenderer(props: {
     b?.type || ""
   ).toLowerCase();
 
-  // Embed the live Profile Map inside any section via:
-  // { "type": "profile_map" }
   if (type === "profile_map") {
     return (
       <ProfileOnlyRadar
-        profilePct={
-          props.data
-            .profile_percentages
-        }
-        profileLabels={
-          props.data.profile_labels
-        }
+        profilePct={props.data.profile_percentages}
+        profileLabels={props.data.profile_labels}
       />
     );
   }
@@ -670,59 +684,46 @@ function BlockRenderer(props: {
   }
 
   if (type === "ul") {
-    const items = Array.isArray(
-      b.items
-    )
+    const items = Array.isArray(b.items)
       ? b.items
       : [];
 
     return (
       <ul className="list-disc pl-5 text-sm font-normal text-slate-700 space-y-1">
-        {items.map(
-          (it: any, i: number) => (
-            <li
-              key={i}
-              className="font-normal text-slate-700"
-            >
-              {safeText(it)}
-            </li>
-          )
-        )}
+        {items.map((it: any, i: number) => (
+          <li
+            key={i}
+            className="font-normal text-slate-700"
+          >
+            {safeText(it)}
+          </li>
+        ))}
       </ul>
     );
   }
 
   if (type === "ol") {
-    const items = Array.isArray(
-      b.items
-    )
+    const items = Array.isArray(b.items)
       ? b.items
       : [];
 
     return (
       <ol className="list-decimal pl-5 text-sm font-normal text-slate-700 space-y-1">
-        {items.map(
-          (it: any, i: number) => (
-            <li
-              key={i}
-              className="font-normal text-slate-700"
-            >
-              {safeText(it)}
-            </li>
-          )
-        )}
+        {items.map((it: any, i: number) => (
+          <li
+            key={i}
+            className="font-normal text-slate-700"
+          >
+            {safeText(it)}
+          </li>
+        ))}
       </ol>
     );
   }
 
   if (type === "quote") {
-    const t = safeText(
-      b.text
-    ).trim();
-
-    const cite = safeText(
-      b.cite
-    ).trim();
+    const t = safeText(b.text).trim();
+    const cite = safeText(b.cite).trim();
 
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -784,19 +785,14 @@ function BlockRenderer(props: {
 
     return (
       <figure className="my-4">
-        <div
-          className={`flex ${justify}`}
-        >
+        <div className={`flex ${justify}`}>
           <img
             src={src}
             alt={safeText(b?.alt)}
             className={`max-w-full ${rounded} ${chrome}`}
-            style={{
-              maxHeight: maxH,
-            }}
+            style={{ maxHeight: maxH }}
             onError={(e) => {
-              e.currentTarget.style.display =
-                "none";
+              e.currentTarget.style.display = "none";
             }}
           />
         </div>
@@ -833,22 +829,17 @@ function BlockRenderer(props: {
   return null;
 }
 
-export default function OperatingFrameReportClient(
-  props: {
-    token: string;
-    tid: string;
-    src: string;
-    data: ResultData;
-    framework: any;
-  }
-) {
-  const { data, framework } =
-    props;
+export default function OperatingFrameReportClient(props: {
+  token: string;
+  tid: string;
+  src: string;
+  data: ResultData;
+  framework: any;
+}) {
+  const { data, framework } = props;
 
   const reportRef =
-    useRef<HTMLDivElement | null>(
-      null
-    );
+    useRef<HTMLDivElement | null>(null);
 
   const participant = fullName(
     data.taker?.first_name,
@@ -856,24 +847,17 @@ export default function OperatingFrameReportClient(
   );
 
   const orgName =
-    data.org_name ||
-    "Organisation";
+    data.org_name || "Organisation";
 
   const testName =
-    data.test_name ||
-    "OperatingFrame™";
+    data.test_name || "OperatingFrame™";
 
   const keys =
-    profileKeyVariants(
-      data.top_profile_code
-    );
+    profileKeyVariants(data.top_profile_code);
 
   const profile =
     keys
-      .map(
-        (k) =>
-          framework?.profiles?.[k]
-      )
+      .map((k) => framework?.profiles?.[k])
       .find(Boolean) || null;
 
   const topProfileName =
@@ -886,17 +870,14 @@ export default function OperatingFrameReportClient(
 
   const topFreqName =
     data.frequency_labels.find(
-      (f) =>
-        f.code === topFreqCode
+      (f) => f.code === topFreqCode
     )?.name || topFreqCode;
 
   const orgLogoSrc =
     "/images/operatingframe-full-test/org-logo.png";
 
   const profileFile =
-    profileNameToImageFile(
-      topProfileName
-    );
+    profileNameToImageFile(topProfileName);
 
   const profileHeroSrc =
     profileFile
@@ -905,19 +886,13 @@ export default function OperatingFrameReportClient(
 
   function openNextSteps() {
     const direct =
-      (data?.link as any)
-        ?.redirect_url ||
-      (data?.link as any)
-        ?.next_steps_url ||
-      (data?.link as any)?.meta
-        ?.redirect_url ||
-      (data?.link as any)?.meta
-        ?.next_steps_url ||
+      (data?.link as any)?.redirect_url ||
+      (data?.link as any)?.next_steps_url ||
+      (data?.link as any)?.meta?.redirect_url ||
+      (data?.link as any)?.meta?.next_steps_url ||
       "";
 
-    const url = String(
-      direct || ""
-    ).trim();
+    const url = String(direct || "").trim();
 
     if (url) {
       window.open(
@@ -944,9 +919,7 @@ export default function OperatingFrameReportClient(
       raw: any
     ) => {
       const title =
-        safeText(
-          raw?.title
-        ).trim() ||
+        safeText(raw?.title).trim() ||
         fallbackTitle;
 
       const blocks =
@@ -1050,16 +1023,10 @@ export default function OperatingFrameReportClient(
               <div className="flex items-start gap-3">
                 <div className="h-11 w-11 md:h-12 md:w-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center overflow-hidden shrink-0">
                   <img
-                    src={
-                      orgLogoSrc
-                    }
-                    alt={
-                      orgName
-                    }
+                    src={orgLogoSrc}
+                    alt={orgName}
                     className="h-full w-full object-cover"
-                    onError={(
-                      e
-                    ) => {
+                    onError={(e) => {
                       e.currentTarget.style.display =
                         "none";
                     }}
@@ -1086,55 +1053,38 @@ export default function OperatingFrameReportClient(
               </div>
 
               <h1 className="mt-4 text-[22px] sm:text-2xl md:text-3xl font-bold tracking-tight leading-tight">
-                Personalised Report
-                for{" "}
+                Personalised Report for{" "}
                 <span className="text-white/90">
-                  {
-                    participant
-                  }
+                  {participant}
                 </span>
               </h1>
 
               <div className="mt-3 grid gap-2">
                 <div className="text-sm text-white/80">
                   <span className="font-semibold text-white">
-                    Top
-                    Profile:
+                    Top Profile:
                   </span>{" "}
-                  {
-                    topProfileName
-                  }
+                  {topProfileName}
                 </div>
 
                 <div className="text-sm text-white/80">
                   <span className="font-semibold text-white">
                     Driver:
                   </span>{" "}
-                  {
-                    topFreqName
-                  }{" "}
-                  (
-                  {
-                    topFreqCode
-                  }
-                  )
+                  {topFreqName} ({topFreqCode})
                 </div>
               </div>
 
               <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
                 <button
-                  onClick={
-                    downloadPdfViaPrint
-                  }
+                  onClick={downloadPdfViaPrint}
                   className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
                 >
                   Download PDF
                 </button>
 
                 <button
-                  onClick={
-                    openNextSteps
-                  }
+                  onClick={openNextSteps}
                   className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
                 >
                   Next Steps
@@ -1145,16 +1095,10 @@ export default function OperatingFrameReportClient(
             <div className="shrink-0 flex items-center justify-start md:justify-end gap-3">
               <div className="h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] md:h-[160px] md:w-[160px] rounded-[26px] bg-white/10 border border-white/15 overflow-hidden shadow-sm">
                 <img
-                  src={
-                    profileHeroSrc
-                  }
-                  alt={
-                    topProfileName
-                  }
+                  src={profileHeroSrc}
+                  alt={topProfileName}
                   className="h-full w-full object-cover"
-                  onError={(
-                    e
-                  ) => {
+                  onError={(e) => {
                     e.currentTarget.style.display =
                       "none";
                   }}
@@ -1174,19 +1118,13 @@ export default function OperatingFrameReportClient(
               </div>
 
               <div className="mt-2 text-sm text-slate-700">
-                {
-                  driversIntro
-                }
+                {driversIntro}
               </div>
 
               <div className="mt-4">
                 <VerticalDriversChart
-                  labels={
-                    data.frequency_labels
-                  }
-                  pct={
-                    data.frequency_percentages
-                  }
+                  labels={data.frequency_labels}
+                  pct={data.frequency_percentages}
                 />
               </div>
             </WhiteCard>
@@ -1197,19 +1135,13 @@ export default function OperatingFrameReportClient(
               </div>
 
               <div className="mt-2 text-sm text-slate-700">
-                {
-                  mapIntro
-                }
+                {mapIntro}
               </div>
 
               <div className="mt-4">
                 <ProfileOnlyRadar
-                  profilePct={
-                    data.profile_percentages
-                  }
-                  profileLabels={
-                    data.profile_labels
-                  }
+                  profilePct={data.profile_percentages}
+                  profileLabels={data.profile_labels}
                 />
               </div>
             </WhiteCard>
@@ -1217,55 +1149,35 @@ export default function OperatingFrameReportClient(
         </GlassCard>
 
         <div className="mt-6 space-y-4">
-          {sections.map(
-            (s, idx) => (
-              <section
-                key={idx}
-                className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5"
-              >
-                <WhiteCard>
-                  <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
-                    {
-                      s.title
-                    }
-                  </h2>
+          {sections.map((s, idx) => (
+            <section
+              key={idx}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5"
+            >
+              <WhiteCard>
+                <h2 className="text-lg sm:text-xl font-semibold text-slate-900">
+                  {s.title}
+                </h2>
 
-                  <div className="mt-4 space-y-3">
-                    {(
-                      s.blocks ||
-                      []
-                    ).map(
-                      (
-                        b: any,
-                        i: number
-                      ) => (
-                        <BlockRenderer
-                          key={
-                            i
-                          }
-                          block={
-                            b
-                          }
-                          topProfileName={
-                            topProfileName
-                          }
-                          data={
-                            data
-                          }
-                        />
-                      )
-                    )}
-                  </div>
-                </WhiteCard>
-              </section>
-            )
-          )}
+                <div className="mt-4 space-y-3">
+                  {(s.blocks || []).map(
+                    (b: any, i: number) => (
+                      <BlockRenderer
+                        key={i}
+                        block={b}
+                        topProfileName={topProfileName}
+                        data={data}
+                      />
+                    )
+                  )}
+                </div>
+              </WhiteCard>
+            </section>
+          ))}
 
           <div className="pt-2">
             <button
-              onClick={
-                openNextSteps
-              }
+              onClick={openNextSteps}
               className="w-full sm:w-auto inline-flex justify-center items-center rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
             >
               Next Steps
@@ -1273,10 +1185,7 @@ export default function OperatingFrameReportClient(
           </div>
 
           <footer className="pt-4 text-xs text-slate-400">
-            ©{" "}
-            {new Date().getFullYear()}{" "}
-            Powered by
-            Profiletest.ai
+            © {new Date().getFullYear()} Powered by Profiletest.ai
           </footer>
         </div>
       </div>
