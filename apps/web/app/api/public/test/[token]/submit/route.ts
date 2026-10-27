@@ -1,5 +1,6 @@
 // apps/web/app/api/public/test/[token]/submit/route.ts
 import { NextResponse } from "next/server";
+import { buildProfileExtendedReport, type AssembledProfileExtendedReport } from "@/lib/visibility/profileExtendedReport";
 import { createClient } from "@supabase/supabase-js";
 import { calculateQscScores } from "@/lib/qsc-scoring";
 import { sendTemplatedEmail } from "@/lib/server/emailTemplates";
@@ -730,6 +731,40 @@ function formatVisibilityLabel(value: any): string | null {
     .join(" ");
 }
 
+// Text-only representation of existing Visibility Ladder internal report panels for GHL.
+// Keep this independent of the customer-facing report rendering.
+function formatVisibilityGhlInsights(
+  report: AssembledProfileExtendedReport
+): Record<string, string> {
+  const output: Record<string, string> = {};
+  for (const section of report.sections || []) {
+    const lines: string[] = [];
+    for (const panel of section.panels || []) {
+      for (const block of panel.blocks || []) {
+        if (block.title) lines.push(block.title);
+        if (block.short_summary) lines.push(block.short_summary);
+        for (const paragraph of block.paragraphs || []) {
+          if (paragraph) lines.push(paragraph);
+        }
+        for (const bullet of block.bullets || []) {
+          if (bullet) lines.push(`- ${bullet}`);
+        }
+        for (const item of block.items || []) {
+          const text = Object.entries(item)
+            .filter(([, value]) => value !== null && value !== undefined && value !== "")
+            .map(([key, value]) => `${key.replace(/_/g, " ")}: ${String(value)}`)
+            .join(" | ");
+          if (text) lines.push(`- ${text}`);
+        }
+        if (block.transition) lines.push(block.transition);
+      }
+    }
+    const formatted = lines.map((line) => line.trim()).filter(Boolean).join("\n");
+    if (formatted) output[section.section_key] = formatted;
+  }
+  return output;
+}
+
 async function syncVisibilityLadderToGhl(args: {
   taker: any;
   assessmentName: string;
@@ -748,6 +783,7 @@ async function syncVisibilityLadderToGhl(args: {
   weakestPillar: string | null;
   balancePattern: string | null;
   patternTags: string[];
+  internalInsights?: Record<string, string>;
 }): Promise<GhlSyncResult> {
   const serviceBase =
     normalizeText(process.env.WHATSWHAT_GHL_SERVICE_BASE_URL) ||
@@ -934,6 +970,74 @@ async function syncVisibilityLadderToGhl(args: {
     process.env.WHATSWHAT_GHL_VL_CF_COMPLETED_AT,
     args.completedAt
   );
+
+  // New requested sales insights fields. Unset IDs are skipped.
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_PERSONALITY_SALES_PROFILE,
+    args.internalInsights?.["personality_sales_profile"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_WORDS_TO_USE,
+    args.internalInsights?.["words_to_use"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_WORDS_NOT_TO_USE,
+    args.internalInsights?.["words_not_to_use"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_REAL_SITUATION,
+    args.internalInsights?.["real_situation"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_CORE_PAIN,
+    args.internalInsights?.["core_pain"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_REAL_PROBLEM,
+    args.internalInsights?.["real_problem"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_WHAT_NOT_TO_DO_ON_CALL,
+    args.internalInsights?.["what_not_to_do_on_call"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_WHAT_TO_DO_ON_CALL,
+    args.internalInsights?.["what_to_do_on_call"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_WHY_THE_OFFER_IS_RIGHT,
+    args.internalInsights?.["why_the_offer_is_the_right_offer"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_OBJECTIONS,
+    args.internalInsights?.["objections"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_CONVERSION_SIGNALS,
+    args.internalInsights?.["conversion_signals"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_CLOSE_LINE,
+    args.internalInsights?.["close_line"]
+  );
+  pushHighLevelCustomField(
+    customFields,
+    process.env.WHATSWHAT_GHL_VL_CF_LONG_TERM_VALUE,
+    args.internalInsights?.["long_term_value"]
+  );
+
 
   const fullName = [args.taker?.first_name, args.taker?.last_name]
     .map(normalizeText)
@@ -2630,6 +2734,23 @@ export async function POST(
       let visibilityGhlSyncResult: GhlSyncResult | null = null;
 
       if (primeMode && isAllowedVisibilityGhlOrg) {
+        // Optional enrichment: failure must not prevent normal GHL sync or assessment completion.
+        let visibilityInternalInsights: Record<string, string> = {};
+        if (personality_type) {
+          try {
+            const internalReport = await buildProfileExtendedReport({
+              tier,
+              level,
+              behaviour_style: personality_type,
+              readiness,
+              pillar_scores,
+              tier_counts: tierCounts,
+            });
+            visibilityInternalInsights = formatVisibilityGhlInsights(internalReport);
+          } catch (error) {
+            console.warn("[visibility submit] GHL internal insights unavailable", error);
+          }
+        }
         visibilityGhlSyncResult = await syncVisibilityLadderToGhl({
           taker,
           assessmentName:
@@ -2651,6 +2772,7 @@ export async function POST(
           weakestPillar: weakest_pillar,
           balancePattern: balance_pattern,
           patternTags: pattern_tags,
+          internalInsights: visibilityInternalInsights,
         });
 
         if (
